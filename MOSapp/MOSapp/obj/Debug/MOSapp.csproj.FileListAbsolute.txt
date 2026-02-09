@@ -1,8 +1,13 @@
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\Assets\config.json
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\MOSapp.exe.config
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\MOSapp.exe
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\MOSapp.pdb
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.csproj.AssemblyReference.cache
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\Views\PasswordWindow.baml
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\Views\SubjectSelectionWindow.baml
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MainWindow.g.cs
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\Views\PasswordWindow.g.cs
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\Views\SubjectSelectionWindow.g.cs
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\App.g.cs
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp_MarkupCompile.cache
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp_MarkupCompile.lref

@@ -1,0 +1,6 @@
+{
+  "excelInitialPath": "C:\\MOSTest\\Excel365\\Tab1\\Initial",
+  "wordInitialPath": "C:\\MOSTest\\Word365\\Tab1\\Initial",
+  "excelExePath": "..\\..\\..\\mos_xaml_app\\bin\\Release\\MOSExcelMogiApp.exe",
+  "wordExePath": "..\\..\\..\\MOS Word app\\bin\\Release\\MOS Word app.exe"
+}
