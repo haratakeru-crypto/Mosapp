@@ -1,3 +1,6 @@
 <Solution>
   <Project Path="MOSapp/MOSapp.csproj" Id="db7f1d38-c509-4890-a692-e31c79ca4aa8" />
+  <Project Path="mos_xaml_app/MOSExcelMogiApp.csproj" Id="c01302e0-98c1-4f0d-93bd-385ba3bc400a" />
+  <Project Path="MOS Word app/MOS Word app.csproj" Id="c836276e-4827-416d-a9f0-13780515296f" />
+  <Project Path="Mos PowerPoint Mogi App/MOS PowerPoint app.csproj" Id="4f05fafa-71ad-413c-9043-25e55e2fa083" />
 </Solution>
