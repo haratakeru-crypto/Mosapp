@@ -1,7 +1,7 @@
 <Window x:Class="MOSapp.Views.SubjectSelectionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MOS 模擬アプリ - 科目選択" Height="500" Width="800"
+        Title="MOS アプリ - 科目選択" Height="500" Width="800"
         WindowStartupLocation="CenterScreen"
         Background="#F5F5F5">
     <Grid>

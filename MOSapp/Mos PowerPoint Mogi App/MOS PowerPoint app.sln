@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mos PowerPoint Mogi App", "MOS PowerPoint app.csproj", "{4F05FAFA-71AD-413C-9043-25E55E2FA083}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4F05FAFA-71AD-413C-9043-25E55E2FA083}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+		{4F05FAFA-71AD-413C-9043-25E55E2FA083}.Debug|Any CPU.Build.0 = Release|Any CPU
+		{4F05FAFA-71AD-413C-9043-25E55E2FA083}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F05FAFA-71AD-413C-9043-25E55E2FA083}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1CF1D1C4-91B4-4C9A-8F00-FCF3646F0148}
+	EndGlobalSection
+EndGlobal

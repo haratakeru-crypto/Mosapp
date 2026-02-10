@@ -223,11 +223,91 @@ namespace MOSapp.Views
 
         private void PowerPointButton_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "PowerPoint はこのランチャーでは起動できません。\n別のソリューション（MOS PowerPoint app）をご利用ください。",
-                "科目選択",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            string pptExePath = GetPowerPointAppExePath();
+            if (string.IsNullOrEmpty(pptExePath) || !File.Exists(pptExePath))
+            {
+                MessageBox.Show("PowerPoint アプリが見つかりません。\n" + (pptExePath ?? ""), "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = pptExePath,
+                    Arguments = "--direct",
+                    UseShellExecute = false,
+                    WorkingDirectory = Path.GetDirectoryName(pptExePath)
+                };
+                var process = Process.Start(startInfo);
+                if (process != null)
+                {
+                    process.EnableRaisingEvents = true;
+                    process.Exited += OnLaunchedProcessExited;
+                }
+                this.Hide();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"PowerPoint アプリの起動に失敗しました: {ex.Message}", "科目選択", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// PowerPoint 模擬アプリの exe パス。Mos PowerPoint Mogi App を優先、表紙が Release なら Release を優先。
+        /// </summary>
+        private static string GetPowerPointAppExePath()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            bool preferRelease = baseDir.IndexOf("\\Release\\", StringComparison.OrdinalIgnoreCase) >= 0;
+            string solutionRoot = GetSolutionRoot();
+            const string exeName = "Mos PowerPoint Mogi App.exe";
+            if (!string.IsNullOrEmpty(solutionRoot))
+            {
+                string mogiDir = Path.Combine(solutionRoot, "Mos PowerPoint Mogi App", "bin");
+                string releasePath = Path.Combine(mogiDir, "Release", exeName);
+                string debugPath = Path.Combine(mogiDir, "Debug", exeName);
+                if (preferRelease)
+                {
+                    if (File.Exists(releasePath)) return Path.GetFullPath(releasePath);
+                    if (File.Exists(debugPath)) return Path.GetFullPath(debugPath);
+                }
+                else
+                {
+                    if (File.Exists(debugPath)) return Path.GetFullPath(debugPath);
+                    if (File.Exists(releasePath)) return Path.GetFullPath(releasePath);
+                }
+                // フォールバック: フォルダ未リネーム時は従来のパスを参照
+                string legacyDir = Path.Combine(solutionRoot, "MOS PowerPoint app", "bin");
+                string legacyRelease = Path.Combine(legacyDir, "Release", "MOS PowerPoint app.exe");
+                string legacyDebug = Path.Combine(legacyDir, "Debug", "MOS PowerPoint app.exe");
+                if (preferRelease)
+                {
+                    if (File.Exists(legacyRelease)) return Path.GetFullPath(legacyRelease);
+                    if (File.Exists(legacyDebug)) return Path.GetFullPath(legacyDebug);
+                }
+                else
+                {
+                    if (File.Exists(legacyDebug)) return Path.GetFullPath(legacyDebug);
+                    if (File.Exists(legacyRelease)) return Path.GetFullPath(legacyRelease);
+                }
+            }
+            try
+            {
+                string configPath = Path.Combine(baseDir, "Assets", "config.json");
+                if (File.Exists(configPath))
+                {
+                    string json = File.ReadAllText(configPath);
+                    var path = GetJsonStringValue(json, "powerPointExePath");
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        path = path.Trim();
+                        string absolutePath = Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(Path.Combine(baseDir, path));
+                        if (File.Exists(absolutePath)) return absolutePath;
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
 
         private static string GetJsonStringValue(string json, string key)
