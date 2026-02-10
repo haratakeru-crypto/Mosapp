@@ -74,11 +74,17 @@ namespace MOS_PowerPoint_app.Views
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
         
-        public UiTestAppBarWindow(int projectId = 1, int groupId = 1)
+        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false)
         {
             InitializeComponent();
             _currentProjectId = projectId;
             _groupId = groupId; // グループIDを保存
+            var scoreBtn = FindName("ScoreButton") as System.Windows.Controls.Button;
+            if (scoreBtn != null)
+                scoreBtn.Visibility = showScoreButton ? Visibility.Visible : Visibility.Collapsed;
+            var pauseBtn = FindName("PauseButton") as System.Windows.Controls.Button;
+            if (pauseBtn != null)
+                pauseBtn.Visibility = showPauseButton ? Visibility.Visible : Visibility.Collapsed;
             InitializeTimer();
             InitializeProjectTimer();
             LoadClipboardTargets(); // クリップボード対象を先に読み込む

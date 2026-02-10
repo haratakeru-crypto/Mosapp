@@ -57,8 +57,22 @@
                     </Button.Style>
                 </Button>
                 
-                <!-- 右側: 採点ボタン、タイマー設定、テストモードテキスト -->
+                <!-- 右側: 採点ボタンの表示、採点ボタン、タイマー設定、テストモードテキスト -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <!-- 採点ボタンの表示 -->
+                    <CheckBox Content="採点ボタンの表示"
+                              IsChecked="{Binding ShowScoreButton, Mode=TwoWay}"
+                              Margin="0,0,15,0"
+                              VerticalAlignment="Center"
+                              Foreground="White"
+                              FontSize="14"/>
+                    <!-- 一時停止ボタンの表示 -->
+                    <CheckBox Content="一時停止ボタンの表示"
+                              IsChecked="{Binding ShowPauseButton, Mode=TwoWay}"
+                              Margin="0,0,15,0"
+                              VerticalAlignment="Center"
+                              Foreground="White"
+                              FontSize="14"/>
                     <!-- 採点ボタン -->
                     <Button Content="採点" 
                             Command="{Binding ScoreCommand}"
@@ -89,10 +103,10 @@
                         </Button.Style>
                     </Button>
                     
-                    <!-- タイマー有効/無効チェックボックス -->
+                    <!-- タイマー有効/無効チェックボックス（デフォルト未チェック＝一時停止） -->
                     <CheckBox Name="TimerCheckBox" 
                               Content="タイマーを使用する"
-                              IsChecked="True"
+                              IsChecked="False"
                               Foreground="White"
                               FontSize="14"
                               FontWeight="SemiBold"

@@ -33,3 +33,40 @@ C:\Users\kouza\source\repos\MOS PowerPoint app\obj\Debug\Views\PasswordWindow.ba
 C:\Users\kouza\source\repos\MOS PowerPoint app\obj\Debug\Views\ReviewPageWindow.baml
 C:\Users\kouza\source\repos\MOS PowerPoint app\obj\Debug\Views\PasswordWindow.g.cs
 C:\Users\kouza\source\repos\MOS PowerPoint app\obj\Debug\Views\ReviewPageWindow.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\References\JSON\MOS模擬アプリ問題文一覧_PowerPoint.json
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\MOS模擬アプリ問題文一覧_PowerPoint.json
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Assets\config.json
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\MOSPP教材用採点表.csv
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos PowerPoint Mogi App.exe.config
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos PowerPoint Mogi App.exe.manifest
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos PowerPoint Mogi App.application
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos PowerPoint Mogi App.exe
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos PowerPoint Mogi App.pdb
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Newtonsoft.Json.dll
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Newtonsoft.Json.xml
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.AssemblyReference.cache
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\UiTestAppBarWindow.baml
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ResultWindow.baml
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PasswordWindow.baml
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ReviewPageWindow.baml
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\SubjectSelectionWindow.baml
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MainWindow.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\UiTestAppBarWindow.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ResultWindow.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PasswordWindow.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ReviewPageWindow.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\SubjectSelectionWindow.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\App.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_Content.g.cs
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_MarkupCompile.cache
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_MarkupCompile.lref
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MainWindow.baml
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.g.resources
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS_PowerPoint_app.Properties.Resources.resources
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.GenerateResource.cache
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.CoreCompileInputs.cache
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe.manifest
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.application
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS Powe.03856F61.Up2Date
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe
+c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.pdb

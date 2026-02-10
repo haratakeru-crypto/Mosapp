@@ -23,8 +23,8 @@ namespace MOS_PowerPoint_app
         private MainViewModel _viewModel;
         private Views.UiTestAppBarWindow _appBarWindow;
         
-        // タイマー無効化フラグ（静的プロパティ）
-        public static bool IsTimerDisabled { get; private set; } = false;
+        // タイマー無効化フラグ（静的プロパティ）。デフォルトは一時停止。
+        public static bool IsTimerDisabled { get; private set; } = true;
 
         public MainWindow()
         {
@@ -40,6 +40,8 @@ namespace MOS_PowerPoint_app
                 _viewModel.HideMainWindowRequested += OnHideMainWindowRequested;
                 _viewModel.ShowMainWindowRequested += OnShowMainWindowRequested;
                 _viewModel.ExamEnded += OnExamEnded;
+
+                Closing += MainWindow_Closing;
             }
             catch (Exception ex)
             {
@@ -50,6 +52,13 @@ namespace MOS_PowerPoint_app
             }
         }
 
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes)
+                e.Cancel = true;
+        }
+
         private void OnShowAppBarRequested(object sender, EventArgs e)
         {
             if (_appBarWindow == null || !_appBarWindow.IsLoaded)
@@ -57,7 +66,7 @@ namespace MOS_PowerPoint_app
                 var project = _viewModel.CurrentProject;
                 if (project != null)
                 {
-                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId);
+                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, _viewModel.ShowPauseButton);
                     _appBarWindow.Closed += (s, args) =>
                     {
                         // バーウィンドウが閉じられたらメインウィンドウを再表示

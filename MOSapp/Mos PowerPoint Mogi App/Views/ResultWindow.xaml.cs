@@ -413,8 +413,31 @@ namespace MOS_PowerPoint_app.Views
             var utf8Bom = new UTF8Encoding(true);
             File.WriteAllLines(outPath, lines, utf8Bom);
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] CSV exported to {outPath}");
+
+            ExportWrongAnswersCsvToDesktop(resultProjects);
         }
-        
+
+        private void ExportWrongAnswersCsvToDesktop(List<ResultProjectInfo> resultProjects)
+        {
+            if (resultProjects == null) return;
+            var csvLines = new List<string> { "プロジェクトID,タスク番号,問題文,正誤" };
+            foreach (var project in resultProjects)
+            {
+                foreach (var task in project.Tasks ?? Enumerable.Empty<ResultTaskInfo>())
+                {
+                    if (string.IsNullOrEmpty(task.ResultMark)) continue;
+                    string desc = (task.Description ?? "").Replace("\"", "\"\"");
+                    if (desc.Contains(",") || desc.Contains("\n")) desc = "\"" + desc + "\"";
+                    csvLines.Add($"{task.ProjectId},{task.TaskId},{desc},{task.ResultMark}");
+                }
+            }
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string fileName = $"MOSPP_間違えた問題_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            string outPath = Path.Combine(desktop, fileName);
+            File.WriteAllLines(outPath, csvLines, new UTF8Encoding(true));
+            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Wrong answers CSV exported to {outPath}");
+        }
+
         private string RemoveQuotes(string text)
         {
             if (string.IsNullOrEmpty(text))

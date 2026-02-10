@@ -28,6 +28,8 @@ namespace MOS_PowerPoint_app
     {
         private int _selectedTabIndex;
         private string _resultMessage;
+        private bool _showScoreButton;
+        private bool _showPauseButton;
         private ProjectViewModel _currentProject;
         private ObservableCollection<TaskResult> _taskResults;
         private int _totalScore;
@@ -77,6 +79,20 @@ namespace MOS_PowerPoint_app
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CurrentProjectName));
             }
+        }
+
+        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        public bool ShowScoreButton
+        {
+            get => _showScoreButton;
+            set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
+        }
+
+        /// <summary>一時停止ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        public bool ShowPauseButton
+        {
+            get => _showPauseButton;
+            set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
         }
 
         public string CurrentProjectName => CurrentProject?.Name ?? "";

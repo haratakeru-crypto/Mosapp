@@ -14,6 +14,14 @@ namespace MOSapp.Views
         public SubjectSelectionWindow()
         {
             InitializeComponent();
+            Closing += SubjectSelectionWindow_Closing;
+        }
+
+        private void SubjectSelectionWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes)
+                e.Cancel = true;
         }
 
         /// <summary>

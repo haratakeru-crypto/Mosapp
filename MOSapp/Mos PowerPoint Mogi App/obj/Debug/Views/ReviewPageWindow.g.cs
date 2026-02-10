@@ -83,7 +83,7 @@ namespace MOS_PowerPoint_app.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/MOS PowerPoint app;component/views/reviewpagewindow.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/Mos PowerPoint Mogi App;component/views/reviewpagewindow.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\Views\ReviewPageWindow.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

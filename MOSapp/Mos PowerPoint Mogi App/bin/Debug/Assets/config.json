@@ -1,3 +1,7 @@
 {
-  "powerPointDataPath": "C:\\MOSTest\\PowerPoint365"
+  "powerPointDataPath": "C:\\MOSTest\\PowerPoint365",
+  "wordInitialPath": "C:\\MOSTest\\Word365\\Tab1\\Initial",
+  "excelInitialPath": "C:\\MOSTest\\Excel365\\Tab1\\Initial",
+  "excelExePath": "C:\\Users\\kouza\\source\\repos\\MOS PowerPoint app\\mos_xaml_app\\bin\\Release\\MOSExcelMogiApp.exe",
+  "wordExePath": "C:\\Users\\kouza\\source\\repos\\MOS PowerPoint app\\MOS Word app\\bin\\Release\\MOS Word app.exe"
 }

@@ -339,7 +339,7 @@ namespace MOS_PowerPoint_app.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/MOS PowerPoint app;component/views/uitestappbarwindow.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/Mos PowerPoint Mogi App;component/views/uitestappbarwindow.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\Views\UiTestAppBarWindow.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);
