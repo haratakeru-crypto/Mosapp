@@ -42,14 +42,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="144808">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="172968">
       <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>SJioHa8NTGnzVoVQnfyGtknse/1bJQ1WJQc3TJVXHZ4=</dsig:DigestValue>
+        <dsig:DigestValue>IS/Fd2URiOorKutiyM5QrqCX2iVzAZIn+nguIOMz/xQ=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

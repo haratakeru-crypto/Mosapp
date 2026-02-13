@@ -150,7 +150,37 @@
                         </CheckBox.Style>
                     </CheckBox>
                     
-                    <TextBlock Text="テストモード" 
+                    <!-- 採点ロジック確認（テストモード） -->
+                    <Button Content="採点ロジック確認"
+                            Command="{Binding TestGradeCommand}"
+                            Margin="0,0,15,0"
+                            Padding="20,8"
+                            Background="#607D8B"
+                            Foreground="White"
+                            BorderThickness="0"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Cursor="Hand"
+                            MinWidth="120">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="5"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    
+                    <TextBlock Text="テストモード"
                               Foreground="White"
                               VerticalAlignment="Center"
                               FontSize="14"
@@ -374,7 +404,40 @@
             <Border.Effect>
                 <DropShadowEffect Color="Black" Direction="315" ShadowDepth="3" Opacity="0.3" BlurRadius="5"/>
             </Border.Effect>
-            <TextBlock Text="{Binding ResultMessage}" Margin="15" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" MinHeight="40"/>
+            <StackPanel Margin="15">
+                <TextBlock Text="{Binding ResultMessage}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" MinHeight="28" Margin="0,0,0,8"/>
+                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding TaskResults}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding TaskNumber, StringFormat=タスク{0}:}" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="× 不合格"/>
+                                                <Setter Property="Foreground" Value="#C62828"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                        <Setter Property="Text" Value="✓ 合格"/>
+                                                        <Setter Property="Foreground" Value="#2E7D32"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Grid.Column="2" Text="{Binding TaskName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="#424242"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

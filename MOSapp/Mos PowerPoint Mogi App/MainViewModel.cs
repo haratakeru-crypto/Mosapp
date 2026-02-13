@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Runtime.InteropServices;
 using System.Configuration;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PowerPointApp = Microsoft.Office.Interop.PowerPoint.Application;
 using PowerPointPresentation = Microsoft.Office.Interop.PowerPoint.Presentation;
@@ -41,6 +42,7 @@ namespace MOS_PowerPoint_app
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
             UiTestCommand = new RelayCommand(ExecuteUiTest);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
+            TestGradeCommand = new RelayCommand(ExecuteTestGrade, CanExecuteTestGrade);
             TaskResults = new ObservableCollection<TaskResult>();
         }
 
@@ -69,6 +71,7 @@ namespace MOS_PowerPoint_app
         public ICommand OpenProjectCommand { get; }
         public ICommand UiTestCommand { get; }
         public ICommand ScoreCommand { get; }
+        public ICommand TestGradeCommand { get; }
 
         public ProjectViewModel CurrentProject
         {
@@ -78,6 +81,7 @@ namespace MOS_PowerPoint_app
                 _currentProject = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CurrentProjectName));
+                CommandManager.InvalidateRequerySuggested();
             }
         }
 
@@ -305,6 +309,11 @@ namespace MOS_PowerPoint_app
             return CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.FilePath);
         }
 
+        private bool CanExecuteTestGrade(object parameter)
+        {
+            return CurrentProject != null;
+        }
+
         private void ExecuteScore(object parameter)
         {
             if (CurrentProject == null || string.IsNullOrEmpty(CurrentProject.FilePath))
@@ -324,6 +333,87 @@ namespace MOS_PowerPoint_app
             catch (Exception ex)
             {
                 ResultMessage = $"エラー: 採点中にエラーが発生しました: {ex.Message}";
+            }
+        }
+
+        private void ExecuteTestGrade(object parameter)
+        {
+            if (CurrentProject == null)
+            {
+                ResultMessage = "プロジェクトを開いてから実行してください。";
+                return;
+            }
+
+            TaskResults.Clear();
+            ResultMessage = "採点ロジック確認中...";
+
+            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
+            if (!File.Exists(jsonPath))
+                jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
+            if (!File.Exists(jsonPath))
+            {
+                ResultMessage = "該当プロジェクトのタスクが見つかりません（問題文JSONがありません）。";
+                return;
+            }
+
+            MOS_PowerPoint_app.Views.ProjectData projectData;
+            try
+            {
+                string jsonContent = File.ReadAllText(jsonPath, Encoding.UTF8);
+                projectData = JsonConvert.DeserializeObject<MOS_PowerPoint_app.Views.ProjectData>(jsonContent);
+            }
+            catch (Exception ex)
+            {
+                ResultMessage = $"問題文の読み込みに失敗しました: {ex.Message}";
+                return;
+            }
+
+            var project = projectData?.Projects?.FirstOrDefault(p => p.ProjectId == CurrentProject.ProjectId);
+            if (project?.Tasks == null || project.Tasks.Count == 0)
+            {
+                ResultMessage = "該当プロジェクトのタスクが見つかりません。";
+                return;
+            }
+
+            PowerPointGrader grader = null;
+            try
+            {
+                grader = new PowerPointGrader();
+                if (!grader.Connect())
+                {
+                    ResultMessage = "PowerPoint を起動し、対象のファイルを開いた状態で実行してください。";
+                    return;
+                }
+
+                int passedCount = 0;
+                foreach (var task in project.Tasks.OrderBy(t => t.TaskId))
+                {
+                    bool passed = false;
+                    try
+                    {
+                        passed = grader.GradeTask(CurrentProject.ProjectId, task.TaskId);
+                    }
+                    catch
+                    {
+                        passed = false;
+                    }
+                    if (passed) passedCount++;
+                    TaskResults.Add(new TaskResult
+                    {
+                        TaskNumber = task.TaskId,
+                        IsPassed = passed,
+                        TaskName = string.IsNullOrEmpty(task.Description) ? $"タスク{task.TaskId}" : task.Description
+                    });
+                }
+                ResultMessage = $"採点ロジック確認: {passedCount}/{project.Tasks.Count} タスク合格";
+            }
+            catch (Exception ex)
+            {
+                ResultMessage = $"採点中にエラーが発生しました: {ex.Message}";
+            }
+            finally
+            {
+                grader?.Dispose();
             }
         }
 
