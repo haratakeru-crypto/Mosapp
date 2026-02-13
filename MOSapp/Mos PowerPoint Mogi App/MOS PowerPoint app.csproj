@@ -202,5 +202,8 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <PropertyGroup>
+    <PreBuildEvent>taskkill /IM &quot;Mos PowerPoint Mogi App.exe&quot; /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
+  </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

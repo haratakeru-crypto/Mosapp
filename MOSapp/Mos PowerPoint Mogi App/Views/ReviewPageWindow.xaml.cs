@@ -51,11 +51,14 @@ namespace MOS_PowerPoint_app.Views
             _timer = new DispatcherTimer();
             _timer.Interval = TimeSpan.FromSeconds(1);
             _timer.Tick += Timer_Tick;
-            _timer.Start();
+            // 「タイマーを使用」にチェックが入っているときだけカウントダウン開始
+            if (!MOS_PowerPoint_app.MainWindow.IsTimerDisabled)
+                _timer.Start();
         }
 
         private void Timer_Tick(object sender, EventArgs e)
         {
+            if (MOS_PowerPoint_app.MainWindow.IsTimerDisabled) return;
             if (_remainingTime.TotalSeconds > 0)
             {
                 _remainingTime = _remainingTime.Subtract(TimeSpan.FromSeconds(1));

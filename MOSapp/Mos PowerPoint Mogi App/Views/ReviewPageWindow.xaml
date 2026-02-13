@@ -185,11 +185,13 @@
                     </Button.Style>
                 </Button>
                 <Grid Grid.Column="2"/>
+                <!-- 閉じる系ボタンは非表示（結果の表示のみ表示） -->
                 <Button Grid.Column="3" Name="BackButton" Content="戻る"
                         Background="#1E40AF" Foreground="White"
                         Padding="20,10" FontWeight="Medium"
                         BorderThickness="0" Click="BackButton_Click"
-                        VerticalAlignment="Center">
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed">
                     <Button.Style>
                         <Style TargetType="Button">
                             <Style.Triggers>
