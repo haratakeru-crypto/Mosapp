@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
@@ -15,6 +17,11 @@ namespace MOS_PowerPoint_app
         private Application _app;
         private Presentation _activePresentation;
         private bool _disposed;
+
+        /// <summary>Task 4 用: 直前の Tick 時点のスライド ID の並び（1枚目→2枚目→…）。</summary>
+        private static List<int> _previousSlideIds = new List<int>();
+        /// <summary>Task 4 用: 3枚目（インデックス2）のスライドが削除されたと判定した場合 true。採点時に参照。</summary>
+        public static bool Task4PassedByThirdSlideDeletion { get; private set; }
 
         /// <summary>
         /// 現在起動している PowerPoint インスタンスに接続する。
@@ -67,12 +74,12 @@ namespace MOS_PowerPoint_app
                     switch (taskId)
                     {
                         case 1: return GradeProject1Task1();
-                        case 2: return false;
+                        case 2: return GradeProject1Task2();
                         case 3: return GradeProject1Task3();
-                        case 4: return false;
-                        case 5: return false;
+                        case 4: return GradeProject1Task4();
+                        case 5: return GradeProject1Task5();
                         case 6: return GradeProject1Task6();
-                        case 7: return false;
+                        case 7: return GradeProject1Task7();
                         default: return false;
                     }
                 case 2:
@@ -399,6 +406,49 @@ namespace MOS_PowerPoint_app
             }
         }
 
+        private bool GradeProject1Task2()
+        {
+            // スライド2を複製 → 2枚目と3枚目が同じレイアウトであることを確認
+            Slides slides = null;
+            try
+            {
+                slides = _activePresentation.Slides;
+                if (slides == null || slides.Count < 3) return false;
+                Slide slide2 = null;
+                Slide slide3 = null;
+                try
+                {
+                    slide2 = slides[2];
+                    slide3 = slides[3];
+                    CustomLayout layout2 = null;
+                    CustomLayout layout3 = null;
+                    try
+                    {
+                        layout2 = slide2.CustomLayout;
+                        layout3 = slide3.CustomLayout;
+                        if (layout2 == null || layout3 == null) return false;
+                        string name2 = layout2.Name ?? "";
+                        string name3 = layout3.Name ?? "";
+                        return string.Equals(name2, name3, StringComparison.OrdinalIgnoreCase);
+                    }
+                    finally
+                    {
+                        if (layout2 != null) { try { Marshal.ReleaseComObject(layout2); } catch { } }
+                        if (layout3 != null) { try { Marshal.ReleaseComObject(layout3); } catch { } }
+                    }
+                }
+                finally
+                {
+                    if (slide2 != null) { try { Marshal.ReleaseComObject(slide2); } catch { } }
+                    if (slide3 != null) { try { Marshal.ReleaseComObject(slide3); } catch { } }
+                }
+            }
+            finally
+            {
+                if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } }
+            }
+        }
+
         private bool GradeProject1Task3()
         {
             Slide slide = null;
@@ -412,6 +462,81 @@ namespace MOS_PowerPoint_app
                 }
                 catch { return false; }
             }
+            finally
+            {
+                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
+            }
+        }
+
+        /// <summary>Task 4 用: 現在のスライド ID 一覧で削除を検出し、3枚目が削除されていればフラグを立てる。監視タイマーから呼ぶ。</summary>
+        public static void CheckSlideDeletion(List<int> currentSlideIds)
+        {
+            if (currentSlideIds == null)
+                return;
+            if (_previousSlideIds.Count == 0)
+            {
+                _previousSlideIds = new List<int>(currentSlideIds);
+                return;
+            }
+            if (currentSlideIds.Count >= _previousSlideIds.Count)
+            {
+                _previousSlideIds = new List<int>(currentSlideIds);
+                return;
+            }
+            var deletedIds = _previousSlideIds.Except(currentSlideIds).ToList();
+            foreach (int deletedId in deletedIds)
+            {
+                int index = _previousSlideIds.IndexOf(deletedId);
+                if (index == 2)
+                {
+                    Task4PassedByThirdSlideDeletion = true;
+                    break;
+                }
+            }
+            _previousSlideIds = new List<int>(currentSlideIds);
+        }
+
+        /// <summary>Task 4 用: 状態をリセットする（アプリバー表示時やプロジェクト切り替え時に呼ぶ）。</summary>
+        public static void ResetTask4SlideDeletionState()
+        {
+            _previousSlideIds.Clear();
+            Task4PassedByThirdSlideDeletion = false;
+        }
+
+        private bool GradeProject1Task4()
+        {
+            if (Task4PassedByThirdSlideDeletion)
+                return true;
+            return false;
+        }
+
+        private bool GradeProject1Task5()
+        {
+            // スライド2のレイアウトを「表スライド」に変更
+            Slide slide = null;
+            CustomLayout layout = null;
+            try
+            {
+                slide = GetSlideByNumber(_activePresentation, 2);
+                if (slide == null) return false;
+                try
+                {
+                    layout = slide.CustomLayout;
+                    if (layout == null) return false;
+                    string name = null;
+                    try
+                    {
+                        name = layout.Name ?? "";
+                    }
+                    catch { return false; }
+                    return name.IndexOf("表スライド", StringComparison.OrdinalIgnoreCase) >= 0;
+                }
+                finally
+                {
+                    if (layout != null) { try { Marshal.ReleaseComObject(layout); } catch { } }
+                }
+            }
+            catch { return false; }
             finally
             {
                 if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
@@ -466,6 +591,25 @@ namespace MOS_PowerPoint_app
             catch { return false; }
             finally
             {
+                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
+            }
+        }
+
+        private bool GradeProject1Task7()
+        {
+            // スライド1枚目の吹き出しに「教育者必見」と入力
+            Slide slide = null;
+            PptShape shape = null;
+            try
+            {
+                slide = GetSlideByNumber(_activePresentation, 1);
+                if (slide == null) return false;
+                shape = FindShapeWithText(slide, "教育者必見");
+                return shape != null;
+            }
+            finally
+            {
+                if (shape != null) { try { Marshal.ReleaseComObject(shape); } catch { } }
                 if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
             }
         }

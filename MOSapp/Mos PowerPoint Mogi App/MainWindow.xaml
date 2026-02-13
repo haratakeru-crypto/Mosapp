@@ -73,6 +73,13 @@
                               VerticalAlignment="Center"
                               Foreground="White"
                               FontSize="14"/>
+                    <!-- 採点を表示（タスク別結果の表示） -->
+                    <CheckBox Content="採点を表示"
+                              IsChecked="{Binding ShowScoreResult, Mode=TwoWay}"
+                              Margin="0,0,15,0"
+                              VerticalAlignment="Center"
+                              Foreground="White"
+                              FontSize="14"/>
                     <!-- 採点ボタン -->
                     <Button Content="採点" 
                             Command="{Binding ScoreCommand}"
@@ -149,42 +156,6 @@
                             </Style>
                         </CheckBox.Style>
                     </CheckBox>
-                    
-                    <!-- 採点ロジック確認（テストモード） -->
-                    <Button Content="採点ロジック確認"
-                            Command="{Binding TestGradeCommand}"
-                            Margin="0,0,15,0"
-                            Padding="20,8"
-                            Background="#607D8B"
-                            Foreground="White"
-                            BorderThickness="0"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Cursor="Hand"
-                            MinWidth="120">
-                        <Button.Style>
-                            <Style TargetType="Button">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}"
-                                                    CornerRadius="5"
-                                                    Padding="{TemplateBinding Padding}">
-                                                <ContentPresenter HorizontalAlignment="Center"
-                                                                VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    
-                    <TextBlock Text="テストモード"
-                              Foreground="White"
-                              VerticalAlignment="Center"
-                              FontSize="14"
-                              FontWeight="SemiBold"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -406,7 +377,8 @@
             </Border.Effect>
             <StackPanel Margin="15">
                 <TextBlock Text="{Binding ResultMessage}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" MinHeight="28" Margin="0,0,0,8"/>
-                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                             Visibility="{Binding ShowScoreResult, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <ItemsControl ItemsSource="{Binding TaskResults}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>

@@ -73,3 +73,5 @@ C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Release\Mo
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Release\MOS Powe.03856F61.Up2Date
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Release\Mos PowerPoint Mogi App.exe
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Release\Mos PowerPoint Mogi App.pdb
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Release\Views\ScoreResultWindow.baml
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Release\Views\ScoreResultWindow.g.cs

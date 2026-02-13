@@ -40,6 +40,7 @@ namespace MOS_PowerPoint_app
                 _viewModel.HideMainWindowRequested += OnHideMainWindowRequested;
                 _viewModel.ShowMainWindowRequested += OnShowMainWindowRequested;
                 _viewModel.ExamEnded += OnExamEnded;
+                _viewModel.ScoreCompleted += OnScoreCompleted;
 
                 Closing += MainWindow_Closing;
             }
@@ -66,7 +67,7 @@ namespace MOS_PowerPoint_app
                 var project = _viewModel.CurrentProject;
                 if (project != null)
                 {
-                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, _viewModel.ShowPauseButton);
+                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreResult, _viewModel.ShowPauseButton, () => _viewModel.ScoreCommand.Execute(null));
                     _appBarWindow.Closed += (s, args) =>
                     {
                         // バーウィンドウが閉じられたらメインウィンドウを再表示
@@ -98,6 +99,16 @@ namespace MOS_PowerPoint_app
             _appBarWindow = null;
         }
 
+        private void OnScoreCompleted(object sender, EventArgs e)
+        {
+            var results = _viewModel?.TaskResults;
+            if (results == null || results.Count == 0)
+                return;
+            var dialog = new Views.ScoreResultWindow(results);
+            dialog.Owner = this;
+            dialog.ShowDialog();
+        }
+
         private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
         {
             IsTimerDisabled = false; // チェックが入っている = タイマー有効
@@ -119,6 +130,7 @@ namespace MOS_PowerPoint_app
                 _viewModel.HideMainWindowRequested -= OnHideMainWindowRequested;
                 _viewModel.ShowMainWindowRequested -= OnShowMainWindowRequested;
                 _viewModel.ExamEnded -= OnExamEnded;
+                _viewModel.ScoreCompleted -= OnScoreCompleted;
             }
             
             // アプリバーウィンドウを閉じる

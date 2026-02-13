@@ -73,12 +73,15 @@ namespace MOS_PowerPoint_app.Views
         private bool _isPaused = false; // 一時停止状態
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
+        private readonly Action _onScoreClick; // 採点ボタン押下時（プロジェクト一覧の採点と同じ処理を実行）
+        private DispatcherTimer _slideMonitorTimer; // Task 4 用: スライド ID 監視（1秒間隔）
         
-        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false)
+        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null)
         {
             InitializeComponent();
             _currentProjectId = projectId;
             _groupId = groupId; // グループIDを保存
+            _onScoreClick = onScoreClick;
             var scoreBtn = FindName("ScoreButton") as System.Windows.Controls.Button;
             if (scoreBtn != null)
                 scoreBtn.Visibility = showScoreButton ? Visibility.Visible : Visibility.Collapsed;
@@ -87,6 +90,7 @@ namespace MOS_PowerPoint_app.Views
                 pauseBtn.Visibility = showPauseButton ? Visibility.Visible : Visibility.Collapsed;
             InitializeTimer();
             InitializeProjectTimer();
+            InitializeSlideMonitor();
             LoadClipboardTargets(); // クリップボード対象を先に読み込む
             LoadTasks();
             UpdateTaskDisplay();
@@ -282,6 +286,67 @@ namespace MOS_PowerPoint_app.Views
             if (!timerDisabled)
             {
                 _projectTimer.Start();
+            }
+        }
+
+        private void InitializeSlideMonitor()
+        {
+            PowerPointGrader.ResetTask4SlideDeletionState();
+            _slideMonitorTimer = new DispatcherTimer();
+            _slideMonitorTimer.Interval = TimeSpan.FromSeconds(1);
+            _slideMonitorTimer.Tick += SlideMonitor_Tick;
+            _slideMonitorTimer.Start();
+        }
+
+        private void SlideMonitor_Tick(object sender, EventArgs e)
+        {
+            PowerPointApp pptApp = null;
+            try
+            {
+                pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+            }
+            catch (COMException)
+            {
+                return;
+            }
+            if (pptApp == null) return;
+            PowerPointPresentation pres = null;
+            try
+            {
+                pres = pptApp.ActivePresentation;
+            }
+            catch
+            {
+                return;
+            }
+            if (pres == null) return;
+            Slides slides = null;
+            try
+            {
+                slides = pres.Slides;
+                if (slides == null) return;
+                int count = slides.Count;
+                var currentSlideIds = new List<int>();
+                for (int i = 1; i <= count; i++)
+                {
+                    Slide slide = null;
+                    try
+                    {
+                        slide = slides[i];
+                        currentSlideIds.Add(slide.SlideID);
+                    }
+                    finally
+                    {
+                        if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
+                    }
+                }
+                PowerPointGrader.CheckSlideDeletion(currentSlideIds);
+            }
+            finally
+            {
+                if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } }
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
+                if (pptApp != null) { try { Marshal.ReleaseComObject(pptApp); } catch { } }
             }
         }
         
@@ -550,48 +615,11 @@ namespace MOS_PowerPoint_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint)");
                 
-                // 現在のプロジェクトのタスク数を取得
-                int taskCount = _tasks != null ? _tasks.Count : 0;
-                if (taskCount == 0)
-                {
-                    MessageBox.Show("タスクが見つかりません。", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                
-                // PowerPointChecker DLLのパスを構築（後で実装）
-                // 現在は採点機能は準備中
-                int passedCount = 0;
-                int totalTasks = taskCount;
-                var taskResults = new List<(int taskId, bool result, string error)>();
-                
-                // 採点機能は後で実装
-                for (int taskNum = 1; taskNum <= taskCount; taskNum++)
-                {
-                    taskResults.Add((taskNum, false, "採点機能は準備中です"));
-                }
-                
-                // 結果を表示
-                StringBuilder resultMessage = new StringBuilder();
-                resultMessage.AppendLine($"採点完了: {passedCount}/{totalTasks} タスク合格");
-                resultMessage.AppendLine($"得点: {passedCount}点 / {totalTasks}点");
-                resultMessage.AppendLine();
-                resultMessage.AppendLine("詳細:");
-                
-                foreach (var (taskId, result, error) in taskResults)
-                {
-                    if (!string.IsNullOrEmpty(error))
-                    {
-                        resultMessage.AppendLine($"  タスク{taskId}: × (エラー: {error})");
-                    }
-                    else
-                    {
-                        resultMessage.AppendLine($"  タスク{taskId}: {(result ? "✓ 合格" : "× 不合格")}");
-                    }
-                }
-                
-                MessageBox.Show(resultMessage.ToString(), "採点結果", MessageBoxButton.OK, MessageBoxImage.Information);
-                
-                System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点完了: {passedCount}/{totalTasks}");
+                // プロジェクト一覧画面の採点と同じ処理を実行（MainViewModel.ExecuteScore → 採点結果ダイアログ表示）
+                if (_onScoreClick != null)
+                    _onScoreClick();
+                else
+                    MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -2079,6 +2107,7 @@ namespace MOS_PowerPoint_app.Views
         {
             _timer?.Stop();
             _projectTimer?.Stop();
+            _slideMonitorTimer?.Stop();
             base.OnClosed(e);
         }
     }

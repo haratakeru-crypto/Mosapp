@@ -31,6 +31,7 @@ namespace MOS_PowerPoint_app
         private string _resultMessage;
         private bool _showScoreButton;
         private bool _showPauseButton;
+        private bool _showScoreResult = true;
         private ProjectViewModel _currentProject;
         private ObservableCollection<TaskResult> _taskResults;
         private int _totalScore;
@@ -42,7 +43,6 @@ namespace MOS_PowerPoint_app
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
             UiTestCommand = new RelayCommand(ExecuteUiTest);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
-            TestGradeCommand = new RelayCommand(ExecuteTestGrade, CanExecuteTestGrade);
             TaskResults = new ObservableCollection<TaskResult>();
         }
 
@@ -71,7 +71,6 @@ namespace MOS_PowerPoint_app
         public ICommand OpenProjectCommand { get; }
         public ICommand UiTestCommand { get; }
         public ICommand ScoreCommand { get; }
-        public ICommand TestGradeCommand { get; }
 
         public ProjectViewModel CurrentProject
         {
@@ -99,10 +98,19 @@ namespace MOS_PowerPoint_app
             set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
         }
 
+        /// <summary>採点結果（タスク別一覧）を表示するか。チェックONで採点ロジックを確認できる。</summary>
+        public bool ShowScoreResult
+        {
+            get => _showScoreResult;
+            set { _showScoreResult = value; OnPropertyChanged(nameof(ShowScoreResult)); }
+        }
+
         public string CurrentProjectName => CurrentProject?.Name ?? "";
 
         public event EventHandler ShowAppBarRequested;
         public event EventHandler HideMainWindowRequested;
+        /// <summary>採点完了時に発火。採点結果ダイアログの表示に使用する。</summary>
+        public event EventHandler ScoreCompleted;
 #pragma warning disable 67 // イベントは外部で使用されるため警告を抑制
         public event EventHandler ShowMainWindowRequested;
         public event EventHandler ExamEnded;
@@ -306,37 +314,10 @@ namespace MOS_PowerPoint_app
 
         private bool CanExecuteScore(object parameter)
         {
-            return CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.FilePath);
-        }
-
-        private bool CanExecuteTestGrade(object parameter)
-        {
             return CurrentProject != null;
         }
 
         private void ExecuteScore(object parameter)
-        {
-            if (CurrentProject == null || string.IsNullOrEmpty(CurrentProject.FilePath))
-            {
-                ResultMessage = "エラー: プロジェクトが選択されていません";
-                return;
-            }
-
-            try
-            {
-                ResultMessage = "採点中...";
-                TaskResults.Clear();
-
-                // 採点機能は後で実装
-                ResultMessage = "採点機能は準備中です";
-            }
-            catch (Exception ex)
-            {
-                ResultMessage = $"エラー: 採点中にエラーが発生しました: {ex.Message}";
-            }
-        }
-
-        private void ExecuteTestGrade(object parameter)
         {
             if (CurrentProject == null)
             {
@@ -345,7 +326,7 @@ namespace MOS_PowerPoint_app
             }
 
             TaskResults.Clear();
-            ResultMessage = "採点ロジック確認中...";
+            ResultMessage = "採点中...";
 
             string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
             if (!File.Exists(jsonPath))
@@ -405,7 +386,8 @@ namespace MOS_PowerPoint_app
                         TaskName = string.IsNullOrEmpty(task.Description) ? $"タスク{task.TaskId}" : task.Description
                     });
                 }
-                ResultMessage = $"採点ロジック確認: {passedCount}/{project.Tasks.Count} タスク合格";
+                ResultMessage = $"採点: {passedCount}/{project.Tasks.Count} タスク合格";
+                ScoreCompleted?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
