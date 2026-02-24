@@ -110,6 +110,32 @@
                         </Button.Style>
                     </Button>
                     
+                    <!-- すべてをリセットする -->
+                    <Button Content="すべてをリセットする" 
+                            Command="{Binding ResetAllProjectsCommand}"
+                            Margin="0,0,15,0"
+                            Padding="15,8"
+                            Background="#B45309"
+                            Foreground="White"
+                            BorderThickness="0"
+                            FontSize="13"
+                            FontWeight="SemiBold"
+                            Cursor="Hand">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    
                     <!-- タイマー有効/無効チェックボックス（デフォルト未チェック＝一時停止） -->
                     <CheckBox Name="TimerCheckBox" 
                               Content="タイマーを使用する"

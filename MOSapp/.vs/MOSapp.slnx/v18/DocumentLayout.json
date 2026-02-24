@@ -3,7 +3,10 @@
   "WorkspaceRootPath": "C:\\Users\\kouza\\source\\repos\\MOSapp\\MOSapp\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{DB7F1D38-C509-4890-A692-E31C79CA4AA8}|MOSapp\\MOSapp.csproj|c:\\users\\kouza\\source\\repos\\mosapp\\mosapp\\mosapp\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\kouza\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DB7F1D38-C509-4890-A692-E31C79CA4AA8}|MOSapp\\MOSapp.csproj|C:\\Users\\kouza\\source\\repos\\MOSapp\\MOSapp\\mosapp\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
       "RelativeMoniker": "D:0:0:{DB7F1D38-C509-4890-A692-E31C79CA4AA8}|MOSapp\\MOSapp.csproj|solutionrelative:mosapp\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     },
     {
@@ -23,18 +26,30 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Window.cs",
+              "DocumentMoniker": "C:\\Users\\kouza\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs",
+              "RelativeDocumentMoniker": "..\\..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs",
+              "ToolTip": "C:\\Users\\kouza\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs",
+              "RelativeToolTip": "..\\..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs",
+              "ViewState": "AgIAAHwLAAAAAAAAAAAMwI4LAAADAAAAAQAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-18T07:47:50.479Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "MainWindow.xaml",
               "DocumentMoniker": "C:\\Users\\kouza\\source\\repos\\MOSapp\\MOSapp\\MOSapp\\MainWindow.xaml",
               "RelativeDocumentMoniker": "MOSapp\\MainWindow.xaml",
               "ToolTip": "C:\\Users\\kouza\\source\\repos\\MOSapp\\MOSapp\\MOSapp\\MainWindow.xaml",
               "RelativeToolTip": "MOSapp\\MainWindow.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-02-09T05:40:56.567Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-02-18T07:32:51.272Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "MainWindow.xaml.cs",
               "DocumentMoniker": "C:\\Users\\kouza\\source\\repos\\MOSapp\\MOSapp\\MOSapp\\MainWindow.xaml.cs",
               "RelativeDocumentMoniker": "MOSapp\\MainWindow.xaml.cs",
@@ -42,7 +57,7 @@
               "RelativeToolTip": "MOSapp\\MainWindow.xaml.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-09T05:40:55.479Z"
+              "WhenOpened": "2026-02-18T07:32:51.272Z"
             }
           ]
         }

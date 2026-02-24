@@ -18,3 +18,11 @@ C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.csproj.Generat
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.csproj.CoreCompileInputs.cache
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.exe
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.pdb
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\MOSExcelMogiApp.exe
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\MOS Word app.exe
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\Mos PowerPoint Mogi App.exe
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\MOSapp.exe.manifest
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\bin\Debug\MOSapp.application
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp_Content.g.cs
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.exe.manifest
+C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.application

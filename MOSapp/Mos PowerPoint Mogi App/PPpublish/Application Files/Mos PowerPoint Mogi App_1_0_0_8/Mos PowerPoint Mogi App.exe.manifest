@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asmv1:assembly xsi:schemaLocation="urn:schemas-microsoft-com:asm.v1 assembly.adaptive.xsd" manifestVersion="1.0" xmlns:asmv1="urn:schemas-microsoft-com:asm.v1" xmlns="urn:schemas-microsoft-com:asm.v2" xmlns:asmv2="urn:schemas-microsoft-com:asm.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:co.v1="urn:schemas-microsoft-com:clickonce.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns:co.v2="urn:schemas-microsoft-com:clickonce.v2">
+  <asmv1:assemblyIdentity name="Mos PowerPoint Mogi App.exe" version="1.0.0.8" publicKeyToken="d2fcd6a4e2978f6c" language="neutral" processorArchitecture="msil" type="win32" />
+  <application />
+  <entryPoint>
+    <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
+    <commandLine file="Mos PowerPoint Mogi App.exe" parameters="" />
+  </entryPoint>
+  <trustInfo>
+    <security>
+      <applicationRequestMinimum>
+        <PermissionSet Unrestricted="true" ID="Custom" SameSite="site" />
+        <defaultAssemblyRequest permissionSetReference="Custom" />
+      </applicationRequestMinimum>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          UAC マニフェスト オプション
+          Windows のユーザー アカウント制御のレベルを変更するには、
+          requestedExecutionLevel ノードを以下のいずれかで置換します。
+
+        <requestedExecutionLevel  level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel  level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel  level="highestAvailable" uiAccess="false" />
+
+         下位互換性を保つためにファイルおよびレジストリの仮想化を使用する場合、
+         requestedExecutionLevel ノードを削除します。
+    -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentOS>
+      <osVersionInfo>
+        <os majorVersion="5" minorVersion="1" buildNumber="2600" servicePackMajor="0" />
+      </osVersionInfo>
+    </dependentOS>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="preRequisite" allowDelayedBinding="true">
+      <assemblyIdentity name="Microsoft.Windows.CommonLanguageRuntime" version="4.0.30319.0" />
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="150440">
+      <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>i1chaNMRGdA031DkYiPtHQqj9taQkw+czBhuIdugR6k=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Newtonsoft.Json.dll" size="721320">
+      <assemblyIdentity name="Newtonsoft.Json" version="13.0.0.0" publicKeyToken="30AD4FE6B2A6AEED" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>8MB68OhNTdTaS9eCO6RTW8BIGzv2I+1Atlm2gUemu3U=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <file name="Assets\config.json" size="419">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>qk3yNgWx0C/1ANIl+IRwD7tvc/oYFFZ0aqeIsC/1juA=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="Mos PowerPoint Mogi App.exe.config" size="291">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>gu7jDeKbvHRLkhvY4QWvH0KOkD6QEYR8C2BXMBci/Vs=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="MOSPP教材用採点表.csv" size="841">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>fQuNOZCFG0NExgkdDIo6+huaXy4+YkBWcD0AOYyJbS0=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="MOS模擬アプリ問題文一覧_PowerPoint.json" size="13764">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>OUm66OhSDfTg+rRfbpLQNggB/ehfaS3aK6mPzGQHhF8=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\JSON\MOS模擬アプリ問題文一覧_PowerPoint.json" size="13766">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>X6EQg0WMERcy1DoCrjv7uXEvOZSRtX73+GV6jhnRRBU=</dsig:DigestValue>
+    </hash>
+  </file>
+<publisherIdentity name="CN=PC425\kouza" issuerKeyHash="0c77e4068dcea99b3fa18f513f1ddd2afb57d2a7" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>fDxqCD4MAu8nrH4EIj1mhcNDws62zvshLxKVjW004N8=</DigestValue></Reference></SignedInfo><SignatureValue>b5whjOXz+4c5971VF3uyUbtBY/lCB99JAlH1SD7JTPcFwxI3FihzerWPJmyguGIsJNW+sW9z7kPkuKMBNGmJNZ5rjdHx2HbaY0T3M0lfObObewcVpPlAs64eUe7wV/aLXP7PGdIl0CSxISpJvMPDLSfAQDE1/Hgrp/q80aLfUmE=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>x+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="dfe0346d8d95122f21fbceb6cec243c385663d22047eac27ef020c3e086a3c7c" Description="" Url=""><as:assemblyIdentity name="Mos PowerPoint Mogi App.exe" version="1.0.0.8" publicKeyToken="d2fcd6a4e2978f6c" language="neutral" processorArchitecture="msil" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=PC425\kouza</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>/EPjq7fUoldqZxrmiZx/EwaMAGeQcQQKw5Wxklr6z1w=</DigestValue></Reference></SignedInfo><SignatureValue>Ux0RuYFzDYN9b1+37G/LRFsyUCOszNwroV09Exm06MWEvfRThoXyVGxfQRC4dwpquOt+tPfNeFBf5mLnzaQbjnAjQeWWfFdIonU85AoBeOP/+hGufjivImuW587ztJRwWFhdTdPXKmmswlieXybjEh8db/4UvdznxKJcBHA9Nww=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>x+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBxTCCAS6gAwIBAgIQEzF8mOTnCIVK5niIZg3WuDANBgkqhkiG9w0BAQsFADAhMR8wHQYDVQQDHhYAUABDADQAMgA1AFwAawBvAHUAegBhMB4XDTI2MDEyODA0MDgwOFoXDTI3MDEyODEwMDgwOFowITEfMB0GA1UEAx4WAFAAQwA0ADIANQBcAGsAbwB1AHoAYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAx+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqUCAwEAATANBgkqhkiG9w0BAQsFAAOBgQAojeW4E8uX9EmITWZejtZh/ohP8Iz4xwytpw/ErF+DpLxRr6Vzv5LqkDhYHdc+cZNKeW6tMbSKeKVZcMTnZSliyEB6mim2qs5wN7vqlNBSWb3XiL2OiWSS4f7Fgr2sE5olLCjQrX1+funECSyjEWbz9LMLO4bZdAIuGZcgImUT1Q==</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>

@@ -226,6 +226,8 @@ namespace MOSapp.Views
                 }
             }
             catch { }
+            string sameDirWord = Path.Combine(baseDir, "MOS Word app.exe");
+            if (File.Exists(sameDirWord)) return Path.GetFullPath(sameDirWord);
             return null;
         }
 
@@ -315,6 +317,8 @@ namespace MOSapp.Views
                 }
             }
             catch { }
+            string sameDirPpt = Path.Combine(baseDir, exeName);
+            if (File.Exists(sameDirPpt)) return Path.GetFullPath(sameDirPpt);
             return null;
         }
 

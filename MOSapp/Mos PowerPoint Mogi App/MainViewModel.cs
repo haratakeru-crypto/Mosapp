@@ -1,13 +1,13 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Runtime.InteropServices;
-using System.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PowerPointApp = Microsoft.Office.Interop.PowerPoint.Application;
@@ -43,6 +43,7 @@ namespace MOS_PowerPoint_app
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
             UiTestCommand = new RelayCommand(ExecuteUiTest);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
+            ResetAllProjectsCommand = new RelayCommand(ExecuteResetAllProjects);
             TaskResults = new ObservableCollection<TaskResult>();
         }
 
@@ -71,6 +72,7 @@ namespace MOS_PowerPoint_app
         public ICommand OpenProjectCommand { get; }
         public ICommand UiTestCommand { get; }
         public ICommand ScoreCommand { get; }
+        public ICommand ResetAllProjectsCommand { get; }
 
         public ProjectViewModel CurrentProject
         {
@@ -267,7 +269,7 @@ namespace MOS_PowerPoint_app
 
                 try
                 {
-                    // PowerPointアプリケーションを取得または作成
+                    // PowerPointアプリケーションを取得または作成（メインスレッドで同期的に実行＝体感速度優先）
                     PowerPointApp pptApp = null;
                     try
                     {
@@ -279,24 +281,18 @@ namespace MOS_PowerPoint_app
                         pptApp.Visible = MsoTriState.msoTrue;
                     }
 
-                    // PowerPointプレゼンテーションを開く
-                    PowerPointPresentation presentation = null;
                     try
                     {
-                        presentation = pptApp.Presentations.Open(project.FilePath, WithWindow: MsoTriState.msoTrue);
+                        pptApp.Presentations.Open(project.FilePath, WithWindow: MsoTriState.msoTrue);
                     }
                     catch (Exception ex)
                     {
-                        // ファイルが既に開いている場合は無視
                         System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
                     }
-                    
+
                     CurrentProject = project;
-                    
-                    // イベントを発火してアプリバーを表示
                     HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                     ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
-                    
                     ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(project.FilePath)}";
                 }
                 catch (Exception ex)
@@ -397,6 +393,47 @@ namespace MOS_PowerPoint_app
             {
                 grader?.Dispose();
             }
+        }
+
+        private void ExecuteResetAllProjects(object parameter)
+        {
+            var result = MessageBox.Show(
+                "すべてのPowerPointプロジェクト（演習・応用編の全プロジェクト）をテンプレートからリセットします。\n現在の変更内容は失われます。実行しますか？",
+                "すべてをリセットする",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            var errors = new System.Collections.Generic.List<string>();
+            int done = 0;
+            foreach (int groupId in new[] { 1, 3 })
+            {
+                for (int projectId = 1; projectId <= 11; projectId++)
+                {
+                    try
+                    {
+                        PowerPointProjectResetHelper.ResetProject(groupId, projectId);
+                        done++;
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add($"Tab{groupId} Project{projectId}: {ex.Message}");
+                    }
+                }
+            }
+
+            if (errors.Count == 0)
+                ResultMessage = $"すべてのプロジェクトをリセットしました（{done}件）。";
+            else
+                ResultMessage = $"{done}件リセットしました。失敗: {errors.Count}件";
+            MessageBox.Show(
+                errors.Count == 0
+                    ? $"すべてのプロジェクトをリセットしました（{done}件）。"
+                    : $"{done}件リセットしました。\n失敗 {errors.Count}件:\n" + string.Join("\n", errors.Take(10)) + (errors.Count > 10 ? "\n…他" : ""),
+                "リセット結果",
+                MessageBoxButton.OK,
+                errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

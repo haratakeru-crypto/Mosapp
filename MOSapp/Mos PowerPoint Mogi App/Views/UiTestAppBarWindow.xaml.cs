@@ -141,79 +141,78 @@ namespace MOS_PowerPoint_app.Views
         
         private void PositionPowerPointWindow()
         {
-            try
+            // リトライ＋Sleep を UI スレッドで行うとフリーズするため、バックグラウンドで実行する
+            System.Threading.Tasks.Task.Run(() =>
             {
-                // 実行中のPowerPointプロセスを取得
-                var pptProcesses = Process.GetProcessesByName("POWERPNT");
-                if (pptProcesses.Length == 0)
+                try
                 {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] PowerPoint process not found");
-                    return;
-                }
-
-                Process pptProcess = pptProcesses[0];
-                
-                // PowerPointのメインウィンドウハンドルを取得
-                IntPtr pptHwnd = IntPtr.Zero;
-                uint processId = (uint)pptProcess.Id;
-                int retryCount = 0;
-                const int maxRetries = 20;
-                
-                while (pptHwnd == IntPtr.Zero && retryCount < maxRetries)
-                {
-                    EnumWindows((windowHandle, lParam) =>
+                    var pptProcesses = Process.GetProcessesByName("POWERPNT");
+                    if (pptProcesses.Length == 0)
                     {
-                        GetWindowThreadProcessId(windowHandle, out uint windowProcessId);
-                        if (windowProcessId == processId)
+                        System.Diagnostics.Debug.WriteLine("[AppBarWindow] PowerPoint process not found");
+                        return;
+                    }
+
+                    IntPtr pptHwnd = IntPtr.Zero;
+                    uint processId = 0;
+                    using (Process pptProcess = pptProcesses[0])
+                    {
+                        processId = (uint)pptProcess.Id;
+                        int retryCount = 0;
+                        const int maxRetries = 20;
+
+                        while (pptHwnd == IntPtr.Zero && retryCount < maxRetries)
                         {
-                            // PowerPointのメインウィンドウを特定（クラス名で判定）
-                            StringBuilder className = new StringBuilder(256);
-                            GetClassName(windowHandle, className, className.Capacity);
-                            if (className.ToString().Contains("PPTFrameClass"))
+                            EnumWindows((windowHandle, lParam) =>
                             {
-                                pptHwnd = windowHandle;
-                                return false;
+                                GetWindowThreadProcessId(windowHandle, out uint windowProcessId);
+                                if (windowProcessId == processId)
+                                {
+                                    StringBuilder className = new StringBuilder(256);
+                                    GetClassName(windowHandle, className, className.Capacity);
+                                    if (className.ToString().Contains("PPTFrameClass"))
+                                    {
+                                        pptHwnd = windowHandle;
+                                        return false;
+                                    }
+                                }
+                                return true;
+                            }, IntPtr.Zero);
+
+                            if (pptHwnd == IntPtr.Zero)
+                            {
+                                Thread.Sleep(500);
+                                retryCount++;
                             }
                         }
-                        return true;
-                    }, IntPtr.Zero);
-                    
-                    if (pptHwnd == IntPtr.Zero)
+                    }
+
+                    if (pptHwnd != IntPtr.Zero)
                     {
-                        Thread.Sleep(500);
-                        retryCount++;
+                        GetWindowRect(pptHwnd, out RECT pptWindowRect);
+                        GetClientRect(pptHwnd, out RECT pptClientRect);
+
+                        int pptBorderWidth = (pptWindowRect.right - pptWindowRect.left) - pptClientRect.right;
+                        int pptBorderHeight = (pptWindowRect.bottom - pptWindowRect.top) - pptClientRect.bottom;
+
+                        int pptX = -pptBorderWidth / 2;
+                        int pptY = -pptBorderHeight / 2;
+                        int pptWidth = 1920 + pptBorderWidth;
+                        int pptHeight = 774 + pptBorderHeight;
+
+                        MoveWindow(pptHwnd, pptX, pptY, pptWidth, pptHeight, true);
+                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] PowerPoint window positioned: {pptWidth}x{pptHeight} at ({pptX}, {pptY})");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[AppBarWindow] PowerPoint window handle not found");
                     }
                 }
-                
-                if (pptHwnd != IntPtr.Zero)
+                catch (Exception ex)
                 {
-                    // PowerPointのウィンドウの境界線サイズを取得
-                    GetWindowRect(pptHwnd, out RECT pptWindowRect);
-                    GetClientRect(pptHwnd, out RECT pptClientRect);
-                    
-                    int pptBorderWidth = (pptWindowRect.right - pptWindowRect.left) - pptClientRect.right;
-                    int pptBorderHeight = (pptWindowRect.bottom - pptWindowRect.top) - pptClientRect.bottom;
-                    
-                    // PowerPointのウィンドウを左上 X=0, Y=0、右下 X=1920, Y=774 にリサイズ
-                    // 高さ: 258 * 3 = 774 (1032 / 4 * 3)
-                    // 境界線を考慮して位置を調整（マージンをゼロにする）
-                    int pptX = -pptBorderWidth / 2;
-                    int pptY = -pptBorderHeight / 2;
-                    int pptWidth = 1920 + pptBorderWidth;
-                    int pptHeight = 774 + pptBorderHeight;
-                    
-                    MoveWindow(pptHwnd, pptX, pptY, pptWidth, pptHeight, true);
-                    System.Diagnostics.Debug.WriteLine($"[AppBarWindow] PowerPoint window positioned: {pptWidth}x{pptHeight} at ({pptX}, {pptY})");
+                    System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error positioning PowerPoint window: {ex.Message}");
                 }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] PowerPoint window handle not found");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error positioning PowerPoint window: {ex.Message}");
-            }
+            });
         }
 
         protected override void OnContentRendered(EventArgs e)
@@ -497,6 +496,7 @@ namespace MOS_PowerPoint_app.Views
                     System.Diagnostics.Debug.WriteLine($"プロジェクト変更: {_currentProjectId} -> {projectId}");
                     _currentProjectId = projectId;
                     LoadCurrentProjectTasks();
+                    OpenProjectDocument(projectId, _groupId);
                 }
                 
                 // タスクを変更
@@ -1565,6 +1565,43 @@ namespace MOS_PowerPoint_app.Views
         
         private void MoveToNextProject()
         {
+            // 現在開いているプレゼンテーションを日付・時間付きバックアップフォルダに保存（MMdd_HHmm）
+            string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] ?? @"C:\MOSTest\PowerPoint365";
+            string backupSubdir = DateTime.Now.ToString("MMdd_HHmm");
+            string backupFolder = Path.Combine(basePath, $"Tab{_groupId}", "backup", backupSubdir);
+            try
+            {
+                PowerPointApp pptApp = null;
+                try
+                {
+                    pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                }
+                catch
+                {
+                    // PowerPointが起動していない場合はスキップ
+                }
+                if (pptApp != null && pptApp.Presentations.Count > 0)
+                {
+                    if (!Directory.Exists(backupFolder))
+                        Directory.CreateDirectory(backupFolder);
+                    string backupFilePath = Path.Combine(backupFolder, $"Project{_currentProjectId}.pptx");
+                    try
+                    {
+                        PowerPointPresentation pres = pptApp.Presentations[1];
+                        pres.SaveCopyAs(backupFilePath);
+                        System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ保存: {backupFilePath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ保存エラー: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ処理エラー: {ex.Message}");
+            }
+
             // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
             
@@ -1820,174 +1857,8 @@ namespace MOS_PowerPoint_app.Views
         
         private void ResetProject(int groupId, int projectId)
         {
-            try
-            {
-                // リセット対象ファイルのパスを取得
-                // App.configからパスを読み込む（存在しない場合はデフォルト値を使用）
-                string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] 
-                    ?? @"C:\MOSTest\PowerPoint365";
-                string tabFolder = Path.Combine(basePath, $"Tab{groupId}");
-                
-                // Project{projectId}.pptx または Project{projectId}.ppt を検索
-                string[] possibleNames = { $"Project{projectId}.pptx", $"Project{projectId}.ppt" };
-                string projectFilePath = null;
-                
-                foreach (var fileName in possibleNames)
-                {
-                    string fullPath = Path.Combine(tabFolder, fileName);
-                    if (File.Exists(fullPath))
-                    {
-                        projectFilePath = fullPath;
-                        break;
-                    }
-                }
-                
-                if (string.IsNullOrEmpty(projectFilePath))
-                {
-                    // ファイルが見つからない場合は固定パスを生成
-                    projectFilePath = Path.Combine(tabFolder, $"Project{projectId}.pptx");
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] ファイルが見つかりません。作成します: {projectFilePath}");
-                }
-                
-                // テンプレートファイルのパスを検索
-                string templatesFolder = Path.Combine(basePath, "Templates", $"Tab{groupId}");
-                string templatePath = null;
-                string fileExtension = ".pptx";
-                
-                // Templatesフォルダ内のファイルを動的に検索
-                if (Directory.Exists(templatesFolder))
-                {
-                    var files = Directory.GetFiles(templatesFolder, $"*{fileExtension}", SearchOption.TopDirectoryOnly);
-                    string searchPattern = $"project{projectId}".ToLower();
-                    
-                    foreach (var file in files)
-                    {
-                        string fileName = Path.GetFileNameWithoutExtension(file).ToLower();
-                        if (fileName.Contains(searchPattern) || fileName == searchPattern)
-                        {
-                            templatePath = file;
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] テンプレートファイルを見つけました: {templatePath}");
-                            break;
-                        }
-                    }
-                }
-                
-                // 固定パターンで検索
-                if (string.IsNullOrEmpty(templatePath))
-                {
-                    string[] patterns = {
-                        Path.Combine(basePath, "Templates", $"Tab{groupId}", $"project{projectId}{fileExtension}"),
-                        Path.Combine(basePath, "Templates", $"project{projectId}{fileExtension}"),
-                        Path.Combine(basePath, "Templates", $"Tab{groupId}", $"Tab{groupId}_project{projectId}{fileExtension}")
-                    };
-                    
-                    foreach (var pattern in patterns)
-                    {
-                        if (File.Exists(pattern))
-                        {
-                            templatePath = pattern;
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] テンプレートファイルを見つけました（固定パターン）: {templatePath}");
-                            break;
-                        }
-                    }
-                }
-                
-                if (string.IsNullOrEmpty(templatePath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] テンプレートファイルが見つかりません: {templatesFolder}");
-                    throw new FileNotFoundException($"テンプレートファイルが見つかりません: {templatesFolder}");
-                }
-                
-                // テンプレートファイルを読み取り専用で保護
-                FileInfo templateFileInfo = new FileInfo(templatePath);
-                if (!templateFileInfo.IsReadOnly)
-                {
-                    templateFileInfo.IsReadOnly = true;
-                }
-                
-                // PowerPointアプリケーションが開いている場合はプレゼンテーションを閉じる
-                CloseAllPowerPointPresentations();
-                
-                // テンプレートファイルをプロジェクトファイルにコピー
-                // コピー先のファイルが読み取り専用の場合は属性を変更
-                if (File.Exists(projectFilePath))
-                {
-                    FileInfo projectFileInfo = new FileInfo(projectFilePath);
-                    if (projectFileInfo.IsReadOnly)
-                    {
-                        projectFileInfo.IsReadOnly = false;
-                    }
-                }
-                
-                File.Copy(templatePath, projectFilePath, overwrite: true);
-                System.Diagnostics.Debug.WriteLine($"[ResetProject] テンプレートファイルをコピーしました: {templatePath} → {projectFilePath}");
-                
-                // Initialフォルダにもコピー
-                string initialFolderPath = Path.Combine(tabFolder, "Initial");
-                string initialFilePath = Path.Combine(initialFolderPath, $"project{projectId}{fileExtension}");
-                
-                if (!Directory.Exists(initialFolderPath))
-                {
-                    Directory.CreateDirectory(initialFolderPath);
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Initialフォルダを作成しました: {initialFolderPath}");
-                }
-                
-                // Initialフォルダのファイルが既に存在する場合、読み取り専用属性を解除
-                if (File.Exists(initialFilePath))
-                {
-                    try
-                    {
-                        FileInfo initialFileInfo = new FileInfo(initialFilePath);
-                        if (initialFileInfo.IsReadOnly)
-                        {
-                            initialFileInfo.IsReadOnly = false;
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Initialファイルの読み取り専用属性を解除しました: {initialFilePath}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Initialファイルの属性変更エラー（続行）: {ex.Message}");
-                    }
-                }
-                
-                // リトライロジックでコピー（ファイルロックされている場合に備える）
-                int retryCount = 0;
-                const int maxRetries = 5;
-                bool copied = false;
-                while (!copied && retryCount < maxRetries)
-                {
-                    try
-                    {
-                        File.Copy(projectFilePath, initialFilePath, overwrite: true);
-                        copied = true;
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Initialフォルダにコピーしました: {initialFilePath}");
-                    }
-                    catch (IOException ex) when (retryCount < maxRetries - 1)
-                    {
-                        // ファイルがロックされている場合は少し待ってリトライ
-                        retryCount++;
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Initialファイルコピーリトライ {retryCount}/{maxRetries}: {ex.Message}");
-                        Thread.Sleep(200); // 200ms待機
-                    }
-                    catch (UnauthorizedAccessException ex)
-                    {
-                        // アクセス権限エラーの場合もリトライ
-                        retryCount++;
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Initialファイルコピーリトライ {retryCount}/{maxRetries} (UnauthorizedAccess): {ex.Message}");
-                        Thread.Sleep(200); // 200ms待機
-                    }
-                }
-                
-                if (!copied)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] 警告: Initialフォルダへのコピーに失敗しましたが、リセットは完了しています: {initialFilePath}");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[ResetProject] Error: {ex.Message}");
-                throw;
-            }
+            CloseAllPowerPointPresentations();
+            MOS_PowerPoint_app.PowerPointProjectResetHelper.ResetProject(groupId, projectId);
         }
         
         /// <summary>

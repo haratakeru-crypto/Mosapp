@@ -17,7 +17,7 @@
     <Deterministic>true</Deterministic>
     <UseWPF>true</UseWPF>
     <IsWebBootstrapper>false</IsWebBootstrapper>
-    <PublishUrl>C:\Users\kouza\Desktop\</PublishUrl>
+    <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
     <UpdateEnabled>false</UpdateEnabled>
@@ -27,7 +27,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>6</ApplicationRevision>
+    <ApplicationRevision>9</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -109,6 +109,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="MainViewModel.cs" />
+    <Compile Include="PowerPointProjectResetHelper.cs" />
     <Compile Include="PowerPointGrader.cs" />
     <Page Include="Views\UiTestAppBarWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -212,7 +213,7 @@
     </BootstrapperPackage>
   </ItemGroup>
   <PropertyGroup>
-    <PreBuildEvent>taskkill /IM &quot;Mos PowerPoint Mogi App.exe&quot; /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
+    <PreBuildEvent>taskkill /IM "Mos PowerPoint Mogi App.exe" /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
