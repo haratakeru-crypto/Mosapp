@@ -53,13 +53,13 @@
       </hash>
     </dependentAssembly>
   </dependency>
-  <file name="Mos PowerPoint Mogi App.exe" size="196096">
+  <file name="Mos PowerPoint Mogi App.exe" size="197632">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>qHBwVzdWkqVatC496EgY2JgDKV1dA4nkMzS1mW5k55E=</dsig:DigestValue>
+      <dsig:DigestValue>38m2JHTsfwLsnGLDW6+e8Secmhoges6dNrX7+4za4Fk=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOS Word app.exe" size="199680">
@@ -68,7 +68,7 @@
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>aK3Z3whlCpEmq5tCd9QtjydawcKxCrC2qKYex2IzjPE=</dsig:DigestValue>
+      <dsig:DigestValue>Wq4Hq8LoVSVRQBaHuhBkO0JJJq7Z08sHTNJ1/vpIeKg=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOSapp.exe.config" size="189">
@@ -80,13 +80,13 @@
       <dsig:DigestValue>R+Wg8QGvQVHX8T0ta/qbhH1bXkqY0fRnS3wBV3J0bN8=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="MOSExcelMogiApp.exe" size="491520">
+  <file name="MOSExcelMogiApp.exe" size="491008">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>50bodMp1sh/m9Xk9Be5BydCyeJoNP/qP23HVFJgmf3g=</dsig:DigestValue>
+      <dsig:DigestValue>fheN782X7/r3KlILs5hHHkq/ClrEz9vyh/FUzeD604U=</dsig:DigestValue>
     </hash>
   </file>
 </asmv1:assembly>

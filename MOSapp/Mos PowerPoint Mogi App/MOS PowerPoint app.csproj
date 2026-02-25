@@ -196,6 +196,9 @@
     <Content Include="MOS模擬アプリ問題文一覧_PowerPoint.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="MOSPP教材用採点表.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

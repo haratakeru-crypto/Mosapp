@@ -72,3 +72,4 @@ C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos 
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.pdb
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ScoreResultWindow.baml
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ScoreResultWindow.g.cs
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json

@@ -487,18 +487,20 @@ namespace MOS_PowerPoint_app.Views
         public void NavigateToTask(int projectId, int taskId)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={projectId}, TaskId={taskId}");
-            
+
             try
             {
+                // レビューページから戻ったときは常に該当プロジェクトのプレゼンテーションを開く
+                OpenProjectDocument(projectId, _groupId);
+
                 // プロジェクトを変更
                 if (projectId != _currentProjectId)
                 {
                     System.Diagnostics.Debug.WriteLine($"プロジェクト変更: {_currentProjectId} -> {projectId}");
                     _currentProjectId = projectId;
                     LoadCurrentProjectTasks();
-                    OpenProjectDocument(projectId, _groupId);
                 }
-                
+
                 // タスクを変更
                 if (taskId != _currentTaskId && taskId >= 1 && taskId <= _tasks.Count)
                 {
@@ -701,7 +703,41 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine($"[LoadClipboardTargets] AppDomain.CurrentDomain.BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}");
                 System.Diagnostics.Debug.WriteLine($"[LoadClipboardTargets] Assembly.Location: {System.Reflection.Assembly.GetExecutingAssembly().Location}");
                 
-                // CSVファイル名
+                // コピー対象問題JSON（入力・追加・変更・挿入の問題）を優先して読み込む
+                string copyTargetJsonName = "MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json";
+                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, copyTargetJsonName);
+                if (!File.Exists(jsonPath))
+                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", copyTargetJsonName);
+                if (File.Exists(jsonPath))
+                {
+                    try
+                    {
+                        string jsonContent = File.ReadAllText(jsonPath, Encoding.UTF8);
+                        var copyTargetData = JsonConvert.DeserializeObject<ProjectData>(jsonContent);
+                        if (copyTargetData?.Projects != null)
+                        {
+                            _clipboardTargets.Clear();
+                            foreach (var project in copyTargetData.Projects)
+                            {
+                                if (project.Tasks == null) continue;
+                                _clipboardTargets[project.ProjectId] = new Dictionary<int, string>();
+                                foreach (var task in project.Tasks)
+                                {
+                                    if (!string.IsNullOrEmpty(task.Description))
+                                        _clipboardTargets[project.ProjectId][task.TaskId] = task.Description;
+                                }
+                            }
+                            System.Diagnostics.Debug.WriteLine($"[LoadClipboardTargets] JSONからクリップボード対象を{_clipboardTargets.Sum(p => p.Value.Count)}件読み込みました: {jsonPath}");
+                            return;
+                        }
+                    }
+                    catch (Exception exJson)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[LoadClipboardTargets] JSON読み込み失敗、CSVにフォールバック: {exJson.Message}");
+                    }
+                }
+                
+                // CSVファイル名（JSONが無い場合のフォールバック）
                 string csvFileName = "MOS模擬アプリ正誤判定表251120_挿入入力のみ.csv";
                 
                 // 複数のパス候補を試す
@@ -1104,17 +1140,14 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] クリップボード対象が見つかりません。通常の問題文を使用します");
             }
             
-            // クリップボード対象がある場合は下線付き表示、ない場合は通常表示
+            // コピーできる部分を""で囲んでから表示（「…」と入力 の 「」内をコピー対象に）
+            string descriptionForDisplay = clipboardTargetDescription ?? currentTask.Description;
+            descriptionForDisplay = WrapCopyablePartInQuotes(descriptionForDisplay);
             if (clipboardTargetDescription != null)
-            {
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（クリップボード対象）");
-                SetTextWithUnderline(taskDescriptionTextBlock, clipboardTargetDescription);
-            }
             else
-            {
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（通常の問題文）");
-                SetTextWithUnderline(taskDescriptionTextBlock, currentTask.Description);
-            }
+            SetTextWithUnderline(taskDescriptionTextBlock, descriptionForDisplay);
             
             // タスクボタンの状態を更新（チェックマークと旗マークも含む）
             UpdateTaskButtons();
@@ -1147,6 +1180,18 @@ namespace MOS_PowerPoint_app.Views
             }
         }
         
+        /// <summary>
+        /// 問題文からコピーすべき部分（「…」と入力 の 「」内など）を抽出し、半角ダブルクォートで囲んだ文字列を返します。
+        /// 既に"が含まれる問題文はそのまま返します。
+        /// </summary>
+        private static string WrapCopyablePartInQuotes(string description)
+        {
+            if (string.IsNullOrEmpty(description)) return description;
+            if (description.IndexOf('"') >= 0) return description;
+            // 「…」と入力 の 「」内を "…" に変換（コピーできる部分として表示）
+            return Regex.Replace(description, @"「([^」]*)」と入力", "\"$1\"と入力");
+        }
+
         /// <summary>
         /// テキスト内の"で囲まれた部分に下線を付けてTextBlockに設定します
         /// "自体は表示せず、その中のテキストだけに下線を付けます
