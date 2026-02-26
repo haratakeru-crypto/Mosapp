@@ -42,14 +42,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="154024">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="155048">
       <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>p0ePAA4zuaT1oO4Fk0pG0IUE1nwaqS4q58VonnenELw=</dsig:DigestValue>
+        <dsig:DigestValue>iTeoO4EeN5iis4+yt+AM/IINDedqBm5aKfiUEvAHhg8=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -90,6 +90,15 @@
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
       <dsig:DigestValue>fQuNOZCFG0NExgkdDIo6+huaXy4+YkBWcD0AOYyJbS0=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json" size="4399">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>iWj/iyX+MosqVmARqwMTuViloAUZrC1C4UUQHSrTLVo=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOS模擬アプリ問題文一覧_PowerPoint.json" size="13764">

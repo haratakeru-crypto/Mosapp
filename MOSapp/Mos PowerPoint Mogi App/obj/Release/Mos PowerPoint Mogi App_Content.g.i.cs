@@ -13,6 +13,8 @@
     "c%e6%96%87%e4%b8%80%e8%a6%a7_powerpoint.json")]
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("mos%e6%a8%a1%e6%93%ac%e3%82%a2%e3%83%97%e3%83%aa%e5%95%8f%e9%a1%8c%e6%96%87%e4%b8" +
     "%80%e8%a6%a7_powerpoint.json")]
+[assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("mos%e6%a8%a1%e6%93%ac%e3%82%a2%e3%83%97%e3%83%aa_%e5%85%a5%e5%8a%9b%e8%bf%bd%e5%8" +
+    "a%a0%e5%a4%89%e6%9b%b4%e6%8c%bf%e5%85%a5%e5%95%8f%e9%a1%8c_powerpoint.json")]
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("mospp%e6%95%99%e6%9d%90%e7%94%a8%e6%8e%a1%e7%82%b9%e8%a1%a8.csv")]
 
 

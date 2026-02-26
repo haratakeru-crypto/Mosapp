@@ -12,10 +12,15 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
+            <!-- 見出し: 採点結果 -->
+            <TextBlock Grid.Row="0" Text="採点結果" FontSize="22" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
             <!-- Task 行 -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
                 <TextBlock Text="Task" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <ItemsControl x:Name="TaskNumbersPanel" ItemsSource="{Binding}">
                     <ItemsControl.ItemsPanel>
@@ -31,8 +36,8 @@
                 </ItemsControl>
             </StackPanel>
 
-            <!-- Result 行（〇 / ×）-->
-            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
+            <!-- Result 行（〇 / ✖）-->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,20">
                 <TextBlock Text="Result" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <ItemsControl x:Name="ResultPanel" ItemsSource="{Binding}">
                     <ItemsControl.ItemsPanel>
@@ -45,7 +50,7 @@
                             <TextBlock MinWidth="32" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,8,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="×"/>
+                                        <Setter Property="Text" Value="✖"/>
                                         <Setter Property="Foreground" Value="#C62828"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsPassed}" Value="True">
@@ -62,7 +67,7 @@
             </StackPanel>
 
             <!-- 閉じる -->
-            <Button Grid.Row="2" Content="閉じる" Width="100" Height="32"
+            <Button Grid.Row="3" Content="閉じる" Width="100" Height="32"
                     HorizontalAlignment="Center"
                     Background="#9E9E9E" Foreground="White" BorderThickness="0"
                     Click="CloseButton_Click"

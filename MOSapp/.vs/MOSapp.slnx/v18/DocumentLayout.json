@@ -21,8 +21,16 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 2,
           "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{b1e99781-ab81-11d0-b683-00aa00a3ee26}"
+            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
@@ -31,7 +39,7 @@
               "RelativeDocumentMoniker": "..\\..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs",
               "ToolTip": "C:\\Users\\kouza\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs",
               "RelativeToolTip": "..\\..\\..\\..\\AppData\\Local\\Temp\\.vsdbgsrc\\6a6280942472ced65a72e87619a3e05af433c73828356ddc03d9e9bc336797f0\\Window.cs",
-              "ViewState": "AgIAAHwLAAAAAAAAAAAMwIYLAAACAAAAAQAAAA==",
+              "ViewState": "AgIAAIcLAAAAAAAAAAAAwJYLAABfAAAAAQAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-02-18T07:47:50.479Z",
               "EditorCaption": ""

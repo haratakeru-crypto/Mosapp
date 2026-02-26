@@ -49,7 +49,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>++uMZAyWEX4/dYIgJy8him1GI/hJQd1gFXfhRop59is=</dsig:DigestValue>
+        <dsig:DigestValue>uhlSUNyPU2rx2PpD5yMT1aB86JBl9GSkCzlCaLI9kr4=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -92,13 +92,13 @@
       <dsig:DigestValue>fQuNOZCFG0NExgkdDIo6+huaXy4+YkBWcD0AOYyJbS0=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json" size="4291">
+  <file name="MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json" size="4399">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>S3E6RRbkCFzL31CssZdcFJZgOuqtJO7vjlMivbP5RKE=</dsig:DigestValue>
+      <dsig:DigestValue>iWj/iyX+MosqVmARqwMTuViloAUZrC1C4UUQHSrTLVo=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOS模擬アプリ問題文一覧_PowerPoint.json" size="13764">

@@ -1,0 +1,8 @@
+日付,カテゴリ,項目,内容,対象ファイル
+2025-02-24,Wordチェッカー,1-3 判定,最後の段落でスタイル「参照2」を判定するよう変更（Find廃止）,products\Group1\WordChecker1_1.cs
+2025-02-24,Wordチェッカー,1-4 判定,「はじめに」以降で「日本におけるCSR活動」を探しスタイル「見出し2」を判定,products\Group1\WordChecker1_1.cs
+2025-02-24,表示,問題文取得,1-3の表示をWord文書の最後の段落から取得するよう変更,Views\AppBarWindow.xaml.cs;Views\UiTestAppBarWindow.xaml.cs
+2025-02-24,デバッグ,1-3 ログ,entry/GetDocument/count/target set/pName・rName/exception の Debug.WriteLine 追加,products\Group1\WordChecker1_1.cs
+2025-02-24,ビルド,ソリューション,WordChecker1_1 をソリューションに追加,MOS Word app.sln
+2025-02-24,ビルド,プロジェクト参照,メインアプリから WordChecker1_1 を参照（ReferenceOutputAssembly=false）,MOS Word app.csproj
+2025-02-24,ビルド,PostBuild,DLL を bin\Debug\products にコピーする PostBuildEvent 追加,products\Group1\WordChecker1_1.csproj
