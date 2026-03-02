@@ -1,0 +1,72 @@
+<Window x:Class="MOS_PowerPoint_app.Views.ObjectSelectedWarningWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="操作が必要です" Height="320" Width="480"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        BorderBrush="#1E3A5F"
+        BorderThickness="2">
+    <Window.Resources>
+        <Style x:Key="TitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#1E3A5F"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,20,0,16"/>
+        </Style>
+        <Style x:Key="BodyStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="#333"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="24,0,24,8"/>
+        </Style>
+        <Style x:Key="BulletStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="#333"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="24,4,24,4"/>
+        </Style>
+    </Window.Resources>
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock Grid.Row="0" Text="操作が必要です" Style="{StaticResource TitleStyle}"/>
+        
+        <StackPanel Grid.Row="1" VerticalAlignment="Top">
+            <TextBlock Style="{StaticResource BodyStyle}" Text="[OK] ボタンをクリックして試験画面に戻り、下記を確認後、[次のプロジェクト] ボタンをクリックしてください。"/>
+            <TextBlock Style="{StaticResource BulletStyle}" Text="・編集中の操作がある場合は確定してください。"/>
+            <TextBlock Style="{StaticResource BulletStyle}" Text="・オブジェクト (グラフ、図、SmartArt、テーブル、セル範囲など) が選択されている場合は、選択を解除してください。"/>
+            <TextBlock Style="{StaticResource BulletStyle}" Text="・ダイアログボックスが開いている場合は閉じてください。"/>
+        </StackPanel>
+        
+        <Button Grid.Row="2" Content="OK" Width="120" Height="36" Margin="0,16,0,24"
+                HorizontalAlignment="Center"
+                Background="#1E3A5F" Foreground="White" FontSize="14" FontWeight="Medium"
+                BorderThickness="0" Cursor="Hand"
+                Click="OkButton_Click">
+            <Button.Style>
+                <Style TargetType="Button">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                        CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#2E5A8F"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Button.Style>
+        </Button>
+    </Grid>
+</Window>
