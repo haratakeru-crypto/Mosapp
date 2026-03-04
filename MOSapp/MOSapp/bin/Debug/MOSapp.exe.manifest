@@ -49,7 +49,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>92FOSAUGjioPnwB3kFs37Tu6abIM4vhjzd9uw5m/gZ8=</dsig:DigestValue>
+        <dsig:DigestValue>D+y2HumEXabRIdvxHhdMCkpF+PlugfVaZLoUNAY30K0=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -59,7 +59,7 @@
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>N8iCNlUAum+j9+IOM678Q9iG7um98I2NthWzUeXd5f4=</dsig:DigestValue>
+      <dsig:DigestValue>NRvLhlfDgUE95IqnkK0JEQHljJPJ1f+CBvtAX0KDn3U=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOS Word app.exe" size="211968">
@@ -68,7 +68,7 @@
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>7OObaLxpRUnzkvs6Kx9XxX7GPnqTVoGyix+Yj53dSrI=</dsig:DigestValue>
+      <dsig:DigestValue>qK0RiSsKuZ4EZLYTa3Ora5m9SM//vdyh9WLsqyRkenk=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOSapp.exe.config" size="189">

@@ -49,7 +49,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>9ftc976760HFPzMTpiGUpep1vFD4vN48sp2M34NknGA=</dsig:DigestValue>
+        <dsig:DigestValue>zf0W3UjtXgKOWkJ/Aq3ZFGp72YP02p4Z1Qn0/yZV+Z4=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -65,22 +65,22 @@
       </hash>
     </dependentAssembly>
   </dependency>
-  <file name="Assets\config.json" size="419">
+  <file name="Assets\config.json" size="426">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>qk3yNgWx0C/1ANIl+IRwD7tvc/oYFFZ0aqeIsC/1juA=</dsig:DigestValue>
+      <dsig:DigestValue>0kyZW4JsqtzZ7+xJAybps2T7Wgms7JmBrGUEn0Ahe3k=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="Mos PowerPoint Mogi App.exe.config" size="291">
+  <file name="Mos PowerPoint Mogi App.exe.config" size="300">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>gu7jDeKbvHRLkhvY4QWvH0KOkD6QEYR8C2BXMBci/Vs=</dsig:DigestValue>
+      <dsig:DigestValue>Pn28xTIpJwPY71x92Vl1KzvSCLdlutXMyEyOXZXvgZk=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOSPP教材用採点表.csv" size="841">
