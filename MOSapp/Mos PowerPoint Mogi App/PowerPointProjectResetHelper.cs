@@ -2,6 +2,7 @@ using System;
 using System.Configuration;
 using System.IO;
 using System.Threading;
+using Libraries;
 
 namespace MOS_PowerPoint_app
 {
@@ -14,6 +15,8 @@ namespace MOS_PowerPoint_app
     {
         public static void ResetProject(int groupId, int projectId)
         {
+            PPLogReader.ClearLog();
+
             string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"]
                 ?? @"C:\MOSTest\PowerPoint365";
             string tabFolder = Path.Combine(basePath, $"Tab{groupId}");

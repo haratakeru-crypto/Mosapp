@@ -65,6 +65,56 @@
     <SignManifests>true</SignManifests>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Libraries\Group1\PowerPointCheckerCommon.csproj">
+      <Project>{B2C3D4E5-F6A7-8901-BCDE-F12345678902}</Project>
+      <Name>PowerPointCheckerCommon</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_1.csproj">
+      <Project>{C3D4E5F6-A7B8-9012-CDEF-123456789012}</Project>
+      <Name>PowerPointChecker1_1</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_2.csproj">
+      <Project>{D4E5F6A7-B8C9-0123-DEF0-234567890123}</Project>
+      <Name>PowerPointChecker1_2</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_3.csproj">
+      <Project>{E5F6A7B8-C9D0-1234-EF01-345678901234}</Project>
+      <Name>PowerPointChecker1_3</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_4.csproj">
+      <Project>{F6A7B8C9-D0E1-2345-F012-456789012345}</Project>
+      <Name>PowerPointChecker1_4</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_5.csproj">
+      <Project>{A7B8C9D0-E1F2-3456-0123-567890123456}</Project>
+      <Name>PowerPointChecker1_5</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_6.csproj">
+      <Project>{B8C9D0E1-F2A3-4567-1234-678901234567}</Project>
+      <Name>PowerPointChecker1_6</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_7.csproj">
+      <Project>{C9D0E1F2-A3B4-5678-2345-789012345678}</Project>
+      <Name>PowerPointChecker1_7</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_8.csproj">
+      <Project>{D0E1F2A3-B4C5-6789-3456-890123456789}</Project>
+      <Name>PowerPointChecker1_8</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_9.csproj">
+      <Project>{E1F2A3B4-C5D6-7890-4567-901234567890}</Project>
+      <Name>PowerPointChecker1_9</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_10.csproj">
+      <Project>{F2A3B4C5-D6E7-8901-5678-012345678901}</Project>
+      <Name>PowerPointChecker1_10</Name>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\Group1\PowerPointChecker1_11.csproj">
+      <Project>{A3B4C5D6-E7F8-9012-6789-123456789012}</Project>
+      <Name>PowerPointChecker1_11</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />

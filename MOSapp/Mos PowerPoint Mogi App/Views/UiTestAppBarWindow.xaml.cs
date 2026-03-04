@@ -20,6 +20,7 @@ using PowerPointApp = Microsoft.Office.Interop.PowerPoint.Application;
 using PowerPointPresentation = Microsoft.Office.Interop.PowerPoint.Presentation;
 using Microsoft.Office.Interop.PowerPoint;
 using System.Configuration;
+using Libraries.Group1;
 
 namespace MOS_PowerPoint_app.Views
 {
@@ -290,7 +291,7 @@ namespace MOS_PowerPoint_app.Views
 
         private void InitializeSlideMonitor()
         {
-            PowerPointGrader.ResetTask4SlideDeletionState();
+            PowerPointChecker1_1.ResetTask4SlideDeletionState();
             _slideMonitorTimer = new DispatcherTimer();
             _slideMonitorTimer.Interval = TimeSpan.FromSeconds(1);
             _slideMonitorTimer.Tick += SlideMonitor_Tick;
@@ -339,7 +340,7 @@ namespace MOS_PowerPoint_app.Views
                         if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
                     }
                 }
-                PowerPointGrader.CheckSlideDeletion(currentSlideIds);
+                PowerPointChecker1_1.CheckSlideDeletion(currentSlideIds);
             }
             finally
             {

@@ -2,7 +2,7 @@
 
 ## 1. PowerPointChecker の個別作成（WordChecker / ExcelChecker と同様）
 
-- **配置先**: `C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\Library\Group1`
+- **配置先**: `C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1`
 - **形式**: WordChecker / ExcelChecker と同様に、**PowerPointChecker** として `.cs` と `.csproj` を配置する。
 - **範囲**: **1_1 ～ 1_11** まで、採点チェッカーを**個別ファイル**で作成する。
 - **成果物**: 各番号ごとに `.cs` と `.csproj` のデータ。

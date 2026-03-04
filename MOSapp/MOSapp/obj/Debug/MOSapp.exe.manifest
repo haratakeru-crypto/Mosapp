@@ -49,26 +49,26 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>92FOSAUGjioPnwB3kFs37Tu6abIM4vhjzd9uw5m/gZ8=</dsig:DigestValue>
+        <dsig:DigestValue>8IH9wHU54Euw+nUk+QDZ1+X53aWBztHqP+acLM1legc=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
-  <file name="Mos PowerPoint Mogi App.exe" size="197632">
+  <file name="Mos PowerPoint Mogi App.exe" size="149504">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>N8iCNlUAum+j9+IOM678Q9iG7um98I2NthWzUeXd5f4=</dsig:DigestValue>
+      <dsig:DigestValue>BEZlRQeD7zHEFF5weYpAZN1NfWgCYAzGLrXx7vf3g4w=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="MOS Word app.exe" size="211968">
+  <file name="MOS Word app.exe" size="150528">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>7OObaLxpRUnzkvs6Kx9XxX7GPnqTVoGyix+Yj53dSrI=</dsig:DigestValue>
+      <dsig:DigestValue>RwctN0pzKsFMm0SIHBiCeZyAb7VXp351pdVTRngn4VY=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOSapp.exe.config" size="189">
@@ -80,13 +80,13 @@
       <dsig:DigestValue>R+Wg8QGvQVHX8T0ta/qbhH1bXkqY0fRnS3wBV3J0bN8=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="MOSExcelMogiApp.exe" size="496128">
+  <file name="MOSExcelMogiApp.exe" size="376320">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>EmAvwGWB3y5aBuvfdON4onI9S7baStZXQPvAdRlLhcY=</dsig:DigestValue>
+      <dsig:DigestValue>S9TrAR6bcKIycwvyy3wupK7V6WwVmtbowxiN0JfvosQ=</dsig:DigestValue>
     </hash>
   </file>
 </asmv1:assembly>
