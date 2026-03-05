@@ -45,6 +45,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\PPLogReader.cs" Link="PPLogReader.cs" />
     <Compile Include="PowerPointCheckerCommon.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

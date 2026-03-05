@@ -4,6 +4,7 @@ using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
 using PptShapes = Microsoft.Office.Interop.PowerPoint.Shapes;
+using Libraries;
 
 namespace Libraries.Group1
 {
@@ -116,9 +117,11 @@ namespace Libraries.Group1
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
-        /// <summary>8-4: スライド1のオーディオをスライド切り替えでも1回再生・フェードイン4秒・繰り返し。</summary>
+        /// <summary>8-4: スライド1のオーディオをスライド切り替えでも1回再生・フェードイン4秒・繰り返し。COM の FadeInDuration または VSTO ログで判定。</summary>
         public bool CheckTask_1_8_04()
         {
+            if (PPLogReader.HasTask8_4AudioExecuted())
+                return true;
             Presentation pres = null;
             try
             {

@@ -154,6 +154,19 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Libraries\Group1\PowerPointChecker1_1.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_10.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_11.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_2.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_3.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_4.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_5.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_6.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_7.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_8.cs" />
+    <Compile Include="Libraries\Group1\PowerPointChecker1_9.cs" />
+    <Compile Include="Libraries\Group1\PowerPointCheckerCommon.cs" />
+    <Compile Include="Libraries\PPLogReader.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -228,6 +241,18 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+    <None Include="Libraries\Group1\PowerPointChecker1_1.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_10.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_11.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_2.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_3.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_4.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_5.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_6.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_7.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_8.csproj" />
+    <None Include="Libraries\Group1\PowerPointChecker1_9.csproj" />
+    <None Include="Libraries\Group1\PowerPointCheckerCommon.csproj" />
     <None Include="MOS PowerPoint app_TemporaryKey.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">

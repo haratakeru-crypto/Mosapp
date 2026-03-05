@@ -4,14 +4,17 @@ using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
 using PptShapes = Microsoft.Office.Interop.PowerPoint.Shapes;
+using Libraries;
 
 namespace Libraries.Group1
 {
     public class PowerPointChecker1_5
     {
-        /// <summary>5-1: 配布資料3スライド・部単位4部印刷設定。</summary>
+        /// <summary>5-1: 配布資料3スライド・部単位4部印刷設定。COM の PrintOptions または VSTO ログの印刷記録で判定。</summary>
         public bool CheckTask_1_5_01()
         {
+            if (PPLogReader.HasTask5_1PrintExecuted())
+                return true;
             Presentation pres = null;
             try
             {
@@ -26,6 +29,7 @@ namespace Libraries.Group1
                     {
                         if (po.OutputType != PpPrintOutputType.ppPrintOutputThreeSlideHandouts) return false;
                         if (po.NumberOfCopies != 4) return false;
+                        if (po.Collate != MsoTriState.msoTrue) return false;
                         return true;
                     }
                     catch { return false; }

@@ -66,6 +66,65 @@ namespace PowerPointAddIn1
             }
         }
 
+        /// <summary>5-1: 配布資料3スライド・部単位4部で印刷したことを記録。</summary>
+        public static void LogTask5_1Print()
+        {
+            LogTaskTag("Task5-1", "Print");
+        }
+
+        /// <summary>11-7: ノート・3部・部単位で印刷したことを記録。</summary>
+        public static void LogTask11_7Print()
+        {
+            LogTaskTag("Task11-7", "Print");
+        }
+
+        /// <summary>8-4: オーディオ再生設定（フェードイン4秒等）を記録。</summary>
+        public static void LogTask8_4Audio()
+        {
+            LogTaskTag("Task8-4", "Audio");
+        }
+
+        /// <summary>7-2: スライドの再利用を記録。</summary>
+        public static void LogTask7_2ReuseSlides()
+        {
+            LogTaskTag("Task7-2", "ReuseSlides");
+        }
+
+        /// <summary>7-3: アウトラインから挿入を記録。</summary>
+        public static void LogTask7_3InsertFromOutline()
+        {
+            LogTaskTag("Task7-3", "InsertFromOutline");
+        }
+
+        /// <summary>10-1: ドキュメント検査実行を記録。</summary>
+        public static void LogTask10_1DocumentInspector()
+        {
+            LogTaskTag("Task10-1", "DocumentInspector");
+        }
+
+        /// <summary>10-7: レイアウト複製を記録。</summary>
+        public static void LogTask10_7LayoutDuplicate()
+        {
+            LogTaskTag("Task10-7", "LayoutDuplicate");
+        }
+
+        private static void LogTaskTag(string taskTag, string identifier)
+        {
+            try
+            {
+                lock (_lockObject)
+                {
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string logEntry = $"[{timestamp}] [{taskTag}] {identifier}";
+                    AppendLine(logEntry);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] Error writing log: {ex.Message}");
+            }
+        }
+
         private static void AppendLine(string logEntry)
         {
             using (var fileStream = new FileStream(

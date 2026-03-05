@@ -10,7 +10,7 @@ namespace Libraries.Group1
 {
     public class PowerPointChecker1_10
     {
-        /// <summary>10-1: ドキュメント検査実行（間接: コメントが削除されているか等）。</summary>
+        /// <summary>10-1: ドキュメント検査の結果を検証。コメントが0件かつ、ドキュメントのプロパティと個人情報が空であること。</summary>
         public bool CheckTask_1_10_01()
         {
             Presentation pres = null;
@@ -18,7 +18,8 @@ namespace Libraries.Group1
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
-                int totalComments = 0;
+
+                // コメント: 全スライドで0件であること
                 Slides slides = null;
                 try
                 {
@@ -34,15 +35,34 @@ namespace Libraries.Group1
                             try
                             {
                                 comments = slide.Comments;
-                                if (comments != null) totalComments += comments.Count;
+                                if (comments != null && comments.Count > 0) return false;
                             }
                             finally { if (comments != null) { try { Marshal.ReleaseComObject(comments); } catch { } } }
                         }
                         finally { if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } } }
                     }
-                    return totalComments == 0;
                 }
                 finally { if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } } }
+
+                // ドキュメントのプロパティと個人情報: 指定プロパティがすべて空であること
+                try
+                {
+                    dynamic props = pres.BuiltInDocumentProperties;
+                    if (props == null) return true;
+                    string[] personalPropNames = { "Author", "Manager", "Company", "Last Author", "Title", "Subject", "Keywords", "Comments" };
+                    foreach (string name in personalPropNames)
+                    {
+                        try
+                        {
+                            object val = props[name].Value;
+                            string s = (val == null) ? "" : (val.ToString() ?? "").Trim();
+                            if (!string.IsNullOrEmpty(s)) return false;
+                        }
+                        catch { /* プロパティが存在しない場合は無視 */ }
+                    }
+                    return true;
+                }
+                catch { return false; }
             }
             catch { return false; }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
@@ -247,7 +267,7 @@ namespace Libraries.Group1
             catch { return false; }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
-        /// <summary>10-7: スライドマスターにレイアウト「画像付きスライド」が存在するか。</summary>
+        /// <summary>10-7: スライドマスターにレイアウト「画像付きスライド」が存在するか。COM で検証。VSTO ログで複製操作があれば補強（ログは任意）。</summary>
         public bool CheckTask_1_10_07()
         {
             Presentation pres = null;

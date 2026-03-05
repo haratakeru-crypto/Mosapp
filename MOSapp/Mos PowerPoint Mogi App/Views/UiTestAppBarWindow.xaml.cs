@@ -1960,8 +1960,10 @@ namespace MOS_PowerPoint_app.Views
                     return;
                 }
                 
-                // すべてのプレゼンテーションを閉じる
-                while (pptApp.Presentations.Count > 0)
+                // すべてのプレゼンテーションを閉じる（無限ループ防止: 最大試行回数と Count が減らない場合の打ち切り）
+                const int maxAttempts = 25;
+                int prevCount = pptApp.Presentations.Count;
+                for (int attempt = 0; attempt < maxAttempts && pptApp.Presentations.Count > 0; attempt++)
                 {
                     PowerPointPresentation openPres = null;
                     try
@@ -1970,30 +1972,31 @@ namespace MOS_PowerPoint_app.Views
                         try { openPres.Save(); System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを保存しました: {openPres.Name}"); } catch { }
                         openPres.Close();
                         System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを閉じました: {openPres.Name}");
+                        // 閉じたのに Count が減らない場合はループ打ち切り（7-2 参照ファイル等で発生しうる）
+                        int newCount = pptApp.Presentations.Count;
+                        if (newCount >= prevCount)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] Countが減らないため打ち切り (prev={prevCount}, new={newCount})");
+                            break;
+                        }
+                        prevCount = newCount;
                     }
                     catch (COMException comEx) when (comEx.HResult == unchecked((int)0x80010108)) // RPC_E_DISCONNECTED
                     {
                         // 既に切断されている場合は無視して続行
                         System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションは既に切断されています（無視）: {comEx.Message}");
-                        // ループから抜けるために、Presentations.Countを確認する前にbreak
                         break;
                     }
                     catch (Exception closeEx)
                     {
                         System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを閉じる際のエラー: {closeEx.Message}");
-                        // エラーが発生しても次のプレゼンテーションを試すため、breakしない
-                        // ただし、無限ループを避けるために、Presentations.Countが変わらない場合はbreak
                         if (pptApp.Presentations.Count > 0)
                         {
                             try
                             {
-                                // 次のプレゼンテーションを取得して再試行
                                 var nextPres = pptApp.Presentations[1];
                                 if (nextPres == openPres)
-                                {
-                                    // 同じプレゼンテーションが返された場合はループから抜ける
                                     break;
-                                }
                             }
                             catch
                             {

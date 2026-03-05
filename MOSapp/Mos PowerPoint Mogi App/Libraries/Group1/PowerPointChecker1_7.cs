@@ -2,6 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
+using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
+using Libraries;
 
 namespace Libraries.Group1
 {
@@ -63,8 +65,59 @@ namespace Libraries.Group1
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
-        public bool CheckTask_1_7_02() { return false; }
-        public bool CheckTask_1_7_03() { return false; }
+        /// <summary>7-2: 英検とはからスライド再利用。3枚目に「英検5級」を含むスライドがあるかで検証。</summary>
+        public bool CheckTask_1_7_02()
+        {
+            Presentation pres = null;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres == null) return false;
+                Slide slide3 = null;
+                try
+                {
+                    slide3 = PowerPointCheckerCommon.GetSlideByNumber(pres, 3);
+                    if (slide3 == null) return false;
+                    PptShape sh = null;
+                    try
+                    {
+                        sh = PowerPointCheckerCommon.FindShapeWithText(slide3, "英検5級");
+                        return sh != null;
+                    }
+                    finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
+                }
+                finally { if (slide3 != null) { try { Marshal.ReleaseComObject(slide3); } catch { } } }
+            }
+            catch { return false; }
+            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+        }
+
+        /// <summary>7-3: アウトラインからスライド挿入。6枚目に「弊社の他の講座一覧」を含むスライドがあるかで検証。</summary>
+        public bool CheckTask_1_7_03()
+        {
+            Presentation pres = null;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres == null) return false;
+                Slide slide6 = null;
+                try
+                {
+                    slide6 = PowerPointCheckerCommon.GetSlideByNumber(pres, 6);
+                    if (slide6 == null) return false;
+                    PptShape sh = null;
+                    try
+                    {
+                        sh = PowerPointCheckerCommon.FindShapeWithText(slide6, "弊社の他の講座一覧");
+                        return sh != null;
+                    }
+                    finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
+                }
+                finally { if (slide6 != null) { try { Marshal.ReleaseComObject(slide6); } catch { } } }
+            }
+            catch { return false; }
+            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+        }
 
         /// <summary>7-4: スライドショーを自動プレゼンテーションに設定。</summary>
         public bool CheckTask_1_7_04()

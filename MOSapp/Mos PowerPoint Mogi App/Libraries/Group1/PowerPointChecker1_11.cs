@@ -4,6 +4,7 @@ using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
 using PptShapes = Microsoft.Office.Interop.PowerPoint.Shapes;
+using Libraries;
 
 namespace Libraries.Group1
 {
@@ -295,9 +296,11 @@ namespace Libraries.Group1
             catch { return false; }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
-        /// <summary>11-7: ノートで全スライド3部・部単位で印刷。</summary>
+        /// <summary>11-7: ノートで全スライド3部・部単位で印刷。COM の PrintOptions または VSTO ログの印刷記録で判定。</summary>
         public bool CheckTask_1_11_07()
         {
+            if (PPLogReader.HasTask11_7PrintExecuted())
+                return true;
             Presentation pres = null;
             try
             {

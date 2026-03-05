@@ -80,13 +80,13 @@
       <dsig:DigestValue>R+Wg8QGvQVHX8T0ta/qbhH1bXkqY0fRnS3wBV3J0bN8=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="MOSExcelMogiApp.exe" size="496128">
+  <file name="MOSExcelMogiApp.exe" size="376320">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>ecTs7FvC/fLJ6lsGb7oVkIWkbG1zjJwTsDHF9NRrM30=</dsig:DigestValue>
+      <dsig:DigestValue>S9TrAR6bcKIycwvyy3wupK7V6WwVmtbowxiN0JfvosQ=</dsig:DigestValue>
     </hash>
   </file>
 </asmv1:assembly>
