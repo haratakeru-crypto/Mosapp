@@ -20,6 +20,32 @@ namespace Libraries
         }
 
         /// <summary>
+        /// 現在タスク共有ファイルのパスを取得（%TEMP%\mos_ppt_current_task.txt）。
+        /// 試験アプリが現在の ProjectId,TaskId を書き、VSTO アドインが読み取る。
+        /// </summary>
+        public static string GetCurrentTaskFilePath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
+        }
+
+        /// <summary>
+        /// 現在タスク共有ファイルを削除する。リセット時に呼び出す。
+        /// </summary>
+        public static void ClearCurrentTaskFile()
+        {
+            try
+            {
+                string path = GetCurrentTaskFilePath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] Error clearing current task file: " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// VSTO アドインのログファイルをクリアする。リセット時に呼び出す。
         /// </summary>
         public static void ClearLog()
@@ -121,6 +147,97 @@ namespace Libraries
                 System.Diagnostics.Debug.WriteLine("[PPLogReader] Error reading log: " + ex.Message);
             }
             return result;
+        }
+
+        /// <summary>
+        /// 指定タスク区間内の操作行を取得する。[TaskStart] で区切った区間のうち、指定 projectId-taskId の区間内の [Op] 行の内容（[Op] 以降）を返す。
+        /// </summary>
+        public static List<string> GetOperationsForTask(int projectId, int taskId)
+        {
+            var result = new List<string>();
+            string path = GetLogFilePath();
+            if (!File.Exists(path))
+                return result;
+            try
+            {
+                string[] lines = File.ReadAllLines(path);
+                int currentProject = -1, currentTask = -1;
+                foreach (string line in lines)
+                {
+                    if (line == null) continue;
+                    if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        ParseTaskStart(line, out currentProject, out currentTask);
+                        continue;
+                    }
+                    if (currentProject != projectId || currentTask != taskId)
+                        continue;
+                    int opIdx = line.IndexOf("[Op]", StringComparison.OrdinalIgnoreCase);
+                    if (opIdx < 0) continue;
+                    string afterOp = line.Substring(opIdx + 4).Trim();
+                    if (afterOp.Length > 0)
+                        result.Add(afterOp);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] GetOperationsForTask: " + ex.Message);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 指定タスク区間に、許可リストに含まれない操作が 1 件でもあれば true。許可リストは操作タイプ（RibbonCommand, ShapePositionChange 等）の集合。
+        /// ログが無い・空の場合は false（厳格判定しない）。
+        /// </summary>
+        public static bool HasDisallowedOperations(int projectId, int taskId, HashSet<string> allowedOperationTypes)
+        {
+            if (allowedOperationTypes == null)
+                return false;
+            var ops = GetOperationsForTask(projectId, taskId);
+            foreach (string opLine in ops)
+            {
+                string type = GetOperationType(opLine);
+                if (string.IsNullOrEmpty(type)) continue;
+                if (!allowedOperationTypes.Contains(type))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 指定タスク区間に ShapePositionChange が 1 件でもあれば true。
+        /// </summary>
+        public static bool HasShapePositionChange(int projectId, int taskId)
+        {
+            var ops = GetOperationsForTask(projectId, taskId);
+            foreach (string opLine in ops)
+            {
+                if (opLine.IndexOf("ShapePositionChange", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void ParseTaskStart(string line, out int projectId, out int taskId)
+        {
+            projectId = -1;
+            taskId = -1;
+            int startIdx = line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase);
+            if (startIdx < 0) return;
+            string part = line.Substring(startIdx + 11).Trim();
+            var tokens = part.Split(new[] { '-', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length >= 2 && int.TryParse(tokens[0].Trim(), out projectId) && int.TryParse(tokens[1].Trim(), out taskId))
+                return;
+            projectId = -1;
+            taskId = -1;
+        }
+
+        private static string GetOperationType(string opLine)
+        {
+            if (string.IsNullOrWhiteSpace(opLine)) return "";
+            int space = opLine.IndexOf(' ');
+            return space > 0 ? opLine.Substring(0, space).Trim() : opLine.Trim();
         }
     }
 }

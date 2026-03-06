@@ -95,6 +95,7 @@ namespace MOS_PowerPoint_app.Views
             LoadClipboardTargets(); // クリップボード対象を先に読み込む
             LoadTasks();
             UpdateTaskDisplay();
+            WriteCurrentTaskFile();
             SetWindowPosition();
             // 注意: PowerPointプレゼンテーションはMainViewModelのExecuteOpenProjectで既に開かれている
             // ここでは開かない（PositionPowerPointWindowはSetWindowPositionで呼ばれる）
@@ -335,6 +336,10 @@ namespace MOS_PowerPoint_app.Views
                         slide = slides[i];
                         currentSlideIds.Add(slide.SlideID);
                     }
+                    catch (COMException)
+                    {
+                        // スライド削除などでオブジェクトが無効になった場合はスキップ（強制終了を防ぐ）
+                    }
                     finally
                     {
                         if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
@@ -511,6 +516,7 @@ namespace MOS_PowerPoint_app.Views
                 
                 // UIを更新
                 UpdateTaskDisplay();
+                WriteCurrentTaskFile();
                 
                 // メインウィンドウを表示
                 this.Show();
@@ -1072,6 +1078,7 @@ namespace MOS_PowerPoint_app.Views
             
             // プロジェクトタイトルを更新
             UpdateProjectTitle();
+            WriteCurrentTaskFile();
         }
         
         private void UpdateProjectTitle()
@@ -1579,6 +1586,7 @@ namespace MOS_PowerPoint_app.Views
             {
                 _currentTaskId--;
                 UpdateTaskDisplay();
+                WriteCurrentTaskFile();
             }
         }
         
@@ -1588,6 +1596,7 @@ namespace MOS_PowerPoint_app.Views
             {
                 _currentTaskId++;
                 UpdateTaskDisplay();
+                WriteCurrentTaskFile();
             }
         }
         
@@ -1600,7 +1609,25 @@ namespace MOS_PowerPoint_app.Views
                 {
                     _currentTaskId = taskId;
                     UpdateTaskDisplay();
+                    WriteCurrentTaskFile();
                 }
+            }
+        }
+        
+        /// <summary>
+        /// VSTO アドインが現在タスクを参照するため、共有ファイルに ProjectId,TaskId を書き出す。
+        /// </summary>
+        private void WriteCurrentTaskFile()
+        {
+            try
+            {
+                string path = Libraries.PPLogReader.GetCurrentTaskFilePath();
+                string content = $"{_currentProjectId},{_currentTaskId}";
+                File.WriteAllText(path, content, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] WriteCurrentTaskFile: " + ex.Message);
             }
         }
         
@@ -1888,6 +1915,7 @@ namespace MOS_PowerPoint_app.Views
                 if (result == MessageBoxResult.Yes)
                 {
                     ResetProject(_groupId, _currentProjectId);
+                    PowerPointChecker1_1.ResetTask4SlideDeletionState();
                     MessageBox.Show("プロジェクトをリセットしました。", "リセット完了", MessageBoxButton.OK, MessageBoxImage.Information);
                     
                     // リセット後、PowerPointプレゼンテーションを再読み込み

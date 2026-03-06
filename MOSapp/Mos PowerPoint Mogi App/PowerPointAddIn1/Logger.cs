@@ -108,6 +108,47 @@ namespace PowerPointAddIn1
             LogTaskTag("Task10-7", "LayoutDuplicate");
         }
 
+        /// <summary>
+        /// 現在タスク開始を記録（試験アプリがタスクを切り替えたとき）。形式: [timestamp] [TaskStart] P-T
+        /// </summary>
+        public static void LogTaskStart(int projectId, int taskId)
+        {
+            try
+            {
+                lock (_lockObject)
+                {
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string logEntry = $"[{timestamp}] [TaskStart] {projectId}-{taskId}";
+                    AppendLine(logEntry);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] Error writing log: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 汎用操作を記録。現在タスクが指定されていれば [Task P-T] をプレフィックスする。形式: [timestamp] [Task P-T] [Op] Type Detail
+        /// </summary>
+        public static void LogOperation(string operationType, string detail, int? projectId = null, int? taskId = null)
+        {
+            try
+            {
+                lock (_lockObject)
+                {
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string taskPrefix = (projectId.HasValue && taskId.HasValue) ? $"[Task {projectId.Value}-{taskId.Value}] " : "";
+                    string logEntry = $"[{timestamp}] {taskPrefix}[Op] {operationType} {detail}";
+                    AppendLine(logEntry);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] Error writing log: {ex.Message}");
+            }
+        }
+
         private static void LogTaskTag(string taskTag, string identifier)
         {
             try

@@ -167,6 +167,7 @@
     <Compile Include="Libraries\Group1\PowerPointChecker1_9.cs" />
     <Compile Include="Libraries\Group1\PowerPointCheckerCommon.cs" />
     <Compile Include="Libraries\PPLogReader.cs" />
+    <Compile Include="Libraries\PPAllowedOperations.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

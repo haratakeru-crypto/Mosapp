@@ -98,6 +98,24 @@ namespace PowerPointAddIn1
             }
         }
 
+        /// <summary>
+        /// 組み込みコマンド実行時に呼ばれる。操作をログに記録し、既定の動作はそのまま実行させる。
+        /// </summary>
+        public void Ribbon_OnCommand(IRibbonControl control)
+        {
+            try
+            {
+                string id = control?.Id ?? "";
+                int? p = ThisAddIn.CurrentTaskProjectId >= 0 ? (int?)ThisAddIn.CurrentTaskProjectId : null;
+                int? t = ThisAddIn.CurrentTaskTaskId >= 0 ? (int?)ThisAddIn.CurrentTaskTaskId : null;
+                Logger.LogOperation("RibbonCommand", "Id=" + id, p, t);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[Ribbon] Ribbon_OnCommand: " + ex.Message);
+            }
+        }
+
         #endregion
 
         #region ヘルパー
@@ -138,6 +156,23 @@ namespace PowerPointAddIn1
         {
             return @"<?xml version=""1.0"" encoding=""UTF-8""?>
 <customUI xmlns=""http://schemas.microsoft.com/office/2009/07/customui"" onLoad=""Ribbon_Load"">
+  <commands>
+    <command idMso=""Cut"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""Paste"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""SlideNew"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""SlideDuplicate"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""LayoutGallery"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""AlignLeft"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""AlignCenter"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""AlignRight"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""AlignTop"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""AlignMiddle"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""AlignBottom"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""BringForward"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""SendBackward"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""BringToFront"" onAction=""Ribbon_OnCommand"" />
+    <command idMso=""SendToBack"" onAction=""Ribbon_OnCommand"" />
+  </commands>
   <ribbon>
     <tabs>
       <tab id=""DebugTab"" label=""ログ"" insertAfterMso=""Help"">

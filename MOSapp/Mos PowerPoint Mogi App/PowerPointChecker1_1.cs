@@ -81,6 +81,7 @@ namespace Libraries.Group1
 
         public bool CheckTask_1_1_02()
         {
+            if (Task4PassedByThirdSlideDeletion) return true;
             Presentation pres = null;
             try
             {
@@ -125,6 +126,7 @@ namespace Libraries.Group1
 
         public bool CheckTask_1_1_03()
         {
+            if (Task4PassedByThirdSlideDeletion) return true;
             Presentation pres = null;
             try
             {

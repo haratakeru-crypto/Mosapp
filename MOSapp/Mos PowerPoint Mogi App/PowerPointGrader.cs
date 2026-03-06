@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.PowerPoint;
+using Libraries;
 using Libraries.Group1;
 
 namespace MOS_PowerPoint_app
@@ -51,6 +53,7 @@ namespace MOS_PowerPoint_app
 
         /// <summary>
         /// 指定したプロジェクト・タスクの採点を行う。
+        /// ログに余計な操作や許可されない座標変化があれば不合格。続けて COM による結果判定を行う。
         /// </summary>
         /// <param name="projectId">プロジェクト ID（1～11）。</param>
         /// <param name="taskId">タスク ID。</param>
@@ -58,6 +61,9 @@ namespace MOS_PowerPoint_app
         public bool GradeTask(int projectId, int taskId)
         {
             if (_activePresentation == null)
+                return false;
+
+            if (FailsLogChecks(projectId, taskId))
                 return false;
 
             try
@@ -201,6 +207,24 @@ namespace MOS_PowerPoint_app
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// VSTO ログを参照し、余計な操作または許可されない座標変化があれば true（不合格とする）。
+        /// ログファイルが無い場合は false（アドイン未導入時は COM のみで判定）。
+        /// </summary>
+        private static bool FailsLogChecks(int projectId, int taskId)
+        {
+            string logPath = PPLogReader.GetLogFilePath();
+            if (!File.Exists(logPath))
+                return false;
+
+            var allowed = PPAllowedOperations.GetAllowedOperationTypes(projectId, taskId);
+            if (PPLogReader.HasDisallowedOperations(projectId, taskId, allowed))
+                return true;
+            if (!PPAllowedOperations.IsShapePositionChangeAllowed(projectId, taskId) && PPLogReader.HasShapePositionChange(projectId, taskId))
+                return true;
+            return false;
         }
 
         public void Dispose()
