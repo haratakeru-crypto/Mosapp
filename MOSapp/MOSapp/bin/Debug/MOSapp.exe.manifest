@@ -62,13 +62,13 @@
       <dsig:DigestValue>NRvLhlfDgUE95IqnkK0JEQHljJPJ1f+CBvtAX0KDn3U=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="MOS Word app.exe" size="216576">
+  <file name="MOS Word app.exe" size="217600">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>LmCKRCzVjzn5dNW6mRkmb9UhPoWgfhppybUJVgW3j4k=</dsig:DigestValue>
+      <dsig:DigestValue>tgjVegBkxxUyjzn3FR6NjHsfpkgFVcZa3mO6Yp/va1o=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOSapp.exe.config" size="189">
