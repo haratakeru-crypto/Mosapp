@@ -42,14 +42,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="265640">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="266152">
       <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>XafS2nEH6sMTRhvIPzYCF740OZF04NtXVTVtDVQ/jc8=</dsig:DigestValue>
+        <dsig:DigestValue>pKjPqr+yeBdeN/o5uY3Q2uQW0+Zw1bHDYUDjQHinucI=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -169,7 +169,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>QcBewOsk3BvGWy529w1+N6TQ1X8D7LC/j+wZ6kZS44c=</dsig:DigestValue>
+        <dsig:DigestValue>YFTbuw4xB4a7gtwoeb+6Ts38dQyw6FM8TW7EDgH3bu0=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

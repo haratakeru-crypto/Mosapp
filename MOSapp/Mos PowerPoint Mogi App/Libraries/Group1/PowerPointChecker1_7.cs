@@ -134,7 +134,8 @@ namespace Libraries.Group1
                     if (ssSettings == null) return false;
                     try
                     {
-                        return ssSettings.AdvanceMode == PpSlideShowAdvanceMode.ppSlideShowUseSlideTimings;
+                        // 「自動プレゼンテーション（Kioskモード）」に設定されているかを判定します
+                        return ssSettings.ShowType == PpSlideShowType.ppShowTypeKiosk;
                     }
                     catch { return false; }
                 }

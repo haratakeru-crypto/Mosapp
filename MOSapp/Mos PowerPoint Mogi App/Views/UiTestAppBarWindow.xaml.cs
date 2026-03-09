@@ -2004,7 +2004,14 @@ namespace MOS_PowerPoint_app.Views
                         int newCount = pptApp.Presentations.Count;
                         if (newCount >= prevCount)
                         {
-                            System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] Countが減らないため打ち切り (prev={prevCount}, new={newCount})");
+                            System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] Countが減らないため、強制的にプロセスを終了します。 (prev={prevCount}, new={newCount})");
+                            // 閉じられないプレゼンテーションがある場合は、一度PowerPointを完全に落とす
+                            try
+                            {
+                                var pptProcesses = System.Diagnostics.Process.GetProcessesByName("POWERPNT");
+                                foreach (var proc in pptProcesses) { proc.Kill(); }
+                            }
+                            catch { }
                             break;
                         }
                         prevCount = newCount;
