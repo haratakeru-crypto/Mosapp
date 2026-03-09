@@ -127,7 +127,8 @@ namespace Libraries.Group1
                         try
                         {
                             float w = (float)modelShape.Width;
-                            return Math.Abs(w - 9.5f) < 0.1f;
+                            float cm = w / 28.34646f;
+                            return Math.Abs(cm - 9.5f) < 0.1f;
                         }
                         catch { return false; }
                     }
@@ -153,20 +154,48 @@ namespace Libraries.Group1
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
+                
                 Slide slide = null;
                 try
                 {
                     slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 5);
                     if (slide == null) return false;
+                    
                     PptShape modelShape = null;
                     try
                     {
-                        modelShape = PowerPointCheckerCommon.Find3DModelShapeByName(slide, "Shikaku");
+                        modelShape = PowerPointCheckerCommon.Find3DModelShape(slide);
                         if (modelShape == null) return false;
+                        
                         try
                         {
+                            bool viewMatch = false;
+                            try
+                            {
+                                dynamic dynShape = modelShape;
+                                dynamic m3d = dynShape.Model3D;
+                                if (m3d != null)
+                                {
+                                    // 下背面の回転データ (RotX=20, RotY=180, RotZ=0)
+                                    float rotX = (float)m3d.RotationX;
+                                    float rotY = (float)m3d.RotationY;
+                                    float rotZ = (float)m3d.RotationZ;
+
+                                    if (Math.Abs(rotX - 20f) < 1f && 
+                                        Math.Abs(rotY - 180f) < 1f && 
+                                        Math.Abs(rotZ - 0f) < 1f)
+                                    {
+                                        viewMatch = true;
+                                    }
+                                }
+                            }
+                            catch { }
+
                             float h = (float)modelShape.Height;
-                            return Math.Abs(h - 7.2f) < 0.1f;
+                            float cm = h / 28.34646f;
+                            bool heightMatch = Math.Abs(cm - 7.2f) < 0.1f;
+                            
+                            return viewMatch && heightMatch;
                         }
                         catch { return false; }
                     }

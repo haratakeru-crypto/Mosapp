@@ -54,7 +54,7 @@ namespace Libraries
                 case 5:
                     return taskId == 3 || taskId == 4 || taskId == 5; // 5-3 図形変更, 5-4 幅合わせ, 5-5 グループ化
                 case 6:
-                    return taskId == 3; // 6-3: 3Dモデル幅・中央の枠に
+                    return taskId == 3 || taskId == 4; // 6-3: 3Dモデル幅・中央の枠に, 6-4: 3Dモデル高さ変更等
                 case 7:
                     return taskId == 2 || taskId == 3; // 7-2 スライド再利用, 7-3 アウトラインから挿入（スライド追加で番号ずれ）
                 case 9:
