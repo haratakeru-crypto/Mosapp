@@ -174,27 +174,52 @@ namespace Libraries.Group1
                     {
                         shapes = slide.Shapes;
                         if (shapes == null) return false;
+                        
                         int count = shapes.Count;
-                        float width1 = -1f, width2 = -1f;
-                        int found = 0;
-                        for (int i = 1; i <= count && found < 2; i++)
+                        System.Collections.Generic.List<float> cloudWidths = new System.Collections.Generic.List<float>();
+                        for (int i = 1; i <= count; i++)
                         {
                             PptShape sh = null;
                             try
                             {
                                 sh = shapes[i];
-                                if (!PowerPointCheckerCommon.IsPictureShape(sh)) continue;
-                                float w = (float)sh.Width;
-                                if (width1 < 0) { width1 = w; found = 1; }
-                                else if (Math.Abs(w - width1) > 0.01f) { width2 = w; found = 2; }
+                                bool isCloudCandidate = false;
+                                // 画像であるか、またはオートシェイプの「雲」であるかを確認
+                                if (PowerPointCheckerCommon.IsPictureShape(sh)) 
+                                {
+                                    isCloudCandidate = true;
+                                }
+                                else 
+                                {
+                                    try 
+                                    { 
+                                        if (sh.AutoShapeType == Microsoft.Office.Core.MsoAutoShapeType.msoShapeCloud) 
+                                            isCloudCandidate = true; 
+                                    } catch { }
+                                }
+                                if (isCloudCandidate)
+                                {
+                                    cloudWidths.Add((float)sh.Width);
+                                }
                             }
                             finally
                             {
                                 if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
                             }
                         }
-                        if (found < 2) return false;
-                        return Math.Abs(width1 - width2) < 0.1f;
+                        // 画像または雲の図形が2つ以上ない場合は不正解
+                        // 画像または雲の図形が3つ以上ない場合は不正解（対象となる雲が3つあるため）
+                        if (cloudWidths.Count < 3) return false;
+                        
+                        // 幅を降順（大きい順）に並び替え
+                        // 初期の「大きい雲2つ＋小さい雲1つ」の状態では、
+                        // 1番目(大きい雲)と3番目(小さい雲)で幅が異なるため不正解になる。
+                        // 正しく修正すると、雲3つの幅が揃うため、1番目と3番目の幅が一致して正解となる。
+                        cloudWidths.Sort();
+                        cloudWidths.Reverse();
+                        
+                        // 上位3つの内、最大と最小の差分が0.5未満か確認
+                        return Math.Abs(cloudWidths[0] - cloudWidths[2]) < 0.5f;
                     }
                     finally
                     {
