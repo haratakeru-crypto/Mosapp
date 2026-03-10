@@ -233,6 +233,7 @@ namespace Libraries
             taskId = -1;
         }
 
+
         private static string GetOperationType(string opLine)
         {
             if (string.IsNullOrWhiteSpace(opLine)) return "";

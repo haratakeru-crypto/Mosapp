@@ -21,6 +21,7 @@ C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Powe
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_8.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_9.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointCheckerCommon.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointCheckerCommon.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_1.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_2.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_3.pdb
@@ -61,4 +62,3 @@ C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos 
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS Powe.03856F61.Up2Date
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.pdb
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointCheckerCommon.pdb

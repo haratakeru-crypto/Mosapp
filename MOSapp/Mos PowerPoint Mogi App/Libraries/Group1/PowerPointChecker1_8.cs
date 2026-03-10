@@ -1,5 +1,8 @@
 using System;
+using System.IO;
+using System.IO.Packaging;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
@@ -175,22 +178,67 @@ namespace Libraries.Group1
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
-        /// <summary>8-5: プレゼンテーションを読み取り専用に設定。</summary>
+        /// <summary>8-5: プレゼンテーションを読み取り専用に設定。pptx内XMLのreadOnlyRecommendedタグを直接解析して判定。</summary>
         public bool CheckTask_1_8_05()
         {
             Presentation pres = null;
+            string tempPath = null;
             try
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
+
+                // 現在のメモリ状態（未保存の設定変更も含む）を一時ファイルに書き出す
+                tempPath = Path.Combine(Path.GetTempPath(), "mos_8_5_check_" + Guid.NewGuid().ToString("N") + ".pptx");
                 try
                 {
-                    return pres.ReadOnly == MsoTriState.msoTrue;
+                    pres.SaveCopyAs(tempPath);
                 }
                 catch { return false; }
+
+                // pptx（OPC/ZIP）内の全XMLパートを検索して設定を確認
+                try
+                {
+                    using (var package = Package.Open(tempPath, FileMode.Open, FileAccess.Read))
+                    {
+                        foreach (var part in package.GetParts())
+                        {
+                            // XML関連のパートをすべてチェック（presentation.xml, presProps.xml, app.xml等）
+                            if (part.Uri.OriginalString.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string xml;
+                                using (var reader = new StreamReader(part.GetStream()))
+                                    xml = reader.ReadToEnd();
+
+                                // readOnlyRecommended が 1 または true であれば合格
+                                if (Regex.IsMatch(xml, @"readOnlyRecommended[^>]*val\s*=\s*""(?:1|true)""", RegexOptions.IgnoreCase))
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                // バックアップとしてCOMプロパティ（すでに読取専用として開かれている場合）も確認
+                try
+                {
+                    if (pres.ReadOnly == MsoTriState.msoTrue) return true;
+                }
+                catch { }
+
+                return false;
             }
             catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+            finally
+            {
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
+                if (tempPath != null && File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); } catch { }
+                }
+            }
         }
     }
 }

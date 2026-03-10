@@ -101,18 +101,27 @@ namespace PowerPointAddIn1
         /// <summary>
         /// 組み込みコマンド実行時に呼ばれる。操作をログに記録し、既定の動作はそのまま実行させる。
         /// </summary>
+        // 通常のボタン用
         public void Ribbon_OnCommand(IRibbonControl control)
+        {
+            RecordCommand("RibbonCommand", control, null);
+        }
+        private void RecordCommand(string tag, IRibbonControl control, bool? pressed)
         {
             try
             {
-                string id = control?.Id ?? "";
+                string id = control?.Id ?? "(null)";
+                string detail = "Id=" + id + (pressed.HasValue ? " Pressed=" + pressed.Value : "");
+                
+                
                 int? p = ThisAddIn.CurrentTaskProjectId >= 0 ? (int?)ThisAddIn.CurrentTaskProjectId : null;
                 int? t = ThisAddIn.CurrentTaskTaskId >= 0 ? (int?)ThisAddIn.CurrentTaskTaskId : null;
-                Logger.LogOperation("RibbonCommand", "Id=" + id, p, t);
+                
+                // ログファイルにも記録
+                Logger.LogOperation(tag, detail, p, t);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[Ribbon] Ribbon_OnCommand: " + ex.Message);
             }
         }
 

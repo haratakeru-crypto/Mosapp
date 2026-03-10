@@ -16,6 +16,8 @@
     <command idMso="SendBackward" onAction="Ribbon_OnCommand" />
     <command idMso="BringToFront" onAction="Ribbon_OnCommand" />
     <command idMso="SendToBack" onAction="Ribbon_OnCommand" />
+    <command idMso="FileAlwaysOpenReadOnly" onAction="Ribbon_OnCommand" />
+    <command idMso="FileReadOnlyRecommended" onAction="Ribbon_OnCommand" />
   </commands>
   <ribbon>
     <tabs>
