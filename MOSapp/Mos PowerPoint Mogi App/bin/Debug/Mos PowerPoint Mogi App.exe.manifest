@@ -42,14 +42,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="274856">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="275368">
       <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>KzKjSEAtcniuTcbVE8Z0WLkDtvtjmB4K6ZJOpUP73ls=</dsig:DigestValue>
+        <dsig:DigestValue>0q6Pwyc9490hFNyORjjIaYgFoePN6idANDh1JZbvX80=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -90,14 +90,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_11.dll" size="17920">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_11.dll" size="18432">
       <assemblyIdentity name="PowerPointChecker1_11" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>bKXEynLrxnd9pHutgdJRPBuZ8zVBXbwAAt5QWCfiauI=</dsig:DigestValue>
+        <dsig:DigestValue>WMh6v+gWLUzwFdf9Hv0eTFJ3TjeoZC9RzMkI83mnt3g=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

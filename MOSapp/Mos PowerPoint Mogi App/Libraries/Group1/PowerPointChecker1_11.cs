@@ -27,8 +27,8 @@ namespace Libraries.Group1
                     {
                         float w = (float)pageSetup.SlideWidth;
                         float h = (float)pageSetup.SlideHeight;
-                        if (w <= 0) return false;
-                        float ratio = h / w;
+                        if (h <= 0) return false;
+                        float ratio = w / h;
                         // 16:10 = 1.6
                         return Math.Abs(ratio - 1.6f) < 0.02f;
                     }
@@ -110,41 +110,31 @@ namespace Libraries.Group1
                             {
                                 sh = shapes[i];
                                 if (sh.HasTextFrame != MsoTriState.msoTrue) continue;
-                                string text = null;
+                                string text = "";
                                 try
                                 {
                                     var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
-                                    if (tf == null) continue;
-                                    text = tf.TextRange?.Text ?? "";
+                                    if (tf != null) text = tf.TextRange?.Text ?? "";
                                 }
-                                catch { continue; }
-                                if (string.IsNullOrEmpty(text) || text.IndexOf("•", StringComparison.Ordinal) < 0 && text.IndexOf("・", StringComparison.Ordinal) < 0) continue;
+                                catch { }
+
+                                bool hasBullet = text.Contains("•") || text.Contains("・") || text.Contains("\r") || text.Contains("\n");
+                                if (!hasBullet) continue;
+
                                 try
                                 {
                                     Microsoft.Office.Interop.PowerPoint.FillFormat fill = sh.Fill;
-                                    if (fill == null) continue;
-                                    try
+                                    if (fill != null && fill.Visible == MsoTriState.msoTrue)
                                     {
-                                        if (fill.Visible != MsoTriState.msoTrue) continue;
-                                        Microsoft.Office.Interop.PowerPoint.ColorFormat cf = fill.ForeColor;
-                                        if (cf == null) continue;
-                                        try
+                                        Microsoft.Office.Interop.PowerPoint.LineFormat line = sh.Line;
+                                        if (line != null && line.Visible == MsoTriState.msoTrue)
                                         {
-                                            bool accent1 = (cf.ObjectThemeColor == MsoThemeColorIndex.msoThemeColorAccent1);
-                                            Microsoft.Office.Interop.PowerPoint.LineFormat line = sh.Line;
-                                            if (line == null) continue;
-                                            try
-                                            {
-                                                float weight = (float)line.Weight;
-                                                return accent1 && Math.Abs(weight - 1.5f) < 0.2f;
-                                            }
-                                            finally { if (line != null) { try { Marshal.ReleaseComObject(line); } catch { } } }
+                                            float weight = (float)line.Weight;
+                                            if (Math.Abs(weight - 1.5f) < 0.2f) return true;
                                         }
-                                        finally { if (cf != null) { try { Marshal.ReleaseComObject(cf); } catch { } } }
                                     }
-                                    finally { if (fill != null) { try { Marshal.ReleaseComObject(fill); } catch { } } }
                                 }
-                                catch { continue; }
+                                catch { }
                             }
                             finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
                         }
@@ -216,22 +206,28 @@ namespace Libraries.Group1
                             try
                             {
                                 sh = shapes[i];
+                                // msoGraphic は enumにない場合があるため数値 (24) でチェック
+                                int shapeType = (int)sh.Type;
+                                if (shapeType != 24 && shapeType != 13 /* msoPicture */ && !sh.Name.Contains("Graphic") && !sh.Name.Contains("Icon")) continue;
+
                                 Microsoft.Office.Interop.PowerPoint.FillFormat fill = null;
                                 try
                                 {
                                     fill = sh.Fill;
                                     if (fill == null || fill.Visible != MsoTriState.msoTrue) continue;
+                                    
                                     Microsoft.Office.Interop.PowerPoint.ColorFormat cf = fill.ForeColor;
                                     if (cf == null) continue;
-                                    try
-                                    {
-                                        var otheme = cf.ObjectThemeColor;
-                                        if (otheme == MsoThemeColorIndex.msoThemeColorAccent1 || otheme == MsoThemeColorIndex.msoThemeColorAccent2) return true;
-                                        int rgb = (int)cf.RGB;
-                                        int b = rgb & 0xFF; int g = (rgb >> 8) & 0xFF; int r = (rgb >> 16) & 0xFF;
-                                        if (b > 200 && r < 100 && g < 100) return true;
-                                    }
-                                    catch { continue; }
+                                    
+                                    int rgb = (int)cf.RGB;
+                                    int r = rgb & 0xFF; int g = (rgb >> 8) & 0xFF; int b = (rgb >> 16) & 0xFF;
+
+                                    // 標準色の「青」 (RGB: 0, 112, 192) = BGR(192, 112, 0)
+                                    // 初期状態がアクセントカラー（青系）であるため、RGB指定されているか、または標準色の特定の値を狙う
+                                    if (b >= 190 && b <= 200 && g >= 110 && g <= 120 && r == 0) return true;
+                                    
+                                    // または標準の「青」(別バリエーション)
+                                    if (b == 255 && r == 0 && g == 0) return true; // 純粋な青
                                 }
                                 finally { if (fill != null) { try { Marshal.ReleaseComObject(fill); } catch { } } }
                             }
@@ -255,6 +251,9 @@ namespace Libraries.Group1
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
+                
+                PageSetup ps = pres.PageSetup;
+                float slideHeight = ps.SlideHeight;
                 Slide slide = null;
                 try
                 {
@@ -272,18 +271,31 @@ namespace Libraries.Group1
                             {
                                 sh = shapes[i];
                                 if (sh.HasTextFrame != MsoTriState.msoTrue) continue;
+                                
+                                string text = "";
                                 try
                                 {
-                                    dynamic tf2 = sh.TextFrame2;
-                                    if (tf2 == null) continue;
-                                    try
-                                    {
-                                        int anchor = (int)tf2.VerticalAnchor;
-                                        return anchor == (int)MsoVerticalAnchor.msoAnchorMiddle;
-                                    }
-                                    catch { continue; }
+                                    var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                                    if (tf != null) text = tf.TextRange?.Text ?? "";
                                 }
-                                catch { continue; }
+                                catch { }
+
+                                // 箇条書きを含む図形か
+                                bool isBodyText = text.Contains("•") || text.Contains("・") || text.Contains("\r") || text.Contains("\n");
+                                if (!isBodyText) continue;
+
+                                // [配置] -> [上下中央揃え] のチェック
+                                float shapeCenter = sh.Top + (sh.Height / 2.0f);
+                                float slideCenter = slideHeight / 2.0f;
+
+                                // スライドの中央に配置されているか
+                                if (Math.Abs(shapeCenter - slideCenter) < 5.0f) return true;
+
+                                // もしテキスト内の配置を指している場合も考慮
+                                try {
+                                    dynamic tf2 = sh.TextFrame2;
+                                    if (tf2 != null && (int)tf2.VerticalAnchor == (int)MsoVerticalAnchor.msoAnchorMiddle) return true;
+                                } catch { }
                             }
                             finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
                         }
@@ -296,11 +308,10 @@ namespace Libraries.Group1
             catch { return false; }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
+
         /// <summary>11-7: ノートで全スライド3部・部単位で印刷。COM の PrintOptions または VSTO ログの印刷記録で判定。</summary>
         public bool CheckTask_1_11_07()
         {
-            if (PPLogReader.HasTask11_7PrintExecuted())
-                return true;
             Presentation pres = null;
             try
             {
@@ -313,9 +324,12 @@ namespace Libraries.Group1
                     if (po == null) return false;
                     try
                     {
+                        // 「ノート」
                         if (po.OutputType != PpPrintOutputType.ppPrintOutputNotesPages) return false;
+                        // 「3部」
                         if (po.NumberOfCopies != 3) return false;
-                        return po.Collate == MsoTriState.msoTrue;
+                        // 「1ページ目を全て印刷したあとに...」 = ページ単位 (Uncollated) = Collate: Off
+                        return po.Collate == MsoTriState.msoFalse;
                     }
                     catch { return false; }
                 }
