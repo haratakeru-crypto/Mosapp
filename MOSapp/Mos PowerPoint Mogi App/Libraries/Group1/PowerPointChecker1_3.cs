@@ -276,6 +276,7 @@ namespace Libraries.Group1
                                 float height = (float)sh.Height;
                                 int st = (int)sh.Type;
 
+                                // 1. テキストがある図形から、メインテキスト領域の下端を特定する
                                 if (sh.HasTextFrame == MsoTriState.msoTrue)
                                 {
                                     try
@@ -283,40 +284,62 @@ namespace Libraries.Group1
                                         var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
                                         if (tf.HasText == MsoTriState.msoTrue && tf.TextRange != null && !string.IsNullOrWhiteSpace(tf.TextRange.Text))
                                         {
-                                            bool excludeFromText = (top >= slideHeight * 0.75f);
-                                            if (!excludeFromText && (st == (int)MsoShapeType.msoPicture || st == 11 || st == 28 || st == 29 || st == 7 || st == 14))
-                                                excludeFromText = true;
-                                            if (!excludeFromText && st == (int)MsoShapeType.msoPlaceholder)
+                                            // スライド下部すぎるもの（フッター付近）は除外
+                                            bool isSecondaryArea = (top >= slideHeight * 0.9f);
+                                            bool isValidTextContainer = (st == 14 || st == 17 || st == 1);
+                                            
+                                            if (!isSecondaryArea && isValidTextContainer)
                                             {
-                                                try
+                                                bool isFooter = false;
+                                                if (st == (int)MsoShapeType.msoPlaceholder)
                                                 {
-                                                    var pf = sh.PlaceholderFormat;
-                                                    if (pf != null)
+                                                    try
                                                     {
-                                                        try
+                                                        var pf = sh.PlaceholderFormat;
+                                                        if (pf != null)
                                                         {
                                                             PpPlaceholderType ppt = (PpPlaceholderType)pf.Type;
                                                             if (ppt == PpPlaceholderType.ppPlaceholderFooter ||
                                                                 ppt == PpPlaceholderType.ppPlaceholderDate ||
                                                                 ppt == PpPlaceholderType.ppPlaceholderSlideNumber)
-                                                                excludeFromText = true;
+                                                            {
+                                                                isFooter = true;
+                                                            }
+                                                            try { Marshal.ReleaseComObject(pf); } catch { }
                                                         }
-                                                        finally { if (pf != null) { try { Marshal.ReleaseComObject(pf); } catch { } } }
                                                     }
+                                                    catch { }
                                                 }
-                                                catch { }
-                                            }
-                                            if (!excludeFromText)
-                                            {
-                                                double bottom = top + height;
-                                                if (bottom > textBottom) textBottom = bottom;
+
+                                                if (!isFooter)
+                                                {
+                                                    double bottom = top + height;
+                                                    if (bottom > textBottom) textBottom = bottom;
+                                                }
                                             }
                                         }
                                     }
                                     catch { }
                                 }
-                                if (st == (int)MsoShapeType.msoPicture || st == 11 || st == 28 || st == 29
-                                    || st == 7 || st == 14)
+
+                                // 2. スライドズームの候補を収集
+                                // 名前や代替テキストに "Zoom" または "ズーム" が含まれる図形を候補とする。
+                                bool isZoomCandidate = false;
+                                try
+                                {
+                                    string name = sh.Name ?? "";
+                                    string alt = sh.AlternativeText ?? "";
+                                    if (name.IndexOf("Zoom", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                        name.IndexOf("ズーム", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                        alt.IndexOf("Zoom", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                        alt.IndexOf("ズーム", StringComparison.OrdinalIgnoreCase) >= 0)
+                                    {
+                                        isZoomCandidate = true;
+                                    }
+                                }
+                                catch { }
+
+                                if (isZoomCandidate)
                                 {
                                     candidateZooms.Add(Tuple.Create(sh, left, top, width, height));
                                     sh = null;
@@ -331,14 +354,13 @@ namespace Libraries.Group1
                         const float belowTolerance = 5f;
                         float minTopForZoom = (float)textBottom + belowTolerance;
                         var zoomsBelowText = new List<Tuple<PptShape, float, float, float, float>>();
+
                         foreach (var t in candidateZooms)
                         {
                             if (t.Item3 >= minTopForZoom)
                                 zoomsBelowText.Add(t);
                             else
-                            {
                                 try { Marshal.ReleaseComObject(t.Item1); } catch { }
-                            }
                         }
 
                         if (zoomsBelowText.Count < 2)
