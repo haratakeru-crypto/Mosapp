@@ -58,7 +58,7 @@ namespace Libraries
                 case 7:
                     return taskId == 2 || taskId == 3; // 7-2 スライド再利用, 7-3 アウトラインから挿入（スライド追加で番号ずれ）
                 case 9:
-                    return taskId == 1 || taskId == 7; // 9-1 表→グラフ, 9-7 スライドサイズ変更＋サイズに合わせて調整
+                    return taskId == 1 || taskId == 6 || taskId == 7; // 9-1 表→グラフ, 9-6 ハイパーリンク(文字入力でサイズ変化), 9-7 スライドサイズ変更＋サイズに合わせて調整
                 case 10:
                     return taskId == 5 || taskId == 7; // 10-5 マスターのテーマ変更, 10-7 レイアウト複製・プレースホルダー配置
                 case 11:

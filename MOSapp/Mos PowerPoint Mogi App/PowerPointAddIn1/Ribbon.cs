@@ -120,7 +120,7 @@ namespace PowerPointAddIn1
                 // ログファイルにも記録
                 Logger.LogOperation(tag, detail, p, t);
             }
-            catch (Exception ex)
+            catch
             {
             }
         }
