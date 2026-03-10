@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Packaging;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
@@ -16,99 +19,100 @@ namespace Libraries.Group1
         public bool CheckTask_1_4_01()
         {
             Presentation pres = null;
+            string tempPath = null;
             try
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
+
+                // ---- スタイル判定: COMでSoftEdgeを確認 ----
+                bool styleOk = false;
                 Slide slide = null;
                 try
                 {
                     slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 1);
-                    if (slide == null) return false;
-                    
-                    bool styleOk = false;
-                    bool effectOk = false;
-
-                    PptShapes shapes = slide.Shapes;
-                    for (int i = 1; i <= shapes.Count; i++)
+                    if (slide != null)
                     {
-                        PptShape sh = null;
-                        try {
-                            sh = shapes[i];
-                            dynamic dSh = sh;
-                            string shName = sh.Name;
-
-                            // 1. スタイル判定 (ぼかし)
-                            try {
-                                dynamic se = dSh.SoftEdge;
-                                if (se != null) {
-                                    if ((int)se.Type >= 1 || (float)se.Radius > 0) styleOk = true;
-                                    Marshal.ReleaseComObject(se);
-                                }
-                            } catch { }
-
-                            // 2. アート効果判定 (フィルム粒子=34)
-                            if (!effectOk) {
-                                // A. ShapeRange経由 (プレースホルダーで最も有効)
-                                try {
-                                    dynamic sr = shapes.Range(shName);
-                                    dynamic pf = sr.PictureFormat;
-                                    object aeObj = pf.GetType().InvokeMember("ArtisticEffect", System.Reflection.BindingFlags.GetProperty, null, pf, null);
-                                    if (aeObj != null) {
-                                        int et = (int)((dynamic)aeObj).Type;
-                                        System.Diagnostics.Debug.WriteLine($"[1_4_01] Effect Found(Range): {et}");
-                                        if (et == 34) effectOk = true;
-                                        Marshal.ReleaseComObject(aeObj);
+                        PptShapes shapes = slide.Shapes;
+                        for (int i = 1; i <= shapes.Count; i++)
+                        {
+                            PptShape sh = null;
+                            try
+                            {
+                                sh = shapes[i];
+                                dynamic dSh = sh;
+                                // SoftEdge（ぼかし）チェック
+                                try
+                                {
+                                    dynamic se = dSh.SoftEdge;
+                                    if (se != null)
+                                    {
+                                        if ((int)se.Type >= 1 || (float)se.Radius > 0) styleOk = true;
+                                        Marshal.ReleaseComObject(se);
                                     }
-                                    Marshal.ReleaseComObject(pf);
-                                    Marshal.ReleaseComObject(sr);
                                 } catch { }
-
-                                // B. 個別オブジェクト直撃 (リフレクション)
-                                if (!effectOk) {
-                                    object pfReal = null; try { pfReal = dSh.PictureFormat; } catch { }
-                                    object fillReal = null; try { fillReal = dSh.Fill; } catch { }
-                                    object[] targets = { dSh, pfReal, fillReal };
-
-                                    foreach (var target in targets) {
-                                        if (target == null) continue;
-                                        try {
-                                            object aeObj = target.GetType().InvokeMember("ArtisticEffect", System.Reflection.BindingFlags.GetProperty, null, target, null);
-                                            if (aeObj != null) {
-                                                int et = (int)((dynamic)aeObj).Type;
-                                                System.Diagnostics.Debug.WriteLine($"[1_4_01] Effect Found({target.GetType().Name}): {et}");
-                                                if (et == 34) effectOk = true;
-                                                Marshal.ReleaseComObject(aeObj);
-                                            }
-                                        } catch { }
-                                        if (target != dSh) try { Marshal.ReleaseComObject(target); } catch { }
-                                        if (effectOk) break;
-                                    }
+                                // PictureStyle補完チェック
+                                if (!styleOk)
+                                {
+                                    try
+                                    {
+                                        dynamic pf = dSh.PictureFormat;
+                                        int ps = (int)pf.PictureStyle;
+                                        if (ps == 13 || ps == 20 || ps == 21) styleOk = true;
+                                        Marshal.ReleaseComObject(pf);
+                                    } catch { }
                                 }
                             }
-
-                            // 3. PictureStyle (補完)
-                            if (!styleOk) {
-                                try {
-                                    dynamic pf = dSh.PictureFormat;
-                                    int ps = (int)pf.PictureStyle;
-                                    if (ps == 13 || ps == 20 || ps == 21) styleOk = true;
-                                    Marshal.ReleaseComObject(pf);
-                                } catch { }
-                            }
-                        } catch { }
-                        finally { if (sh != null) Marshal.ReleaseComObject(sh); }
-
-                        if (styleOk && effectOk) break;
+                            catch { }
+                            finally { if (sh != null) Marshal.ReleaseComObject(sh); }
+                            if (styleOk) break;
+                        }
                     }
-
-                    System.Diagnostics.Debug.WriteLine($"[1_4_01] Final Log: style={styleOk}, effect={effectOk}");
-                    return styleOk && effectOk;
                 }
                 finally { if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { } }
+
+                // ---- アート効果判定: pptx XML直接解析 ----
+                bool effectOk = false;
+                try
+                {
+                    tempPath = Path.Combine(Path.GetTempPath(), "mos_1_4_01_check_" + Guid.NewGuid().ToString("N") + ".pptx");
+                    pres.SaveCopyAs(tempPath);
+
+                    using (var package = Package.Open(tempPath, FileMode.Open, FileAccess.Read))
+                    {
+                        foreach (var part in package.GetParts())
+                        {
+                            if (!part.Uri.OriginalString.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)) continue;
+
+                            string xml;
+                            try
+                            {
+                                using (var reader = new StreamReader(part.GetStream()))
+                                    xml = reader.ReadToEnd();
+                            }
+                            catch { continue; }
+
+                            // フィルム粒子候補: artisticGrain / artisticFilmGrain / FilmGrain
+                            if (Regex.IsMatch(xml, @"artistic(Grain|FilmGrain|Film)", RegexOptions.IgnoreCase)
+                                || Regex.IsMatch(xml, @"FilmGrain", RegexOptions.IgnoreCase))
+                            {
+                                effectOk = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                return styleOk && effectOk;
             }
             catch { return false; }
-            finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+                if (tempPath != null && File.Exists(tempPath))
+                    try { File.Delete(tempPath); } catch { }
+            }
         }
 
         /// <summary>4-2: スライド1の画像の図の効果を「反射（中）、オフセットなし」。</summary>
