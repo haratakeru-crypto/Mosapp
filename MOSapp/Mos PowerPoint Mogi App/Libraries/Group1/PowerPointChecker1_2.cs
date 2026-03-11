@@ -9,10 +9,9 @@ namespace Libraries.Group1
 {
     public class PowerPointChecker1_2
     {
-        /// <summary>2-1: すべてのスライドに画面切り替え「プッシュ・右から」。2-3で3,4,5は渦巻きになるため、1,2,6のみチェック。3854(右から)と3853(左から)を許容（日本語UIで1枚目が3853になる環境あり）。</summary>
+        /// <summary>2-1: すべてのスライドに画面切り替え「プッシュ・右から」。3853(左から)を許容（日本語UI環境）。</summary>
         public bool CheckTask_1_2_01()
         {
-            const int ppEffectPushRight = 3854;
             const int ppEffectPushLeft = 3853;
             Presentation pres = null;
             try
@@ -36,7 +35,7 @@ namespace Libraries.Group1
                             try
                             {
                                 int effectVal = (int)slide.SlideShowTransition.EntryEffect;
-                                if (effectVal != ppEffectPushRight && effectVal != ppEffectPushLeft) return false;
+                                if (effectVal != ppEffectPushLeft) return false;
                             }
                             catch { return false; }
                         }
@@ -240,7 +239,6 @@ namespace Libraries.Group1
         /// <summary>2-5: スライド2の人型画像のアニメーションをワイプアウト（横）、継続時間2秒に設定。</summary>
         public bool CheckTask_1_2_05()
         {
-            const int msoAnimEffectWipe = 22;
             const int msoAnimEffectSplit = 16;
             Presentation pres = null;
             try
@@ -293,15 +291,16 @@ namespace Libraries.Group1
                                                     {
                                                         if (es.Id != shapeId) continue;
                                                         int etVal = (int)eff.EffectType;
-                                                        if (etVal != msoAnimEffectWipe && etVal != msoAnimEffectSplit) continue;
-                                                        try
+                                                        float dur = (float)eff.Timing.Duration;
+                                                        int dirVal = -1;
+                                                        try { dirVal = (int)eff.EffectParameters.Direction; } catch { }
+                                                        
+                                                        if (etVal == msoAnimEffectSplit)
                                                         {
-                                                            float dur = (float)eff.Timing.Duration;
-                                                            if (dur >= 1.9f && dur <= 2.1f) return true;
+                                                            if (dirVal == 24 && dur >= 1.9f && dur <= 2.1f) return true;
                                                         }
-                                                        catch { }
                                                     }
-                                                    finally { try { Marshal.ReleaseComObject(es); } catch { } }
+                                                    finally { if (es != null) try { Marshal.ReleaseComObject(es); } catch { } }
                                                 }
                                                 catch { }
                                             }
