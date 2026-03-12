@@ -27,7 +27,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>9</ApplicationRevision>
+    <ApplicationRevision>10</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -113,6 +113,10 @@
       <Project>{A3B4C5D6-E7F8-9012-6789-123456789012}</Project>
       <Name>PowerPointChecker1_11</Name>
     </ProjectReference>
+    <ProjectReference Include="PowerPointAddIn1\PowerPointAddIn1.csproj">
+      <Project>{594e2ed3-7e45-449f-a149-9b286e3a9846}</Project>
+      <Name>PowerPointAddIn1</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -167,7 +171,8 @@
     <Compile Include="Libraries\Group1\PowerPointChecker1_9.cs" />
     <Compile Include="Libraries\Group1\PowerPointCheckerCommon.cs" />
     <Compile Include="Libraries\PPLogReader.cs" />
-    <Compile Include="Libraries\PPAllowedOperations.cs" />
+    <Compile Include="Libraries\PPTaskValidationConfig.cs" />
+    <Compile Include="Libraries\PPSnapshotChecker.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -295,4 +300,15 @@
     <PreBuildEvent>taskkill /IM "Mos PowerPoint Mogi App.exe" /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- 発行時に VSTO アドインの出力を publish\PowerPointAddIn1 にコピーする（Import の後に定義して確実に実行されるようにする） -->
+  <Target Name="AfterPublish">
+    <PropertyGroup>
+      <_AddInOutDir>$(ProjectDir)PowerPointAddIn1\bin\$(Configuration)\</_AddInOutDir>
+      <_AddInPublishDir>$(ProjectDir)$(PublishUrl)PowerPointAddIn1\</_AddInPublishDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(_AddInPublishDir)" />
+    <Exec Command="xcopy /Y /E &quot;$(_AddInOutDir)*.*&quot; &quot;$(_AddInPublishDir)&quot;" IgnoreExitCode="false" />
+    <WriteLinesToFile File="$(_AddInPublishDir)README.txt" Lines="PowerPoint 用 VSTO アドイン（採点連携用）;;1. 本フォルダ内の PowerPointAddIn1.vsto をダブルクリックしてインストールしてください。;2. 初回はセキュリティの警告が出る場合があります。信頼してインストールしてください。;3. インストール後、PowerPoint を起動するとアドインが読み込まれ、模擬アプリの採点が正しく動作します。" Overwrite="true" Encoding="UTF-8" />
+    <Message Importance="high" Text="VSTO アドインを発行フォルダにコピーしました: $(_AddInPublishDir)" />
+  </Target>
 </Project>

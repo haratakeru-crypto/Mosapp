@@ -13,4 +13,5 @@
   <Project Path="MOS Word app/products/Group1/WordChecker1_9.csproj" Id="a1b2c3d4-e5f6-7899-abcd-ef1234567899" />
   <Project Path="MOS Word app/products/Group1/WordChecker1_10.csproj" Id="a1b2c3d4-e5f6-789a-abcd-ef12345678910" />
   <Project Path="Mos PowerPoint Mogi App/MOS PowerPoint app.csproj" Id="4f05fafa-71ad-413c-9043-25e55e2fa083" />
+  <Project Path="Mos PowerPoint Mogi App/PowerPointAddIn1/PowerPointAddIn1.csproj" Id="594e2ed3-7e45-449f-a149-9b286e3a9846" />
 </Solution>

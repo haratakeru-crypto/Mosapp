@@ -17,6 +17,8 @@ namespace MOS_PowerPoint_app
         {
             PPLogReader.ClearLog();
             PPLogReader.ClearCurrentTaskFile();
+            PPLogReader.ClearDestructiveLog();
+            PPLogReader.ClearSnapshot();
 
             string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"]
                 ?? @"C:\MOSTest\PowerPoint365";

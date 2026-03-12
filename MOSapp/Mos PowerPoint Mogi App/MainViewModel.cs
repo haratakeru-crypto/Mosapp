@@ -269,7 +269,10 @@ namespace MOS_PowerPoint_app
 
                 try
                 {
-                    // PowerPointアプリケーションを取得または作成（メインスレッドで同期的に実行＝体感速度優先）
+                    // プロジェクト起動前にタスク情報をクリアし、アドイン側の古いスナップショットとの比較を防止
+                    Libraries.PPLogReader.ClearCurrentTaskFile();
+
+                    // PowerPointアプリケーションを取得または作成
                     PowerPointApp pptApp = null;
                     try
                     {

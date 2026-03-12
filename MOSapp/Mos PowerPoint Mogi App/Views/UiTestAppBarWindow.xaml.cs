@@ -496,6 +496,9 @@ namespace MOS_PowerPoint_app.Views
 
             try
             {
+                // プロジェクト切り替えやジャンプ前に一旦タスク情報をクリアし、アドイン側の誤検知を防ぐ
+                Libraries.PPLogReader.ClearCurrentTaskFile();
+
                 // レビューページから戻ったときは常に該当プロジェクトのプレゼンテーションを開く
                 OpenProjectDocument(projectId, _groupId);
 
@@ -1079,6 +1082,7 @@ namespace MOS_PowerPoint_app.Views
             // プロジェクトタイトルを更新
             UpdateProjectTitle();
             WriteCurrentTaskFile();
+            SyncProjectToMainViewModel();
         }
         
         private void UpdateProjectTitle()
@@ -1622,7 +1626,8 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 string path = Libraries.PPLogReader.GetCurrentTaskFilePath();
-                string content = $"{_currentProjectId},{_currentTaskId}";
+                var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
+                string content = $"{_currentProjectId},{_currentTaskId},{(int)flags}";
                 File.WriteAllText(path, content, Encoding.UTF8);
             }
             catch (Exception ex)
@@ -1638,6 +1643,9 @@ namespace MOS_PowerPoint_app.Views
         
         private void MoveToNextProject()
         {
+            // プロジェクト切り替え前にタスク情報をクリアし、アドイン側の破壊的操作チェックをスキップさせる
+            Libraries.PPLogReader.ClearCurrentTaskFile();
+
             // 現在開いているプレゼンテーションを日付・時間付きバックアップフォルダに保存（MMdd_HHmm）
             string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] ?? @"C:\MOSTest\PowerPoint365";
             string backupSubdir = DateTime.Now.ToString("MMdd_HHmm");
@@ -1662,6 +1670,7 @@ namespace MOS_PowerPoint_app.Views
                     {
                         PowerPointPresentation pres = pptApp.Presentations[1];
                         pres.SaveCopyAs(backupFilePath);
+                        pres.Save(); 
                         System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ保存: {backupFilePath}");
                     }
                     catch (Exception ex)
@@ -1734,7 +1743,13 @@ namespace MOS_PowerPoint_app.Views
                     return;
                 }
                 
-                // PowerPointアプリケーションを取得または作成
+                // 既に開いているプレゼンテーションがある場合は閉じる（頑健な方法を使用）
+                CloseAllPowerPointPresentations();
+                
+                // プロセスが完全に終了するのを少し待つ
+                Thread.Sleep(500);
+
+                // PowerPointアプリケーションを取得または作成（CloseAll...でプロセスが終了した可能性があるため、必要に応じて再取得）
                 PowerPointApp pptApp = null;
                 try
                 {
@@ -1746,58 +1761,53 @@ namespace MOS_PowerPoint_app.Views
                     pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
                 }
                 
-                // 現在開いているプレゼンテーションを閉じてから新しいプレゼンテーションを開く
+                // 新しいプレゼンテーションを開く
                 PowerPointPresentation presentation = null;
+                int retryCount = 0;
+                while (retryCount < 3)
+                {
+                    try
+                    {
+                        presentation = pptApp.Presentations.Open(filePath, WithWindow: Microsoft.Office.Core.MsoTriState.msoTrue);
+                        System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開きました: {filePath}");
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        retryCount++;
+                        System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー (試行 {retryCount}/3): {ex.Message}");
+                        if (retryCount >= 3)
+                        {
+                            MessageBox.Show($"プロジェクト{projectId}のファイルを開けませんでした。\nPowerPointを一度終了してから再度お試しください。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+                        
+                        // 1秒待機してから再試行
+                        Thread.Sleep(1000);
+                        
+                        // PowerPointアプリケーションの状態を確認・再取得
+                        try
+                        {
+                            pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                        }
+                        catch
+                        {
+                            try { pptApp = new PowerPointApp(); } catch { }
+                        }
+                        
+                        if (pptApp != null)
+                            pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
+                    }
+                }
+                
+                if (presentation == null) return;
+                
                 try
                 {
-                    // 既に開いているプレゼンテーションがある場合は閉じる
-                    while (pptApp.Presentations.Count > 0)
-                    {
-                        PowerPointPresentation openPres = pptApp.Presentations[1]; // 1-based index
-                        try
-                        {
-                            openPres.Close();
-                        }
-                        catch (Exception closeEx)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"プレゼンテーションを閉じる際のエラー: {closeEx.Message}");
-                            // エラーが発生しても次に進む
-                        }
-                        finally
-                        {
-                            // COMオブジェクトの参照を解放
-                            try
-                            {
-                                if (openPres != null)
-                                {
-                                    Marshal.ReleaseComObject(openPres);
-                                }
-                            }
-                            catch { }
-                        }
-                    }
-                    
-                    // 新しいプレゼンテーションを開く
-                    presentation = pptApp.Presentations.Open(filePath, WithWindow: Microsoft.Office.Core.MsoTriState.msoTrue);
-                    System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開きました: {filePath}");
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー: {ex.Message}");
-                    return;
-                }
-                finally
-                {
                     // COMオブジェクトの参照を解放
-                    if (presentation != null)
-                    {
-                        try
-                        {
-                            Marshal.ReleaseComObject(presentation);
-                        }
-                        catch { }
-                    }
+                    Marshal.ReleaseComObject(presentation);
                 }
+                catch { }
                 
                 // PowerPointウィンドウを画面の上部2/3に配置
                 PositionPowerPointWindow();
@@ -1914,12 +1924,15 @@ namespace MOS_PowerPoint_app.Views
                 
                 if (result == MessageBoxResult.Yes)
                 {
+                    // リセット前にスナップショットをクリアし、アドイン側に再取得を促す
+                    Libraries.PPLogReader.ClearSnapshot();
                     ResetProject(_groupId, _currentProjectId);
                     PowerPointChecker1_1.ResetTask4SlideDeletionState();
                     MessageBox.Show("プロジェクトをリセットしました。", "リセット完了", MessageBoxButton.OK, MessageBoxImage.Information);
                     
                     // リセット後、PowerPointプレゼンテーションを再読み込み
                     OpenProjectDocument(_currentProjectId, _groupId);
+                    WriteCurrentTaskFile();
                 }
             }
             catch (Exception ex)
@@ -2009,7 +2022,10 @@ namespace MOS_PowerPoint_app.Views
                             try
                             {
                                 var pptProcesses = System.Diagnostics.Process.GetProcessesByName("POWERPNT");
-                                foreach (var proc in pptProcesses) { proc.Kill(); }
+                                foreach (var proc in pptProcesses) 
+                                { 
+                                    try { proc.Kill(); proc.WaitForExit(2000); } catch { } 
+                                }
                             }
                             catch { }
                             break;
@@ -2063,7 +2079,37 @@ namespace MOS_PowerPoint_app.Views
             _timer?.Stop();
             _projectTimer?.Stop();
             _slideMonitorTimer?.Stop();
+            // ウィンドウを閉じる際にタスク情報をクリアし、次回起動時に古い情報でチェックが走るのを防ぐ
+            Libraries.PPLogReader.ClearCurrentTaskFile();
             base.OnClosed(e);
+        }
+        /// <summary>
+        /// アプリバー側のプロジェクト変更を MainViewModel 側に同期させます。
+        /// これにより、採点時に正しいプロジェクトのタスク一覧が使用されるようになります。
+        /// </summary>
+        private void SyncProjectToMainViewModel()
+        {
+            try
+            {
+                var mainWin = System.Windows.Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+                if (mainWin != null && mainWin.DataContext is MainViewModel vm)
+                {
+                    // 現在の GroupId と ProjectId に一致するプロジェクトを検索
+                    var project = vm.ProjectGroups
+                        .FirstOrDefault(g => g.GroupId == _groupId)?
+                        .Projects.FirstOrDefault(p => p.ProjectId == _currentProjectId);
+
+                    if (project != null)
+                    {
+                        vm.CurrentProject = project;
+                        System.Diagnostics.Debug.WriteLine($"[Sync] MainViewModel のプロジェクトを更新しました: {project.Name}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Sync] 同期エラー: {ex.Message}");
+            }
         }
     }
     

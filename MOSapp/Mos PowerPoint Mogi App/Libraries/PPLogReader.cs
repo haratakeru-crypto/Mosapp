@@ -28,6 +28,18 @@ namespace Libraries
             return Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
         }
 
+        /// <summary>破壊的操作ログのパスを取得（%TEMP%\mos_ppt_destructive_errors.log）</summary>
+        public static string GetDestructiveLogPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_destructive_errors.log");
+        }
+
+        /// <summary>スナップショットファイルのパスを取得（%TEMP%\mos_ppt_snapshot.txt）</summary>
+        public static string GetSnapshotPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_snapshot.txt");
+        }
+
         /// <summary>
         /// 現在タスク共有ファイルを削除する。リセット時に呼び出す。
         /// </summary>
@@ -59,6 +71,36 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[PPLogReader] Error clearing log: " + ex.Message);
+            }
+        }
+
+        /// <summary>破壊的操作ログをクリアする。</summary>
+        public static void ClearDestructiveLog()
+        {
+            try
+            {
+                string path = GetDestructiveLogPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] Error clearing destructive log: " + ex.Message);
+            }
+        }
+
+        /// <summary>スナップショットファイルをクリアする。</summary>
+        public static void ClearSnapshot()
+        {
+            try
+            {
+                string path = GetSnapshotPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] Error clearing snapshot: " + ex.Message);
             }
         }
 

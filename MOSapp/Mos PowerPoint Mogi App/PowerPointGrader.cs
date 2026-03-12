@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.PowerPoint;
@@ -58,13 +59,48 @@ namespace MOS_PowerPoint_app
         /// <param name="projectId">プロジェクト ID（1～11）。</param>
         /// <param name="taskId">タスク ID。</param>
         /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
+        public void StartTask(int projectId, int taskId)
+        {
+            try
+            {
+                var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
+                File.WriteAllText(Libraries.PPLogReader.GetCurrentTaskFilePath(), $"{projectId},{taskId},{(int)flags}");
+            }
+            catch { }
+        }
+        /// <summary>
+        /// 指定したプロジェクト・タスクの採点を行う。
+        /// ログに余計な操作や許可されない座標変化があれば不合格。続けて COM による結果判定を行う。
+        /// </summary>
+        /// <param name="projectId">プロジェクト ID（1～11）。</param>
+        /// <param name="taskId">タスク ID。</param>
+        /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
         public bool GradeTask(int projectId, int taskId)
         {
             if (_activePresentation == null)
                 return false;
 
+            // 1. 過去の破壊的操作ログのチェック
+            if (HasLoggedDestructiveError(projectId, taskId))
+            {
+                System.Diagnostics.Debug.WriteLine($"[Grader] Task {projectId}-{taskId} FAILED due to logged destructive operation.");
+                return false;
+            }
+
             if (FailsLogChecks(projectId, taskId))
                 return false;
+
+            // 2. 現在の破壊的操作（リアルタイムスナップショット）のチェック
+            var exemptFlags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
+            var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, exemptFlags);
+            if (destructiveErrors.Count > 0)
+            {
+                foreach (var err in destructiveErrors)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
+                }
+                return false;
+            }
 
             try
             {
@@ -213,17 +249,36 @@ namespace MOS_PowerPoint_app
         /// VSTO ログを参照し、余計な操作または許可されない座標変化があれば true（不合格とする）。
         /// ログファイルが無い場合は false（アドイン未導入時は COM のみで判定）。
         /// </summary>
+        private static readonly string DestructiveLogPath = Path.Combine(Path.GetTempPath(), "mos_ppt_destructive_errors.log");
+
+        private bool HasLoggedDestructiveError(int projectId, int taskId)
+        {
+            try
+            {
+                if (!File.Exists(DestructiveLogPath)) return false;
+                var lines = File.ReadAllLines(DestructiveLogPath);
+                string prefix = $"{projectId},{taskId}:";
+                foreach (var line in lines)
+                {
+                    if (line.StartsWith(prefix)) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
         private static bool FailsLogChecks(int projectId, int taskId)
         {
             string logPath = PPLogReader.GetLogFilePath();
             if (!File.Exists(logPath))
                 return false;
 
-            var allowed = PPAllowedOperations.GetAllowedOperationTypes(projectId, taskId);
+            // ログからは「許可されていないリボンコマンド操作」があるかのみを確認する
+            // 座標変化は SnapshotChecker 側でより正確に判定するため、ここでは無視する
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "RibbonCommand" };
             if (PPLogReader.HasDisallowedOperations(projectId, taskId, allowed))
                 return true;
-            if (!PPAllowedOperations.IsShapePositionChangeAllowed(projectId, taskId) && PPLogReader.HasShapePositionChange(projectId, taskId))
-                return true;
+            
             return false;
         }
 

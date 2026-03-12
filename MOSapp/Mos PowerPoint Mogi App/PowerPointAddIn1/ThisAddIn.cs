@@ -34,14 +34,14 @@ namespace PowerPointAddIn1
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
 
-        private Timer _shapePositionPollTimer;
-        private Dictionary<string, Tuple<float, float, float, float>> _shapePositionSnapshot = new Dictionary<string, Tuple<float, float, float, float>>();
         private const float PositionTolerancePt = 0.5f;
 
         /// <summary>現在タスク（VSTO が読み取った ProjectId, TaskId）。ログ記録時に使用。</summary>
         internal static int CurrentTaskProjectId { get; private set; } = -1;
         /// <summary>現在タスクの TaskId。</summary>
         internal static int CurrentTaskTaskId { get; private set; } = -1;
+
+        private int _currentTaskExemptFlags = 0;
 
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
@@ -76,11 +76,6 @@ namespace PowerPointAddIn1
             _taskFilePollTimer.Interval = 500;
             _taskFilePollTimer.Tick += TaskFilePollTimer_Tick;
             _taskFilePollTimer.Start();
-
-            _shapePositionPollTimer = new Timer();
-            _shapePositionPollTimer.Interval = 1500;
-            _shapePositionPollTimer.Tick += ShapePositionPollTimer_Tick;
-            _shapePositionPollTimer.Start();
         }
 
         private void TaskFilePollTimer_Tick(object sender, EventArgs e)
@@ -88,7 +83,11 @@ namespace PowerPointAddIn1
             try
             {
                 if (!File.Exists(CurrentTaskFilePath))
+                {
+                    _currentTaskProjectId = -1;
+                    _currentTaskTaskId = -1;
                     return;
+                }
                 string line = null;
                 try
                 {
@@ -100,14 +99,28 @@ namespace PowerPointAddIn1
                 if (parts.Length < 2) return;
                 if (!int.TryParse(parts[0].Trim(), out int projectId) || !int.TryParse(parts[1].Trim(), out int taskId))
                     return;
-                if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId)
+
+                bool forceSnapshot = !File.Exists(SnapshotFilePath);
+
+                if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId && !forceSnapshot)
                     return;
+
+                // --- タスク切り替え時の処理 ---
+                // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
+                // ※ プロジェクトIDが変わる場合は、比較対象のプレゼンテーションが異なるためスキップする
+                if (_currentTaskProjectId != -1 && !forceSnapshot && projectId == _currentTaskProjectId)
+                {
+                    CheckAndLogDestructiveOperations(_currentTaskProjectId, _currentTaskTaskId, _currentTaskExemptFlags);
+                }
+
                 _currentTaskProjectId = projectId;
                 _currentTaskTaskId = taskId;
+                _currentTaskExemptFlags = parts.Length >= 3 ? int.Parse(parts[2].Trim()) : 0;
+
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
                 Logger.LogTaskStart(projectId, taskId);
-                TakeShapePositionSnapshot();
+                TakeUnifiedSnapshot();
             }
             catch (Exception ex)
             {
@@ -115,64 +128,233 @@ namespace PowerPointAddIn1
             }
         }
 
-        private void TakeShapePositionSnapshot()
+        private static readonly string SnapshotFilePath = Path.Combine(Path.GetTempPath(), "mos_ppt_snapshot.txt");
+        private static readonly string DestructiveLogPath = Path.Combine(Path.GetTempPath(), "mos_ppt_destructive_errors.log");
+
+        private void TakeUnifiedSnapshot()
         {
-            _shapePositionSnapshot.Clear();
             try
             {
-                if (Application == null || Application.Presentations == null) return;
-                PowerPoint.Presentation pres = null;
-                try
-                {
-                    pres = Application.ActivePresentation;
-                    if (pres == null) return;
-                    PowerPoint.Slides slides = null;
-                    try
-                    {
-                        slides = pres.Slides;
-                        if (slides == null) return;
-                        for (int si = 1; si <= slides.Count; si++)
-                        {
-                            PowerPoint.Slide slide = null;
-                            try
-                            {
-                                slide = slides[si];
-                                if (slide == null) continue;
-                                PowerPoint.Shapes shapes = null;
-                                try
-                                {
-                                    shapes = slide.Shapes;
-                                    if (shapes == null) continue;
-                                    for (int shi = 1; shi <= shapes.Count; shi++)
-                                    {
-                                        PowerPoint.Shape sh = null;
-                                        try
-                                        {
-                                            sh = shapes[shi];
-                                            if (sh == null) continue;
-                                            if (!IsImageOrPlaceholder(sh)) continue;
-                                            float left = (float)sh.Left;
-                                            float top = (float)sh.Top;
-                                            float w = (float)sh.Width;
-                                            float h = (float)sh.Height;
-                                            string key = si + "_" + sh.Id;
-                                            _shapePositionSnapshot[key] = Tuple.Create(left, top, w, h);
-                                        }
-                                        finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
-                                    }
-                                }
-                                finally { if (shapes != null) try { Marshal.ReleaseComObject(shapes); } catch { } }
-                            }
-                            finally { if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { } }
-                        }
-                    }
-                    finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
-                }
-                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+                var status = CaptureCurrentStatus(CurrentTaskProjectId, CurrentTaskTaskId);
+                if (status == null) return;
+                SaveSnapshot(status);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[ShapeSnapshot] " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("[TakeSnapshot] " + ex.Message);
+            }
+        }
+
+        private SnapshotData CaptureCurrentStatus(int pid, int tid)
+        {
+            try
+            {
+                if (Application == null) return null;
+                PowerPoint.Presentation pres = null;
+                try { pres = Application.ActivePresentation; } catch { }
+                if (pres == null) return null;
+
+                var data = new SnapshotData { ProjectId = pid, TaskId = tid };
+                var slides = pres.Slides;
+                if (slides != null)
+                {
+                    data.SlidesCount = slides.Count;
+                    for (int i = 1; i <= data.SlidesCount; i++)
+                    {
+                        PowerPoint.Slide slide = slides[i];
+                        data.SlideNames.Add(slide.Name);
+                        
+                        PowerPoint.Shapes shapes = slide.Shapes;
+                        data.ShapesCounts[i] = shapes.Count;
+                        
+                        for (int j = 1; j <= shapes.Count; j++)
+                        {
+                            PowerPoint.Shape shape = shapes[j];
+                            try
+                            {
+                                // Text Check (TextFrame2 priority)
+                                try {
+                                    dynamic tf2 = shape.TextFrame2;
+                                    if (tf2 != null && (int)tf2.HasText == -1) data.TotalTextLength += tf2.TextRange.Length;
+                                    else if (shape.HasTextFrame == Office.MsoTriState.msoTrue && shape.TextFrame.HasText == Office.MsoTriState.msoTrue)
+                                        data.TotalTextLength += shape.TextFrame.TextRange.Length;
+                                } catch { }
+
+                                // Position Check
+                                if (IsImageOrPlaceholder(shape))
+                                {
+                                    string key = $"{i}_{shape.Id}";
+                                    data.ShapePositions[key] = Tuple.Create(shape.Left, shape.Top, shape.Width, shape.Height);
+                                }
+                            }
+                            catch { }
+                            finally { Marshal.ReleaseComObject(shape); }
+                        }
+                        
+                        int animCount = 0;
+                        try { animCount = slide.TimeLine.MainSequence.Count; } catch { }
+                        data.AnimationCounts[i] = animCount;
+
+                        Marshal.ReleaseComObject(shapes);
+                        Marshal.ReleaseComObject(slide);
+                    }
+                    Marshal.ReleaseComObject(slides);
+                }
+                return data;
+            }
+            catch { return null; }
+        }
+
+        private List<string> CompareSnapshots(SnapshotData start, SnapshotData current, int exemptFlagsInt)
+        {
+            var errors = new List<string>();
+            var flags = (PPValidationExemptFlags)exemptFlagsInt;
+
+            if (!flags.HasFlag(PPValidationExemptFlags.SlidesCount))
+            {
+                if (current.SlidesCount != start.SlidesCount) errors.Add("SlidesCount changed");
+            }
+
+            if (!flags.HasFlag(PPValidationExemptFlags.ShapesCount))
+            {
+                foreach (var kvp in start.ShapesCounts)
+                {
+                    if (current.ShapesCounts.ContainsKey(kvp.Key) && current.ShapesCounts[kvp.Key] != kvp.Value)
+                        errors.Add($"ShapesCount on Slide {kvp.Key} changed");
+                }
+            }
+
+            if (!flags.HasFlag(PPValidationExemptFlags.TextLength))
+            {
+                if (current.TotalTextLength != start.TotalTextLength) errors.Add("TotalTextLength changed");
+            }
+
+            if (!flags.HasFlag(PPValidationExemptFlags.ShapePosition))
+            {
+                foreach (var kvp in start.ShapePositions)
+                {
+                    if (current.ShapePositions.ContainsKey(kvp.Key))
+                    {
+                        var cPos = current.ShapePositions[kvp.Key];
+                        var sPos = kvp.Value;
+                        if (Math.Abs(cPos.Item1 - sPos.Item1) > PositionTolerancePt ||
+                            Math.Abs(cPos.Item2 - sPos.Item2) > PositionTolerancePt ||
+                            Math.Abs(cPos.Item3 - sPos.Item3) > PositionTolerancePt ||
+                            Math.Abs(cPos.Item4 - sPos.Item4) > PositionTolerancePt)
+                        {
+                            errors.Add($"Shape position/size changed on Slide {kvp.Key.Split('_')[0]}");
+                        }
+                    }
+                }
+            }
+            return errors;
+        }
+
+        private void SaveSnapshot(SnapshotData data)
+        {
+            try
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine($"TaskId:{data.ProjectId},{data.TaskId}");
+                sb.AppendLine($"SlidesCount:{data.SlidesCount}");
+                sb.AppendLine($"TotalTextLength:{data.TotalTextLength}");
+                
+                var shapeCountsStr = string.Join("|", data.ShapesCounts.Select(x => $"{x.Key}:{x.Value}"));
+                sb.AppendLine($"ShapesCounts:{shapeCountsStr}");
+
+                var posList = data.ShapePositions.Select(x => $"{x.Key}:{x.Value.Item1},{x.Value.Item2},{x.Value.Item3},{x.Value.Item4}");
+                sb.AppendLine($"ShapePositions:{string.Join("|", posList)}");
+
+                File.WriteAllText(SnapshotFilePath, sb.ToString());
+            }
+            catch { }
+        }
+
+        private SnapshotData LoadSnapshot()
+        {
+            if (!File.Exists(SnapshotFilePath)) return null;
+            var data = new SnapshotData();
+            try
+            {
+                var lines = File.ReadAllLines(SnapshotFilePath);
+                foreach (var line in lines)
+                {
+                    var idx = line.IndexOf(':');
+                    if (idx < 0) continue;
+                    var key = line.Substring(0, idx);
+                    var val = line.Substring(idx + 1);
+                    switch (key)
+                    {
+                        case "TaskId":
+                            var ids = val.Split(',');
+                            data.ProjectId = int.Parse(ids[0]);
+                            data.TaskId = int.Parse(ids[1]);
+                            break;
+                        case "SlidesCount": data.SlidesCount = int.Parse(val); break;
+                        case "TotalTextLength": data.TotalTextLength = long.Parse(val); break;
+                        case "ShapesCounts":
+                            foreach (var part in val.Split('|')) {
+                                var kv = part.Split(':');
+                                if (kv.Length == 2) data.ShapesCounts[int.Parse(kv[0])] = int.Parse(kv[1]);
+                            }
+                            break;
+                        case "ShapePositions":
+                            foreach (var part in val.Split('|')) {
+                                var kv = part.Split(':');
+                                if (kv.Length == 2) {
+                                    var coords = kv[1].Split(',');
+                                    data.ShapePositions[kv[0]] = Tuple.Create(float.Parse(coords[0]), float.Parse(coords[1]), float.Parse(coords[2]), float.Parse(coords[3]));
+                                }
+                            }
+                            break;
+                    }
+                }
+                return data;
+            }
+            catch { return null; }
+        }
+
+        private class SnapshotData
+        {
+            public int ProjectId; public int TaskId; public int SlidesCount;
+            public List<string> SlideNames = new List<string>();
+            public Dictionary<int, int> ShapesCounts = new Dictionary<int, int>();
+            public long TotalTextLength;
+            public Dictionary<int, int> AnimationCounts = new Dictionary<int, int>();
+            public Dictionary<string, Tuple<float, float, float, float>> ShapePositions = new Dictionary<string, Tuple<float, float, float, float>>();
+        }
+
+        [Flags]
+        private enum PPValidationExemptFlags
+        {
+            None = 0, ShapesCount = 1, TextLength = 2, SlidesCount = 4, AnimationRemoved = 8, ShapePosition = 16, All = 31
+        }
+
+        private void CheckAndLogDestructiveOperations(int projectId, int taskId, int exemptFlagsInt)
+        {
+            try
+            {
+                // 現在のスナップショット（開始時のデータ）をロード
+                var startSnapshot = LoadSnapshot();
+                if (startSnapshot == null || startSnapshot.ProjectId != projectId || startSnapshot.TaskId != taskId) return;
+
+                // 現在のリアルタイムな状態を取得
+                var currentStatus = CaptureCurrentStatus(projectId, taskId);
+                if (currentStatus == null) return;
+
+                // 比較
+                List<string> errors = CompareSnapshots(startSnapshot, currentStatus, exemptFlagsInt);
+                if (errors.Count > 0)
+                {
+                    // ログに記録
+                    string errorMsg = string.Join(" | ", errors);
+                    File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId}:{errorMsg}{Environment.NewLine}");
+                    System.Diagnostics.Debug.WriteLine($"[DestructiveCheck] Task {projectId}-{taskId} FAILED: {errorMsg}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[CheckAndLog] " + ex.Message);
             }
         }
 
@@ -194,79 +376,6 @@ namespace PowerPointAddIn1
             catch { return false; }
         }
 
-        private void ShapePositionPollTimer_Tick(object sender, EventArgs e)
-        {
-            if (_currentTaskProjectId < 0 || _currentTaskTaskId < 0) return;
-            try
-            {
-                if (Application == null || Application.Presentations == null) return;
-                PowerPoint.Presentation pres = null;
-                try
-                {
-                    pres = Application.ActivePresentation;
-                    if (pres == null) return;
-                    PowerPoint.Slides slides = null;
-                    try
-                    {
-                        slides = pres.Slides;
-                        if (slides == null) return;
-                        for (int si = 1; si <= slides.Count; si++)
-                        {
-                            PowerPoint.Slide slide = null;
-                            try
-                            {
-                                slide = slides[si];
-                                if (slide == null) continue;
-                                PowerPoint.Shapes shapes = null;
-                                try
-                                {
-                                    shapes = slide.Shapes;
-                                    if (shapes == null) continue;
-                                    for (int shi = 1; shi <= shapes.Count; shi++)
-                                    {
-                                        PowerPoint.Shape sh = null;
-                                        try
-                                        {
-                                            sh = shapes[shi];
-                                            if (sh == null) continue;
-                                            if (!IsImageOrPlaceholder(sh)) continue;
-                                            string key = si + "_" + sh.Id;
-                                            float left = (float)sh.Left;
-                                            float top = (float)sh.Top;
-                                            float w = (float)sh.Width;
-                                            float h = (float)sh.Height;
-                                            if (_shapePositionSnapshot.TryGetValue(key, out var old))
-                                            {
-                                                if (Math.Abs(old.Item1 - left) > PositionTolerancePt || Math.Abs(old.Item2 - top) > PositionTolerancePt ||
-                                                    Math.Abs(old.Item3 - w) > PositionTolerancePt || Math.Abs(old.Item4 - h) > PositionTolerancePt)
-                                                {
-                                                    string detail = $"Slide={si} ShapeId={sh.Id} Left={old.Item1:F1}->{left:F1} Top={old.Item2:F1}->{top:F1} Width={old.Item3:F1} Height={old.Item4:F1}";
-                                                    Logger.LogOperation("ShapePositionChange", detail, _currentTaskProjectId, _currentTaskTaskId);
-                                                    _shapePositionSnapshot[key] = Tuple.Create(left, top, w, h);
-                                                }
-                                            }
-                                            else
-                                            {
-                                                _shapePositionSnapshot[key] = Tuple.Create(left, top, w, h);
-                                            }
-                                        }
-                                        finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
-                                    }
-                                }
-                                finally { if (shapes != null) try { Marshal.ReleaseComObject(shapes); } catch { } }
-                            }
-                            finally { if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { } }
-                        }
-                    }
-                    finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
-                }
-                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("[ShapePositionPoll] " + ex.Message);
-            }
-        }
 
         private void Layout10_7PollTimer_Tick(object sender, EventArgs e)
         {
@@ -480,12 +589,6 @@ namespace PowerPointAddIn1
 
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
         {
-            if (_shapePositionPollTimer != null)
-            {
-                _shapePositionPollTimer.Stop();
-                _shapePositionPollTimer.Dispose();
-                _shapePositionPollTimer = null;
-            }
             if (_taskFilePollTimer != null)
             {
                 _taskFilePollTimer.Stop();
