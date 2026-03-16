@@ -11,6 +11,9 @@ namespace MOSapp.Views
     /// </summary>
     public partial class SubjectSelectionWindow : Window
     {
+        /// <summary>発行時に3科目exeを格納するサブフォルダ名。Merge-AppOutputs-ToPublish.ps1 の $SubjectAppsSubfolderName と一致させること。</summary>
+        private const string SubjectAppsSubfolderName = "App";
+
         public SubjectSelectionWindow()
         {
             InitializeComponent();
@@ -125,6 +128,8 @@ namespace MOSapp.Views
                 }
             }
             catch { }
+            string subfolderExe = Path.Combine(baseDir, SubjectAppsSubfolderName, "MOSExcelMogiApp.exe");
+            if (File.Exists(subfolderExe)) return Path.GetFullPath(subfolderExe);
             string sameDirExe = Path.Combine(baseDir, "MOSExcelMogiApp.exe");
             if (File.Exists(sameDirExe)) return Path.GetFullPath(sameDirExe);
             return null;
@@ -226,6 +231,8 @@ namespace MOSapp.Views
                 }
             }
             catch { }
+            string subfolderWord = Path.Combine(baseDir, SubjectAppsSubfolderName, "MOS Word app.exe");
+            if (File.Exists(subfolderWord)) return Path.GetFullPath(subfolderWord);
             string sameDirWord = Path.Combine(baseDir, "MOS Word app.exe");
             if (File.Exists(sameDirWord)) return Path.GetFullPath(sameDirWord);
             return null;
@@ -317,6 +324,8 @@ namespace MOSapp.Views
                 }
             }
             catch { }
+            string subfolderPpt = Path.Combine(baseDir, SubjectAppsSubfolderName, exeName);
+            if (File.Exists(subfolderPpt)) return Path.GetFullPath(subfolderPpt);
             string sameDirPpt = Path.Combine(baseDir, exeName);
             if (File.Exists(sameDirPpt)) return Path.GetFullPath(sameDirPpt);
             return null;
