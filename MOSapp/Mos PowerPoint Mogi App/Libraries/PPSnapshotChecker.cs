@@ -87,13 +87,25 @@ namespace Libraries
                             slide = pres.Slides[i];
                             
                             // 図形数
-                            if (!exemptFlags.HasFlag(PPValidationExemptFlags.ShapesCount))
+                            int allowedDelta = PPTaskValidationConfig.GetAllowedShapesCountDelta(projectId, taskId, i);
+                            bool hasShapesExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.ShapesCount);
+
+                            if (!hasShapesExemptFlag || allowedDelta != int.MaxValue)
                             {
                                 if (snapshot.ShapesCounts.TryGetValue(i, out int expectedShapesCount))
                                 {
-                                    if (slide.Shapes.Count != expectedShapesCount)
+                                    int targetDelta = hasShapesExemptFlag ? allowedDelta : 0;
+                                    int actualCount = slide.Shapes.Count;
+                                    if (actualCount != expectedShapesCount + targetDelta)
                                     {
-                                        errors.Add($"ShapesCount changed on slide {i}: expected {expectedShapesCount}, but is {slide.Shapes.Count}");
+                                        if (hasShapesExemptFlag)
+                                        {
+                                            errors.Add($"不正な図形操作: スライド {i} で指示外の図形追加または削除が検知されました（期待される変化数: {targetDelta}, 実際の数: {actualCount - expectedShapesCount}）");
+                                        }
+                                        else
+                                        {
+                                            errors.Add($"ShapesCount changed on slide {i}: expected {expectedShapesCount}, but is {actualCount}");
+                                        }
                                     }
                                 }
                             }

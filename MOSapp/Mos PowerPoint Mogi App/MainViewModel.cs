@@ -401,7 +401,7 @@ namespace MOS_PowerPoint_app
         private void ExecuteResetAllProjects(object parameter)
         {
             var result = MessageBox.Show(
-                "すべてのPowerPointプロジェクト（演習・応用編の全プロジェクト）をテンプレートからリセットします。\n現在の変更内容は失われます。実行しますか？",
+                "すべてのPowerPointプロジェクトをテンプレートからリセットします。\n現在の変更内容は失われます。実行しますか？",
                 "すべてをリセットする",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -410,7 +410,7 @@ namespace MOS_PowerPoint_app
 
             var errors = new System.Collections.Generic.List<string>();
             int done = 0;
-            foreach (int groupId in new[] { 1, 3 })
+            foreach (int groupId in new[] { 1 }) // Tab1のみリセットし、Tab3（応用編）は除外
             {
                 for (int projectId = 1; projectId <= 11; projectId++)
                 {

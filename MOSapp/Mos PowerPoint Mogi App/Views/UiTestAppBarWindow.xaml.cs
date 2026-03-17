@@ -1696,6 +1696,7 @@ namespace MOS_PowerPoint_app.Views
                 // 最後のプロジェクトを超えた場合はメッセージを表示
                 System.Diagnostics.Debug.WriteLine($"プロジェクト{maxProjectId}を超えました");
                 MessageBox.Show("すべてのプロジェクトが完了しました。", "完了", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowReviewPageWindow();
                 return;
             }
             

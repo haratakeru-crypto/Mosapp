@@ -193,6 +193,27 @@ namespace Libraries
         }
 
         /// <summary>
+        /// ShapesCount免除フラグが有効な場合でも、特定のスライドにおいて許可される「図形数の増減（デルタ）」を返します。
+        /// 1 なら +1個（挿入）、-2 なら -2個（グループ化など）を意味します。
+        /// 厳格にチェックすべきでないタスクやスライドの場合は int.MaxValue を返すと無制限になります。
+        /// </summary>
+        public static int GetAllowedShapesCountDelta(int projectId, int taskId, int slideIndex)
+        {
+            // 厳格に図形数の増減を管理するタスク
+            // 目的のスライド以外からの呼び出しに対しては「0（増減禁止）」を返すことで、他スライドへの変更をブロックします。
+            if (projectId == 3 && taskId == 1) return slideIndex == 5 ? 0 : 0; // 3-1 SmartArt挿入
+            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // 3-3 SmartArt変換
+            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 2 : 0; // 3-4 スライドズーム
+            if (projectId == 5 && taskId == 3) return 0;                       // 5-3 図形変更 (全スライド不変)
+            if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5 グループ化
+            if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3 3Dモデル挿入
+            if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1 グラフ作成 (プレースホルダー内挿入のため不変)
+
+            // フッター関連やレイアウト変更、スライド追加等のタスクは複雑に変動するため無制限
+            return int.MaxValue;
+        }
+
+        /// <summary>
         /// ShapePosition免除フラグが有効な場合でも、既存図形の位置・サイズ変更を一切許可しない（新規追加図形の免除のみとする）タスクかどうかを返します。
         /// </summary>
         public static bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)

@@ -223,6 +223,25 @@ namespace PowerPointAddIn1
                         errors.Add($"ShapesCount on Slide {kvp.Key} changed");
                 }
             }
+            else
+            {
+                // 免除されているが、厳密なデルタチェックを適用
+                foreach (var kvp in start.ShapesCounts)
+                {
+                    int allowedDelta = GetAllowedShapesCountDelta(start.ProjectId, start.TaskId, kvp.Key);
+                    if (allowedDelta != int.MaxValue)
+                    {
+                        if (current.ShapesCounts.ContainsKey(kvp.Key))
+                        {
+                            int actualDelta = current.ShapesCounts[kvp.Key] - kvp.Value;
+                            if (actualDelta != allowedDelta)
+                            {
+                                errors.Add($"不正な図形操作: スライド {kvp.Key} で指示外の図形変化が検知されました（期待: {allowedDelta}, 実際: {actualDelta}）");
+                            }
+                        }
+                    }
+                }
+            }
 
             if (!flags.HasFlag(PPValidationExemptFlags.TextLength))
             {
@@ -291,9 +310,23 @@ namespace PowerPointAddIn1
             if (projectId == 4 && taskId == 5) return 1; // 4-5
             if (projectId == 5 && taskId == 4) return 1; // 5-4
             if (projectId == 6 && taskId == 4) return 1; // 6-4
+            if (projectId == 9 && taskId == 1) return -1; // デフォルトへ (deltaで制御)
             if (projectId == 9 && taskId == 6) return 1; // 9-6
             if (projectId == 11 && taskId == 6) return 1; // 11-6
             return -1;
+        }
+
+        private int GetAllowedShapesCountDelta(int projectId, int taskId, int slideIndex)
+        {
+            if (projectId == 3 && taskId == 1) return slideIndex == 5 ? 0 : 0; // 3-1
+            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // 3-3
+            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 2 : 0; // 3-4
+            if (projectId == 5 && taskId == 3) return 0;                       // 5-3
+            if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5
+            if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3
+            if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1
+
+            return int.MaxValue;
         }
 
         private void SaveSnapshot(SnapshotData data)
