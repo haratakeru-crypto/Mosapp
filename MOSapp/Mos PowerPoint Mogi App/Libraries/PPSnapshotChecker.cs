@@ -111,6 +111,7 @@ namespace Libraries
                             }
 
                             shapes = slide.Shapes;
+                            long slideTextLength = 0;
                             for (int j = 1; j <= shapes.Count; j++)
                             {
                                 try
@@ -122,17 +123,44 @@ namespace Libraries
                                         dynamic tf2 = shape.TextFrame2;
                                         if (tf2 != null && (int)tf2.HasText == -1)
                                         {
-                                            currentTotalTextLength += tf2.TextRange.Length;
+                                            slideTextLength += tf2.TextRange.Length;
                                         }
                                         else if (shape.HasTextFrame == Office.MsoTriState.msoTrue && shape.TextFrame.HasText == Office.MsoTriState.msoTrue)
                                         {
-                                            currentTotalTextLength += shape.TextFrame.TextRange.Length;
+                                            slideTextLength += shape.TextFrame.TextRange.Length;
                                         }
                                     }
                                     catch { }
                                 }
                                 catch { }
                                 finally { if (shape != null) { Marshal.ReleaseComObject(shape); shape = null; } }
+                            }
+
+                            // 算出されたスライドのテキスト文字数を全体の合計に加算
+                            currentTotalTextLength += slideTextLength;
+
+                            // スライドごとの文字増減の厳格チェック
+                            int allowedTextDelta = PPTaskValidationConfig.GetAllowedTextLengthDelta(projectId, taskId, i);
+                            bool hasTextExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.TextLength);
+
+                            if (!hasTextExemptFlag || allowedTextDelta != int.MaxValue)
+                            {
+                                if (snapshot.SlideTextLengths.TryGetValue(i, out long expectedSlideTextLength))
+                                {
+                                    long targetDelta = hasTextExemptFlag ? allowedTextDelta : 0;
+                                    if (slideTextLength != expectedSlideTextLength + targetDelta)
+                                    {
+                                        if (hasTextExemptFlag)
+                                        {
+                                            errors.Add($"不正なテキスト変更: スライド {i} で指示外のテキスト変更が検知されました（期待: {targetDelta}, 実際: {slideTextLength - expectedSlideTextLength}）");
+                                        }
+                                        else
+                                        {
+                                            // 以前は全体だけだったが、スライド単位でも変化がないかチェック
+                                            errors.Add($"TextLength changed on slide {i}: expected {expectedSlideTextLength}, but is {slideTextLength}");
+                                        }
+                                    }
+                                }
                             }
 
                             // アニメーション数（減少のみ不合格）
@@ -233,6 +261,7 @@ namespace Libraries
             public List<string> SlideNames = new List<string>();
             public Dictionary<int, int> ShapesCounts = new Dictionary<int, int>();
             public long TotalTextLength;
+            public Dictionary<int, long> SlideTextLengths = new Dictionary<int, long>();
             public Dictionary<int, int> AnimationCounts = new Dictionary<int, int>();
             public Dictionary<string, Tuple<float, float, float, float>> ShapePositions = new Dictionary<string, Tuple<float, float, float, float>>();
         }
@@ -274,6 +303,9 @@ namespace Libraries
                         case "TotalTextLength":
                             long.TryParse(value, out data.TotalTextLength);
                             break;
+                        case "SlideTextLengths":
+                            ParseLongPairs(value, data.SlideTextLengths);
+                            break;
                         case "AnimationCounts":
                             ParsePairs(value, data.AnimationCounts);
                             break;
@@ -294,6 +326,19 @@ namespace Libraries
             {
                 var parts = pair.Split(':');
                 if (parts.Length == 2 && int.TryParse(parts[0], out int k) && int.TryParse(parts[1], out int v))
+                {
+                    dict[k] = v;
+                }
+            }
+        }
+
+        private static void ParseLongPairs(string value, Dictionary<int, long> dict)
+        {
+            var pairs = value.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var pair in pairs)
+            {
+                var parts = pair.Split(':');
+                if (parts.Length == 2 && int.TryParse(parts[0], out int k) && long.TryParse(parts[1], out long v))
                 {
                     dict[k] = v;
                 }

@@ -214,6 +214,21 @@ namespace Libraries
         }
 
         /// <summary>
+        /// TextLength免除フラグが有効な場合でも、特定のスライドにおいて許可される「テキスト文字数の増減（デルタ）」を返します。
+        /// 厳格にチェックすべきでないタスクやスライドの場合は int.MaxValue を返すと無制限になります。
+        /// </summary>
+        public static int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
+        {
+            // 1-7: 吹き出しへのテキスト入力 (スライド1に「教育者必見」の5文字が追加される)
+            if (projectId == 1 && taskId == 7) return slideIndex == 1 ? 5 : 0;
+            // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
+            if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
+
+            // 変換、削除、インポートなど文字数が可変なものはチェックを省略
+            return int.MaxValue;
+        }
+
+        /// <summary>
         /// ShapePosition免除フラグが有効な場合でも、既存図形の位置・サイズ変更を一切許可しない（新規追加図形の免除のみとする）タスクかどうかを返します。
         /// </summary>
         public static bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)

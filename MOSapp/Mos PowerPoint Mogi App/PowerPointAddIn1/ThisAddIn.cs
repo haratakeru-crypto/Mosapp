@@ -167,6 +167,7 @@ namespace PowerPointAddIn1
                         PowerPoint.Shapes shapes = slide.Shapes;
                         data.ShapesCounts[i] = shapes.Count;
                         
+                        long slideTextLength = 0;
                         for (int j = 1; j <= shapes.Count; j++)
                         {
                             PowerPoint.Shape shape = shapes[j];
@@ -175,9 +176,9 @@ namespace PowerPointAddIn1
                                 // Text Check (TextFrame2 priority)
                                 try {
                                     dynamic tf2 = shape.TextFrame2;
-                                    if (tf2 != null && (int)tf2.HasText == -1) data.TotalTextLength += tf2.TextRange.Length;
+                                    if (tf2 != null && (int)tf2.HasText == -1) slideTextLength += tf2.TextRange.Length;
                                     else if (shape.HasTextFrame == Office.MsoTriState.msoTrue && shape.TextFrame.HasText == Office.MsoTriState.msoTrue)
-                                        data.TotalTextLength += shape.TextFrame.TextRange.Length;
+                                        slideTextLength += shape.TextFrame.TextRange.Length;
                                 } catch { }
 
                                 // Position Check
@@ -194,6 +195,8 @@ namespace PowerPointAddIn1
                         int animCount = 0;
                         try { animCount = slide.TimeLine.MainSequence.Count; } catch { }
                         data.AnimationCounts[i] = animCount;
+                        data.TotalTextLength += slideTextLength;
+                        data.SlideTextLengths[i] = slideTextLength;
 
                         Marshal.ReleaseComObject(shapes);
                         Marshal.ReleaseComObject(slide);
@@ -246,6 +249,24 @@ namespace PowerPointAddIn1
             if (!flags.HasFlag(PPValidationExemptFlags.TextLength))
             {
                 if (current.TotalTextLength != start.TotalTextLength) errors.Add("TotalTextLength changed");
+            }
+            else
+            {
+                foreach (var kvp in start.SlideTextLengths)
+                {
+                    int allowedDelta = GetAllowedTextLengthDelta(start.ProjectId, start.TaskId, kvp.Key);
+                    if (allowedDelta != int.MaxValue)
+                    {
+                        if (current.SlideTextLengths.ContainsKey(kvp.Key))
+                        {
+                            long actualDelta = current.SlideTextLengths[kvp.Key] - kvp.Value;
+                            if (actualDelta != allowedDelta)
+                            {
+                                errors.Add($"不正なテキスト変更: スライド {kvp.Key} で指示外のテキスト変更が検知されました（期待: {allowedDelta}, 実際: {actualDelta}）");
+                            }
+                        }
+                    }
+                }
             }
 
             // 図形座標・サイズの比較
@@ -329,6 +350,17 @@ namespace PowerPointAddIn1
             return int.MaxValue;
         }
 
+        private int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
+        {
+            // 1-7: 吹き出しへのテキスト入力 (スライド1に「教育者必見」の5文字が追加される)
+            if (projectId == 1 && taskId == 7) return slideIndex == 1 ? 5 : 0;
+            // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
+            if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
+
+            // 変換、削除、インポートなど文字数が可変なものはチェックを省略
+            return int.MaxValue;
+        }
+
         private void SaveSnapshot(SnapshotData data)
         {
             try
@@ -340,6 +372,9 @@ namespace PowerPointAddIn1
                 
                 var shapeCountsStr = string.Join("|", data.ShapesCounts.Select(x => $"{x.Key}:{x.Value}"));
                 sb.AppendLine($"ShapesCounts:{shapeCountsStr}");
+
+                var textLengthsStr = string.Join("|", data.SlideTextLengths.Select(x => $"{x.Key}:{x.Value}"));
+                sb.AppendLine($"SlideTextLengths:{textLengthsStr}");
 
                 var posList = data.ShapePositions.Select(x => $"{x.Key}:{x.Value.Item1},{x.Value.Item2},{x.Value.Item3},{x.Value.Item4}");
                 sb.AppendLine($"ShapePositions:{string.Join("|", posList)}");
@@ -377,6 +412,12 @@ namespace PowerPointAddIn1
                                 if (kv.Length == 2) data.ShapesCounts[int.Parse(kv[0])] = int.Parse(kv[1]);
                             }
                             break;
+                        case "SlideTextLengths":
+                            foreach (var part in val.Split('|')) {
+                                var kv = part.Split(':');
+                                if (kv.Length == 2) data.SlideTextLengths[int.Parse(kv[0])] = long.Parse(kv[1]);
+                            }
+                            break;
                         case "ShapePositions":
                             foreach (var part in val.Split('|')) {
                                 var kv = part.Split(':');
@@ -399,6 +440,7 @@ namespace PowerPointAddIn1
             public List<string> SlideNames = new List<string>();
             public Dictionary<int, int> ShapesCounts = new Dictionary<int, int>();
             public long TotalTextLength;
+            public Dictionary<int, long> SlideTextLengths = new Dictionary<int, long>();
             public Dictionary<int, int> AnimationCounts = new Dictionary<int, int>();
             public Dictionary<string, Tuple<float, float, float, float>> ShapePositions = new Dictionary<string, Tuple<float, float, float, float>>();
         }
