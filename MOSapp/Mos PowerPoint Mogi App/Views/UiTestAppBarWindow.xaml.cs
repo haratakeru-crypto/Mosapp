@@ -432,7 +432,7 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Showing result window");
                 
                 // 結果画面を作成
-                var resultWindow = new ResultWindow(_projectTaskFlaggedStates, _projectTaskViewedStates, _groupId);
+                var resultWindow = new ResultWindow(_projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, _groupId);
                 resultWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                 resultWindow.Topmost = true;
                 
@@ -625,6 +625,7 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
+                SyncProjectToMainViewModel();
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint)");
                 
                 // プロジェクト一覧画面の採点と同じ処理を実行（MainViewModel.ExecuteScore → 採点結果ダイアログ表示）

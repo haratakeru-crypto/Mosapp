@@ -229,8 +229,14 @@ namespace PowerPointAddIn1
                 if (current.TotalTextLength != start.TotalTextLength) errors.Add("TotalTextLength changed");
             }
 
-            if (!flags.HasFlag(PPValidationExemptFlags.ShapePosition))
+            // 図形座標・サイズの比較
+            bool exemptFullShapePosition = flags.HasFlag(PPValidationExemptFlags.ShapePosition);
+            bool onlyNewShapesExempt = IsShapePositionExemptForNewShapesOnly(start.ProjectId, start.TaskId);
+            int allowedExistingChangesCount = GetAllowedExistingShapePositionChangeCount(start.ProjectId, start.TaskId);
+
+            if (!exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0)
             {
+                int changedExistingShapesCount = 0;
                 foreach (var kvp in start.ShapePositions)
                 {
                     if (current.ShapePositions.ContainsKey(kvp.Key))
@@ -242,12 +248,52 @@ namespace PowerPointAddIn1
                             Math.Abs(cPos.Item3 - sPos.Item3) > PositionTolerancePt ||
                             Math.Abs(cPos.Item4 - sPos.Item4) > PositionTolerancePt)
                         {
-                            errors.Add($"Shape position/size changed on Slide {kvp.Key.Split('_')[0]}");
+                            if (exemptFullShapePosition)
+                            {
+                                if (onlyNewShapesExempt)
+                                {
+                                    errors.Add($"不正な図形変更: 指示外の既存図形(ID:{kvp.Key})の位置・サイズが変更されています。");
+                                }
+                                else if (allowedExistingChangesCount >= 0)
+                                {
+                                    changedExistingShapesCount++;
+                                    if (changedExistingShapesCount > allowedExistingChangesCount)
+                                    {
+                                        errors.Add($"上限超過の図形変更: 許可された数以上の既存図形(ID:{kvp.Key})が変更されています。");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                errors.Add($"Shape position/size changed on Slide {kvp.Key.Split('_')[0]} (ID:{kvp.Key})");
+                            }
                         }
                     }
                 }
             }
             return errors;
+        }
+
+        private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
+        {
+            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4)) return true; // 3-1, 3-3, 3-4
+            if (projectId == 4 && taskId == 6) return true; // 4-6
+            if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3, 5-5
+            if (projectId == 6 && taskId == 3) return true; // 6-3
+            if (projectId == 9 && taskId == 1) return true; // 9-1
+            if (projectId == 10 && taskId == 7) return true; // 10-7
+            return false;
+        }
+
+        private int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
+        {
+            if (projectId == 4 && taskId == 4) return 1; // 4-4
+            if (projectId == 4 && taskId == 5) return 1; // 4-5
+            if (projectId == 5 && taskId == 4) return 1; // 5-4
+            if (projectId == 6 && taskId == 4) return 1; // 6-4
+            if (projectId == 9 && taskId == 6) return 1; // 9-6
+            if (projectId == 11 && taskId == 6) return 1; // 11-6
+            return -1;
         }
 
         private void SaveSnapshot(SnapshotData data)

@@ -191,5 +191,34 @@ namespace Libraries
 
             return flags;
         }
+
+        /// <summary>
+        /// ShapePosition免除フラグが有効な場合でも、既存図形の位置・サイズ変更を一切許可しない（新規追加図形の免除のみとする）タスクかどうかを返します。
+        /// </summary>
+        public static bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
+        {
+            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4)) return true; // 3-1, 3-3 SmartArt関連, 3-4 スライドズーム
+            if (projectId == 4 && taskId == 6) return true; // 4-6 順序入れ替え (座標は不変)
+            if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3 図形変更, 5-5 グループ化
+            if (projectId == 6 && taskId == 3) return true; // 6-3 3Dモデル挿入
+            if (projectId == 9 && taskId == 1) return true; // 9-1 グラフ作成
+            if (projectId == 10 && taskId == 7) return true; // 10-7 プレースホルダー追加
+            return false;
+        }
+
+        /// <summary>
+        /// ShapePosition免除フラグが有効な場合で、既存図形の変更を一部許可するタスクにおける「変更許可上限数」を返します。
+        /// 制約を設けない場合は -1 を返します。
+        /// </summary>
+        public static int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
+        {
+            if (projectId == 4 && taskId == 4) return 1; // 4-4 画像のトリミング
+            if (projectId == 4 && taskId == 5) return 1; // 4-5 画像の配置
+            if (projectId == 5 && taskId == 4) return 1; // 5-4 図形のサイズ変更
+            if (projectId == 6 && taskId == 4) return 1; // 6-4 3Dモデルのサイズ変更
+            if (projectId == 9 && taskId == 6) return 1; // 9-6 ハイパーリンク (書き換えによるサイズ変化を許容)
+            if (projectId == 11 && taskId == 6) return 1; // 11-6 整列
+            return -1;
+        }
     }
 }

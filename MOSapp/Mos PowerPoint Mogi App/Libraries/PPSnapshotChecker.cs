@@ -137,8 +137,13 @@ namespace Libraries
                             }
 
                             // 図形座標・サイズの比較
-                            if (!exemptFlags.HasFlag(PPValidationExemptFlags.ShapePosition))
+                            bool exemptFullShapePosition = exemptFlags.HasFlag(PPValidationExemptFlags.ShapePosition);
+                            bool onlyNewShapesExempt = PPTaskValidationConfig.IsShapePositionExemptForNewShapesOnly(projectId, taskId);
+                            int allowedExistingChangesCount = PPTaskValidationConfig.GetAllowedExistingShapePositionChangeCount(projectId, taskId);
+
+                            if (!exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0)
                             {
+                                int changedExistingShapesCount = 0;
                                 shapes = slide.Shapes;
                                 for (int j = 1; j <= shapes.Count; j++)
                                 {
@@ -156,7 +161,27 @@ namespace Libraries
                                             if (Math.Abs(old.Item1 - left) > 0.5f || Math.Abs(old.Item2 - top) > 0.5f ||
                                                 Math.Abs(old.Item3 - w) > 0.5f || Math.Abs(old.Item4 - h) > 0.5f)
                                             {
-                                                errors.Add($"Shape position/size changed on slide {i} (ShapeId {shape.Id})");
+                                                if (exemptFullShapePosition)
+                                                {
+                                                    if (onlyNewShapesExempt)
+                                                    {
+                                                        // 既存図形の位置変更が一切許されないタスクでの違反
+                                                        errors.Add($"不正な図形変更: スライド {i} で指示外の既存図形(ID:{shape.Id})の位置・サイズが変更されています。");
+                                                    }
+                                                    else if (allowedExistingChangesCount >= 0)
+                                                    {
+                                                        changedExistingShapesCount++;
+                                                        if (changedExistingShapesCount > allowedExistingChangesCount)
+                                                        {
+                                                            // 許可された個数以上の既存図形が変更された
+                                                            errors.Add($"上限超過の図形変更: スライド {i} で許可された数以上の既存図形(ID:{shape.Id})が変更されています。");
+                                                        }
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    errors.Add($"Shape position/size changed on slide {i} (ShapeId {shape.Id})");
+                                                }
                                             }
                                         }
                                     }

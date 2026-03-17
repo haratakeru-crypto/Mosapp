@@ -17,6 +17,7 @@ namespace MOS_PowerPoint_app.Views
     /// </summary>
     public partial class ResultWindow : Window
     {
+        private Dictionary<int, bool[]> _projectTaskCompletedStates; // 解答済み状態を保持
         private Dictionary<int, bool[]> _projectTaskFlaggedStates; // 「あとで見直す」フラグ状態
         private Dictionary<int, bool[]> _projectTaskViewedStates; // 閲覧状態（未読問題の追跡用）
         private int _groupId = 1;
@@ -26,11 +27,13 @@ namespace MOS_PowerPoint_app.Views
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
         public Action OnEndRequested { get; set; } // 終了ボタン押下時（PowerPoint終了・メイン画面に戻る）
 
-        public ResultWindow(Dictionary<int, bool[]> projectTaskFlaggedStates = null, 
+        public ResultWindow(Dictionary<int, bool[]> projectTaskCompletedStates = null,
+                           Dictionary<int, bool[]> projectTaskFlaggedStates = null, 
                            Dictionary<int, bool[]> projectTaskViewedStates = null, 
                            int groupId = 1)
         {
             InitializeComponent();
+            _projectTaskCompletedStates = projectTaskCompletedStates ?? new Dictionary<int, bool[]>();
             _projectTaskFlaggedStates = projectTaskFlaggedStates ?? new Dictionary<int, bool[]>();
             _projectTaskViewedStates = projectTaskViewedStates ?? new Dictionary<int, bool[]>();
             _groupId = groupId;
@@ -102,7 +105,10 @@ namespace MOS_PowerPoint_app.Views
                 {
                     if (project.Tasks == null) continue;
                     
-                    // 「あとで見直す」フラグ状態と閲覧状態を取得
+                    // 「解答済み」状態、フラグ状態、閲覧状態を取得
+                    bool[] completedStates = _projectTaskCompletedStates.ContainsKey(project.ProjectId) 
+                        ? _projectTaskCompletedStates[project.ProjectId] 
+                        : new bool[0];
                     bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) 
                         ? _projectTaskFlaggedStates[project.ProjectId] 
                         : new bool[0];
@@ -115,11 +121,12 @@ namespace MOS_PowerPoint_app.Views
                         // タスクIDは1始まり、配列は0始まりなので -1
                         int arrayIndex = task.TaskId - 1;
                         
+                        bool isCompleted = arrayIndex >= 0 && arrayIndex < completedStates.Length && completedStates[arrayIndex];
                         bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
                         bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                         
-                        // 「あとで見直す」または未読の場合は✖としてカウント
-                        if (isFlagged || isUnread)
+                        // 「あとで見直す」または未読、または未回答の場合は✖としてカウント
+                        if (isFlagged || isUnread || !isCompleted)
                         {
                             totalWrongTasks++;
                         }
@@ -226,7 +233,11 @@ namespace MOS_PowerPoint_app.Views
                     {
                         foreach (var task in project.Tasks)
                         {
-                            if (task.ResultMark == "✖")
+                            if (task.ResultMark == "〇")
+                            {
+                                task.ResultColor = Brushes.Green; // 〇は緑色に設定
+                            }
+                            else if (task.ResultMark == "✖")
                             {
                                 task.ResultColor = Brushes.Red;
                             }
@@ -298,7 +309,10 @@ namespace MOS_PowerPoint_app.Views
                 {
                     foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
                     {
-                        // 「あとで見直す」フラグ状態と閲覧状態を取得
+                        // 各状態を取得
+                        bool[] completedStates = _projectTaskCompletedStates.ContainsKey(project.ProjectId) 
+                            ? _projectTaskCompletedStates[project.ProjectId] 
+                            : new bool[0];
                         bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) 
                             ? _projectTaskFlaggedStates[project.ProjectId] 
                             : new bool[0];
@@ -314,6 +328,7 @@ namespace MOS_PowerPoint_app.Views
                                 // タスクIDは1始まり、配列は0始まりなので -1
                                 int arrayIndex = task.TaskId - 1;
                                 
+                                bool isCompleted = arrayIndex >= 0 && arrayIndex < completedStates.Length && completedStates[arrayIndex];
                                 bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
                                 bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                                 
@@ -326,7 +341,7 @@ namespace MOS_PowerPoint_app.Views
                                 else
                                 {
                                     // 閲覧済み: フラグありなら✖、なしなら空白
-                                    resultMark = isFlagged ? "✖" : "";
+                                    resultMark = (isCompleted && !isFlagged) ? "〇" : "✖";
                                 }
                                 
                                 return new ResultTaskInfo
