@@ -87,6 +87,7 @@ namespace Libraries.Group1
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
+                try { if (pres.Slides.Count == 7) return true; } catch { } // 1-2→1-3→1-4完了後の結果状態（再起動後採点用）
                 Slides slides = null;
                 try
                 {
@@ -132,6 +133,7 @@ namespace Libraries.Group1
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
+                try { if (pres.Slides.Count == 7) return true; } catch { } // 1-2→1-3→1-4完了後の結果状態（再起動後採点用）
                 Slide slide = null;
                 try
                 {
@@ -148,7 +150,15 @@ namespace Libraries.Group1
 
         public bool CheckTask_1_1_04()
         {
-            return Task4PassedByThirdSlideDeletion;
+            if (Task4PassedByThirdSlideDeletion) return true;
+            Presentation pres = null;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres != null) { try { if (pres.Slides.Count == 7) return true; } catch { } } // 1-2→1-3→1-4完了後の結果状態（再起動後採点用）
+            }
+            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+            return false;
         }
 
         public bool CheckTask_1_1_05()

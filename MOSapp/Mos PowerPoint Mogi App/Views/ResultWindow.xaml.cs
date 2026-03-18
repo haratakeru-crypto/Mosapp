@@ -20,6 +20,7 @@ namespace MOS_PowerPoint_app.Views
         private Dictionary<int, bool[]> _projectTaskCompletedStates; // 解答済み状態を保持
         private Dictionary<int, bool[]> _projectTaskFlaggedStates; // 「あとで見直す」フラグ状態
         private Dictionary<int, bool[]> _projectTaskViewedStates; // 閲覧状態（未読問題の追跡用）
+        private Dictionary<int, List<bool>> _allProjectScoringResults; // 方式A: 結果表示時に実行した全プロジェクトの採点結果（projectId → タスクごと正否）
         private int _groupId = 1;
         private List<ResultProjectInfo> _allProjects; // すべてのプロジェクトを保持
         private bool _showingWrongOnly = false; // フィルター状態
@@ -30,14 +31,16 @@ namespace MOS_PowerPoint_app.Views
         public ResultWindow(Dictionary<int, bool[]> projectTaskCompletedStates = null,
                            Dictionary<int, bool[]> projectTaskFlaggedStates = null, 
                            Dictionary<int, bool[]> projectTaskViewedStates = null, 
-                           int groupId = 1)
+                           int groupId = 1,
+                           Dictionary<int, List<bool>> allProjectScoringResults = null)
         {
             InitializeComponent();
             _projectTaskCompletedStates = projectTaskCompletedStates ?? new Dictionary<int, bool[]>();
             _projectTaskFlaggedStates = projectTaskFlaggedStates ?? new Dictionary<int, bool[]>();
             _projectTaskViewedStates = projectTaskViewedStates ?? new Dictionary<int, bool[]>();
+            _allProjectScoringResults = allProjectScoringResults ?? new Dictionary<int, List<bool>>();
             _groupId = groupId;
-            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, groupId: {_groupId}");
+            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}");
             
             // ウィンドウが読み込まれた後にデータを読み込む（非同期）
             this.Loaded += ResultWindow_Loaded;
@@ -98,14 +101,14 @@ namespace MOS_PowerPoint_app.Views
 
                 int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
                 
-                // 全タスクを対象に✖の問題数を計算（「あとで見直す」フラグ + 未読問題）
+                // 全タスクを対象に✖の問題数を計算
                 int totalWrongTasks = 0;
+                bool useScoringResults = _allProjectScoringResults != null && _allProjectScoringResults.Count > 0;
                 
                 foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
                 {
                     if (project.Tasks == null) continue;
                     
-                    // 「解答済み」状態、フラグ状態、閲覧状態を取得
                     bool[] completedStates = _projectTaskCompletedStates.ContainsKey(project.ProjectId) 
                         ? _projectTaskCompletedStates[project.ProjectId] 
                         : new bool[0];
@@ -115,20 +118,25 @@ namespace MOS_PowerPoint_app.Views
                     bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) 
                         ? _projectTaskViewedStates[project.ProjectId] 
                         : new bool[0];
+                    List<bool> scoreList = useScoringResults && _allProjectScoringResults.ContainsKey(project.ProjectId) 
+                        ? _allProjectScoringResults[project.ProjectId] 
+                        : null;
                     
                     foreach (var task in project.Tasks)
                     {
-                        // タスクIDは1始まり、配列は0始まりなので -1
                         int arrayIndex = task.TaskId - 1;
-                        
                         bool isCompleted = arrayIndex >= 0 && arrayIndex < completedStates.Length && completedStates[arrayIndex];
                         bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
                         bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                         
-                        // 「あとで見直す」または未読、または未回答の場合は✖としてカウント
-                        if (isFlagged || isUnread || !isCompleted)
+                        if (scoreList != null && arrayIndex >= 0 && arrayIndex < scoreList.Count)
                         {
-                            totalWrongTasks++;
+                            // 方式A: 採点結果あり → 不正解 or あとで見直す なら✖
+                            if (isFlagged || !scoreList[arrayIndex]) totalWrongTasks++;
+                        }
+                        else
+                        {
+                            if (isFlagged || isUnread || !isCompleted) totalWrongTasks++;
                         }
                     }
                 }
@@ -333,14 +341,26 @@ namespace MOS_PowerPoint_app.Views
                                 bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                                 
                                 string resultMark;
-                                if (isUnread)
+                                // 方式A: 全プロジェクト採点結果がある場合はそれを優先（あとで見直すは従来どおり✖）
+                                bool? scoringPassed = null;
+                                if (_allProjectScoringResults != null && _allProjectScoringResults.ContainsKey(project.ProjectId))
+                                {
+                                    var scoreList = _allProjectScoringResults[project.ProjectId];
+                                    if (arrayIndex >= 0 && arrayIndex < scoreList.Count)
+                                        scoringPassed = scoreList[arrayIndex];
+                                }
+                                if (scoringPassed.HasValue)
+                                {
+                                    resultMark = isFlagged ? "✖" : (scoringPassed.Value ? "〇" : "✖");
+                                }
+                                else if (isUnread)
                                 {
                                     // 未閲覧: 最初の未閲覧のみ「時間切れ」、以降は空白
                                     resultMark = (project.ProjectId == firstProjectId && task.TaskId == firstTaskId) ? "時間切れ" : "";
                                 }
                                 else
                                 {
-                                    // 閲覧済み: フラグありなら✖、なしなら空白
+                                    // 閲覧済み: フラグありなら✖、完了かつフラグなしなら〇
                                     resultMark = (isCompleted && !isFlagged) ? "〇" : "✖";
                                 }
                                 

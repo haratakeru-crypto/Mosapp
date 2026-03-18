@@ -14,6 +14,7 @@ using System.Windows.Input;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Reflection;
 using System.Windows.Interop;
 using PowerPointApp = Microsoft.Office.Interop.PowerPoint.Application;
@@ -373,7 +374,7 @@ namespace MOS_PowerPoint_app.Views
                 _timer.Stop();
                 UpdateTimerDisplay();
                 // 試験終了処理：結果画面を表示
-                ShowResultWindow();
+                ShowResultWindowAsync();
             }
         }
         
@@ -403,7 +404,7 @@ namespace MOS_PowerPoint_app.Views
                 };
                 reviewWindow.OnShowResultRequested = () =>
                 {
-                    ShowResultWindow();
+                    ShowResultWindowAsync();
                 };
                 reviewWindow.OnBackRequested = () =>
                 {
@@ -423,20 +424,63 @@ namespace MOS_PowerPoint_app.Views
         }
 
         /// <summary>
-        /// 結果画面を表示する
+        /// 結果画面を表示する（方式A: 表示前に全プロジェクトを採点してから結果を渡す）
         /// </summary>
-        private void ShowResultWindow()
+        private async void ShowResultWindowAsync()
         {
+            Window overlay = null;
             try
             {
-                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Showing result window");
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Showing result window (scoring all projects first)");
                 
-                // 結果画面を作成
-                var resultWindow = new ResultWindow(_projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, _groupId);
+                // 「採点中です」オーバーレイを表示
+                overlay = new Window
+                {
+                    Title = "採点中",
+                    Width = 320,
+                    Height = 120,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    ResizeMode = ResizeMode.NoResize,
+                    Content = new System.Windows.Controls.TextBlock
+                    {
+                        Text = "採点中です。しばらくお待ちください...",
+                        FontSize = 14,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                };
+                overlay.Show();
+                await Task.Yield();
+                
+                // 全プロジェクトを採点（バックグラウンドで実行）
+                Dictionary<int, List<bool>> allResults = null;
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        allResults = ScoreAllProjects();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ScoreAllProjects] Error: {ex.Message}");
+                    }
+                });
+                
+                if (overlay != null)
+                {
+                    try { overlay.Close(); } catch { }
+                    overlay = null;
+                }
+                
+                if (allResults == null)
+                    allResults = new Dictionary<int, List<bool>>();
+                
+                // 結果画面を作成（採点結果を渡す）
+                var resultWindow = new ResultWindow(_projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, _groupId, allResults);
                 resultWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                 resultWindow.Topmost = true;
                 
-                // OnEndRequestedを設定（終了時: PowerPoint終了・メイン画面に戻る）
                 resultWindow.OnEndRequested = () =>
                 {
                     CloseAllPowerPointPresentations();
@@ -461,10 +505,8 @@ namespace MOS_PowerPoint_app.Views
                     }
                 };
                 
-                // OnNavigateToTaskを設定
                 resultWindow.OnNavigateToTask = (projectId, taskId) =>
                 {
-                    // AppBarWindowを確実に表示
                     var appBarWindow = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
                     if (appBarWindow != null)
                     {
@@ -476,15 +518,77 @@ namespace MOS_PowerPoint_app.Views
                 
                 resultWindow.Show();
                 resultWindow.Activate();
-                
-                // AppBarWindowを非表示にする
                 this.Hide();
             }
             catch (Exception ex)
             {
+                if (overlay != null)
+                {
+                    try { overlay.Close(); } catch { }
+                }
                 System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] Error showing result window: {ex.Message}");
                 MessageBox.Show($"結果画面の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+        
+        /// <summary>
+        /// 全プロジェクトを採点し、projectId → タスクごとの正否リスト を返す（方式A用）
+        /// </summary>
+        private Dictionary<int, List<bool>> ScoreAllProjects()
+        {
+            var results = new Dictionary<int, List<bool>>();
+            if (_projectData?.Projects == null || _projectData.Projects.Count == 0)
+                return results;
+            
+            PowerPointGrader grader = null;
+            try
+            {
+                grader = new PowerPointGrader();
+                if (!grader.Connect())
+                {
+                    System.Diagnostics.Debug.WriteLine("[ScoreAllProjects] PowerPoint に接続できませんでした");
+                    return results;
+                }
+                foreach (var project in _projectData.Projects.OrderBy(p => p.ProjectId))
+                {
+                    if (project.Tasks == null || project.Tasks.Count == 0)
+                        continue;
+                    var list = new List<bool>();
+                    try
+                    {
+                        OpenProjectDocument(project.ProjectId, _groupId);
+                        Thread.Sleep(800);
+                        foreach (var task in project.Tasks.OrderBy(t => t.TaskId))
+                        {
+                            bool passed = false;
+                            try
+                            {
+                                passed = grader.GradeTask(project.ProjectId, task.TaskId);
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[ScoreAllProjects] GradeTask {project.ProjectId}-{task.TaskId}: {ex.Message}");
+                            }
+                            list.Add(passed);
+                        }
+                        results[project.ProjectId] = list;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ScoreAllProjects] Project {project.ProjectId}: {ex.Message}");
+                        for (int i = 0; i < project.Tasks.Count; i++)
+                            list.Add(false);
+                        if (list.Count > 0)
+                            results[project.ProjectId] = list;
+                    }
+                }
+            }
+            finally
+            {
+                try { grader?.Dispose(); } catch { }
+            }
+            System.Diagnostics.Debug.WriteLine($"[ScoreAllProjects] Done: {results.Count} projects");
+            return results;
         }
         
         /// <summary>
@@ -533,6 +637,40 @@ namespace MOS_PowerPoint_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"ナビゲーションエラー: {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// 採点結果を結果画面用の解答済み状態に反映する（方式B: 採点で合格したタスクを〇で表示するため）
+        /// </summary>
+        /// <param name="projectId">対象プロジェクトID</param>
+        /// <param name="taskResults">採点結果（TaskNumber は 1 始まり、IsPassed で合格/不合格）</param>
+        public void ApplyScoreResults(int projectId, IEnumerable<MOS_PowerPoint_app.TaskResult> taskResults)
+        {
+            if (taskResults == null) return;
+            var list = taskResults.ToList();
+            if (list.Count == 0) return;
+            int arraySize = list.Max(t => t.TaskNumber);
+            if (arraySize < 1) return;
+            if (!_projectTaskCompletedStates.ContainsKey(projectId) || _projectTaskCompletedStates[projectId].Length < arraySize)
+            {
+                var newArray = new bool[arraySize];
+                if (_projectTaskCompletedStates.ContainsKey(projectId))
+                {
+                    var old = _projectTaskCompletedStates[projectId];
+                    Array.Copy(old, newArray, Math.Min(old.Length, arraySize));
+                }
+                _projectTaskCompletedStates[projectId] = newArray;
+            }
+            bool[] completedStates = _projectTaskCompletedStates[projectId];
+            foreach (var task in list)
+            {
+                int index = task.TaskNumber - 1;
+                if (index >= 0 && index < completedStates.Length)
+                {
+                    completedStates[index] = task.IsPassed;
+                }
+            }
+            System.Diagnostics.Debug.WriteLine($"[ApplyScoreResults] プロジェクト{projectId}: {list.Count(r => r.IsPassed)}/{list.Count} を解答済みに反映しました");
         }
         
         private void ProjectTimer_Tick(object sender, EventArgs e)
@@ -641,13 +779,37 @@ namespace MOS_PowerPoint_app.Views
             }
         }
         
+        /// <summary>
+        /// 閉じるボタン（Excelに合わせて結果画面は表示せず、試験終了してメインに戻る）
+        /// </summary>
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes)
+                return;
             _timer?.Stop();
             _projectTimer?.Stop();
             SaveAllPowerPointPresentations();
-            // 結果画面を表示
-            ShowResultWindow();
+            CloseAllPowerPointPresentations();
+            try
+            {
+                var pptProcesses = Process.GetProcessesByName("POWERPNT");
+                foreach (var proc in pptProcesses)
+                {
+                    proc.Kill();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CloseButton] PowerPoint プロセス終了エラー: {ex.Message}");
+            }
+            this.Close();
+            var main = System.Windows.Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+            if (main != null)
+            {
+                main.Show();
+                main.Activate();
+            }
         }
         
         private void ReviewPageButton_Click(object sender, RoutedEventArgs e)

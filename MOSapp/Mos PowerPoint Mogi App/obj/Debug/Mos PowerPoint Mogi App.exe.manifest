@@ -90,14 +90,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="287656">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="293288">
       <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>p3bJWe0SvxJK9BnVppmCTcfiF30VcdbGvQ7klgKa/1U=</dsig:DigestValue>
+        <dsig:DigestValue>O64PwrIPaVMrvknSLLoFb2r/gkcq1h91yvS+4Q46bzo=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -114,26 +114,26 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointAddIn1.dll" size="51200">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointAddIn1.dll" size="47616">
       <assemblyIdentity name="PowerPointAddIn1" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>JN2MtZKCcIp837zmGAtnnONxaj7jnSNupuBCDRX7dKE=</dsig:DigestValue>
+        <dsig:DigestValue>KHb8UUNMUuTIu7gV6Bqrelgjh3rR8aKpwoCqffcMeHo=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_1.dll" size="11776">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_1.dll" size="12288">
       <assemblyIdentity name="PowerPointChecker1_1" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>By59QGwJUSkpN5fM4Ds9aXD4KYgruHvpFyg4ItZekx4=</dsig:DigestValue>
+        <dsig:DigestValue>MXhBMOL7Q3QPHpAnJ9kvdCEREfouxecozI+gxTLhg88=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

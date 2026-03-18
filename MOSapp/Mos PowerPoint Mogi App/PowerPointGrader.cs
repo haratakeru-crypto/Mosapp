@@ -273,8 +273,7 @@ namespace MOS_PowerPoint_app
             if (!File.Exists(logPath))
                 return false;
 
-            // ログからは「許可されていないリボンコマンド操作」があるかのみを確認する
-            // 座標変化は SnapshotChecker 側でより正確に判定するため、ここでは無視する
+            // [Op] は旧リボン上書きで RibbonCommand のみ出力。上書き廃止後は通常該当なし。将来 LogOperation を増やす場合は allowed を調整。
             var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "RibbonCommand" };
             if (PPLogReader.HasDisallowedOperations(projectId, taskId, allowed))
                 return true;

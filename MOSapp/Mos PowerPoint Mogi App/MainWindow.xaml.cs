@@ -104,6 +104,18 @@ namespace MOS_PowerPoint_app
             var results = _viewModel?.TaskResults;
             if (results == null || results.Count == 0)
                 return;
+            // 採点結果をアプリバーの解答済み状態に反映（結果画面で〇が正しく表示されるようにする）
+            if (_appBarWindow != null && _viewModel?.CurrentProject != null)
+            {
+                try
+                {
+                    _appBarWindow.ApplyScoreResults(_viewModel.CurrentProject.ProjectId, results);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[OnScoreCompleted] ApplyScoreResults error: {ex.Message}");
+                }
+            }
             var dialog = new Views.ScoreResultWindow(results);
             dialog.Owner = this;
             dialog.ShowDialog();
