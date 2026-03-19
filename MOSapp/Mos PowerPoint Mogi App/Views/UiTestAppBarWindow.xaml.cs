@@ -22,6 +22,7 @@ using PowerPointPresentation = Microsoft.Office.Interop.PowerPoint.Presentation;
 using Microsoft.Office.Interop.PowerPoint;
 using System.Configuration;
 using Libraries.Group1;
+using Libraries;
 
 namespace MOS_PowerPoint_app.Views
 {
@@ -77,6 +78,8 @@ namespace MOS_PowerPoint_app.Views
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
         private readonly Action _onScoreClick; // 採点ボタン押下時（プロジェクト一覧の採点と同じ処理を実行）
         private DispatcherTimer _slideMonitorTimer; // Task 4 用: スライド ID 監視（1秒間隔）
+        private bool _fromResultWindow = false; // 結果画面からタスクに飛んできたかどうか
+        private ResultWindow _resultWindow = null; // 結果画面への参照
         
         public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null)
         {
@@ -346,7 +349,16 @@ namespace MOS_PowerPoint_app.Views
                         if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
                     }
                 }
-                PowerPointChecker1_1.CheckSlideDeletion(currentSlideIds);
+                string presName = "";
+                try { presName = pres.Name ?? ""; } catch { }
+                string presKey = presName;
+                try
+                {
+                    // 保存済みなら FullName がより一意で安定（無い場合は Name にフォールバック）
+                    presKey = string.IsNullOrEmpty(pres.FullName) ? presName : pres.FullName;
+                }
+                catch { }
+                PowerPointChecker1_1.CheckSlideDeletion(currentSlideIds, presKey);
             }
             finally
             {
@@ -429,28 +441,63 @@ namespace MOS_PowerPoint_app.Views
         private async void ShowResultWindowAsync()
         {
             Window overlay = null;
+            DispatcherTimer overlayKeepOnTopTimer = null;
             try
             {
                 System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Showing result window (scoring all projects first)");
                 
                 // 「採点中です」オーバーレイを表示
+                // 待機を徹底するため画面中央に表示（Owner は付けず、ワークエリア中央 = CenterScreen）
                 overlay = new Window
                 {
                     Title = "採点中",
                     Width = 320,
-                    Height = 120,
+                    Height = 140,
                     WindowStartupLocation = WindowStartupLocation.CenterScreen,
                     WindowStyle = WindowStyle.ToolWindow,
                     ResizeMode = ResizeMode.NoResize,
-                    Content = new System.Windows.Controls.TextBlock
+                    ShowInTaskbar = false,
+                    Topmost = true,
+                    Content = new StackPanel
                     {
-                        Text = "採点中です。しばらくお待ちください...",
-                        FontSize = 14,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center
+                        Margin = new Thickness(16, 14, 16, 14),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Children =
+                        {
+                            new TextBlock
+                            {
+                                Text = "採点中です。しばらくお待ちください...",
+                                FontSize = 14,
+                                TextAlignment = TextAlignment.Center,
+                                HorizontalAlignment = HorizontalAlignment.Stretch,
+                                Margin = new Thickness(0, 0, 0, 12)
+                            },
+                            new ProgressBar
+                            {
+                                Height = 14,
+                                IsIndeterminate = true,
+                                Minimum = 0,
+                                Maximum = 100
+                            }
+                        }
                     }
                 };
                 overlay.Show();
+                overlay.Activate();
+
+                // PowerPoint 側が前面化しても、採点中表示が背面に回らないように保護する。
+                overlayKeepOnTopTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+                overlayKeepOnTopTimer.Tick += (_, __) =>
+                {
+                    if (overlay == null || !overlay.IsVisible) return;
+                    if (!overlay.IsActive)
+                    {
+                        overlay.Topmost = false;
+                        overlay.Topmost = true;
+                        overlay.Activate();
+                    }
+                };
+                overlayKeepOnTopTimer.Start();
                 await Task.Yield();
                 
                 // 全プロジェクトを採点（バックグラウンドで実行）
@@ -469,6 +516,7 @@ namespace MOS_PowerPoint_app.Views
                 
                 if (overlay != null)
                 {
+                    overlayKeepOnTopTimer?.Stop();
                     try { overlay.Close(); } catch { }
                     overlay = null;
                 }
@@ -524,6 +572,7 @@ namespace MOS_PowerPoint_app.Views
             {
                 if (overlay != null)
                 {
+                    overlayKeepOnTopTimer?.Stop();
                     try { overlay.Close(); } catch { }
                 }
                 System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] Error showing result window: {ex.Message}");
@@ -563,6 +612,9 @@ namespace MOS_PowerPoint_app.Views
                             bool passed = false;
                             try
                             {
+                                // スナップショット ID Mismatch を防ぐため、採点前に current_task を更新し、
+                                // VSTO 側の snapshot 更新を短時間待ってから GradeTask を呼ぶ。
+                                grader.StartTaskAndWaitForSnapshot(project.ProjectId, task.TaskId);
                                 passed = grader.GradeTask(project.ProjectId, task.TaskId);
                             }
                             catch (Exception ex)
@@ -816,6 +868,77 @@ namespace MOS_PowerPoint_app.Views
         {
             ShowReviewPageWindow();
         }
+
+        /// <summary>
+        /// 結果画面から来たフラグを設定し、ボタン表示を切り替える
+        /// </summary>
+        public void SetFromResultWindow(bool fromResultWindow)
+        {
+            _fromResultWindow = fromResultWindow;
+            UpdateReviewPageButtonVisibility();
+        }
+
+        /// <summary>
+        /// 結果画面への参照を保持する
+        /// </summary>
+        public void SetResultWindow(ResultWindow resultWindow)
+        {
+            _resultWindow = resultWindow;
+        }
+
+        private void UpdateReviewPageButtonVisibility()
+        {
+            var reviewPageButton = FindName("ReviewPageButton") as System.Windows.Controls.Button;
+            var returnToResultButton = FindName("ReturnToResultButton") as System.Windows.Controls.Button;
+
+            if (reviewPageButton != null && returnToResultButton != null)
+            {
+                if (_fromResultWindow)
+                {
+                    reviewPageButton.Visibility = Visibility.Collapsed;
+                    returnToResultButton.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    reviewPageButton.Visibility = Visibility.Visible;
+                    returnToResultButton.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+        private void ReturnToResultButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 結果画面を表示
+                if (_resultWindow != null && !_resultWindow.IsVisible)
+                {
+                    _resultWindow.Show();
+                    _resultWindow.Activate();
+                    _resultWindow.Focus();
+                }
+                else
+                {
+                    // 既存の結果画面を探す
+                    var resultWindow = System.Windows.Application.Current.Windows.OfType<ResultWindow>().FirstOrDefault();
+                    if (resultWindow != null)
+                    {
+                        resultWindow.Show();
+                        resultWindow.Activate();
+                        resultWindow.Focus();
+                    }
+                }
+
+                // AppBarWindowを非表示にする
+                this.Hide();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ReturnToResultButton] Error: {ex.Message}");
+                MessageBox.Show("結果画面の表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         
         
         private void LoadTasks()
@@ -1806,45 +1929,70 @@ namespace MOS_PowerPoint_app.Views
         
         private void MoveToNextProject()
         {
-            // プロジェクト切り替え前にタスク情報をクリアし、アドイン側の破壊的操作チェックをスキップさせる
-            Libraries.PPLogReader.ClearCurrentTaskFile();
-
-            // 現在開いているプレゼンテーションを日付・時間付きバックアップフォルダに保存（MMdd_HHmm）
-            string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] ?? @"C:\MOSTest\PowerPoint365";
-            string backupSubdir = DateTime.Now.ToString("MMdd_HHmm");
-            string backupFolder = Path.Combine(basePath, $"Tab{_groupId}", "backup", backupSubdir);
+            // プロジェクト遷移直前に破壊的操作チェックを完了し、違反があればログに記録（遷移は継続）
             try
             {
-                PowerPointApp pptApp = null;
-                try
+                var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
+                var swDestructive = Stopwatch.StartNew();
+                var errors = Libraries.PPSnapshotChecker.CompareAndGetErrors(_currentProjectId, _currentTaskId, flags);
+                PPGradingPerf.Log("MoveToNextProject.destructiveSnapshotCheck", swDestructive.ElapsedMilliseconds, $"P{_currentProjectId}-T{_currentTaskId} errCount={errors?.Count ?? 0}");
+                if (errors != null && errors.Count > 0)
                 {
-                    pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
-                }
-                catch
-                {
-                    // PowerPointが起動していない場合はスキップ
-                }
-                if (pptApp != null && pptApp.Presentations.Count > 0)
-                {
-                    if (!Directory.Exists(backupFolder))
-                        Directory.CreateDirectory(backupFolder);
-                    string backupFilePath = Path.Combine(backupFolder, $"Project{_currentProjectId}.pptx");
-                    try
-                    {
-                        PowerPointPresentation pres = pptApp.Presentations[1];
-                        pres.SaveCopyAs(backupFilePath);
-                        pres.Save(); 
-                        System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ保存: {backupFilePath}");
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ保存エラー: {ex.Message}");
-                    }
+                    string logPath = Libraries.PPLogReader.GetDestructiveLogPath();
+                    string errorMsg = string.Join(" | ", errors);
+                    File.AppendAllText(logPath, $"{_currentProjectId},{_currentTaskId}:{errorMsg}{Environment.NewLine}");
+                    System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Destructive check failed for {_currentProjectId}-{_currentTaskId}: {errorMsg}");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ処理エラー: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Destructive check error: {ex.Message}");
+            }
+
+            // プロジェクト切り替え前にタスク情報をクリアし、アドイン側の破壊的操作チェックをスキップさせる
+            Libraries.PPLogReader.ClearCurrentTaskFile();
+
+            bool enableProjectBackup = false;
+            bool.TryParse(ConfigurationManager.AppSettings["EnableProjectBackup"], out enableProjectBackup);
+            if (enableProjectBackup)
+            {
+                // 現在開いているプレゼンテーションを日付・時間付きバックアップフォルダに保存（MMdd_HHmm）
+                string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] ?? @"C:\MOSTest\PowerPoint365";
+                string backupSubdir = DateTime.Now.ToString("MMdd_HHmm");
+                string backupFolder = Path.Combine(basePath, $"Tab{_groupId}", "backup", backupSubdir);
+                try
+                {
+                    PowerPointApp pptApp = null;
+                    try
+                    {
+                        pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                    }
+                    catch
+                    {
+                        // PowerPointが起動していない場合はスキップ
+                    }
+                    if (pptApp != null && pptApp.Presentations.Count > 0)
+                    {
+                        if (!Directory.Exists(backupFolder))
+                            Directory.CreateDirectory(backupFolder);
+                        string backupFilePath = Path.Combine(backupFolder, $"Project{_currentProjectId}.pptx");
+                        try
+                        {
+                            PowerPointPresentation pres = pptApp.Presentations[1];
+                            pres.SaveCopyAs(backupFilePath);
+                            pres.Save();
+                            System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ保存: {backupFilePath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ保存エラー: {ex.Message}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] バックアップ処理エラー: {ex.Message}");
+                }
             }
 
             // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
@@ -2149,6 +2297,24 @@ namespace MOS_PowerPoint_app.Views
             }
         }
 
+        /// <summary>Presentations.Count 取得時の COM 例外を握りつぶす（切断直後など）。</summary>
+        private static int GetPresentationCountSafe(PowerPointApp pptApp)
+        {
+            if (pptApp == null) return 0;
+            try
+            {
+                return pptApp.Presentations.Count;
+            }
+            catch (COMException)
+            {
+                return 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         private void CloseAllPowerPointPresentations()
         {
             try
@@ -2166,23 +2332,40 @@ namespace MOS_PowerPoint_app.Views
                 }
                 
                 // すべてのプレゼンテーションを閉じる（無限ループ防止: 最大試行回数と Count が減らない場合の打ち切り）
+                // 注意: Close() 後は openPres は無効になるため、名前は必ず閉じる前に取得すること。
                 const int maxAttempts = 25;
-                int prevCount = pptApp.Presentations.Count;
-                for (int attempt = 0; attempt < maxAttempts && pptApp.Presentations.Count > 0; attempt++)
+                int prevCount = GetPresentationCountSafe(pptApp);
+                for (int attempt = 0; attempt < maxAttempts && GetPresentationCountSafe(pptApp) > 0; attempt++)
                 {
                     PowerPointPresentation openPres = null;
                     try
                     {
                         openPres = pptApp.Presentations[1]; // 1-based index
-                        try { openPres.Save(); System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを保存しました: {openPres.Name}"); } catch { }
-                        openPres.Close();
-                        System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを閉じました: {openPres.Name}");
-                        // 閉じたのに Count が減らない場合はループ打ち切り（7-2 参照ファイル等で発生しうる）
-                        int newCount = pptApp.Presentations.Count;
+                        string presName = "(不明)";
+                        try { presName = openPres.Name; } catch { }
+
+                        try
+                        {
+                            openPres.Save();
+                            System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを保存しました: {presName}");
+                        }
+                        catch { }
+
+                        try
+                        {
+                            openPres.Close();
+                        }
+                        catch (COMException comClose)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] Close で COM: {comClose.Message}");
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを閉じました: {presName}");
+
+                        int newCount = GetPresentationCountSafe(pptApp);
                         if (newCount >= prevCount)
                         {
                             System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] Countが減らないため、強制的にプロセスを終了します。 (prev={prevCount}, new={newCount})");
-                            // 閉じられないプレゼンテーションがある場合は、一度PowerPointを完全に落とす
                             try
                             {
                                 var pptProcesses = System.Diagnostics.Process.GetProcessesByName("POWERPNT");
@@ -2198,20 +2381,27 @@ namespace MOS_PowerPoint_app.Views
                     }
                     catch (COMException comEx) when (comEx.HResult == unchecked((int)0x80010108)) // RPC_E_DISCONNECTED
                     {
-                        // 既に切断されている場合は無視して続行
                         System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションは既に切断されています（無視）: {comEx.Message}");
                         break;
+                    }
+                    catch (COMException comEx)
+                    {
+                        // オブジェクトは存在しません 等、Close 前後の切断
+                        System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] COM: {comEx.Message} (0x{comEx.HResult:X8})");
+                        if (GetPresentationCountSafe(pptApp) <= 0)
+                            break;
                     }
                     catch (Exception closeEx)
                     {
                         System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] プレゼンテーションを閉じる際のエラー: {closeEx.Message}");
-                        if (pptApp.Presentations.Count > 0)
+                        if (GetPresentationCountSafe(pptApp) > 0)
                         {
                             try
                             {
                                 var nextPres = pptApp.Presentations[1];
                                 if (nextPres == openPres)
                                     break;
+                                try { Marshal.ReleaseComObject(nextPres); } catch { }
                             }
                             catch
                             {

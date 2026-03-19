@@ -13,13 +13,40 @@ namespace Libraries.Group1
     {
         /// <summary>Task 4 用: 直前の Tick 時点のスライド ID の並び。</summary>
         private static List<int> _previousSlideIds = new List<int>();
+        /// <summary>Task 4 用: 直前の Tick 時点のプレゼン識別子（別プレゼン比較による誤検知を防ぐ）。</summary>
+        private static string _previousPresentationKey = null;
         /// <summary>Task 4 用: 3枚目（インデックス2）のスライドが削除されたと判定した場合 true。</summary>
         public static bool Task4PassedByThirdSlideDeletion { get; private set; }
 
         /// <summary>Task 4 用: 現在のスライド ID 一覧で削除を検出し、3枚目が削除されていればフラグを立てる。</summary>
         public static void CheckSlideDeletion(List<int> currentSlideIds)
         {
+            CheckSlideDeletion(currentSlideIds, null);
+        }
+
+        /// <summary>
+        /// Task 4 用: 現在のスライド ID 一覧で削除を検出し、3枚目が削除されていればフラグを立てる。
+        /// </summary>
+        /// <param name="presentationKey">別プレゼン比較防止用（例: FullName）。null の場合はプレゼン切替リセットのみ行わない。</param>
+        public static void CheckSlideDeletion(List<int> currentSlideIds, string presentationKey = null)
+        {
             if (currentSlideIds == null) return;
+
+            // プレゼンが切り替わった場合は比較を行わず、監視状態を初期化する（別プレゼン比較の誤検知防止）
+            string key = string.IsNullOrWhiteSpace(presentationKey) ? null : presentationKey.Trim();
+            if (!string.IsNullOrEmpty(key))
+            {
+                if (!string.IsNullOrEmpty(_previousPresentationKey) &&
+                    !string.Equals(_previousPresentationKey, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    _previousSlideIds = new List<int>(currentSlideIds);
+                    _previousPresentationKey = key;
+                    Task4PassedByThirdSlideDeletion = false;
+                    return;
+                }
+                _previousPresentationKey = key;
+            }
+
             if (_previousSlideIds.Count == 0)
             {
                 _previousSlideIds = new List<int>(currentSlideIds);
@@ -30,6 +57,7 @@ namespace Libraries.Group1
                 _previousSlideIds = new List<int>(currentSlideIds);
                 return;
             }
+
             var deletedIds = _previousSlideIds.Except(currentSlideIds).ToList();
             foreach (int deletedId in deletedIds)
             {
@@ -48,6 +76,7 @@ namespace Libraries.Group1
         {
             _previousSlideIds.Clear();
             Task4PassedByThirdSlideDeletion = false;
+            _previousPresentationKey = null;
         }
 
         public bool CheckTask_1_1_01()
@@ -237,6 +266,7 @@ namespace Libraries.Group1
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
+        /// <summary>1-7: スライド1の吹き出しに「教育者必見」が入っているか。</summary>
         public bool CheckTask_1_1_07()
         {
             Presentation pres = null;

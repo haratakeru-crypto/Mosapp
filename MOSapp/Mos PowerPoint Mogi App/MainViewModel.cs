@@ -371,6 +371,8 @@ namespace MOS_PowerPoint_app
                     bool passed = false;
                     try
                     {
+                        // 1タスクごとに current_task を更新し、VSTO 側の snapshot が追いつくのを短時間待つ。
+                        grader.StartTaskAndWaitForSnapshot(CurrentProject.ProjectId, task.TaskId);
                         passed = grader.GradeTask(CurrentProject.ProjectId, task.TaskId);
                     }
                     catch
@@ -407,6 +409,9 @@ namespace MOS_PowerPoint_app
                 MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
+
+            // 全プロジェクトリセット時のみ採点用証跡も消す（単体リセットでは残す）
+            try { Libraries.PPLogReader.ClearTaskEvidence(); } catch { }
 
             var errors = new System.Collections.Generic.List<string>();
             int done = 0;

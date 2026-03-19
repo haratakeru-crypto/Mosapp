@@ -312,6 +312,8 @@ namespace Libraries.Group1
         /// <summary>11-7: ノートで全スライド3部・部単位で印刷。COM の PrintOptions または VSTO ログの印刷記録で判定。</summary>
         public bool CheckTask_1_11_07()
         {
+            if (PPLogReader.HasTask11_7PrintExecuted())
+                return true;
             Presentation pres = null;
             try
             {
@@ -328,8 +330,8 @@ namespace Libraries.Group1
                         if (po.OutputType != PpPrintOutputType.ppPrintOutputNotesPages) return false;
                         // 「3部」
                         if (po.NumberOfCopies != 3) return false;
-                        // 「1ページ目を全て印刷したあとに...」 = ページ単位 (Uncollated) = Collate: Off
-                        return po.Collate == MsoTriState.msoFalse;
+                        // 「部単位」 = Collate: On
+                        return po.Collate == MsoTriState.msoTrue;
                     }
                     catch { return false; }
                 }

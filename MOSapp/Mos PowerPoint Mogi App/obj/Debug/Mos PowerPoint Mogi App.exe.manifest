@@ -90,14 +90,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="293288">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="305576">
       <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>O64PwrIPaVMrvknSLLoFb2r/gkcq1h91yvS+4Q46bzo=</dsig:DigestValue>
+        <dsig:DigestValue>72pQY81Onn2leVeWw4cbvGTBHb5xSGrWcYrZaU+pUB4=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -114,14 +114,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointAddIn1.dll" size="47616">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointAddIn1.dll" size="50176">
       <assemblyIdentity name="PowerPointAddIn1" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>KHb8UUNMUuTIu7gV6Bqrelgjh3rR8aKpwoCqffcMeHo=</dsig:DigestValue>
+        <dsig:DigestValue>SBabFlYpYublPexA0fTyDX/vgCfu++96x0MwyHyTK1M=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -133,7 +133,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>MXhBMOL7Q3QPHpAnJ9kvdCEREfouxecozI+gxTLhg88=</dsig:DigestValue>
+        <dsig:DigestValue>rz/ZZSrMSolKu5PTc0EG55CuhXa0d2TdRoR3hpRMjCs=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -157,7 +157,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>utZlMURoJXVc5keLRBC3f+YkL4OoKEL6wT072oJcmRY=</dsig:DigestValue>
+        <dsig:DigestValue>WsXgkEYRZnsY/iGG+jKSBheTQ4ZfH32TVNj6L4WmFGI=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -181,7 +181,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>VTOV+Osx9GLMNpTWScnCNkBHsx1xIHwulgP75/QJOGk=</dsig:DigestValue>
+        <dsig:DigestValue>dpwAi9T76msuaUXWcWHZFatqKAxMPcN2EPDJYl8KthY=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -229,19 +229,19 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>RLPPHeG4W3RBWN0oPAVJyrLr1dNCEnrj1M38rmL7tSg=</dsig:DigestValue>
+        <dsig:DigestValue>TPegPo36ooRxhhBAFsQFXQRPZ6pWBpQN00UFoTkRhy0=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_8.dll" size="12800">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_8.dll" size="14336">
       <assemblyIdentity name="PowerPointChecker1_8" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>6ieDBm+Q6CeST28jj1uh/gi3cMuYHQSQUtHA6VC03xg=</dsig:DigestValue>
+        <dsig:DigestValue>0Dtw0GHdpuQXDIzEBEbhi40a/p0348qWOJypTvAJztQ=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -258,14 +258,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointCheckerCommon.dll" size="17920">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointCheckerCommon.dll" size="20480">
       <assemblyIdentity name="PowerPointCheckerCommon" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>yF3MuXLD2BbvSY66MDsK8o1EWE9QbZVYwLaLs/Rz7D0=</dsig:DigestValue>
+        <dsig:DigestValue>zHGieC1CyyaFleVWYMLjlyIZJeVN+Q2QKrjJXk01ua0=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -278,13 +278,13 @@
       <dsig:DigestValue>0kyZW4JsqtzZ7+xJAybps2T7Wgms7JmBrGUEn0Ahe3k=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="Mos PowerPoint Mogi App.exe.config" size="300">
+  <file name="Mos PowerPoint Mogi App.exe.config" size="357">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>Pn28xTIpJwPY71x92Vl1KzvSCLdlutXMyEyOXZXvgZk=</dsig:DigestValue>
+      <dsig:DigestValue>BUby9nlTTufXEXnsv08OuptDqdR7x+wJbVJjZmee2Mk=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOSPP教材用採点表.csv" size="841">

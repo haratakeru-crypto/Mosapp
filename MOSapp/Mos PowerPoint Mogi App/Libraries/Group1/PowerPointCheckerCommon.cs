@@ -379,6 +379,7 @@ namespace Libraries.Group1
                     try
                     {
                         sh = shapes[i];
+                        // 可能なら MediaType を使う（取得が例外になる環境がある）
                         try
                         {
                             if (sh.MediaType == PpMediaType.ppMediaTypeMovie)
@@ -388,7 +389,31 @@ namespace Libraries.Group1
                                 return r;
                             }
                         }
-                        catch { }
+                        catch
+                        {
+                            // ignore
+                        }
+
+                        // MediaType が取得できない/不安定な環境向けのフォールバック:
+                        // msoMedia で MediaFormat が取得できるものを動画候補として扱う（8-1～8-3 は動画タスク）。
+                        try
+                        {
+                            if (sh.Type == MsoShapeType.msoMedia)
+                            {
+                                var mf = sh.MediaFormat;
+                                if (mf != null)
+                                {
+                                    try { Marshal.ReleaseComObject(mf); } catch { }
+                                    PptShape r = sh;
+                                    sh = null;
+                                    return r;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
                     }
                     finally
                     {

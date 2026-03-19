@@ -29,9 +29,10 @@ namespace Libraries
             {
                 switch (taskId)
                 {
-                    case 1: // 1-1 スライド追加
-                        // 新しいスライドが追加されるため、SlidesCount, ShapesCount, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                    case 1: // 1-1 スライド追加（4枚目に挿入）
+                        // SlidesCount / 図形・位置に加え、TextLength も免除する。
+                        // 挿入により 4 枚目以降のスライド番号がずれ、スナップショットの「スライド i の文字数」と一致しなくなるため。
+                        flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
                     case 2: // 1-2 スライド複製
                     case 4: // 1-4 スライド削除
@@ -214,6 +215,41 @@ namespace Libraries
         }
 
         /// <summary>
+        /// ShapesCount 免除フラグが有効な場合の「許容デルタ」判定。
+        /// 既定は allowedDelta と actualDelta の厳密一致。
+        /// 例外的に、6-3（3Dモデル挿入）はスナップショット取得タイミング等で +1 が 0 として観測される場合があるため、
+        /// スライド1に限り 0 または +1 を許容する（削除や大量追加は引き続き不許可）。
+        /// 3-4（スライドズーム挿入）は結果表示時にスナップショットが挿入後状態で取られると actualDelta が 0 になるため、
+        /// スライド1では 0 または +2 を許容する。
+        /// 5-5（グループ化）は結果表示時にスナップショットがグループ化後状態で取られると actualDelta が 0 になるため、
+        /// スライド3では 0 または -2 を許容する。
+        /// </summary>
+        public static bool IsAllowedShapesCountDelta(int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
+        {
+            if (allowedDelta == int.MaxValue) return true;
+
+            // 6-3: Slide 1 only: allow 0 or +1. Disallow deletions (<0) and bulk additions (>1).
+            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 1;
+            }
+
+            // 3-4: Slide 1 only: allow 0 or +2 (snapshot may be taken after zooms are already inserted during result grading).
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 2;
+            }
+
+            // 5-5: Slide 3 only: allow 0 or -2 (snapshot may be taken after group is already created during result grading).
+            if (projectId == 5 && taskId == 5 && slideIndex == 3)
+            {
+                return actualDelta == 0 || actualDelta == -2;
+            }
+
+            return actualDelta == allowedDelta;
+        }
+
+        /// <summary>
         /// TextLength免除フラグが有効な場合でも、特定のスライドにおいて許可される「テキスト文字数の増減（デルタ）」を返します。
         /// 厳格にチェックすべきでないタスクやスライドの場合は int.MaxValue を返すと無制限になります。
         /// </summary>
@@ -226,6 +262,62 @@ namespace Libraries
 
             // 変換、削除、インポートなど文字数が可変なものはチェックを省略
             return int.MaxValue;
+        }
+
+        /// <summary>
+        /// TextLength 免除時のスライド別デルタ判定。既定は allowedDelta と actualDelta の厳密一致。
+        /// 9-6（ハイパーリンク）スライド1は、スナップショット時点で既に置換済みの場合 actualDelta が 0 となるため、
+        /// 0 または -57（想定の URL→お問い合わせ）のみ許容する。
+        /// 1-7（吹き出し「教育者必見」）スライド1は、結果表示時にスナップショットが入力後状態で取られると actualDelta が 0 になるため、
+        /// 0 または +5 を許容する。
+        /// </summary>
+        public static bool IsAllowedTextLengthDelta(int projectId, int taskId, int slideIndex, int allowedDelta, long actualDelta)
+        {
+            if (allowedDelta == int.MaxValue) return true;
+
+            if (projectId == 9 && taskId == 6 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == -57;
+            }
+
+            if (projectId == 1 && taskId == 7 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 5;
+            }
+
+            return actualDelta == allowedDelta;
+        }
+
+        /// <summary>破壊的操作ログ用。6-3は「0 または +1」、3-4 スライド1は「0 または +2」、5-5 スライド3は「0 または -2」、それ以外は従来の期待値表記。</summary>
+        public static string FormatDestructiveShapesCountMessage(int slideIndex, int projectId, int taskId, int allowedDelta, int actualDelta)
+        {
+            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +2、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 5 && taskId == 5 && slideIndex == 3)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または -2、実際の変化: {actualDelta}）";
+            }
+            return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
+        }
+
+        /// <summary>破壊的操作ログ用。9-6 スライド1は「0 または -57」、1-7 スライド1は「0 または +5」、それ以外は従来表記。</summary>
+        public static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
+        {
+            if (projectId == 9 && taskId == 6 && slideIndex == 1)
+            {
+                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または -57、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 1 && taskId == 7 && slideIndex == 1)
+            {
+                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または +5、実際の変化: {actualDelta}）";
+            }
+            return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
         }
 
         /// <summary>

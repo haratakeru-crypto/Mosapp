@@ -122,6 +122,8 @@ namespace Libraries.Group1
         /// <summary>7-4: スライドショーを自動プレゼンテーションに設定。</summary>
         public bool CheckTask_1_7_04()
         {
+            if (PPLogReader.HasTask7_4KioskExecuted())
+                return true;
             Presentation pres = null;
             try
             {

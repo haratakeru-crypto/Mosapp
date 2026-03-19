@@ -564,6 +564,14 @@ namespace MOS_PowerPoint_app.Views
                 {
                     try
                     {
+                        // AppBarWindowに結果画面からの遷移フラグと参照をセット
+                        var appBarWindow = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
+                        if (appBarWindow != null)
+                        {
+                            appBarWindow.SetFromResultWindow(true);
+                            appBarWindow.SetResultWindow(this);
+                        }
+
                         // UI更新の機会を与える
                         await Task.Delay(50);
                         

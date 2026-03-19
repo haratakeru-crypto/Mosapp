@@ -6,13 +6,15 @@ namespace PowerPointAddIn1
 {
     /// <summary>
     /// PowerPoint 操作ログを記録するクラス。
-    /// 10-4 グレースケール等の VSTO 検証用ログを mos_ppt_log.txt に記録する。
+    /// mos_ppt_log.txt に全般を記録するほか、5-1/10-4/11-7 の採点根拠は mos_ppt_task_evidence.txt にも追記する（単体リセットでメインログが消されても採点可能にする）。
     /// </summary>
     public static class Logger
     {
         private static readonly object _lockObject = new object();
         private static readonly string _logFileName = "mos_ppt_log.txt";
+        private static readonly string _taskEvidenceFileName = "mos_ppt_task_evidence.txt";
         private static string _logFilePath;
+        private static string _taskEvidenceFilePath;
 
         private static string LogFilePath
         {
@@ -23,6 +25,17 @@ namespace PowerPointAddIn1
                     _logFilePath = Path.Combine(Path.GetTempPath(), _logFileName);
                 }
                 return _logFilePath;
+            }
+        }
+
+        /// <summary>採点用証跡（PPLogReader.GetTaskEvidenceLogPath と同一パス）</summary>
+        private static string TaskEvidenceFilePath
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_taskEvidenceFilePath))
+                    _taskEvidenceFilePath = Path.Combine(Path.GetTempPath(), _taskEvidenceFileName);
+                return _taskEvidenceFilePath;
             }
         }
 
@@ -37,7 +50,7 @@ namespace PowerPointAddIn1
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     string logEntry = $"[{timestamp}] [{commandId}] Executed";
-                    AppendLine(logEntry);
+                    AppendToFile(LogFilePath, logEntry);
                 }
             }
             catch (Exception ex)
@@ -57,7 +70,8 @@ namespace PowerPointAddIn1
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     string logEntry = $"[{timestamp}] [Task10-4] Grayscale";
-                    AppendLine(logEntry);
+                    AppendToFile(LogFilePath, logEntry);
+                    AppendToFile(TaskEvidenceFilePath, logEntry);
                 }
             }
             catch (Exception ex)
@@ -96,6 +110,12 @@ namespace PowerPointAddIn1
             LogTaskTag("Task7-3", "InsertFromOutline");
         }
 
+        /// <summary>7-4: スライドショーを自動プレゼンテーション（Kiosk）に設定したことを記録。</summary>
+        public static void LogTask7_4Kiosk()
+        {
+            LogTaskTag("Task7-4", "Kiosk");
+        }
+
         /// <summary>10-1: ドキュメント検査実行を記録。</summary>
         public static void LogTask10_1DocumentInspector()
         {
@@ -119,7 +139,7 @@ namespace PowerPointAddIn1
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     string logEntry = $"[{timestamp}] [TaskStart] {projectId}-{taskId}";
-                    AppendLine(logEntry);
+                    AppendToFile(LogFilePath, logEntry);
                 }
             }
             catch (Exception ex)
@@ -140,7 +160,7 @@ namespace PowerPointAddIn1
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     string taskPrefix = (projectId.HasValue && taskId.HasValue) ? $"[Task {projectId.Value}-{taskId.Value}] " : "";
                     string logEntry = $"[{timestamp}] {taskPrefix}[Op] {operationType} {detail}";
-                    AppendLine(logEntry);
+                    AppendToFile(LogFilePath, logEntry);
                 }
             }
             catch (Exception ex)
@@ -157,7 +177,13 @@ namespace PowerPointAddIn1
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     string logEntry = $"[{timestamp}] [{taskTag}] {identifier}";
-                    AppendLine(logEntry);
+                    AppendToFile(LogFilePath, logEntry);
+                    // 採点がログ依存のタスクは証跡にも同一行を残す（単体プロジェクトリセットでメインログ削除後も採点可能）
+                    if (string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal))
+                    {
+                        AppendToFile(TaskEvidenceFilePath, logEntry);
+                    }
                 }
             }
             catch (Exception ex)
@@ -166,10 +192,10 @@ namespace PowerPointAddIn1
             }
         }
 
-        private static void AppendLine(string logEntry)
+        private static void AppendToFile(string filePath, string logEntry)
         {
             using (var fileStream = new FileStream(
-                LogFilePath,
+                filePath,
                 FileMode.Append,
                 FileAccess.Write,
                 FileShare.ReadWrite | FileShare.Delete))
@@ -180,7 +206,7 @@ namespace PowerPointAddIn1
         }
 
         /// <summary>
-        /// ログファイルをクリア
+        /// メイン操作ログのみクリア。採点用証跡（mos_ppt_task_evidence.txt）は消さない。
         /// </summary>
         public static void ClearLog()
         {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -16,26 +17,37 @@ namespace Libraries
         public static List<string> CompareAndGetErrors(int projectId, int taskId, PPValidationExemptFlags exemptFlags)
         {
             List<string> errors = new List<string>();
+            var swTotal = Stopwatch.StartNew();
 
             if (!File.Exists(SnapshotFilePath))
             {
                 System.Diagnostics.Debug.WriteLine("[Validation] Snapshot file not found.");
+                PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors", swTotal.ElapsedMilliseconds, "no snapshot file");
                 return errors;
             }
 
             // スナップショットの読み込み
+            var swLoad = Stopwatch.StartNew();
             var snapshot = LoadSnapshot();
-            if (snapshot == null) return errors;
+            PPGradingPerf.Log("PPSnapshotChecker.LoadSnapshot", swLoad.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+            if (snapshot == null)
+            {
+                PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors", swTotal.ElapsedMilliseconds, "load returned null");
+                return errors;
+            }
 
             // 重要：現在採点中のタスクと、スナップショットが取られたタスクが一致する場合のみチェックを行う。
             if (snapshot.ProjectId != projectId || snapshot.TaskId != taskId)
             {
                 System.Diagnostics.Debug.WriteLine($"[Validation] ID Mismatch (Skipping): Snapshot={snapshot.ProjectId}-{snapshot.TaskId}, Grading={projectId}-{taskId}");
+                PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors", swTotal.ElapsedMilliseconds, $"skipped id mismatch snap={snapshot.ProjectId}-{snapshot.TaskId}");
                 return errors;
             }
             System.Diagnostics.Debug.WriteLine($"[Validation] Starting Check for Project{projectId} Task{taskId}");
 
             // 現在の状態の取得
+            var swCom = Stopwatch.StartNew();
+            int perfSlideCount = -1;
             PowerPoint.Application pptApp = null;
             try
             {
@@ -47,6 +59,7 @@ namespace Libraries
                 {
                     pres = pptApp.ActivePresentation;
                     if (pres == null) return errors;
+                    try { perfSlideCount = pres.Slides.Count; } catch { }
 
                     // 1. スライド数の比較
                     if (!exemptFlags.HasFlag(PPValidationExemptFlags.SlidesCount))
@@ -94,13 +107,17 @@ namespace Libraries
                             {
                                 if (snapshot.ShapesCounts.TryGetValue(i, out int expectedShapesCount))
                                 {
-                                    int targetDelta = hasShapesExemptFlag ? allowedDelta : 0;
                                     int actualCount = slide.Shapes.Count;
-                                    if (actualCount != expectedShapesCount + targetDelta)
+                                    int actualDelta = actualCount - expectedShapesCount;
+                                    bool deltaOk = !hasShapesExemptFlag
+                                        ? (actualDelta == 0)
+                                        : PPTaskValidationConfig.IsAllowedShapesCountDelta(projectId, taskId, i, allowedDelta, actualDelta);
+
+                                    if (!deltaOk)
                                     {
                                         if (hasShapesExemptFlag)
                                         {
-                                            errors.Add($"不正な図形操作: スライド {i} で指示外の図形追加または削除が検知されました（期待される変化数: {targetDelta}, 実際の数: {actualCount - expectedShapesCount}）");
+                                            errors.Add(PPTaskValidationConfig.FormatDestructiveShapesCountMessage(i, projectId, taskId, allowedDelta, actualDelta));
                                         }
                                         else
                                         {
@@ -111,8 +128,17 @@ namespace Libraries
                             }
 
                             shapes = slide.Shapes;
+                            int shapesCount = shapes.Count;
                             long slideTextLength = 0;
-                            for (int j = 1; j <= shapes.Count; j++)
+
+                            // 図形座標・サイズの比較設定（図形走査はテキスト算出と同一ループで実施）
+                            bool exemptFullShapePosition = exemptFlags.HasFlag(PPValidationExemptFlags.ShapePosition);
+                            bool onlyNewShapesExempt = PPTaskValidationConfig.IsShapePositionExemptForNewShapesOnly(projectId, taskId);
+                            int allowedExistingChangesCount = PPTaskValidationConfig.GetAllowedExistingShapePositionChangeCount(projectId, taskId);
+                            bool needsShapePositionCheck = !exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0;
+                            int changedExistingShapesCount = 0;
+
+                            for (int j = 1; j <= shapesCount; j++)
                             {
                                 try
                                 {
@@ -131,65 +157,10 @@ namespace Libraries
                                         }
                                     }
                                     catch { }
-                                }
-                                catch { }
-                                finally { if (shape != null) { Marshal.ReleaseComObject(shape); shape = null; } }
-                            }
 
-                            // 算出されたスライドのテキスト文字数を全体の合計に加算
-                            currentTotalTextLength += slideTextLength;
-
-                            // スライドごとの文字増減の厳格チェック
-                            int allowedTextDelta = PPTaskValidationConfig.GetAllowedTextLengthDelta(projectId, taskId, i);
-                            bool hasTextExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.TextLength);
-
-                            if (!hasTextExemptFlag || allowedTextDelta != int.MaxValue)
-                            {
-                                if (snapshot.SlideTextLengths.TryGetValue(i, out long expectedSlideTextLength))
-                                {
-                                    long targetDelta = hasTextExemptFlag ? allowedTextDelta : 0;
-                                    if (slideTextLength != expectedSlideTextLength + targetDelta)
+                                    // 図形座標・サイズの比較
+                                    if (needsShapePositionCheck)
                                     {
-                                        if (hasTextExemptFlag)
-                                        {
-                                            errors.Add($"不正なテキスト変更: スライド {i} で指示外のテキスト変更が検知されました（期待: {targetDelta}, 実際: {slideTextLength - expectedSlideTextLength}）");
-                                        }
-                                        else
-                                        {
-                                            // 以前は全体だけだったが、スライド単位でも変化がないかチェック
-                                            errors.Add($"TextLength changed on slide {i}: expected {expectedSlideTextLength}, but is {slideTextLength}");
-                                        }
-                                    }
-                                }
-                            }
-
-                            // アニメーション数（減少のみ不合格）
-                            if (!exemptFlags.HasFlag(PPValidationExemptFlags.AnimationRemoved))
-                            {
-                                if (snapshot.AnimationCounts.TryGetValue(i, out int expectedAnimCount))
-                                {
-                                    int currentAnimCount = slide.TimeLine.MainSequence.Count;
-                                    if (currentAnimCount < expectedAnimCount)
-                                    {
-                                        errors.Add($"Animation removed on slide {i}: expected at least {expectedAnimCount}, but is {currentAnimCount}");
-                                    }
-                                }
-                            }
-
-                            // 図形座標・サイズの比較
-                            bool exemptFullShapePosition = exemptFlags.HasFlag(PPValidationExemptFlags.ShapePosition);
-                            bool onlyNewShapesExempt = PPTaskValidationConfig.IsShapePositionExemptForNewShapesOnly(projectId, taskId);
-                            int allowedExistingChangesCount = PPTaskValidationConfig.GetAllowedExistingShapePositionChangeCount(projectId, taskId);
-
-                            if (!exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0)
-                            {
-                                int changedExistingShapesCount = 0;
-                                shapes = slide.Shapes;
-                                for (int j = 1; j <= shapes.Count; j++)
-                                {
-                                    try
-                                    {
-                                        shape = shapes[j];
                                         string key = i + "_" + shape.Id;
                                         if (snapshot.ShapePositions.TryGetValue(key, out var old))
                                         {
@@ -225,10 +196,55 @@ namespace Libraries
                                             }
                                         }
                                     }
-                                    catch { }
-                                    finally { if (shape != null) { Marshal.ReleaseComObject(shape); shape = null; } }
+                                }
+                                catch { }
+                                finally { if (shape != null) { Marshal.ReleaseComObject(shape); shape = null; } }
+                            }
+
+                            // 算出されたスライドのテキスト文字数を全体の合計に加算
+                            currentTotalTextLength += slideTextLength;
+
+                            // スライドごとの文字増減の厳格チェック
+                            int allowedTextDelta = PPTaskValidationConfig.GetAllowedTextLengthDelta(projectId, taskId, i);
+                            bool hasTextExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.TextLength);
+
+                            if (!hasTextExemptFlag || allowedTextDelta != int.MaxValue)
+                            {
+                                if (snapshot.SlideTextLengths.TryGetValue(i, out long expectedSlideTextLength))
+                                {
+                                    long actualTextDelta = slideTextLength - expectedSlideTextLength;
+                                    bool textOk = !hasTextExemptFlag
+                                        ? (actualTextDelta == 0)
+                                        : PPTaskValidationConfig.IsAllowedTextLengthDelta(projectId, taskId, i, allowedTextDelta, actualTextDelta);
+
+                                    if (!textOk)
+                                    {
+                                        if (hasTextExemptFlag)
+                                        {
+                                            errors.Add(PPTaskValidationConfig.FormatDestructiveTextLengthMessage(i, projectId, taskId, allowedTextDelta, actualTextDelta));
+                                        }
+                                        else
+                                        {
+                                            // 以前は全体だけだったが、スライド単位でも変化がないかチェック
+                                            errors.Add($"TextLength changed on slide {i}: expected {expectedSlideTextLength}, but is {slideTextLength}");
+                                        }
+                                    }
                                 }
                             }
+
+                            // アニメーション数（減少のみ不合格）
+                            if (!exemptFlags.HasFlag(PPValidationExemptFlags.AnimationRemoved))
+                            {
+                                if (snapshot.AnimationCounts.TryGetValue(i, out int expectedAnimCount))
+                                {
+                                    int currentAnimCount = slide.TimeLine.MainSequence.Count;
+                                    if (currentAnimCount < expectedAnimCount)
+                                    {
+                                        errors.Add($"Animation removed on slide {i}: expected at least {expectedAnimCount}, but is {currentAnimCount}");
+                                    }
+                                }
+                            }
+
                         }
                         catch { }
                         finally { if (slide != null) Marshal.ReleaseComObject(slide); }
@@ -248,8 +264,14 @@ namespace Libraries
                 finally { if (pres != null) Marshal.ReleaseComObject(pres); }
             }
             catch { }
-            finally { if (pptApp != null) Marshal.ReleaseComObject(pptApp); }
+            finally
+            {
+                if (pptApp != null) Marshal.ReleaseComObject(pptApp);
+                string slideInfo = perfSlideCount >= 0 ? $"slides={perfSlideCount}" : "slides=?";
+                PPGradingPerf.Log("PPSnapshotChecker.comActivePresCompare", swCom.ElapsedMilliseconds, $"P{projectId}-T{taskId} {slideInfo}");
+            }
 
+            PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} errors={errors.Count}");
             return errors;
         }
 

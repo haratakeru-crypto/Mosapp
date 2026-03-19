@@ -16,6 +16,8 @@ namespace MOS_PowerPoint_app
         public static void ResetProject(int groupId, int projectId)
         {
             PPLogReader.ClearLog();
+            // プロジェクト5/10/11をやり直すときは該当タスクの証跡のみ削除。他プロジェクトの証跡は残す。
+            PPLogReader.ClearTaskEvidenceForProject(projectId);
             PPLogReader.ClearCurrentTaskFile();
             PPLogReader.ClearDestructiveLog();
             PPLogReader.ClearSnapshot();

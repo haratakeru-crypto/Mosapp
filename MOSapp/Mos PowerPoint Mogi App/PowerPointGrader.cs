@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Office.Interop.PowerPoint;
 using Libraries;
 using Libraries.Group1;
@@ -68,6 +71,65 @@ namespace MOS_PowerPoint_app
             }
             catch { }
         }
+
+        /// <summary>
+        /// StartTask の書き込み後、VSTO 側のスナップショット（%TEMP%\mos_ppt_snapshot.txt）が
+        /// 指定の projectId-taskId に更新されるまで短時間待機する。
+        /// タイムアウトした場合は待機を諦め、採点は継続する（スナップショットチェックは ID Mismatch でスキップされる）。
+        /// </summary>
+        public void StartTaskAndWaitForSnapshot(int projectId, int taskId, int timeoutMs = 2000, int pollIntervalMs = 50)
+        {
+            var swTotal = Stopwatch.StartNew();
+            StartTask(projectId, taskId);
+
+            // VSTO 側は一定間隔（例: 500ms）で current_task を監視して snapshot を更新するため、短時間だけ待つ。
+            string snapshotPath = Libraries.PPLogReader.GetSnapshotPath();
+            var swWait = Stopwatch.StartNew();
+            while (swWait.ElapsedMilliseconds < timeoutMs)
+            {
+                try
+                {
+                    if (TryReadSnapshotTaskId(snapshotPath, out int snapProjectId, out int snapTaskId))
+                    {
+                        if (snapProjectId == projectId && snapTaskId == taskId)
+                        {
+                            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.wait", swWait.ElapsedMilliseconds, $"P{projectId}-T{taskId} snapshot matched");
+                            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+                            return;
+                        }
+                    }
+                }
+                catch { }
+                Thread.Sleep(pollIntervalMs);
+            }
+            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.wait", swWait.ElapsedMilliseconds, $"P{projectId}-T{taskId} timeout {timeoutMs}ms");
+            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+        }
+
+        private static bool TryReadSnapshotTaskId(string snapshotPath, out int projectId, out int taskId)
+        {
+            projectId = -1;
+            taskId = -1;
+            if (string.IsNullOrWhiteSpace(snapshotPath) || !File.Exists(snapshotPath))
+                return false;
+
+            // 期待フォーマット例: "TaskId:1,4"
+            // PPSnapshotChecker.LoadSnapshot と同じ形式を読む。
+            string[] lines = File.ReadAllLines(snapshotPath);
+            foreach (string line in lines)
+            {
+                if (string.IsNullOrEmpty(line)) continue;
+                int colonIndex = line.IndexOf(':');
+                if (colonIndex < 0) continue;
+                string key = line.Substring(0, colonIndex);
+                if (!string.Equals(key, "TaskId", StringComparison.Ordinal)) continue;
+                string value = line.Substring(colonIndex + 1);
+                var ids = value.Split(',');
+                if (ids.Length != 2) return false;
+                return int.TryParse(ids[0], out projectId) && int.TryParse(ids[1], out taskId);
+            }
+            return false;
+        }
         /// <summary>
         /// 指定したプロジェクト・タスクの採点を行う。
         /// ログに余計な操作や許可されない座標変化があれば不合格。続けて COM による結果判定を行う。
@@ -77,171 +139,196 @@ namespace MOS_PowerPoint_app
         /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
         public bool GradeTask(int projectId, int taskId)
         {
+            var swGradeTotal = Stopwatch.StartNew();
             if (_activePresentation == null)
                 return false;
 
+            var sw = Stopwatch.StartNew();
             // 1. 過去の破壊的操作ログのチェック
             if (HasLoggedDestructiveError(projectId, taskId))
             {
                 System.Diagnostics.Debug.WriteLine($"[Grader] Task {projectId}-{taskId} FAILED due to logged destructive operation.");
+                PPGradingPerf.Log("GradeTask.HasLoggedDestructiveError", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+                PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit");
                 return false;
             }
+            PPGradingPerf.Log("GradeTask.HasLoggedDestructiveError", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
 
+            sw.Restart();
             if (FailsLogChecks(projectId, taskId))
+            {
+                PPGradingPerf.Log("GradeTask.FailsLogChecks", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} failed");
+                PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit");
                 return false;
+            }
+            PPGradingPerf.Log("GradeTask.FailsLogChecks", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
 
             // 2. 現在の破壊的操作（リアルタイムスナップショット）のチェック
+            sw.Restart();
             var exemptFlags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
             var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, exemptFlags);
+            PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
             if (destructiveErrors.Count > 0)
             {
                 foreach (var err in destructiveErrors)
                 {
                     System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
                 }
+                PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit snapshot errors");
                 return false;
             }
 
+            sw.Restart();
+            bool comResult;
             try
             {
-                switch (projectId)
-                {
-                    case 1:
-                        var c1 = new PowerPointChecker1_1();
-                        switch (taskId)
-                        {
-                            case 1: return c1.CheckTask_1_1_01();
-                            case 2: return c1.CheckTask_1_1_02();
-                            case 3: return c1.CheckTask_1_1_03();
-                            case 4: return c1.CheckTask_1_1_04();
-                            case 5: return c1.CheckTask_1_1_05();
-                            case 6: return c1.CheckTask_1_1_06();
-                            case 7: return c1.CheckTask_1_1_07();
-                            default: return false;
-                        }
-                    case 2:
-                        var c2 = new PowerPointChecker1_2();
-                        switch (taskId)
-                        {
-                            case 1: return c2.CheckTask_1_2_01();
-                            case 2: return c2.CheckTask_1_2_02();
-                            case 3: return c2.CheckTask_1_2_03();
-                            case 4: return c2.CheckTask_1_2_04();
-                            case 5: return c2.CheckTask_1_2_05();
-                            case 6: return c2.CheckTask_1_2_06();
-                            case 7: return c2.CheckTask_1_2_07();
-                            default: return false;
-                        }
-                    case 3:
-                        var c3 = new PowerPointChecker1_3();
-                        switch (taskId)
-                        {
-                            case 1: return c3.CheckTask_1_3_01();
-                            case 2: return c3.CheckTask_1_3_02();
-                            case 3: return c3.CheckTask_1_3_03();
-                            case 4: return c3.CheckTask_1_3_04();
-                            default: return false;
-                        }
-                    case 4:
-                        var c4 = new PowerPointChecker1_4();
-                        switch (taskId)
-                        {
-                            case 1: return c4.CheckTask_1_4_01();
-                            case 2: return c4.CheckTask_1_4_02();
-                            case 3: return c4.CheckTask_1_4_03();
-                            case 4: return c4.CheckTask_1_4_04();
-                            case 5: return c4.CheckTask_1_4_05();
-                            case 6: return c4.CheckTask_1_4_06();
-                            default: return false;
-                        }
-                    case 5:
-                        var c5 = new PowerPointChecker1_5();
-                        switch (taskId)
-                        {
-                            case 1: return c5.CheckTask_1_5_01();
-                            case 2: return c5.CheckTask_1_5_02();
-                            case 3: return c5.CheckTask_1_5_03();
-                            case 4: return c5.CheckTask_1_5_04();
-                            case 5: return c5.CheckTask_1_5_05();
-                            default: return false;
-                        }
-                    case 6:
-                        var c6 = new PowerPointChecker1_6();
-                        switch (taskId)
-                        {
-                            case 1: return c6.CheckTask_1_6_01();
-                            case 2: return c6.CheckTask_1_6_02();
-                            case 3: return c6.CheckTask_1_6_03();
-                            case 4: return c6.CheckTask_1_6_04();
-                            default: return false;
-                        }
-                    case 7:
-                        var c7 = new PowerPointChecker1_7();
-                        switch (taskId)
-                        {
-                            case 1: return c7.CheckTask_1_7_01();
-                            case 2: return c7.CheckTask_1_7_02();
-                            case 3: return c7.CheckTask_1_7_03();
-                            case 4: return c7.CheckTask_1_7_04();
-                            default: return false;
-                        }
-                    case 8:
-                        var c8 = new PowerPointChecker1_8();
-                        switch (taskId)
-                        {
-                            case 1: return c8.CheckTask_1_8_01();
-                            case 2: return c8.CheckTask_1_8_02();
-                            case 3: return c8.CheckTask_1_8_03();
-                            case 4: return c8.CheckTask_1_8_04();
-                            case 5: return c8.CheckTask_1_8_05();
-                            default: return false;
-                        }
-                    case 9:
-                        var c9 = new PowerPointChecker1_9();
-                        switch (taskId)
-                        {
-                            case 1: return c9.CheckTask_1_9_01();
-                            case 2: return c9.CheckTask_1_9_02();
-                            case 3: return c9.CheckTask_1_9_03();
-                            case 4: return c9.CheckTask_1_9_04();
-                            case 5: return c9.CheckTask_1_9_05();
-                            case 6: return c9.CheckTask_1_9_06();
-                            case 7: return c9.CheckTask_1_9_07();
-                            default: return false;
-                        }
-                    case 10:
-                        var c10 = new PowerPointChecker1_10();
-                        switch (taskId)
-                        {
-                            case 1: return c10.CheckTask_1_10_01();
-                            case 2: return c10.CheckTask_1_10_02();
-                            case 3: return c10.CheckTask_1_10_03();
-                            case 4: return c10.CheckTask_1_10_04();
-                            case 5: return c10.CheckTask_1_10_05();
-                            case 6: return c10.CheckTask_1_10_06();
-                            case 7: return c10.CheckTask_1_10_07();
-                            default: return false;
-                        }
-                    case 11:
-                        var c11 = new PowerPointChecker1_11();
-                        switch (taskId)
-                        {
-                            case 1: return c11.CheckTask_1_11_01();
-                            case 2: return c11.CheckTask_1_11_02();
-                            case 3: return c11.CheckTask_1_11_03();
-                            case 4: return c11.CheckTask_1_11_04();
-                            case 5: return c11.CheckTask_1_11_05();
-                            case 6: return c11.CheckTask_1_11_06();
-                            case 7: return c11.CheckTask_1_11_07();
-                            default: return false;
-                        }
-                    default:
-                        return false;
-                }
+                comResult = RunComChecker(projectId, taskId);
             }
             catch
             {
-                return false;
+                comResult = false;
+            }
+            PPGradingPerf.Log("GradeTask.ComChecker", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
+            PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
+            return comResult;
+        }
+
+        /// <summary>プロジェクト別の COM 採点のみ（計測用に分離）。</summary>
+        private static bool RunComChecker(int projectId, int taskId)
+        {
+            switch (projectId)
+            {
+                case 1:
+                    var c1 = new PowerPointChecker1_1();
+                    switch (taskId)
+                    {
+                        case 1: return c1.CheckTask_1_1_01();
+                        case 2: return c1.CheckTask_1_1_02();
+                        case 3: return c1.CheckTask_1_1_03();
+                        case 4: return c1.CheckTask_1_1_04();
+                        case 5: return c1.CheckTask_1_1_05();
+                        case 6: return c1.CheckTask_1_1_06();
+                        case 7: return c1.CheckTask_1_1_07();
+                        default: return false;
+                    }
+                case 2:
+                    var c2 = new PowerPointChecker1_2();
+                    switch (taskId)
+                    {
+                        case 1: return c2.CheckTask_1_2_01();
+                        case 2: return c2.CheckTask_1_2_02();
+                        case 3: return c2.CheckTask_1_2_03();
+                        case 4: return c2.CheckTask_1_2_04();
+                        case 5: return c2.CheckTask_1_2_05();
+                        case 6: return c2.CheckTask_1_2_06();
+                        case 7: return c2.CheckTask_1_2_07();
+                        default: return false;
+                    }
+                case 3:
+                    var c3 = new PowerPointChecker1_3();
+                    switch (taskId)
+                    {
+                        case 1: return c3.CheckTask_1_3_01();
+                        case 2: return c3.CheckTask_1_3_02();
+                        case 3: return c3.CheckTask_1_3_03();
+                        case 4: return c3.CheckTask_1_3_04();
+                        default: return false;
+                    }
+                case 4:
+                    var c4 = new PowerPointChecker1_4();
+                    switch (taskId)
+                    {
+                        case 1: return c4.CheckTask_1_4_01();
+                        case 2: return c4.CheckTask_1_4_02();
+                        case 3: return c4.CheckTask_1_4_03();
+                        case 4: return c4.CheckTask_1_4_04();
+                        case 5: return c4.CheckTask_1_4_05();
+                        case 6: return c4.CheckTask_1_4_06();
+                        default: return false;
+                    }
+                case 5:
+                    var c5 = new PowerPointChecker1_5();
+                    switch (taskId)
+                    {
+                        case 1: return c5.CheckTask_1_5_01();
+                        case 2: return c5.CheckTask_1_5_02();
+                        case 3: return c5.CheckTask_1_5_03();
+                        case 4: return c5.CheckTask_1_5_04();
+                        case 5: return c5.CheckTask_1_5_05();
+                        default: return false;
+                    }
+                case 6:
+                    var c6 = new PowerPointChecker1_6();
+                    switch (taskId)
+                    {
+                        case 1: return c6.CheckTask_1_6_01();
+                        case 2: return c6.CheckTask_1_6_02();
+                        case 3: return c6.CheckTask_1_6_03();
+                        case 4: return c6.CheckTask_1_6_04();
+                        default: return false;
+                    }
+                case 7:
+                    var c7 = new PowerPointChecker1_7();
+                    switch (taskId)
+                    {
+                        case 1: return c7.CheckTask_1_7_01();
+                        case 2: return c7.CheckTask_1_7_02();
+                        case 3: return c7.CheckTask_1_7_03();
+                        case 4: return c7.CheckTask_1_7_04();
+                        default: return false;
+                    }
+                case 8:
+                    var c8 = new PowerPointChecker1_8();
+                    switch (taskId)
+                    {
+                        case 1: return c8.CheckTask_1_8_01();
+                        case 2: return c8.CheckTask_1_8_02();
+                        case 3: return c8.CheckTask_1_8_03();
+                        case 4: return c8.CheckTask_1_8_04();
+                        case 5: return c8.CheckTask_1_8_05();
+                        default: return false;
+                    }
+                case 9:
+                    var c9 = new PowerPointChecker1_9();
+                    switch (taskId)
+                    {
+                        case 1: return c9.CheckTask_1_9_01();
+                        case 2: return c9.CheckTask_1_9_02();
+                        case 3: return c9.CheckTask_1_9_03();
+                        case 4: return c9.CheckTask_1_9_04();
+                        case 5: return c9.CheckTask_1_9_05();
+                        case 6: return c9.CheckTask_1_9_06();
+                        case 7: return c9.CheckTask_1_9_07();
+                        default: return false;
+                    }
+                case 10:
+                    var c10 = new PowerPointChecker1_10();
+                    switch (taskId)
+                    {
+                        case 1: return c10.CheckTask_1_10_01();
+                        case 2: return c10.CheckTask_1_10_02();
+                        case 3: return c10.CheckTask_1_10_03();
+                        case 4: return c10.CheckTask_1_10_04();
+                        case 5: return c10.CheckTask_1_10_05();
+                        case 6: return c10.CheckTask_1_10_06();
+                        case 7: return c10.CheckTask_1_10_07();
+                        default: return false;
+                    }
+                case 11:
+                    var c11 = new PowerPointChecker1_11();
+                    switch (taskId)
+                    {
+                        case 1: return c11.CheckTask_1_11_01();
+                        case 2: return c11.CheckTask_1_11_02();
+                        case 3: return c11.CheckTask_1_11_03();
+                        case 4: return c11.CheckTask_1_11_04();
+                        case 5: return c11.CheckTask_1_11_05();
+                        case 6: return c11.CheckTask_1_11_06();
+                        case 7: return c11.CheckTask_1_11_07();
+                        default: return false;
+                    }
+                default:
+                    return false;
             }
         }
 

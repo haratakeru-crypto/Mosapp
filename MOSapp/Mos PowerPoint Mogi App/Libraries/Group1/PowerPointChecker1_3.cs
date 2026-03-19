@@ -314,7 +314,8 @@ namespace Libraries.Group1
                                                 if (!isFooter)
                                                 {
                                                     double bottom = top + height;
-                                                    if (bottom > textBottom) textBottom = bottom;
+                                                    if (bottom > textBottom)
+                                                        textBottom = bottom;
                                                 }
                                             }
                                         }
@@ -357,7 +358,8 @@ namespace Libraries.Group1
 
                         foreach (var t in candidateZooms)
                         {
-                            if (t.Item3 >= minTopForZoom)
+                            bool ok = t.Item3 >= minTopForZoom;
+                            if (ok)
                                 zoomsBelowText.Add(t);
                             else
                                 try { Marshal.ReleaseComObject(t.Item1); } catch { }

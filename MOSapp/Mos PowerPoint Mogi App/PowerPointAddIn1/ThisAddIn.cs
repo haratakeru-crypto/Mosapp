@@ -30,6 +30,9 @@ namespace PowerPointAddIn1
         private bool _task5_1PrintLogged;
         private bool _task11_7PrintLogged;
 
+        private Timer _kiosk7_4PollTimer;
+        private bool _task7_4KioskLogged;
+
         private Timer _taskFilePollTimer;
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
@@ -71,6 +74,12 @@ namespace PowerPointAddIn1
             _layout10_7PollTimer.Interval = 1500;
             _layout10_7PollTimer.Tick += Layout10_7PollTimer_Tick;
             _layout10_7PollTimer.Start();
+
+            _task7_4KioskLogged = false;
+            _kiosk7_4PollTimer = new Timer();
+            _kiosk7_4PollTimer.Interval = 1000;
+            _kiosk7_4PollTimer.Tick += Kiosk7_4PollTimer_Tick;
+            _kiosk7_4PollTimer.Start();
 
             _taskFilePollTimer = new Timer();
             _taskFilePollTimer.Interval = 500;
@@ -237,9 +246,9 @@ namespace PowerPointAddIn1
                         if (current.ShapesCounts.ContainsKey(kvp.Key))
                         {
                             int actualDelta = current.ShapesCounts[kvp.Key] - kvp.Value;
-                            if (actualDelta != allowedDelta)
+                            if (!IsAllowedShapesCountDelta(start.ProjectId, start.TaskId, kvp.Key, allowedDelta, actualDelta))
                             {
-                                errors.Add($"不正な図形操作: スライド {kvp.Key} で指示外の図形変化が検知されました（期待: {allowedDelta}, 実際: {actualDelta}）");
+                                errors.Add(FormatDestructiveShapesCountMessage(kvp.Key, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
                             }
                         }
                     }
@@ -260,9 +269,9 @@ namespace PowerPointAddIn1
                         if (current.SlideTextLengths.ContainsKey(kvp.Key))
                         {
                             long actualDelta = current.SlideTextLengths[kvp.Key] - kvp.Value;
-                            if (actualDelta != allowedDelta)
+                            if (!IsAllowedTextLengthDelta(start.ProjectId, start.TaskId, kvp.Key, allowedDelta, actualDelta))
                             {
-                                errors.Add($"不正なテキスト変更: スライド {kvp.Key} で指示外のテキスト変更が検知されました（期待: {allowedDelta}, 実際: {actualDelta}）");
+                                errors.Add(FormatDestructiveTextLengthMessage(kvp.Key, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
                             }
                         }
                     }
@@ -312,6 +321,50 @@ namespace PowerPointAddIn1
                 }
             }
             return errors;
+        }
+
+        private static bool IsAllowedShapesCountDelta(int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
+        {
+            if (allowedDelta == int.MaxValue) return true;
+
+            // 6-3: Slide 1 only: allow 0 or +1. Disallow deletions (<0) and bulk additions (>1).
+            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 1;
+            }
+
+            return actualDelta == allowedDelta;
+        }
+
+        private static bool IsAllowedTextLengthDelta(int projectId, int taskId, int slideIndex, int allowedDelta, long actualDelta)
+        {
+            if (allowedDelta == int.MaxValue) return true;
+
+            // 9-6 slide 1: allow 0 (already replaced at snapshot) or -57 (expected URL→お問い合わせ).
+            if (projectId == 9 && taskId == 6 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == -57;
+            }
+
+            return actualDelta == allowedDelta;
+        }
+
+        private static string FormatDestructiveShapesCountMessage(int slideIndex, int projectId, int taskId, int allowedDelta, int actualDelta)
+        {
+            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
+        }
+
+        private static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
+        {
+            if (projectId == 9 && taskId == 6 && slideIndex == 1)
+            {
+                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または -57、実際の変化: {actualDelta}）";
+            }
+            return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
         }
 
         private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
@@ -568,6 +621,7 @@ namespace PowerPointAddIn1
                         _lastPrintOutputType = -1;
                         _lastPrintCopies = -1;
                         _lastPrintCollate = -1;
+                    _task7_4KioskLogged = false;
                     }
 
                     PowerPoint.PrintOptions po = null;
@@ -708,6 +762,35 @@ namespace PowerPointAddIn1
             }
         }
 
+        private void Kiosk7_4PollTimer_Tick(object sender, EventArgs e)
+        {
+            if (_task7_4KioskLogged) return;
+            try
+            {
+                if (Application == null || Application.Presentations == null) return;
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+                    PowerPoint.SlideShowSettings ss = null;
+                    try
+                    {
+                        ss = pres.SlideShowSettings;
+                        if (ss == null) return;
+                        if (ss.ShowType == PowerPoint.PpSlideShowType.ppShowTypeKiosk)
+                        {
+                            Logger.LogTask7_4Kiosk();
+                            _task7_4KioskLogged = true;
+                        }
+                    }
+                    finally { if (ss != null) try { Marshal.ReleaseComObject(ss); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
         {
             if (_taskFilePollTimer != null)
@@ -715,6 +798,12 @@ namespace PowerPointAddIn1
                 _taskFilePollTimer.Stop();
                 _taskFilePollTimer.Dispose();
                 _taskFilePollTimer = null;
+            }
+            if (_kiosk7_4PollTimer != null)
+            {
+                _kiosk7_4PollTimer.Stop();
+                _kiosk7_4PollTimer.Dispose();
+                _kiosk7_4PollTimer = null;
             }
             if (_printOptionsPollTimer != null)
             {
