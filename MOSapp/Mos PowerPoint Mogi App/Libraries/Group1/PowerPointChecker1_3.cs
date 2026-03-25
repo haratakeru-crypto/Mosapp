@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Office.Interop.PowerPoint;
@@ -232,7 +233,8 @@ namespace Libraries.Group1
 
         /// <summary>
         /// 3-4: スライド1に「この機能が使える！」「受験当日の流れ」のスライドズームを挿入し、文字より下に配置し重ならないようにしたか判定。
-        /// 文字が入っているオブジェクトの下端（フッター・日付・スライド番号を除く）より下にズームが2つあり、重なっていないことを確認する。
+        /// 文字が入っているオブジェクトの下端（フッター・日付・スライド番号を除く）より下にズームがちょうど2つあり、
+        /// 重なっていないこと、かつ保存済み .pptx を Open XML で読み、スライド1からの他スライド参照のタイトルが問題文の2つと一致することを確認する。
         /// </summary>
         public bool CheckTask_1_3_04()
         {
@@ -240,17 +242,20 @@ namespace Libraries.Group1
             try
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
-                if (pres == null) return false;
+                if (pres == null)
+                    return false;
                 Slide slide = null;
                 try
                 {
                     slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 1);
-                    if (slide == null) return false;
+                    if (slide == null)
+                        return false;
                     PptShapes shapes = null;
                     try
                     {
                         shapes = slide.Shapes;
-                        if (shapes == null) return false;
+                        if (shapes == null)
+                            return false;
 
                         float slideHeight = 0f;
                         try
@@ -323,22 +328,25 @@ namespace Libraries.Group1
                                     catch { }
                                 }
 
-                                // 2. スライドズームの候補を収集
-                                // 名前や代替テキストに "Zoom" または "ズーム" が含まれる図形を候補とする。
-                                bool isZoomCandidate = false;
-                                try
+                                // 2. スライドズームの候補を収集（msoSlideZoom=36、または名前・代替テキストに Zoom / ズーム）
+                                const int msoSlideZoom = 36;
+                                bool isZoomCandidate = st == msoSlideZoom;
+                                if (!isZoomCandidate)
                                 {
-                                    string name = sh.Name ?? "";
-                                    string alt = sh.AlternativeText ?? "";
-                                    if (name.IndexOf("Zoom", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                        name.IndexOf("ズーム", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                        alt.IndexOf("Zoom", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                        alt.IndexOf("ズーム", StringComparison.OrdinalIgnoreCase) >= 0)
+                                    try
                                     {
-                                        isZoomCandidate = true;
+                                        string name = sh.Name ?? "";
+                                        string alt = sh.AlternativeText ?? "";
+                                        if (name.IndexOf("Zoom", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            name.IndexOf("ズーム", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            alt.IndexOf("Zoom", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            alt.IndexOf("ズーム", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            isZoomCandidate = true;
+                                        }
                                     }
+                                    catch { }
                                 }
-                                catch { }
 
                                 if (isZoomCandidate)
                                 {
@@ -354,6 +362,7 @@ namespace Libraries.Group1
 
                         const float belowTolerance = 5f;
                         float minTopForZoom = (float)textBottom + belowTolerance;
+
                         var zoomsBelowText = new List<Tuple<PptShape, float, float, float, float>>();
 
                         foreach (var t in candidateZooms)
@@ -362,10 +371,12 @@ namespace Libraries.Group1
                             if (ok)
                                 zoomsBelowText.Add(t);
                             else
+                            {
                                 try { Marshal.ReleaseComObject(t.Item1); } catch { }
+                            }
                         }
 
-                        if (zoomsBelowText.Count < 2)
+                        if (zoomsBelowText.Count != 2)
                         {
                             foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
                             return false;
@@ -381,12 +392,57 @@ namespace Libraries.Group1
                                 float la = ta.Item2, ra = ta.Item2 + ta.Item4, taTop = ta.Item3, ba = ta.Item3 + ta.Item5;
                                 float lb = tb.Item2, rb = tb.Item2 + tb.Item4, tbTop = tb.Item3, bb = tb.Item3 + tb.Item5;
                                 bool overlaps = !(ra <= lb || la >= rb || ba <= tbTop || taTop >= bb);
-                                if (overlaps) noOverlap = false;
+                                if (overlaps)
+                                    noOverlap = false;
                             }
                         }
 
-                        foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
-                        return noOverlap;
+                        if (!noOverlap)
+                        {
+                            foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
+                            return false;
+                        }
+
+                        const string titleRequired1 = "この機能が使える！";
+                        const string titleRequired2 = "受験当日の流れ";
+
+                        string pptxPath = null;
+                        try
+                        {
+                            pptxPath = pres.FullName;
+                        }
+                        catch { }
+
+                        if (string.IsNullOrWhiteSpace(pptxPath) || !File.Exists(pptxPath))
+                        {
+                            foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
+                            return false;
+                        }
+
+                        if (!pptxPath.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase))
+                        {
+                            foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
+                            return false;
+                        }
+
+                        try
+                        {
+                            if (!PptxSlideZoomLinkReader.TryValidateSlideSlideZoomTargetTitles(
+                                    pptxPath,
+                                    presentationSlideNumber1Based: 1,
+                                    titleRequired1,
+                                    titleRequired2,
+                                    out _))
+                            {
+                                return false;
+                            }
+                        }
+                        finally
+                        {
+                            foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
+                        }
+
+                        return true;
                     }
                     finally
                     {
@@ -398,7 +454,10 @@ namespace Libraries.Group1
                     if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
                 }
             }
-            catch { return false; }
+            catch
+            {
+                return false;
+            }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
     }

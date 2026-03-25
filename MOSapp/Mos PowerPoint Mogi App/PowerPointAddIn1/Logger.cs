@@ -15,6 +15,9 @@ namespace PowerPointAddIn1
         private static readonly string _taskEvidenceFileName = "mos_ppt_task_evidence.txt";
         private static string _logFilePath;
         private static string _taskEvidenceFilePath;
+        private static int _currentProjectId = -1;
+        private static int _currentTaskId = -1;
+        private static int _currentAttemptNo = 1;
 
         private static string LogFilePath
         {
@@ -131,20 +134,31 @@ namespace PowerPointAddIn1
         /// <summary>
         /// 現在タスク開始を記録（試験アプリがタスクを切り替えたとき）。形式: [timestamp] [TaskStart] P-T
         /// </summary>
-        public static void LogTaskStart(int projectId, int taskId)
+        public static void LogTaskStart(int projectId, int taskId, int attemptNo = 1)
         {
             try
             {
                 lock (_lockObject)
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    string logEntry = $"[{timestamp}] [TaskStart] {projectId}-{taskId}";
+                    if (attemptNo < 1) attemptNo = 1;
+                    string logEntry = $"[{timestamp}] [TaskStart] {projectId}-{taskId}-{attemptNo}";
                     AppendToFile(LogFilePath, logEntry);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Logger] Error writing log: {ex.Message}");
+            }
+        }
+
+        public static void SetCurrentTaskContext(int projectId, int taskId, int attemptNo)
+        {
+            lock (_lockObject)
+            {
+                _currentProjectId = projectId;
+                _currentTaskId = taskId;
+                _currentAttemptNo = attemptNo < 1 ? 1 : attemptNo;
             }
         }
 
@@ -176,11 +190,15 @@ namespace PowerPointAddIn1
                 lock (_lockObject)
                 {
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    string logEntry = $"[{timestamp}] [{taskTag}] {identifier}";
+                    string contextPrefix = (_currentProjectId > 0 && _currentTaskId > 0)
+                        ? $"[Task {_currentProjectId}-{_currentTaskId}-{_currentAttemptNo}] "
+                        : "";
+                    string logEntry = $"[{timestamp}] {contextPrefix}[{taskTag}] {identifier}";
                     AppendToFile(LogFilePath, logEntry);
                     // 採点がログ依存のタスクは証跡にも同一行を残す（単体プロジェクトリセットでメインログ削除後も採点可能）
                     if (string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
-                        || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal))
+                        || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal))
                     {
                         AppendToFile(TaskEvidenceFilePath, logEntry);
                     }

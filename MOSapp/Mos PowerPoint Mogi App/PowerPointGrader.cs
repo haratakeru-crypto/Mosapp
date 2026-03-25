@@ -27,31 +27,42 @@ namespace MOS_PowerPoint_app
         /// <returns>接続に成功した場合は true、PowerPoint が起動していない等で失敗した場合は false。</returns>
         public bool Connect()
         {
-            if (_app != null)
-                return true;
-
-            try
+            lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
-                _app = (Application)Marshal.GetActiveObject("PowerPoint.Application");
-                if (_app == null)
-                    return false;
-
                 try
                 {
-                    _activePresentation = _app.ActivePresentation;
-                }
-                catch
-                {
-                    _activePresentation = null;
-                }
+                    if (_app == null)
+                    {
+                        _app = (Application)Marshal.GetActiveObject("PowerPoint.Application");
+                        if (_app == null)
+                            return false;
+                    }
 
-                return _activePresentation != null;
-            }
-            catch (COMException)
-            {
-                _app = null;
-                _activePresentation = null;
-                return false;
+                    // プレゼンを閉じて別ファイルを開いた直後など、古い Presentation 参照は無効になる。
+                    // 毎回 ActivePresentation を取り直す（全プロジェクト連続採点で必須）。
+                    if (_activePresentation != null)
+                    {
+                        try { Marshal.ReleaseComObject(_activePresentation); } catch { }
+                        _activePresentation = null;
+                    }
+
+                    try
+                    {
+                        _activePresentation = _app.ActivePresentation;
+                    }
+                    catch
+                    {
+                        _activePresentation = null;
+                    }
+
+                    return _activePresentation != null;
+                }
+                catch (COMException)
+                {
+                    _app = null;
+                    _activePresentation = null;
+                    return false;
+                }
             }
         }
 
@@ -62,12 +73,13 @@ namespace MOS_PowerPoint_app
         /// <param name="projectId">プロジェクト ID（1～11）。</param>
         /// <param name="taskId">タスク ID。</param>
         /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
-        public void StartTask(int projectId, int taskId)
+        public void StartTask(int projectId, int taskId, int attemptNo = 1)
         {
             try
             {
                 var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
-                File.WriteAllText(Libraries.PPLogReader.GetCurrentTaskFilePath(), $"{projectId},{taskId},{(int)flags}");
+                if (attemptNo < 1) attemptNo = 1;
+                File.WriteAllText(Libraries.PPLogReader.GetCurrentTaskFilePath(), $"{projectId},{taskId},{(int)flags},{attemptNo}");
             }
             catch { }
         }
@@ -79,8 +91,13 @@ namespace MOS_PowerPoint_app
         /// </summary>
         public void StartTaskAndWaitForSnapshot(int projectId, int taskId, int timeoutMs = 2000, int pollIntervalMs = 50)
         {
+            StartTaskAndWaitForSnapshot(projectId, taskId, 1, timeoutMs, pollIntervalMs);
+        }
+
+        public void StartTaskAndWaitForSnapshot(int projectId, int taskId, int attemptNo, int timeoutMs = 2000, int pollIntervalMs = 50)
+        {
             var swTotal = Stopwatch.StartNew();
-            StartTask(projectId, taskId);
+            StartTask(projectId, taskId, attemptNo);
 
             // VSTO 側は一定間隔（例: 500ms）で current_task を監視して snapshot を更新するため、短時間だけ待つ。
             string snapshotPath = Libraries.PPLogReader.GetSnapshotPath();
@@ -139,13 +156,18 @@ namespace MOS_PowerPoint_app
         /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
         public bool GradeTask(int projectId, int taskId)
         {
+            return GradeTask(projectId, taskId, 1);
+        }
+
+        public bool GradeTask(int projectId, int taskId, int attemptNo)
+        {
             var swGradeTotal = Stopwatch.StartNew();
             if (_activePresentation == null)
                 return false;
 
             var sw = Stopwatch.StartNew();
             // 1. 過去の破壊的操作ログのチェック
-            if (HasLoggedDestructiveError(projectId, taskId))
+            if (HasLoggedDestructiveError(projectId, taskId, attemptNo))
             {
                 System.Diagnostics.Debug.WriteLine($"[Grader] Task {projectId}-{taskId} FAILED due to logged destructive operation.");
                 PPGradingPerf.Log("GradeTask.HasLoggedDestructiveError", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
@@ -155,7 +177,7 @@ namespace MOS_PowerPoint_app
             PPGradingPerf.Log("GradeTask.HasLoggedDestructiveError", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
 
             sw.Restart();
-            if (FailsLogChecks(projectId, taskId))
+            if (FailsLogChecks(projectId, taskId, attemptNo))
             {
                 PPGradingPerf.Log("GradeTask.FailsLogChecks", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} failed");
                 PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit");
@@ -163,32 +185,40 @@ namespace MOS_PowerPoint_app
             }
             PPGradingPerf.Log("GradeTask.FailsLogChecks", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
 
-            // 2. 現在の破壊的操作（リアルタイムスナップショット）のチェック
+            // 2. スナップショット比較と COM 採点を同一ロックで実行（閉じる処理とスナップショット COM の間に割り込まれないようにする）
             sw.Restart();
             var exemptFlags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
-            var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, exemptFlags);
-            PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
-            if (destructiveErrors.Count > 0)
+            bool comResult = false;
+            lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
-                foreach (var err in destructiveErrors)
+                var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, exemptFlags);
+                PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+                if (destructiveErrors.Count > 0)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
+                    foreach (var err in destructiveErrors)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
+                    }
+                    PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit snapshot errors");
+                    return false;
                 }
-                PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit snapshot errors");
-                return false;
-            }
 
-            sw.Restart();
-            bool comResult;
-            try
-            {
-                comResult = RunComChecker(projectId, taskId);
+                sw.Restart();
+                try
+                {
+                    PPLogReader.SetGradingContext(projectId, taskId, attemptNo);
+                    comResult = RunComChecker(projectId, taskId);
+                }
+                catch
+                {
+                    comResult = false;
+                }
+                finally
+                {
+                    PPLogReader.ClearGradingContext();
+                }
+                PPGradingPerf.Log("GradeTask.ComChecker", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
             }
-            catch
-            {
-                comResult = false;
-            }
-            PPGradingPerf.Log("GradeTask.ComChecker", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
             PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
             return comResult;
         }
@@ -338,23 +368,25 @@ namespace MOS_PowerPoint_app
         /// </summary>
         private static readonly string DestructiveLogPath = Path.Combine(Path.GetTempPath(), "mos_ppt_destructive_errors.log");
 
-        private bool HasLoggedDestructiveError(int projectId, int taskId)
+        private bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
         {
             try
             {
                 if (!File.Exists(DestructiveLogPath)) return false;
                 var lines = File.ReadAllLines(DestructiveLogPath);
-                string prefix = $"{projectId},{taskId}:";
+                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                string legacyPrefix = $"{projectId},{taskId}:";
                 foreach (var line in lines)
                 {
                     if (line.StartsWith(prefix)) return true;
+                    if (attemptNo <= 1 && line.StartsWith(legacyPrefix)) return true;
                 }
             }
             catch { }
             return false;
         }
 
-        private static bool FailsLogChecks(int projectId, int taskId)
+        private static bool FailsLogChecks(int projectId, int taskId, int attemptNo)
         {
             string logPath = PPLogReader.GetLogFilePath();
             if (!File.Exists(logPath))
@@ -362,7 +394,7 @@ namespace MOS_PowerPoint_app
 
             // [Op] は旧リボン上書きで RibbonCommand のみ出力。上書き廃止後は通常該当なし。将来 LogOperation を増やす場合は allowed を調整。
             var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "RibbonCommand" };
-            if (PPLogReader.HasDisallowedOperations(projectId, taskId, allowed))
+            if (PPLogReader.HasDisallowedOperations(projectId, taskId, attemptNo, allowed))
                 return true;
             
             return false;
@@ -380,24 +412,27 @@ namespace MOS_PowerPoint_app
                 return;
             if (disposing)
             {
-                try
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
                 {
-                    if (_activePresentation != null)
+                    try
                     {
-                        Marshal.ReleaseComObject(_activePresentation);
-                        _activePresentation = null;
+                        if (_activePresentation != null)
+                        {
+                            Marshal.ReleaseComObject(_activePresentation);
+                            _activePresentation = null;
+                        }
                     }
-                }
-                catch { }
-                try
-                {
-                    if (_app != null)
+                    catch { }
+                    try
                     {
-                        Marshal.ReleaseComObject(_app);
-                        _app = null;
+                        if (_app != null)
+                        {
+                            Marshal.ReleaseComObject(_app);
+                            _app = null;
+                        }
                     }
+                    catch { }
                 }
-                catch { }
             }
             _disposed = true;
         }

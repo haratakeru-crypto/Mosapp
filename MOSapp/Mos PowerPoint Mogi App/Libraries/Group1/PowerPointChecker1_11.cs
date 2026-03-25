@@ -148,7 +148,7 @@ namespace Libraries.Group1
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
-        /// <summary>11-4: 配布資料マスターで日付削除・フッター「四季のうつろい」。</summary>
+        /// <summary>11-4: 配布資料マスターで日付非表示・フッター「四季のうつろい」。日付は HeadersFooters.Visible が UI と一致しないため、日付プレースホルダー形状の Visible で判定する。</summary>
         public bool CheckTask_1_11_04()
         {
             Presentation pres = null;
@@ -161,25 +161,63 @@ namespace Libraries.Group1
                 {
                     handoutMaster = pres.HandoutMaster;
                     if (handoutMaster == null) return false;
+                    HeadersFooters hf = null;
                     try
                     {
-                        HeadersFooters hf = null;
-                        try
-                        {
-                            hf = handoutMaster.HeadersFooters;
-                            if (hf == null) return false;
-                            bool dateVisible = hf.DateAndTime.Visible == MsoTriState.msoTrue;
-                            string footer = hf.Footer.Text ?? "";
-                            return !dateVisible && footer.IndexOf("四季のうつろい", StringComparison.OrdinalIgnoreCase) >= 0;
-                        }
-                        finally { if (hf != null) { try { Marshal.ReleaseComObject(hf); } catch { } } }
+                        hf = handoutMaster.HeadersFooters;
+                        if (hf == null) return false;
+                        string footer = hf.Footer.Text ?? "";
+                        if (footer.IndexOf("四季のうつろい", StringComparison.OrdinalIgnoreCase) < 0)
+                            return false;
+                        return !HandoutMasterHasVisibleDatePlaceholder(handoutMaster);
                     }
-                    catch { return false; }
+                    finally { if (hf != null) { try { Marshal.ReleaseComObject(hf); } catch { } } }
                 }
                 finally { if (handoutMaster != null) { try { Marshal.ReleaseComObject(handoutMaster); } catch { } } }
             }
             catch { return false; }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+        }
+
+        /// <summary>
+        /// 配布資料マスター上に「日付」プレースホルダーが1つでも表示されている（Visible）なら true。
+        /// 該当形状が無い場合は false（日付を消した扱いでよい）。
+        /// </summary>
+        private static bool HandoutMasterHasVisibleDatePlaceholder(Master handoutMaster)
+        {
+            if (handoutMaster == null) return false;
+            PptShapes shapes = null;
+            try
+            {
+                shapes = handoutMaster.Shapes;
+                if (shapes == null) return false;
+                int n = shapes.Count;
+                for (int i = 1; i <= n; i++)
+                {
+                    PptShape sh = null;
+                    try
+                    {
+                        sh = shapes[i];
+                        if (sh == null) continue;
+                        if (sh.Type != MsoShapeType.msoPlaceholder) continue;
+                        PlaceholderFormat pf = null;
+                        try
+                        {
+                            pf = sh.PlaceholderFormat;
+                            if (pf == null) continue;
+                            if ((PpPlaceholderType)pf.Type != PpPlaceholderType.ppPlaceholderDate)
+                                continue;
+                            if (sh.Visible == MsoTriState.msoTrue)
+                                return true;
+                        }
+                        finally { if (pf != null) { try { Marshal.ReleaseComObject(pf); } catch { } } }
+                    }
+                    finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
+                }
+                return false;
+            }
+            catch { return false; }
+            finally { if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } } }
         }
 
         /// <summary>11-5: スライド5のアイコンに「青」塗りつぶし。</summary>

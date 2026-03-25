@@ -21,6 +21,8 @@ namespace MOS_PowerPoint_app.Views
         private Dictionary<int, bool[]> _projectTaskFlaggedStates; // 「あとで見直す」フラグ状態
         private Dictionary<int, bool[]> _projectTaskViewedStates; // 閲覧状態（未読問題の追跡用）
         private Dictionary<int, List<bool>> _allProjectScoringResults; // 方式A: 結果表示時に実行した全プロジェクトの採点結果（projectId → タスクごと正否）
+        private Dictionary<int, List<bool>> _initialProjectScoringResults; // 初回採点結果の保持
+        private HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private int _groupId = 1;
         private List<ResultProjectInfo> _allProjects; // すべてのプロジェクトを保持
         private bool _showingWrongOnly = false; // フィルター状態
@@ -39,6 +41,7 @@ namespace MOS_PowerPoint_app.Views
             _projectTaskFlaggedStates = projectTaskFlaggedStates ?? new Dictionary<int, bool[]>();
             _projectTaskViewedStates = projectTaskViewedStates ?? new Dictionary<int, bool[]>();
             _allProjectScoringResults = allProjectScoringResults ?? new Dictionary<int, List<bool>>();
+            _initialProjectScoringResults = CloneScoringResults(_allProjectScoringResults);
             _groupId = groupId;
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}");
             
@@ -93,68 +96,15 @@ namespace MOS_PowerPoint_app.Views
                     {
                         WrongCountTextBlock.Text = "0";
                         TotalCountTextBlock.Text = $"/ {fallbackTotal}";
-                        AccuracyTextBlock.Text = "100%";
+                        CorrectCountTextBlock.Text = $"{fallbackTotal}";
+                        CorrectTotalCountTextBlock.Text = $"/ {fallbackTotal}";
+                        AccuracyTextBlock.Text = "初回 100.0% / 修正後 100.0%";
                     });
                     await LoadProjectDataAsync();
                     return;
                 }
 
-                int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
-                
-                // 全タスクを対象に✖の問題数を計算
-                int totalWrongTasks = 0;
-                bool useScoringResults = _allProjectScoringResults != null && _allProjectScoringResults.Count > 0;
-                
-                foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
-                {
-                    if (project.Tasks == null) continue;
-                    
-                    bool[] completedStates = _projectTaskCompletedStates.ContainsKey(project.ProjectId) 
-                        ? _projectTaskCompletedStates[project.ProjectId] 
-                        : new bool[0];
-                    bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) 
-                        ? _projectTaskFlaggedStates[project.ProjectId] 
-                        : new bool[0];
-                    bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) 
-                        ? _projectTaskViewedStates[project.ProjectId] 
-                        : new bool[0];
-                    List<bool> scoreList = useScoringResults && _allProjectScoringResults.ContainsKey(project.ProjectId) 
-                        ? _allProjectScoringResults[project.ProjectId] 
-                        : null;
-                    
-                    foreach (var task in project.Tasks)
-                    {
-                        int arrayIndex = task.TaskId - 1;
-                        bool isCompleted = arrayIndex >= 0 && arrayIndex < completedStates.Length && completedStates[arrayIndex];
-                        bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
-                        bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
-                        
-                        if (scoreList != null && arrayIndex >= 0 && arrayIndex < scoreList.Count)
-                        {
-                            // 方式A: 採点結果あり → 不正解 or あとで見直す なら✖
-                            if (isFlagged || !scoreList[arrayIndex]) totalWrongTasks++;
-                        }
-                        else
-                        {
-                            if (isFlagged || isUnread || !isCompleted) totalWrongTasks++;
-                        }
-                    }
-                }
-
-                // 正答率を計算（正答数 = 総数 - ✖数）
-                int correctCount = totalTasks - totalWrongTasks;
-                double accuracy = totalTasks > 0 ? (double)correctCount / totalTasks * 100.0 : 0.0;
-                int accuracyPercent = (int)Math.Round(accuracy);
-
-                System.Diagnostics.Debug.WriteLine($"[ResultWindow] Total tasks: {totalTasks}, Total ✖ tasks: {totalWrongTasks}, Accuracy: {accuracyPercent}%");
-
-                // UIスレッドで更新
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    WrongCountTextBlock.Text = $"{totalWrongTasks}";
-                    TotalCountTextBlock.Text = $"/ {totalTasks}";
-                    AccuracyTextBlock.Text = $"{accuracyPercent}%";
-                });
+                int latestWrongTasks = UpdateSummary(projectData);
 
                 // 結果を表示（非同期で読み込む）
                 await LoadProjectDataAsync();
@@ -164,7 +114,7 @@ namespace MOS_PowerPoint_app.Views
                 {
                     try
                     {
-                        await Task.Run(() => ExportScoringCsvToDesktop(totalWrongTasks, _allProjects));
+                        await Task.Run(() => ExportScoringCsvToDesktop(latestWrongTasks, _allProjects));
                         _csvExported = true;
                     }
                     catch (Exception csvEx)
@@ -371,7 +321,8 @@ namespace MOS_PowerPoint_app.Views
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
                                     ResultMark = resultMark,
-                                    ResultColor = null // 後でUIスレッドで設定
+                                    ResultColor = null, // 後でUIスレッドで設定
+                                    IsInitiallyWrong = _initialWrongTaskKeys.Contains(GetTaskKey(project.ProjectId, task.TaskId))
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
                         };
@@ -570,6 +521,8 @@ namespace MOS_PowerPoint_app.Views
                         {
                             appBarWindow.SetFromResultWindow(true);
                             appBarWindow.SetResultWindow(this);
+                            appBarWindow.SetInitialWrongTaskKeys(_initialWrongTaskKeys);
+                            appBarWindow.TryPrepareRetryAttemptFromResult(taskInfo.ProjectId, taskInfo.TaskId);
                         }
 
                         // UI更新の機会を与える
@@ -588,6 +541,129 @@ namespace MOS_PowerPoint_app.Views
                 }
             }
         }
+
+        public void ApplyRetryScoreResult(int projectId, int taskId, bool? passed, bool isError)
+        {
+            if (isError || !passed.HasValue)
+                return;
+
+            if (!_allProjectScoringResults.ContainsKey(projectId))
+                _allProjectScoringResults[projectId] = new List<bool>();
+            var scoreList = _allProjectScoringResults[projectId];
+            int index = taskId - 1;
+            while (scoreList.Count <= index)
+                scoreList.Add(false);
+            scoreList[index] = passed.Value;
+
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    ProjectData projectData = await LoadProjectDataModelAsync();
+                    if (projectData != null)
+                    {
+                        UpdateSummary(projectData);
+                        await LoadProjectDataAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] ApplyRetryScoreResult error: {ex.Message}");
+                }
+            });
+        }
+
+        private async Task<ProjectData> LoadProjectDataModelAsync()
+        {
+            return await Task.Run(() =>
+            {
+                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
+                if (!File.Exists(jsonPath))
+                {
+                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
+                }
+                if (!File.Exists(jsonPath))
+                    return null;
+                string jsonContent = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);
+                return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
+            });
+        }
+
+        private int UpdateSummary(ProjectData projectData)
+        {
+            int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
+            int initialWrong = CalculateWrongCount(projectData, _initialProjectScoringResults, true);
+            int latestWrong = CalculateWrongCount(projectData, _allProjectScoringResults, false);
+            CaptureInitialWrongTasks(projectData);
+
+            int latestCorrect = totalTasks - latestWrong;
+            double initialAccuracy = totalTasks > 0 ? (double)(totalTasks - initialWrong) / totalTasks * 100.0 : 0.0;
+            double latestAccuracy = totalTasks > 0 ? (double)latestCorrect / totalTasks * 100.0 : 0.0;
+
+            Dispatcher.Invoke(() =>
+            {
+                WrongCountTextBlock.Text = $"{latestWrong}";
+                TotalCountTextBlock.Text = $"/ {totalTasks}";
+                CorrectCountTextBlock.Text = $"{latestCorrect}";
+                CorrectTotalCountTextBlock.Text = $"/ {totalTasks}";
+                AccuracyTextBlock.Text = $"初回 {initialAccuracy:F1}% / 修正後 {latestAccuracy:F1}%";
+            });
+            return latestWrong;
+        }
+
+        private int CalculateWrongCount(ProjectData projectData, Dictionary<int, List<bool>> scoringResults, bool collectInitialWrong)
+        {
+            int totalWrongTasks = 0;
+            bool useScoringResults = scoringResults != null && scoringResults.Count > 0;
+            foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
+            {
+                if (project.Tasks == null) continue;
+                bool[] completedStates = _projectTaskCompletedStates.ContainsKey(project.ProjectId) ? _projectTaskCompletedStates[project.ProjectId] : new bool[0];
+                bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) ? _projectTaskFlaggedStates[project.ProjectId] : new bool[0];
+                bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) ? _projectTaskViewedStates[project.ProjectId] : new bool[0];
+                List<bool> scoreList = useScoringResults && scoringResults.ContainsKey(project.ProjectId) ? scoringResults[project.ProjectId] : null;
+                foreach (var task in project.Tasks)
+                {
+                    int arrayIndex = task.TaskId - 1;
+                    bool isCompleted = arrayIndex >= 0 && arrayIndex < completedStates.Length && completedStates[arrayIndex];
+                    bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
+                    bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
+                    bool isWrong;
+                    if (scoreList != null && arrayIndex >= 0 && arrayIndex < scoreList.Count)
+                        isWrong = isFlagged || !scoreList[arrayIndex];
+                    else
+                        isWrong = isFlagged || isUnread || !isCompleted;
+
+                    if (isWrong)
+                    {
+                        totalWrongTasks++;
+                        if (collectInitialWrong)
+                            _initialWrongTaskKeys.Add(GetTaskKey(project.ProjectId, task.TaskId));
+                    }
+                }
+            }
+            return totalWrongTasks;
+        }
+
+        private void CaptureInitialWrongTasks(ProjectData projectData)
+        {
+            if (_initialWrongTaskKeys.Count > 0) return;
+            CalculateWrongCount(projectData, _initialProjectScoringResults, true);
+        }
+
+        private static Dictionary<int, List<bool>> CloneScoringResults(Dictionary<int, List<bool>> source)
+        {
+            var clone = new Dictionary<int, List<bool>>();
+            if (source == null) return clone;
+            foreach (var kvp in source)
+                clone[kvp.Key] = kvp.Value != null ? new List<bool>(kvp.Value) : new List<bool>();
+            return clone;
+        }
+
+        private static string GetTaskKey(int projectId, int taskId)
+        {
+            return $"{projectId}-{taskId}";
+        }
     }
 
     public class ResultProjectInfo
@@ -604,5 +680,6 @@ namespace MOS_PowerPoint_app.Views
         public int TaskId { get; set; }
         public string ResultMark { get; set; }
         public Brush ResultColor { get; set; }
+        public bool IsInitiallyWrong { get; set; }
     }
 }

@@ -80,6 +80,9 @@ namespace MOS_PowerPoint_app.Views
         private DispatcherTimer _slideMonitorTimer; // Task 4 用: スライド ID 監視（1秒間隔）
         private bool _fromResultWindow = false; // 結果画面からタスクに飛んできたかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
+        private readonly HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         
         public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null)
         {
@@ -445,6 +448,11 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Showing result window (scoring all projects first)");
+
+                // 採点中に UI タイマーが MoveToNextProject / OpenProjectDocument を走らせて COM と競合しないよう停止する
+                _timer?.Stop();
+                _projectTimer?.Stop();
+                _slideMonitorTimer?.Stop();
                 
                 // 「採点中です」オーバーレイを表示
                 // 待機を徹底するため画面中央に表示（Owner は付けず、ワークエリア中央 = CenterScreen）
@@ -593,11 +601,6 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 grader = new PowerPointGrader();
-                if (!grader.Connect())
-                {
-                    System.Diagnostics.Debug.WriteLine("[ScoreAllProjects] PowerPoint に接続できませんでした");
-                    return results;
-                }
                 foreach (var project in _projectData.Projects.OrderBy(p => p.ProjectId))
                 {
                     if (project.Tasks == null || project.Tasks.Count == 0)
@@ -607,6 +610,15 @@ namespace MOS_PowerPoint_app.Views
                     {
                         OpenProjectDocument(project.ProjectId, _groupId);
                         Thread.Sleep(800);
+                        // OpenProjectDocument は CloseAll 後に別ファイルを開くため、採点前に ActivePresentation を必ず取り直す
+                        if (!grader.Connect())
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[ScoreAllProjects] PowerPoint に接続できないかプレゼンがありません (Project {project.ProjectId})");
+                            for (int i = 0; i < project.Tasks.Count; i++)
+                                list.Add(false);
+                            results[project.ProjectId] = list;
+                            continue;
+                        }
                         foreach (var task in project.Tasks.OrderBy(t => t.TaskId))
                         {
                             bool passed = false;
@@ -614,8 +626,9 @@ namespace MOS_PowerPoint_app.Views
                             {
                                 // スナップショット ID Mismatch を防ぐため、採点前に current_task を更新し、
                                 // VSTO 側の snapshot 更新を短時間待ってから GradeTask を呼ぶ。
-                                grader.StartTaskAndWaitForSnapshot(project.ProjectId, task.TaskId);
-                                passed = grader.GradeTask(project.ProjectId, task.TaskId);
+                                int attemptNo = Libraries.PPTaskAttemptRegistry.GetAttempt(project.ProjectId, task.TaskId);
+                                grader.StartTaskAndWaitForSnapshot(project.ProjectId, task.TaskId, attemptNo, 2000, 50);
+                                passed = grader.GradeTask(project.ProjectId, task.TaskId, attemptNo);
                             }
                             catch (Exception ex)
                             {
@@ -886,6 +899,25 @@ namespace MOS_PowerPoint_app.Views
             _resultWindow = resultWindow;
         }
 
+        public void SetInitialWrongTaskKeys(IEnumerable<string> keys)
+        {
+            _initialWrongTaskKeys.Clear();
+            if (keys == null) return;
+            foreach (var key in keys)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                    _initialWrongTaskKeys.Add(key);
+            }
+        }
+
+        public bool TryPrepareRetryAttemptFromResult(int projectId, int taskId)
+        {
+            string key = GetTaskKey(projectId, taskId);
+            if (!_initialWrongTaskKeys.Contains(key))
+                return false;
+            return EnsureRetryAttemptPrepared(projectId, taskId);
+        }
+
         private void UpdateReviewPageButtonVisibility()
         {
             var reviewPageButton = FindName("ReviewPageButton") as System.Windows.Controls.Button;
@@ -910,6 +942,11 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
+                if (_fromResultWindow)
+                {
+                    TryRescorePendingRetryTasks();
+                }
+
                 // 結果画面を表示
                 if (_resultWindow != null && !_resultWindow.IsVisible)
                 {
@@ -1913,7 +1950,12 @@ namespace MOS_PowerPoint_app.Views
             {
                 string path = Libraries.PPLogReader.GetCurrentTaskFilePath();
                 var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
-                string content = $"{_currentProjectId},{_currentTaskId},{(int)flags}";
+                if (_fromResultWindow)
+                {
+                    EnsureRetryAttemptPrepared(_currentProjectId, _currentTaskId);
+                }
+                int attemptNo = GetCurrentTaskAttempt(_currentProjectId, _currentTaskId);
+                string content = $"{_currentProjectId},{_currentTaskId},{(int)flags},{attemptNo}";
                 File.WriteAllText(path, content, Encoding.UTF8);
             }
             catch (Exception ex)
@@ -1940,7 +1982,8 @@ namespace MOS_PowerPoint_app.Views
                 {
                     string logPath = Libraries.PPLogReader.GetDestructiveLogPath();
                     string errorMsg = string.Join(" | ", errors);
-                    File.AppendAllText(logPath, $"{_currentProjectId},{_currentTaskId}:{errorMsg}{Environment.NewLine}");
+                    int attemptNo = GetCurrentTaskAttempt(_currentProjectId, _currentTaskId);
+                    File.AppendAllText(logPath, $"{_currentProjectId},{_currentTaskId},{attemptNo}:{errorMsg}{Environment.NewLine}");
                     System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Destructive check failed for {_currentProjectId}-{_currentTaskId}: {errorMsg}");
                 }
             }
@@ -2054,77 +2097,81 @@ namespace MOS_PowerPoint_app.Views
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のファイルが見つかりません: {tabFolder}");
                     return;
                 }
-                
-                // 既に開いているプレゼンテーションがある場合は閉じる（頑健な方法を使用）
-                CloseAllPowerPointPresentations();
-                
-                // プロセスが完全に終了するのを少し待つ
-                Thread.Sleep(500);
 
-                // PowerPointアプリケーションを取得または作成（CloseAll...でプロセスが終了した可能性があるため、必要に応じて再取得）
-                PowerPointApp pptApp = null;
-                try
+                // 採点スレッドと競合しないよう、閉じる〜開くまでを COM ロックで直列化する
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
                 {
-                    pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
-                }
-                catch
-                {
-                    pptApp = new PowerPointApp();
-                    pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
-                }
-                
-                // 新しいプレゼンテーションを開く
-                PowerPointPresentation presentation = null;
-                int retryCount = 0;
-                while (retryCount < 3)
-                {
+                    // 既に開いているプレゼンテーションがある場合は閉じる（頑健な方法を使用）
+                    CloseAllPowerPointPresentations();
+
+                    // プロセスが完全に終了するのを少し待つ
+                    Thread.Sleep(500);
+
+                    // PowerPointアプリケーションを取得または作成（CloseAll...でプロセスが終了した可能性があるため、必要に応じて再取得）
+                    PowerPointApp pptApp = null;
                     try
                     {
-                        presentation = pptApp.Presentations.Open(filePath, WithWindow: Microsoft.Office.Core.MsoTriState.msoTrue);
-                        System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開きました: {filePath}");
-                        break;
+                        pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        retryCount++;
-                        System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー (試行 {retryCount}/3): {ex.Message}");
-                        if (retryCount >= 3)
-                        {
-                            MessageBox.Show($"プロジェクト{projectId}のファイルを開けませんでした。\nPowerPointを一度終了してから再度お試しください。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                            return;
-                        }
-                        
-                        // 1秒待機してから再試行
-                        Thread.Sleep(1000);
-                        
-                        // PowerPointアプリケーションの状態を確認・再取得
+                        pptApp = new PowerPointApp();
+                        pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
+                    }
+
+                    // 新しいプレゼンテーションを開く
+                    PowerPointPresentation presentation = null;
+                    int retryCount = 0;
+                    while (retryCount < 3)
+                    {
                         try
                         {
-                            pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                            presentation = pptApp.Presentations.Open(filePath, WithWindow: Microsoft.Office.Core.MsoTriState.msoTrue);
+                            System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開きました: {filePath}");
+                            break;
                         }
-                        catch
+                        catch (Exception ex)
                         {
-                            try { pptApp = new PowerPointApp(); } catch { }
+                            retryCount++;
+                            System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー (試行 {retryCount}/3): {ex.Message}");
+                            if (retryCount >= 3)
+                            {
+                                MessageBox.Show($"プロジェクト{projectId}のファイルを開けませんでした。\nPowerPointを一度終了してから再度お試しください。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                                return;
+                            }
+
+                            // 1秒待機してから再試行
+                            Thread.Sleep(1000);
+
+                            // PowerPointアプリケーションの状態を確認・再取得
+                            try
+                            {
+                                pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                            }
+                            catch
+                            {
+                                try { pptApp = new PowerPointApp(); } catch { }
+                            }
+
+                            if (pptApp != null)
+                                pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
                         }
-                        
-                        if (pptApp != null)
-                            pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
                     }
+
+                    if (presentation == null) return;
+
+                    try
+                    {
+                        // COMオブジェクトの参照を解放
+                        Marshal.ReleaseComObject(presentation);
+                    }
+                    catch { }
+
+                    // PowerPointウィンドウを画面の上部2/3に配置
+                    PositionPowerPointWindow();
+
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のプレゼンテーションを開きました: {filePath}");
                 }
-                
-                if (presentation == null) return;
-                
-                try
-                {
-                    // COMオブジェクトの参照を解放
-                    Marshal.ReleaseComObject(presentation);
-                }
-                catch { }
-                
-                // PowerPointウィンドウを画面の上部2/3に配置
-                PositionPowerPointWindow();
-                
-                System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のプレゼンテーションを開きました: {filePath}");
             }
             catch (Exception ex)
             {
@@ -2267,27 +2314,30 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
-                PowerPointApp pptApp = null;
-                try
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
                 {
-                    pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
-                }
-                catch
-                {
-                    System.Diagnostics.Debug.WriteLine("[SaveAllPowerPointPresentations] PowerPointアプリケーションが見つかりません");
-                    return;
-                }
-                for (int i = 1; i <= pptApp.Presentations.Count; i++)
-                {
+                    PowerPointApp pptApp = null;
                     try
                     {
-                        var pres = pptApp.Presentations[i];
-                        pres.Save();
-                        System.Diagnostics.Debug.WriteLine($"[SaveAllPowerPointPresentations] 保存しました: {pres.Name}");
+                        pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        System.Diagnostics.Debug.WriteLine($"[SaveAllPowerPointPresentations] 保存エラー: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine("[SaveAllPowerPointPresentations] PowerPointアプリケーションが見つかりません");
+                        return;
+                    }
+                    for (int i = 1; i <= pptApp.Presentations.Count; i++)
+                    {
+                        try
+                        {
+                            var pres = pptApp.Presentations[i];
+                            pres.Save();
+                            System.Diagnostics.Debug.WriteLine($"[SaveAllPowerPointPresentations] 保存しました: {pres.Name}");
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[SaveAllPowerPointPresentations] 保存エラー: {ex.Message}");
+                        }
                     }
                 }
             }
@@ -2319,6 +2369,8 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
+                {
                 PowerPointApp pptApp = null;
                 try
                 {
@@ -2421,6 +2473,7 @@ namespace MOS_PowerPoint_app.Views
                         catch { }
                     }
                 }
+                }
             }
             catch (Exception ex)
             {
@@ -2464,6 +2517,89 @@ namespace MOS_PowerPoint_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"[Sync] 同期エラー: {ex.Message}");
             }
+        }
+
+        private static string GetTaskKey(int projectId, int taskId)
+        {
+            return $"{projectId}-{taskId}";
+        }
+
+        private static int GetCurrentTaskAttempt(int projectId, int taskId)
+        {
+            return Libraries.PPTaskAttemptRegistry.GetAttempt(projectId, taskId);
+        }
+
+        private bool EnsureRetryAttemptPrepared(int projectId, int taskId)
+        {
+            string key = GetTaskKey(projectId, taskId);
+            if (!_initialWrongTaskKeys.Contains(key))
+                return false;
+            if (_preparedRetryTaskKeys.Contains(key))
+                return true;
+
+            int currentAttempt = GetCurrentTaskAttempt(projectId, taskId);
+            Libraries.PPTaskAttemptRegistry.SetAttempt(projectId, taskId, currentAttempt + 1);
+            _retryTaskKeys.Add(key);
+            _preparedRetryTaskKeys.Add(key);
+            System.Diagnostics.Debug.WriteLine($"[RetryAttempt] Started for {key}, attempt={GetCurrentTaskAttempt(projectId, taskId)}");
+            return true;
+        }
+
+        private void TryRescorePendingRetryTasks()
+        {
+            if (_retryTaskKeys.Count == 0)
+                return;
+
+            var keysToScore = _retryTaskKeys.ToList();
+            var resultWindow = _resultWindow ?? System.Windows.Application.Current.Windows.OfType<ResultWindow>().FirstOrDefault();
+            if (resultWindow == null)
+                return;
+
+            foreach (var key in keysToScore)
+            {
+                if (!TryParseTaskKey(key, out int projectId, out int taskId))
+                    continue;
+
+                int attemptNo = GetCurrentTaskAttempt(projectId, taskId);
+                bool? passed = null;
+                bool isError = false;
+                try
+                {
+                    using (var grader = new PowerPointGrader())
+                    {
+                        if (!grader.Connect())
+                        {
+                            isError = true;
+                        }
+                        else
+                        {
+                            grader.StartTaskAndWaitForSnapshot(projectId, taskId, attemptNo, 2000, 50);
+                            passed = grader.GradeTask(projectId, taskId, attemptNo);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    isError = true;
+                    System.Diagnostics.Debug.WriteLine($"[RetryAttempt] Rescore error for {key}: {ex.Message}");
+                }
+
+                resultWindow.ApplyRetryScoreResult(projectId, taskId, passed, isError);
+                if (!isError)
+                    _retryTaskKeys.Remove(key);
+            }
+        }
+
+        private static bool TryParseTaskKey(string key, out int projectId, out int taskId)
+        {
+            projectId = -1;
+            taskId = -1;
+            if (string.IsNullOrWhiteSpace(key))
+                return false;
+            var parts = key.Split('-');
+            if (parts.Length != 2)
+                return false;
+            return int.TryParse(parts[0], out projectId) && int.TryParse(parts[1], out taskId);
         }
     }
     

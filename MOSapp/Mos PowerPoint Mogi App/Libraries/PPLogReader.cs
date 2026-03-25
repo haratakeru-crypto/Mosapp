@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace Libraries
 {
@@ -12,6 +13,24 @@ namespace Libraries
     /// </summary>
     public static class PPLogReader
     {
+        private static readonly AsyncLocal<int?> _gradingProjectId = new AsyncLocal<int?>();
+        private static readonly AsyncLocal<int?> _gradingTaskId = new AsyncLocal<int?>();
+        private static readonly AsyncLocal<int?> _gradingAttemptNo = new AsyncLocal<int?>();
+
+        public static void SetGradingContext(int projectId, int taskId, int attemptNo)
+        {
+            _gradingProjectId.Value = projectId;
+            _gradingTaskId.Value = taskId;
+            _gradingAttemptNo.Value = attemptNo;
+        }
+
+        public static void ClearGradingContext()
+        {
+            _gradingProjectId.Value = null;
+            _gradingTaskId.Value = null;
+            _gradingAttemptNo.Value = null;
+        }
+
         /// <summary>
         /// ログファイルのパスを取得（%TEMP%\mos_ppt_log.txt）
         /// </summary>
@@ -216,6 +235,14 @@ namespace Libraries
         /// <summary>採点用証跡を優先し、無ければ従来の mos_ppt_log.txt を検索する。</summary>
         private static bool HasGradingEvidenceMarker(string marker)
         {
+            if (_gradingProjectId.Value.HasValue && _gradingTaskId.Value.HasValue && _gradingAttemptNo.Value.HasValue)
+            {
+                int p = _gradingProjectId.Value.Value;
+                int t = _gradingTaskId.Value.Value;
+                int a = _gradingAttemptNo.Value.Value;
+                return HasMarkerWithinTask(GetTaskEvidenceLogPath(), p, t, a, marker)
+                    || HasMarkerWithinTask(GetLogFilePath(), p, t, a, marker);
+            }
             return FileContainsMarker(GetTaskEvidenceLogPath(), marker)
                 || FileContainsMarker(GetLogFilePath(), marker);
         }
@@ -248,23 +275,39 @@ namespace Libraries
         /// </summary>
         public static bool HasMarkerWithinTask(int projectId, int taskId, string marker)
         {
+            if (_gradingProjectId.Value == projectId && _gradingTaskId.Value == taskId && _gradingAttemptNo.Value.HasValue)
+                return HasMarkerWithinTask(projectId, taskId, _gradingAttemptNo.Value.Value, marker);
+            return HasMarkerWithinTask(projectId, taskId, 1, marker);
+        }
+
+        public static bool HasMarkerWithinTask(int projectId, int taskId, int attemptNo, string marker)
+        {
             if (string.IsNullOrEmpty(marker))
                 return false;
-            string path = GetLogFilePath();
-            if (!File.Exists(path))
+            return HasMarkerWithinTask(GetLogFilePath(), projectId, taskId, attemptNo, marker);
+        }
+
+        private static bool HasMarkerWithinTask(string path, int projectId, int taskId, int attemptNo, string marker)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(marker) || !File.Exists(path))
                 return false;
             try
             {
                 string[] lines = File.ReadAllLines(path);
                 bool inTarget = false;
-                int curP = -1, curT = -1;
+                int curP = -1, curT = -1, curA = 1;
                 foreach (string line in lines)
                 {
                     if (line == null) continue;
+                    string taskPrefix = $"[Task {projectId}-{taskId}-{attemptNo}]";
+                    if (line.IndexOf(taskPrefix, StringComparison.OrdinalIgnoreCase) >= 0
+                        && line.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true;
+
                     if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        ParseTaskStart(line, out curP, out curT);
-                        inTarget = (curP == projectId && curT == taskId);
+                        ParseTaskStart(line, out curP, out curT, out curA);
+                        inTarget = (curP == projectId && curT == taskId && curA == attemptNo);
                         continue;
                     }
                     if (!inTarget) continue;
@@ -351,6 +394,11 @@ namespace Libraries
         /// </summary>
         public static List<string> GetOperationsForTask(int projectId, int taskId)
         {
+            return GetOperationsForTask(projectId, taskId, 1);
+        }
+
+        public static List<string> GetOperationsForTask(int projectId, int taskId, int attemptNo)
+        {
             var result = new List<string>();
             string path = GetLogFilePath();
             if (!File.Exists(path))
@@ -358,16 +406,16 @@ namespace Libraries
             try
             {
                 string[] lines = File.ReadAllLines(path);
-                int currentProject = -1, currentTask = -1;
+                int currentProject = -1, currentTask = -1, currentAttempt = 1;
                 foreach (string line in lines)
                 {
                     if (line == null) continue;
                     if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        ParseTaskStart(line, out currentProject, out currentTask);
+                        ParseTaskStart(line, out currentProject, out currentTask, out currentAttempt);
                         continue;
                     }
-                    if (currentProject != projectId || currentTask != taskId)
+                    if (currentProject != projectId || currentTask != taskId || currentAttempt != attemptNo)
                         continue;
                     int opIdx = line.IndexOf("[Op]", StringComparison.OrdinalIgnoreCase);
                     if (opIdx < 0) continue;
@@ -389,9 +437,14 @@ namespace Libraries
         /// </summary>
         public static bool HasDisallowedOperations(int projectId, int taskId, HashSet<string> allowedOperationTypes)
         {
+            return HasDisallowedOperations(projectId, taskId, 1, allowedOperationTypes);
+        }
+
+        public static bool HasDisallowedOperations(int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes)
+        {
             if (allowedOperationTypes == null)
                 return false;
-            var ops = GetOperationsForTask(projectId, taskId);
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo);
             foreach (string opLine in ops)
             {
                 string type = GetOperationType(opLine);
@@ -407,7 +460,7 @@ namespace Libraries
         /// </summary>
         public static bool HasShapePositionChange(int projectId, int taskId)
         {
-            var ops = GetOperationsForTask(projectId, taskId);
+            var ops = GetOperationsForTask(projectId, taskId, 1);
             foreach (string opLine in ops)
             {
                 if (opLine.IndexOf("ShapePositionChange", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -416,18 +469,27 @@ namespace Libraries
             return false;
         }
 
-        private static void ParseTaskStart(string line, out int projectId, out int taskId)
+        private static void ParseTaskStart(string line, out int projectId, out int taskId, out int attemptNo)
         {
             projectId = -1;
             taskId = -1;
+            attemptNo = 1;
             int startIdx = line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase);
             if (startIdx < 0) return;
             string part = line.Substring(startIdx + 11).Trim();
             var tokens = part.Split(new[] { '-', ',' }, StringSplitOptions.RemoveEmptyEntries);
             if (tokens.Length >= 2 && int.TryParse(tokens[0].Trim(), out projectId) && int.TryParse(tokens[1].Trim(), out taskId))
+            {
+                if (tokens.Length >= 3)
+                {
+                    int.TryParse(tokens[2].Trim(), out attemptNo);
+                    if (attemptNo < 1) attemptNo = 1;
+                }
                 return;
+            }
             projectId = -1;
             taskId = -1;
+            attemptNo = 1;
         }
 
 

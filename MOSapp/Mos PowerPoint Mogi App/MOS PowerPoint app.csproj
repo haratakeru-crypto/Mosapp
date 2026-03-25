@@ -171,6 +171,7 @@
     <Compile Include="Libraries\Group1\PowerPointChecker1_9.cs" />
     <Compile Include="Libraries\Group1\PowerPointCheckerCommon.cs" />
     <Compile Include="Libraries\PPLogReader.cs" />
+    <Compile Include="Libraries\PPTaskAttemptRegistry.cs" />
     <Compile Include="Libraries\PPTaskValidationConfig.cs" />
     <Compile Include="Libraries\PPSnapshotChecker.cs" />
     <Compile Include="Libraries\PPGradingPerf.cs" />

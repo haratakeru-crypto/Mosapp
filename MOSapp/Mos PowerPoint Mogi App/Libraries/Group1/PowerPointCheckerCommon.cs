@@ -15,28 +15,36 @@ namespace Libraries.Group1
     public static class PowerPointCheckerCommon
     {
         /// <summary>
+        /// PowerPoint COM（開閉・ActivePresentation・採点）を直列化する。採点スレッドと UI スレッドの競合で無効な Presentation を触るのを防ぐ。
+        /// </summary>
+        public static readonly object PowerPointComInteropSync = new object();
+
+        /// <summary>
         /// 現在アクティブな PowerPoint プレゼンテーションを取得する。
         /// </summary>
         /// <returns>アクティブプレゼンテーション。取得失敗時は null。呼び出し元で Marshal.ReleaseComObject すること。</returns>
         public static Presentation GetActivePresentation()
         {
-            try
+            lock (PowerPointComInteropSync)
             {
-                var app = (Application)Marshal.GetActiveObject("PowerPoint.Application");
-                if (app == null) return null;
                 try
                 {
-                    var pres = app.ActivePresentation;
-                    return pres;
+                    var app = (Application)Marshal.GetActiveObject("PowerPoint.Application");
+                    if (app == null) return null;
+                    try
+                    {
+                        var pres = app.ActivePresentation;
+                        return pres;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
                 }
-                catch
+                catch (COMException)
                 {
                     return null;
                 }
-            }
-            catch (COMException)
-            {
-                return null;
             }
         }
 

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using Libraries.Group1;
 using PowerPoint = Microsoft.Office.Interop.PowerPoint;
 using Office = Microsoft.Office.Core;
 
@@ -45,13 +46,15 @@ namespace Libraries
             }
             System.Diagnostics.Debug.WriteLine($"[Validation] Starting Check for Project{projectId} Task{taskId}");
 
-            // 現在の状態の取得
+            // 現在の状態の取得（CloseAllPowerPointPresentations / OpenProjectDocument と採点スレッドの競合を防ぐ）
             var swCom = Stopwatch.StartNew();
             int perfSlideCount = -1;
             PowerPoint.Application pptApp = null;
-            try
+            lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
-                pptApp = (PowerPoint.Application)Marshal.GetActiveObject("PowerPoint.Application");
+                try
+                {
+                    pptApp = (PowerPoint.Application)Marshal.GetActiveObject("PowerPoint.Application");
                 if (pptApp == null) return errors;
 
                 PowerPoint.Presentation pres = null;
@@ -262,13 +265,14 @@ namespace Libraries
                 }
                 catch { }
                 finally { if (pres != null) Marshal.ReleaseComObject(pres); }
-            }
-            catch { }
-            finally
-            {
-                if (pptApp != null) Marshal.ReleaseComObject(pptApp);
-                string slideInfo = perfSlideCount >= 0 ? $"slides={perfSlideCount}" : "slides=?";
-                PPGradingPerf.Log("PPSnapshotChecker.comActivePresCompare", swCom.ElapsedMilliseconds, $"P{projectId}-T{taskId} {slideInfo}");
+                }
+                catch { }
+                finally
+                {
+                    if (pptApp != null) Marshal.ReleaseComObject(pptApp);
+                    string slideInfo = perfSlideCount >= 0 ? $"slides={perfSlideCount}" : "slides=?";
+                    PPGradingPerf.Log("PPSnapshotChecker.comActivePresCompare", swCom.ElapsedMilliseconds, $"P{projectId}-T{taskId} {slideInfo}");
+                }
             }
 
             PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} errors={errors.Count}");

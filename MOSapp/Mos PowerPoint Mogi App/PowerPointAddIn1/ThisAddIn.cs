@@ -36,6 +36,7 @@ namespace PowerPointAddIn1
         private Timer _taskFilePollTimer;
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
+        private int _currentTaskAttemptNo = 1;
 
         private const float PositionTolerancePt = 0.5f;
 
@@ -95,6 +96,7 @@ namespace PowerPointAddIn1
                 {
                     _currentTaskProjectId = -1;
                     _currentTaskTaskId = -1;
+                    _currentTaskAttemptNo = 1;
                     return;
                 }
                 string line = null;
@@ -125,10 +127,18 @@ namespace PowerPointAddIn1
                 _currentTaskProjectId = projectId;
                 _currentTaskTaskId = taskId;
                 _currentTaskExemptFlags = parts.Length >= 3 ? int.Parse(parts[2].Trim()) : 0;
+                int attemptNo = 1;
+                if (parts.Length >= 4)
+                {
+                    int.TryParse(parts[3].Trim(), out attemptNo);
+                    if (attemptNo < 1) attemptNo = 1;
+                }
+                _currentTaskAttemptNo = attemptNo;
 
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
-                Logger.LogTaskStart(projectId, taskId);
+                Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
+                Logger.LogTaskStart(projectId, taskId, attemptNo);
                 TakeUnifiedSnapshot();
             }
             catch (Exception ex)
@@ -522,7 +532,7 @@ namespace PowerPointAddIn1
                 {
                     // ログに記録
                     string errorMsg = string.Join(" | ", errors);
-                    File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId}:{errorMsg}{Environment.NewLine}");
+                    File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId},{_currentTaskAttemptNo}:{errorMsg}{Environment.NewLine}");
                     System.Diagnostics.Debug.WriteLine($"[DestructiveCheck] Task {projectId}-{taskId} FAILED: {errorMsg}");
                 }
             }
@@ -554,6 +564,7 @@ namespace PowerPointAddIn1
         private void Layout10_7PollTimer_Tick(object sender, EventArgs e)
         {
             if (_task10_7Logged) return;
+            if (!IsCurrentTask(10, 7)) return;
             try
             {
                 if (Application == null || Application.Presentations == null) return;
@@ -604,6 +615,9 @@ namespace PowerPointAddIn1
         {
             try
             {
+                bool isTask5_1 = IsCurrentTask(5, 1);
+                bool isTask11_7 = IsCurrentTask(11, 7);
+                if (!isTask5_1 && !isTask11_7) return;
                 if (Application == null || Application.Presentations == null) return;
                 PowerPoint.Presentation pres = null;
                 try
@@ -651,14 +665,14 @@ namespace PowerPointAddIn1
 
                         if (changed)
                         {
-                            if (!_task5_1PrintLogged &&
+                            if (isTask5_1 && !_task5_1PrintLogged &&
                                 outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputThreeSlideHandouts &&
                                 copies == 4 && collate)
                             {
                                 Logger.LogTask5_1Print();
                                 _task5_1PrintLogged = true;
                             }
-                            if (!_task11_7PrintLogged &&
+                            if (isTask11_7 && !_task11_7PrintLogged &&
                                 outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages &&
                                 copies == 3 && collate)
                             {
@@ -677,6 +691,7 @@ namespace PowerPointAddIn1
         private void Audio8_4PollTimer_Tick(object sender, EventArgs e)
         {
             if (_task8_4Logged) return;
+            if (!IsCurrentTask(8, 4)) return;
             try
             {
                 if (Application == null || Application.Presentations == null) return;
@@ -732,6 +747,11 @@ namespace PowerPointAddIn1
 
         private void GrayscalePollTimer_Tick(object sender, EventArgs e)
         {
+            if (!IsCurrentTask(10, 4))
+            {
+                _lastBlackAndWhite = false;
+                return;
+            }
             try
             {
                 if (Application == null) return;
@@ -765,6 +785,7 @@ namespace PowerPointAddIn1
         private void Kiosk7_4PollTimer_Tick(object sender, EventArgs e)
         {
             if (_task7_4KioskLogged) return;
+            if (!IsCurrentTask(7, 4)) return;
             try
             {
                 if (Application == null || Application.Presentations == null) return;
@@ -836,6 +857,11 @@ namespace PowerPointAddIn1
         {
             System.Diagnostics.Debug.WriteLine("[ThisAddIn] CreateRibbonExtensibilityObject called");
             return new Ribbon();
+        }
+
+        private static bool IsCurrentTask(int projectId, int taskId)
+        {
+            return CurrentTaskProjectId == projectId && CurrentTaskTaskId == taskId;
         }
 
         #region VSTO で生成されたコード

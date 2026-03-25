@@ -34,7 +34,8 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Linq" />
     <Reference Include="System.Runtime.InteropServices" />
-    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="Microsoft.Office.Interop.PowerPoint">
       <HintPath>C:\Windows\assembly\GAC_MSIL\Microsoft.Office.Interop.PowerPoint\15.0.0.0__71e9bce111e9429c\Microsoft.Office.Interop.PowerPoint.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
@@ -47,6 +48,7 @@
   <ItemGroup>
     <Compile Include="..\PPLogReader.cs" Link="PPLogReader.cs" />
     <Compile Include="PowerPointCheckerCommon.cs" />
+    <Compile Include="PptxSlideZoomLinkReader.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
