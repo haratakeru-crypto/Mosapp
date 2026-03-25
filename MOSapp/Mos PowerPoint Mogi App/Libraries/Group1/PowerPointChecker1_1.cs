@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
+using Libraries;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
 using PptShapes = Microsoft.Office.Interop.PowerPoint.Shapes;
 
@@ -110,18 +111,17 @@ namespace Libraries.Group1
 
         public bool CheckTask_1_1_02()
         {
-            if (Task4PassedByThirdSlideDeletion) return true;
             Presentation pres = null;
             try
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
-                try { if (pres.Slides.Count == 7) return true; } catch { } // 1-2→1-3→1-4完了後の結果状態（再起動後採点用）
                 Slides slides = null;
                 try
                 {
                     slides = pres.Slides;
-                    if (slides == null || slides.Count < 3) return false;
+                    if (slides == null || slides.Count < 3)
+                        return PPLogReader.HasTask1_2DuplicateExecuted();
                     Slide slide2 = null, slide3 = null;
                     try
                     {
@@ -134,7 +134,9 @@ namespace Libraries.Group1
                             layout3 = slide3.CustomLayout;
                             if (layout2 == null || layout3 == null) return false;
                             string name2 = layout2.Name ?? "", name3 = layout3.Name ?? "";
-                            return string.Equals(name2, name3, StringComparison.OrdinalIgnoreCase);
+                            if (string.Equals(name2, name3, StringComparison.OrdinalIgnoreCase))
+                                return true;
+                            return PPLogReader.HasTask1_2DuplicateExecuted();
                         }
                         finally
                         {
@@ -150,30 +152,33 @@ namespace Libraries.Group1
                 }
                 finally { if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } } }
             }
-            catch { return false; }
+            catch { return PPLogReader.HasTask1_2DuplicateExecuted(); }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
         public bool CheckTask_1_1_03()
         {
-            if (Task4PassedByThirdSlideDeletion) return true;
             Presentation pres = null;
             try
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
-                try { if (pres.Slides.Count == 7) return true; } catch { } // 1-2→1-3→1-4完了後の結果状態（再起動後採点用）
                 Slide slide = null;
                 try
                 {
                     slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 3);
-                    if (slide == null) return false;
-                    try { return slide.SlideShowTransition.Hidden == MsoTriState.msoTrue; }
-                    catch { return false; }
+                    if (slide == null) return PPLogReader.HasTask1_3HideSlide3Executed();
+                    try
+                    {
+                        if (slide.SlideShowTransition.Hidden == MsoTriState.msoTrue)
+                            return true;
+                        return PPLogReader.HasTask1_3HideSlide3Executed();
+                    }
+                    catch { return PPLogReader.HasTask1_3HideSlide3Executed(); }
                 }
                 finally { if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } } }
             }
-            catch { return false; }
+            catch { return PPLogReader.HasTask1_3HideSlide3Executed(); }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
@@ -184,10 +189,10 @@ namespace Libraries.Group1
             try
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
-                if (pres != null) { try { if (pres.Slides.Count == 7) return true; } catch { } } // 1-2→1-3→1-4完了後の結果状態（再起動後採点用）
+                if (pres != null && Task4PassedByThirdSlideDeletion) return true;
             }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
-            return false;
+            return PPLogReader.HasTask1_4DeleteThirdSlideExecuted();
         }
 
         public bool CheckTask_1_1_05()

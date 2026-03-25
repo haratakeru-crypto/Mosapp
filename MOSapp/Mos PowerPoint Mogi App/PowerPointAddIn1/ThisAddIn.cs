@@ -32,6 +32,12 @@ namespace PowerPointAddIn1
 
         private Timer _kiosk7_4PollTimer;
         private bool _task7_4KioskLogged;
+        private Timer _task1_2To1_4PollTimer;
+        private bool _task1_2Logged;
+        private bool _task1_3Logged;
+        private bool _task1_4Logged;
+        private List<int> _task1_4PrevSlideIds = new List<int>();
+        private string _task1_4PrevPresentationKey;
 
         private Timer _taskFilePollTimer;
         private int _currentTaskProjectId = -1;
@@ -81,6 +87,16 @@ namespace PowerPointAddIn1
             _kiosk7_4PollTimer.Interval = 1000;
             _kiosk7_4PollTimer.Tick += Kiosk7_4PollTimer_Tick;
             _kiosk7_4PollTimer.Start();
+
+            _task1_2Logged = false;
+            _task1_3Logged = false;
+            _task1_4Logged = false;
+            _task1_4PrevSlideIds.Clear();
+            _task1_4PrevPresentationKey = null;
+            _task1_2To1_4PollTimer = new Timer();
+            _task1_2To1_4PollTimer.Interval = 700;
+            _task1_2To1_4PollTimer.Tick += Task1_2To1_4PollTimer_Tick;
+            _task1_2To1_4PollTimer.Start();
 
             _taskFilePollTimer = new Timer();
             _taskFilePollTimer.Interval = 500;
@@ -134,6 +150,14 @@ namespace PowerPointAddIn1
                     if (attemptNo < 1) attemptNo = 1;
                 }
                 _currentTaskAttemptNo = attemptNo;
+                if (!(projectId == 1 && taskId == 2)) _task1_2Logged = false;
+                if (!(projectId == 1 && taskId == 3)) _task1_3Logged = false;
+                if (!(projectId == 1 && taskId == 4))
+                {
+                    _task1_4Logged = false;
+                    _task1_4PrevSlideIds.Clear();
+                    _task1_4PrevPresentationKey = null;
+                }
 
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
@@ -812,6 +836,128 @@ namespace PowerPointAddIn1
             catch { }
         }
 
+        private void Task1_2To1_4PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (Application == null || Application.Presentations == null) return;
+                if (!IsCurrentTask(1, 2) && !IsCurrentTask(1, 3) && !IsCurrentTask(1, 4)) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    if (IsCurrentTask(1, 2) && !_task1_2Logged)
+                    {
+                        PowerPoint.Slides slides = null;
+                        PowerPoint.Slide slide2 = null;
+                        PowerPoint.Slide slide3 = null;
+                        PowerPoint.CustomLayout l2 = null;
+                        PowerPoint.CustomLayout l3 = null;
+                        try
+                        {
+                            slides = pres.Slides;
+                            if (slides != null && slides.Count >= 3)
+                            {
+                                slide2 = slides[2];
+                                slide3 = slides[3];
+                                if (slide2 != null && slide3 != null)
+                                {
+                                    l2 = slide2.CustomLayout;
+                                    l3 = slide3.CustomLayout;
+                                    string n2 = l2?.Name ?? "";
+                                    string n3 = l3?.Name ?? "";
+                                    if (!string.IsNullOrEmpty(n2) && string.Equals(n2, n3, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        Logger.LogTask1_2Duplicate();
+                                        _task1_2Logged = true;
+                                    }
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            if (l2 != null) try { Marshal.ReleaseComObject(l2); } catch { }
+                            if (l3 != null) try { Marshal.ReleaseComObject(l3); } catch { }
+                            if (slide2 != null) try { Marshal.ReleaseComObject(slide2); } catch { }
+                            if (slide3 != null) try { Marshal.ReleaseComObject(slide3); } catch { }
+                            if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+                        }
+                    }
+
+                    if (IsCurrentTask(1, 3) && !_task1_3Logged)
+                    {
+                        PowerPoint.Slides slides = null;
+                        PowerPoint.Slide slide3 = null;
+                        try
+                        {
+                            slides = pres.Slides;
+                            if (slides != null && slides.Count >= 3)
+                            {
+                                slide3 = slides[3];
+                                if (slide3 != null && slide3.SlideShowTransition.Hidden == Office.MsoTriState.msoTrue)
+                                {
+                                    Logger.LogTask1_3Hide();
+                                    _task1_3Logged = true;
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            if (slide3 != null) try { Marshal.ReleaseComObject(slide3); } catch { }
+                            if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+                        }
+                    }
+
+                    if (IsCurrentTask(1, 4) && !_task1_4Logged)
+                    {
+                        string key = null;
+                        try { key = (pres.FullName ?? pres.Name ?? "").Trim(); } catch { }
+                        PowerPoint.Slides slides = null;
+                        try
+                        {
+                            slides = pres.Slides;
+                            if (slides == null) return;
+                            var currentIds = new List<int>();
+                            for (int i = 1; i <= slides.Count; i++)
+                            {
+                                PowerPoint.Slide s = null;
+                                try
+                                {
+                                    s = slides[i];
+                                    if (s != null) currentIds.Add(s.SlideID);
+                                }
+                                finally { if (s != null) try { Marshal.ReleaseComObject(s); } catch { } }
+                            }
+
+                            if (string.IsNullOrEmpty(_task1_4PrevPresentationKey) || !string.Equals(_task1_4PrevPresentationKey, key, StringComparison.OrdinalIgnoreCase))
+                            {
+                                _task1_4PrevPresentationKey = key;
+                                _task1_4PrevSlideIds = new List<int>(currentIds);
+                                return;
+                            }
+
+                            if (_task1_4PrevSlideIds.Count >= 3 && currentIds.Count < _task1_4PrevSlideIds.Count)
+                            {
+                                int deletedId = _task1_4PrevSlideIds[2];
+                                if (!currentIds.Contains(deletedId))
+                                {
+                                    Logger.LogTask1_4DeleteThirdSlide();
+                                    _task1_4Logged = true;
+                                }
+                            }
+                            _task1_4PrevSlideIds = new List<int>(currentIds);
+                        }
+                        finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
+                    }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
         {
             if (_taskFilePollTimer != null)
@@ -825,6 +971,12 @@ namespace PowerPointAddIn1
                 _kiosk7_4PollTimer.Stop();
                 _kiosk7_4PollTimer.Dispose();
                 _kiosk7_4PollTimer = null;
+            }
+            if (_task1_2To1_4PollTimer != null)
+            {
+                _task1_2To1_4PollTimer.Stop();
+                _task1_2To1_4PollTimer.Dispose();
+                _task1_2To1_4PollTimer = null;
             }
             if (_printOptionsPollTimer != null)
             {

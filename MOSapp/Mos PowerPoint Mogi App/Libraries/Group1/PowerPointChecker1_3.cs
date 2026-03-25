@@ -406,29 +406,40 @@ namespace Libraries.Group1
                         const string titleRequired1 = "この機能が使える！";
                         const string titleRequired2 = "受験当日の流れ";
 
-                        string pptxPath = null;
+                        string originalPptxPath = null;
+                        try { originalPptxPath = pres.FullName; } catch { }
+
+                        // その場採点では未保存変更があるため、最新状態を SaveCopyAs した一時 .pptx を優先して解析する。
+                        string validationPptxPath = null;
+                        string tempPptxPath = null;
                         try
                         {
-                            pptxPath = pres.FullName;
-                        }
-                        catch { }
+                            tempPptxPath = Path.Combine(Path.GetTempPath(), "Mosapp_3_4_" + Guid.NewGuid().ToString("N") + ".pptx");
+                            try
+                            {
+                                pres.SaveCopyAs(
+                                    tempPptxPath,
+                                    PpSaveAsFileType.ppSaveAsOpenXMLPresentation,
+                                    MsoTriState.msoFalse);
+                                if (File.Exists(tempPptxPath))
+                                    validationPptxPath = tempPptxPath;
+                            }
+                            catch
+                            {
+                                // SaveCopyAs に失敗した場合は保存済みの実ファイルへフォールバック
+                            }
 
-                        if (string.IsNullOrWhiteSpace(pptxPath) || !File.Exists(pptxPath))
-                        {
-                            foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
-                            return false;
-                        }
+                            if (string.IsNullOrWhiteSpace(validationPptxPath))
+                            {
+                                if (string.IsNullOrWhiteSpace(originalPptxPath) || !File.Exists(originalPptxPath))
+                                    return false;
+                                if (!originalPptxPath.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase))
+                                    return false;
+                                validationPptxPath = originalPptxPath;
+                            }
 
-                        if (!pptxPath.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase))
-                        {
-                            foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
-                            return false;
-                        }
-
-                        try
-                        {
                             if (!PptxSlideZoomLinkReader.TryValidateSlideSlideZoomTargetTitles(
-                                    pptxPath,
+                                    validationPptxPath,
                                     presentationSlideNumber1Based: 1,
                                     titleRequired1,
                                     titleRequired2,
@@ -440,6 +451,10 @@ namespace Libraries.Group1
                         finally
                         {
                             foreach (var t in zoomsBelowText) { try { Marshal.ReleaseComObject(t.Item1); } catch { } }
+                            if (!string.IsNullOrWhiteSpace(tempPptxPath))
+                            {
+                                try { if (File.Exists(tempPptxPath)) File.Delete(tempPptxPath); } catch { }
+                            }
                         }
 
                         return true;

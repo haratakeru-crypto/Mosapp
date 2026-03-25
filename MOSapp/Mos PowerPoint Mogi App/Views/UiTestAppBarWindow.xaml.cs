@@ -587,6 +587,114 @@ namespace MOS_PowerPoint_app.Views
                 MessageBox.Show($"結果画面の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        /// <summary>プロジェクト切替が 300ms 以上かかる場合のみ「準備中」オーバーレイを表示する（速い遷移ではチラつきを抑える）。</summary>
+        private const int PrepareProjectOverlayDelayMs = 300;
+
+        private static Window CreatePrepareProjectOverlayWindow()
+        {
+            return new Window
+            {
+                Title = "プロジェクト準備中",
+                SizeToContent = SizeToContent.WidthAndHeight,
+                MinWidth = 260,
+                MaxWidth = 420,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                WindowStyle = WindowStyle.ToolWindow,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                Topmost = true,
+                Content = new StackPanel
+                {
+                    Margin = new Thickness(16, 14, 16, 14),
+                    MaxWidth = 388,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = "次のプロジェクトを準備しています。\nしばらくお待ちください...",
+                            FontSize = 14,
+                            TextWrapping = TextWrapping.Wrap,
+                            TextAlignment = TextAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            MaxWidth = 356
+                        }
+                    }
+                }
+            };
+        }
+
+        private static DispatcherTimer StartPrepareOverlayKeepOnTopTimer(Window overlay)
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer.Tick += (_, __) =>
+            {
+                if (overlay == null || !overlay.IsVisible) return;
+                if (!overlay.IsActive)
+                {
+                    overlay.Topmost = false;
+                    overlay.Topmost = true;
+                    overlay.Activate();
+                }
+            };
+            timer.Start();
+            return timer;
+        }
+
+        /// <summary>
+        /// 遅延後に準備中オーバーレイを表示しつつ遷移処理を実行する。
+        /// 処理の合間で Dispatcher を yield し、オーバーレイの表示キューが処理されるようにする。
+        /// </summary>
+        private async Task RunWithDelayedPrepareOverlayAsync(Func<Task> transitionAsync)
+        {
+            bool transitionCompleted = false;
+            Window overlay = null;
+            DispatcherTimer overlayKeepOnTopTimer = null;
+            System.Threading.Timer showOverlayTimer = null;
+
+            void ShowOverlayIfNeeded()
+            {
+                if (transitionCompleted) return;
+                if (overlay != null) return;
+                try
+                {
+                    overlay = CreatePrepareProjectOverlayWindow();
+                    overlay.Show();
+                    overlay.Activate();
+                    overlayKeepOnTopTimer = StartPrepareOverlayKeepOnTopTimer(overlay);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[RunWithDelayedPrepareOverlay] Show overlay: {ex.Message}");
+                }
+            }
+
+            showOverlayTimer = new System.Threading.Timer(
+                _ => Dispatcher.BeginInvoke(new Action(ShowOverlayIfNeeded)),
+                null,
+                PrepareProjectOverlayDelayMs,
+                Timeout.Infinite);
+
+            try
+            {
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                await transitionAsync();
+            }
+            finally
+            {
+                transitionCompleted = true;
+                showOverlayTimer?.Dispose();
+                showOverlayTimer = null;
+                overlayKeepOnTopTimer?.Stop();
+                overlayKeepOnTopTimer = null;
+                if (overlay != null)
+                {
+                    try { overlay.Close(); } catch { }
+                    overlay = null;
+                }
+            }
+        }
         
         /// <summary>
         /// 全プロジェクトを採点し、projectId → タスクごとの正否リスト を返す（方式A用）
@@ -659,7 +767,7 @@ namespace MOS_PowerPoint_app.Views
         /// <summary>
         /// タスクに移動する（結果画面から呼び出される）
         /// </summary>
-        public void NavigateToTask(int projectId, int taskId)
+        public async void NavigateToTask(int projectId, int taskId)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={projectId}, TaskId={taskId}");
 
@@ -668,35 +776,40 @@ namespace MOS_PowerPoint_app.Views
                 // プロジェクト切り替えやジャンプ前に一旦タスク情報をクリアし、アドイン側の誤検知を防ぐ
                 Libraries.PPLogReader.ClearCurrentTaskFile();
 
-                // レビューページから戻ったときは常に該当プロジェクトのプレゼンテーションを開く
-                OpenProjectDocument(projectId, _groupId);
-
-                // プロジェクトを変更
-                if (projectId != _currentProjectId)
+                await RunWithDelayedPrepareOverlayAsync(async () =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"プロジェクト変更: {_currentProjectId} -> {projectId}");
-                    _currentProjectId = projectId;
-                    LoadCurrentProjectTasks();
-                }
+                    // レビューページから戻ったときは常に該当プロジェクトのプレゼンテーションを開く
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    OpenProjectDocument(projectId, _groupId);
+                    await Dispatcher.Yield(DispatcherPriority.Background);
 
-                // タスクを変更
-                if (taskId != _currentTaskId && taskId >= 1 && taskId <= _tasks.Count)
-                {
-                    System.Diagnostics.Debug.WriteLine($"タスク変更: {_currentTaskId} -> {taskId}");
-                    _currentTaskId = taskId;
-                }
-                
-                // UIを更新
-                UpdateTaskDisplay();
-                WriteCurrentTaskFile();
-                
-                // メインウィンドウを表示
-                this.Show();
-                this.WindowState = WindowState.Normal;
-                this.Activate();
-                this.Focus();
-                
-                System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のタスク{taskId}に移動しました");
+                    // プロジェクトを変更
+                    if (projectId != _currentProjectId)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"プロジェクト変更: {_currentProjectId} -> {projectId}");
+                        _currentProjectId = projectId;
+                        LoadCurrentProjectTasks();
+                    }
+
+                    // タスクを変更
+                    if (taskId != _currentTaskId && taskId >= 1 && taskId <= _tasks.Count)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"タスク変更: {_currentTaskId} -> {taskId}");
+                        _currentTaskId = taskId;
+                    }
+
+                    // UIを更新
+                    UpdateTaskDisplay();
+                    WriteCurrentTaskFile();
+
+                    // メインウィンドウを表示
+                    this.Show();
+                    this.WindowState = WindowState.Normal;
+                    this.Activate();
+                    this.Focus();
+
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のタスク{taskId}に移動しました");
+                });
             }
             catch (Exception ex)
             {
@@ -1964,12 +2077,22 @@ namespace MOS_PowerPoint_app.Views
             }
         }
         
-        private void NextProject_Click(object sender, RoutedEventArgs e)
+        private async void NextProject_Click(object sender, RoutedEventArgs e)
         {
-            MoveToNextProject();
+            await MoveToNextProjectAsync();
         }
         
-        private void MoveToNextProject()
+        private async Task MoveToNextProjectAsync()
+        {
+            int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
+            // 最終プロジェクトで「次」は「すべて完了」になるため、「次のプロジェクトを準備」オーバーレイは出さない
+            if (_currentProjectId >= maxProjectId)
+                await MoveToNextProjectCoreAsync();
+            else
+                await RunWithDelayedPrepareOverlayAsync(MoveToNextProjectCoreAsync);
+        }
+
+        private async Task MoveToNextProjectCoreAsync()
         {
             // プロジェクト遷移直前に破壊的操作チェックを完了し、違反があればログに記録（遷移は継続）
             try
@@ -1992,8 +2115,12 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Destructive check error: {ex.Message}");
             }
 
+            await Dispatcher.Yield(DispatcherPriority.Background);
+
             // プロジェクト切り替え前にタスク情報をクリアし、アドイン側の破壊的操作チェックをスキップさせる
             Libraries.PPLogReader.ClearCurrentTaskFile();
+
+            await Dispatcher.Yield(DispatcherPriority.Background);
 
             bool enableProjectBackup = false;
             bool.TryParse(ConfigurationManager.AppSettings["EnableProjectBackup"], out enableProjectBackup);
@@ -2038,12 +2165,14 @@ namespace MOS_PowerPoint_app.Views
                 }
             }
 
+            await Dispatcher.Yield(DispatcherPriority.Background);
+
             // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
-            
+
             // 次のプロジェクトに移動
             _currentProjectId++;
-            
+
             if (_currentProjectId > maxProjectId)
             {
                 // 最後のプロジェクトを超えた場合はメッセージを表示
@@ -2052,19 +2181,21 @@ namespace MOS_PowerPoint_app.Views
                 ShowReviewPageWindow();
                 return;
             }
-            
+
+            await Dispatcher.Yield(DispatcherPriority.Background);
+
             // 新しいプロジェクトのPowerPointプレゼンテーションを開く
             OpenProjectDocument(_currentProjectId, _groupId);
-            
+
             // プロジェクト変更時は状態をリセットしない（Dictionaryで管理）
-            
+
             // 新しいプロジェクトのタスクを読み込み
             LoadCurrentProjectTasks();
             UpdateTaskDisplay();
-            
+
             // プロジェクトタイマーをリセット
             ResetProjectTimer();
-            
+
             System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
         }
         
@@ -2179,14 +2310,14 @@ namespace MOS_PowerPoint_app.Views
             }
         }
         
-        private void MoveToNextProjectWithMessage()
+        private async void MoveToNextProjectWithMessage()
         {
             // メッセージを表示
             MessageBox.Show("5分経ったので次のプロジェクトに移動します", "時間切れ", 
                           MessageBoxButton.OK, MessageBoxImage.Information);
             
             // 次のプロジェクトに移動
-            MoveToNextProject();
+            await MoveToNextProjectAsync();
         }
         
         private void ResetProjectTimer()

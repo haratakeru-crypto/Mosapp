@@ -67,20 +67,8 @@ namespace PowerPointAddIn1
         /// </summary>
         public static void LogTask10_4Grayscale()
         {
-            try
-            {
-                lock (_lockObject)
-                {
-                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    string logEntry = $"[{timestamp}] [Task10-4] Grayscale";
-                    AppendToFile(LogFilePath, logEntry);
-                    AppendToFile(TaskEvidenceFilePath, logEntry);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[Logger] Error writing log: {ex.Message}");
-            }
+            // 他の証跡タスク（5-1, 11-7）と同様、Task コンテキスト付きの統一フォーマットで記録する。
+            LogTaskTag("Task10-4", "Grayscale");
         }
 
         /// <summary>5-1: 配布資料3スライド・部単位4部で印刷したことを記録。</summary>
@@ -93,6 +81,24 @@ namespace PowerPointAddIn1
         public static void LogTask11_7Print()
         {
             LogTaskTag("Task11-7", "Print");
+        }
+
+        /// <summary>1-2: スライド2の複製状態（2,3枚目同レイアウト）を検出したことを記録。</summary>
+        public static void LogTask1_2Duplicate()
+        {
+            LogTaskTag("Task1-2", "Duplicate");
+        }
+
+        /// <summary>1-3: スライド3を非表示にしたことを記録。</summary>
+        public static void LogTask1_3Hide()
+        {
+            LogTaskTag("Task1-3", "HideSlide3");
+        }
+
+        /// <summary>1-4: （開始時の）3枚目スライドを削除したことを記録。</summary>
+        public static void LogTask1_4DeleteThirdSlide()
+        {
+            LogTaskTag("Task1-4", "DeleteThirdSlide");
         }
 
         /// <summary>8-4: オーディオ再生設定（フェードイン4秒等）を記録。</summary>
@@ -196,7 +202,10 @@ namespace PowerPointAddIn1
                     string logEntry = $"[{timestamp}] {contextPrefix}[{taskTag}] {identifier}";
                     AppendToFile(LogFilePath, logEntry);
                     // 採点がログ依存のタスクは証跡にも同一行を残す（単体プロジェクトリセットでメインログ削除後も採点可能）
-                    if (string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
+                    if (string.Equals(taskTag, "Task1-2", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task1-3", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task1-4", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal))
                     {

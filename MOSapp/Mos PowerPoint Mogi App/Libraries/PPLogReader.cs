@@ -171,6 +171,13 @@ namespace Libraries
         {
             switch (projectId)
             {
+                case 1:
+                    return new[]
+                    {
+                        "[Task1-2] Duplicate",
+                        "[Task1-3] HideSlide3",
+                        "[Task1-4] DeleteThirdSlide"
+                    };
                 case 5:
                     return new[] { "[Task5-1] Print" };
                 case 10:
@@ -230,6 +237,24 @@ namespace Libraries
         public static bool HasTask11_7PrintExecuted()
         {
             return HasGradingEvidenceMarker("[Task11-7] Print");
+        }
+
+        /// <summary>証跡またはメインログに 1-2 複製記録（[Task1-2] Duplicate）が含まれるか。</summary>
+        public static bool HasTask1_2DuplicateExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task1-2] Duplicate");
+        }
+
+        /// <summary>証跡またはメインログに 1-3 非表示記録（[Task1-3] HideSlide3）が含まれるか。</summary>
+        public static bool HasTask1_3HideSlide3Executed()
+        {
+            return HasGradingEvidenceMarker("[Task1-3] HideSlide3");
+        }
+
+        /// <summary>証跡またはメインログに 1-4 削除記録（[Task1-4] DeleteThirdSlide）が含まれるか。</summary>
+        public static bool HasTask1_4DeleteThirdSlideExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task1-4] DeleteThirdSlide");
         }
 
         /// <summary>採点用証跡を優先し、無ければ従来の mos_ppt_log.txt を検索する。</summary>
