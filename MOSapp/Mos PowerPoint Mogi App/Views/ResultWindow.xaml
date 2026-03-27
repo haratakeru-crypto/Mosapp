@@ -102,6 +102,22 @@
                                                VerticalAlignment="Center"
                                                Margin="5,0,0,0"/>
                                 </StackPanel>
+                                <!-- 正答数表示 -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                                    <TextBlock Text="正答数: "
+                                               FontSize="20" FontWeight="Medium"
+                                               Foreground="#374151"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="CorrectCountTextBlock" Text="0"
+                                               FontSize="24" FontWeight="Bold"
+                                               Foreground="#10B981"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="CorrectTotalCountTextBlock" Text="/ 0"
+                                               FontSize="20" FontWeight="Medium"
+                                               Foreground="#374151"
+                                               VerticalAlignment="Center"
+                                               Margin="5,0,0,0"/>
+                                </StackPanel>
                             </StackPanel>
                         </Grid>
                         

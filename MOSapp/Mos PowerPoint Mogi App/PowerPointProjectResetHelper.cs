@@ -2,6 +2,7 @@ using System;
 using System.Configuration;
 using System.IO;
 using System.Threading;
+using Libraries;
 
 namespace MOS_PowerPoint_app
 {
@@ -14,6 +15,14 @@ namespace MOS_PowerPoint_app
     {
         public static void ResetProject(int groupId, int projectId)
         {
+            PPLogReader.ClearLog();
+            // プロジェクト5/10/11をやり直すときは該当タスクの証跡のみ削除。他プロジェクトの証跡は残す。
+            PPLogReader.ClearTaskEvidenceForProject(projectId);
+            PPLogReader.ClearCurrentTaskFile();
+            PPLogReader.ClearDestructiveLog();
+            PPLogReader.ClearSnapshot();
+            PPTaskAttemptRegistry.ClearProject(projectId);
+
             string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"]
                 ?? @"C:\MOSTest\PowerPoint365";
             string tabFolder = Path.Combine(basePath, $"Tab{groupId}");

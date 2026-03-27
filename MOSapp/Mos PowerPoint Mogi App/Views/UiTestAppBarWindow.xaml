@@ -40,7 +40,8 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="🕐" FontSize="20" Foreground="White" Margin="0,0,10,0" VerticalAlignment="Center"/>
                         <TextBlock Name="TimerTextBlock" Text="50:00:00" FontFamily="Consolas" FontSize="20" Foreground="White" FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"/>
-                        <Button Content="レビューページ" 
+                        <!-- レビューページボタン（通常時） -->
+                        <Button Name="ReviewPageButton" Content="レビューページ" 
                                 Background="White" 
                                 Foreground="#1E40AF" 
                                 Padding="24,10" 
@@ -48,7 +49,33 @@
                                 BorderThickness="0"
                                 FontWeight="Medium"
                                 FontSize="16"
-                                Click="ReviewPageButton_Click">
+                                Click="ReviewPageButton_Click"
+                                Visibility="Visible">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#F3F4F6"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Background" Value="#E5E7EB"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- 結果に戻るボタン（結果画面からタスクに飛んだ場合） -->
+                        <Button Name="ReturnToResultButton" Content="結果に戻る" 
+                                Background="White" 
+                                Foreground="#1E40AF" 
+                                Padding="24,10" 
+                                Margin="20,0,0,0"
+                                BorderThickness="0"
+                                FontWeight="Medium"
+                                FontSize="16"
+                                Click="ReturnToResultButton_Click"
+                                Visibility="Collapsed">
                             <Button.Style>
                                 <Style TargetType="Button">
                                     <Style.Triggers>

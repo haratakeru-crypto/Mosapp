@@ -7,14 +7,14 @@
     <framework targetVersion="4.8" profile="Full" supportedRuntime="4.0.30319" />
   </compatibleFrameworks>
   <dependency>
-    <dependentAssembly dependencyType="install" codebase="Mos PowerPoint Mogi App.exe.manifest" size="6428">
+    <dependentAssembly dependencyType="install" codebase="Mos PowerPoint Mogi App.exe.manifest" size="17883">
       <assemblyIdentity name="Mos PowerPoint Mogi App.exe" version="1.0.0.10" publicKeyToken="0000000000000000" language="neutral" processorArchitecture="msil" type="win32" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>18YeQMsD8R+4Z1gEzWRp/oxCGgRJRYSny1NwaIeRwSs=</dsig:DigestValue>
+        <dsig:DigestValue>qsIk/1n1Vhrnj6kIb582k//vfCQN0k8BnqfgL+j/8Tc=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

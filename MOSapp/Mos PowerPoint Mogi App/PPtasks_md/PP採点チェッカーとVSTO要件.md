@@ -2,7 +2,7 @@
 
 ## 1. PowerPointChecker の個別作成（WordChecker / ExcelChecker と同様）
 
-- **配置先**: `C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\Library\Group1`
+- **配置先**: `C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1`
 - **形式**: WordChecker / ExcelChecker と同様に、**PowerPointChecker** として `.cs` と `.csproj` を配置する。
 - **範囲**: **1_1 ～ 1_11** まで、採点チェッカーを**個別ファイル**で作成する。
 - **成果物**: 各番号ごとに `.cs` と `.csproj` のデータ。
@@ -35,3 +35,20 @@
   - 問題が「**スライドの挿入**」だけなのに、スライド内の**画像やプレースホルダーの操作**をしていた場合、
   - **結果だけ**見ると「スライドの挿入」はできているので**正解**になってしまうが、
   - **過程**を確認すると、問題文の指示に**ない操作**をしているため、**実際のテストでは不正解**とする必要がある。
+
+---
+
+## 5. 日本語 UI と COM 値の差（プロジェクト2の 2-1・2-5）
+
+- **背景**: 日本語版 PowerPoint で正しい操作（例: 画面切り替え「右から」）を行っても、環境やバージョンにより保存される COM 値に混乱が生じることがある。
+- **PpEntryEffect（画面切り替え）の定義規則**:
+    - COM の列挙名（例: `ppEffectPushLeft`）は、**「物体が移動する方向（Destination）」**を指している。
+    - 日本語 UI（例:「右から」）は、**「物体が入ってくる方向（Source）」**を指している。
+- **具体的な対応表**:
+    | COM 列挙名 (定数値) | 意味 | 日本語 UI |
+    | :--- | :--- | :--- |
+    | **ppEffectPushLeft (3853)** | 左へプッシュする | **「右から」** |
+    | **ppEffectPushRight (3854)** | 右へプッシュする | **「左から」** |
+- **採点側の対応**:
+    - 基本的には公式の COM 値（右からの場合は 3853）で判定する。
+- **限界**: COM 値だけでは「右から」と「左から」を完全に区別しきれないケース（環境依存の反転など）があるため、最終的には VSTO を用いた操作ログ（UI で何を選択したか）の参照が必要となる。

@@ -1,16 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Office.Interop.PowerPoint;
-using Microsoft.Office.Core;
-using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
-using PptShapes = Microsoft.Office.Interop.PowerPoint.Shapes;
+using Libraries;
+using Libraries.Group1;
 
 namespace MOS_PowerPoint_app
 {
     /// <summary>
     /// 起動中の PowerPoint に接続し、MOS 模擬試験のタスクごとの採点を行うクラス。
+    /// 採点ロジックは Libraries.Group1 の PowerPointChecker1_X に委譲する。
     /// </summary>
     public sealed class PowerPointGrader : IDisposable
     {
@@ -18,174 +21,340 @@ namespace MOS_PowerPoint_app
         private Presentation _activePresentation;
         private bool _disposed;
 
-        /// <summary>Task 4 用: 直前の Tick 時点のスライド ID の並び（1枚目→2枚目→…）。</summary>
-        private static List<int> _previousSlideIds = new List<int>();
-        /// <summary>Task 4 用: 3枚目（インデックス2）のスライドが削除されたと判定した場合 true。採点時に参照。</summary>
-        public static bool Task4PassedByThirdSlideDeletion { get; private set; }
-
         /// <summary>
         /// 現在起動している PowerPoint インスタンスに接続する。
         /// </summary>
         /// <returns>接続に成功した場合は true、PowerPoint が起動していない等で失敗した場合は false。</returns>
         public bool Connect()
         {
-            if (_app != null)
-                return true;
-
-            try
+            lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
-                _app = (Application)Marshal.GetActiveObject("PowerPoint.Application");
-                if (_app == null)
-                    return false;
-
                 try
                 {
-                    _activePresentation = _app.ActivePresentation;
-                }
-                catch
-                {
-                    _activePresentation = null;
-                }
+                    if (_app == null)
+                    {
+                        _app = (Application)Marshal.GetActiveObject("PowerPoint.Application");
+                        if (_app == null)
+                            return false;
+                    }
 
-                return _activePresentation != null;
-            }
-            catch (COMException)
-            {
-                _app = null;
-                _activePresentation = null;
-                return false;
+                    // プレゼンを閉じて別ファイルを開いた直後など、古い Presentation 参照は無効になる。
+                    // 毎回 ActivePresentation を取り直す（全プロジェクト連続採点で必須）。
+                    if (_activePresentation != null)
+                    {
+                        try { Marshal.ReleaseComObject(_activePresentation); } catch { }
+                        _activePresentation = null;
+                    }
+
+                    try
+                    {
+                        _activePresentation = _app.ActivePresentation;
+                    }
+                    catch
+                    {
+                        _activePresentation = null;
+                    }
+
+                    return _activePresentation != null;
+                }
+                catch (COMException)
+                {
+                    _app = null;
+                    _activePresentation = null;
+                    return false;
+                }
             }
         }
 
         /// <summary>
         /// 指定したプロジェクト・タスクの採点を行う。
+        /// ログに余計な操作や許可されない座標変化があれば不合格。続けて COM による結果判定を行う。
+        /// </summary>
+        /// <param name="projectId">プロジェクト ID（1～11）。</param>
+        /// <param name="taskId">タスク ID。</param>
+        /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
+        public void StartTask(int projectId, int taskId, int attemptNo = 1)
+        {
+            try
+            {
+                var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
+                if (attemptNo < 1) attemptNo = 1;
+                File.WriteAllText(Libraries.PPLogReader.GetCurrentTaskFilePath(), $"{projectId},{taskId},{(int)flags},{attemptNo}");
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// StartTask の書き込み後、VSTO 側のスナップショット（%TEMP%\mos_ppt_snapshot.txt）が
+        /// 指定の projectId-taskId に更新されるまで短時間待機する。
+        /// タイムアウトした場合は待機を諦め、採点は継続する（スナップショットチェックは ID Mismatch でスキップされる）。
+        /// </summary>
+        public void StartTaskAndWaitForSnapshot(int projectId, int taskId, int timeoutMs = 2000, int pollIntervalMs = 50)
+        {
+            StartTaskAndWaitForSnapshot(projectId, taskId, 1, timeoutMs, pollIntervalMs);
+        }
+
+        public void StartTaskAndWaitForSnapshot(int projectId, int taskId, int attemptNo, int timeoutMs = 2000, int pollIntervalMs = 50)
+        {
+            var swTotal = Stopwatch.StartNew();
+            StartTask(projectId, taskId, attemptNo);
+
+            // VSTO 側は一定間隔（例: 500ms）で current_task を監視して snapshot を更新するため、短時間だけ待つ。
+            string snapshotPath = Libraries.PPLogReader.GetSnapshotPath();
+            var swWait = Stopwatch.StartNew();
+            while (swWait.ElapsedMilliseconds < timeoutMs)
+            {
+                try
+                {
+                    if (TryReadSnapshotTaskId(snapshotPath, out int snapProjectId, out int snapTaskId))
+                    {
+                        if (snapProjectId == projectId && snapTaskId == taskId)
+                        {
+                            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.wait", swWait.ElapsedMilliseconds, $"P{projectId}-T{taskId} snapshot matched");
+                            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+                            return;
+                        }
+                    }
+                }
+                catch { }
+                Thread.Sleep(pollIntervalMs);
+            }
+            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.wait", swWait.ElapsedMilliseconds, $"P{projectId}-T{taskId} timeout {timeoutMs}ms");
+            PPGradingPerf.Log("StartTaskAndWaitForSnapshot.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+        }
+
+        private static bool TryReadSnapshotTaskId(string snapshotPath, out int projectId, out int taskId)
+        {
+            projectId = -1;
+            taskId = -1;
+            if (string.IsNullOrWhiteSpace(snapshotPath) || !File.Exists(snapshotPath))
+                return false;
+
+            // 期待フォーマット例: "TaskId:1,4"
+            // PPSnapshotChecker.LoadSnapshot と同じ形式を読む。
+            string[] lines = File.ReadAllLines(snapshotPath);
+            foreach (string line in lines)
+            {
+                if (string.IsNullOrEmpty(line)) continue;
+                int colonIndex = line.IndexOf(':');
+                if (colonIndex < 0) continue;
+                string key = line.Substring(0, colonIndex);
+                if (!string.Equals(key, "TaskId", StringComparison.Ordinal)) continue;
+                string value = line.Substring(colonIndex + 1);
+                var ids = value.Split(',');
+                if (ids.Length != 2) return false;
+                return int.TryParse(ids[0], out projectId) && int.TryParse(ids[1], out taskId);
+            }
+            return false;
+        }
+        /// <summary>
+        /// 指定したプロジェクト・タスクの採点を行う。
+        /// ログに余計な操作や許可されない座標変化があれば不合格。続けて COM による結果判定を行う。
         /// </summary>
         /// <param name="projectId">プロジェクト ID（1～11）。</param>
         /// <param name="taskId">タスク ID。</param>
         /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
         public bool GradeTask(int projectId, int taskId)
         {
+            return GradeTask(projectId, taskId, 1);
+        }
+
+        public bool GradeTask(int projectId, int taskId, int attemptNo)
+        {
+            var swGradeTotal = Stopwatch.StartNew();
             if (_activePresentation == null)
                 return false;
 
+            var sw = Stopwatch.StartNew();
+            // 1. 過去の破壊的操作ログのチェック
+            if (HasLoggedDestructiveError(projectId, taskId, attemptNo))
+            {
+                System.Diagnostics.Debug.WriteLine($"[Grader] Task {projectId}-{taskId} FAILED due to logged destructive operation.");
+                PPGradingPerf.Log("GradeTask.HasLoggedDestructiveError", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+                PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit");
+                return false;
+            }
+            PPGradingPerf.Log("GradeTask.HasLoggedDestructiveError", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+
+            sw.Restart();
+            if (FailsLogChecks(projectId, taskId, attemptNo))
+            {
+                PPGradingPerf.Log("GradeTask.FailsLogChecks", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} failed");
+                PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit");
+                return false;
+            }
+            PPGradingPerf.Log("GradeTask.FailsLogChecks", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+
+            // 2. スナップショット比較と COM 採点を同一ロックで実行（閉じる処理とスナップショット COM の間に割り込まれないようにする）
+            sw.Restart();
+            var exemptFlags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
+            bool comResult = false;
+            lock (PowerPointCheckerCommon.PowerPointComInteropSync)
+            {
+                var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, exemptFlags);
+                PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+                if (destructiveErrors.Count > 0)
+                {
+                    foreach (var err in destructiveErrors)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
+                    }
+                    PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit snapshot errors");
+                    return false;
+                }
+
+                sw.Restart();
+                try
+                {
+                    PPLogReader.SetGradingContext(projectId, taskId, attemptNo);
+                    comResult = RunComChecker(projectId, taskId);
+                }
+                catch
+                {
+                    comResult = false;
+                }
+                finally
+                {
+                    PPLogReader.ClearGradingContext();
+                }
+                PPGradingPerf.Log("GradeTask.ComChecker", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
+            }
+            PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
+            return comResult;
+        }
+
+        /// <summary>プロジェクト別の COM 採点のみ（計測用に分離）。</summary>
+        private static bool RunComChecker(int projectId, int taskId)
+        {
             switch (projectId)
             {
                 case 1:
+                    var c1 = new PowerPointChecker1_1();
                     switch (taskId)
                     {
-                        case 1: return GradeProject1Task1();
-                        case 2: return GradeProject1Task2();
-                        case 3: return GradeProject1Task3();
-                        case 4: return GradeProject1Task4();
-                        case 5: return GradeProject1Task5();
-                        case 6: return GradeProject1Task6();
-                        case 7: return GradeProject1Task7();
+                        case 1: return c1.CheckTask_1_1_01();
+                        case 2: return c1.CheckTask_1_1_02();
+                        case 3: return c1.CheckTask_1_1_03();
+                        case 4: return c1.CheckTask_1_1_04();
+                        case 5: return c1.CheckTask_1_1_05();
+                        case 6: return c1.CheckTask_1_1_06();
+                        case 7: return c1.CheckTask_1_1_07();
                         default: return false;
                     }
                 case 2:
+                    var c2 = new PowerPointChecker1_2();
                     switch (taskId)
                     {
-                        case 1: return GradeProject2Task1();
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return GradeProject2Task4();
-                        case 5: return false;
-                        case 6: return false;
-                        case 7: return false;
+                        case 1: return c2.CheckTask_1_2_01();
+                        case 2: return c2.CheckTask_1_2_02();
+                        case 3: return c2.CheckTask_1_2_03();
+                        case 4: return c2.CheckTask_1_2_04();
+                        case 5: return c2.CheckTask_1_2_05();
+                        case 6: return c2.CheckTask_1_2_06();
+                        case 7: return c2.CheckTask_1_2_07();
                         default: return false;
                     }
                 case 3:
+                    var c3 = new PowerPointChecker1_3();
                     switch (taskId)
                     {
-                        case 1: return GradeProject3Task1();
-                        case 2: return GradeProject3Task2();
-                        case 3: return false;
-                        case 4: return false;
+                        case 1: return c3.CheckTask_1_3_01();
+                        case 2: return c3.CheckTask_1_3_02();
+                        case 3: return c3.CheckTask_1_3_03();
+                        case 4: return c3.CheckTask_1_3_04();
                         default: return false;
                     }
                 case 4:
+                    var c4 = new PowerPointChecker1_4();
                     switch (taskId)
                     {
-                        case 1: return false;
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return GradeProject4Task4();
-                        case 5: return GradeProject4Task5();
-                        case 6: return GradeProject4Task6();
+                        case 1: return c4.CheckTask_1_4_01();
+                        case 2: return c4.CheckTask_1_4_02();
+                        case 3: return c4.CheckTask_1_4_03();
+                        case 4: return c4.CheckTask_1_4_04();
+                        case 5: return c4.CheckTask_1_4_05();
+                        case 6: return c4.CheckTask_1_4_06();
                         default: return false;
                     }
                 case 5:
+                    var c5 = new PowerPointChecker1_5();
                     switch (taskId)
                     {
-                        case 1: return false;
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return false;
-                        case 5: return false;
+                        case 1: return c5.CheckTask_1_5_01();
+                        case 2: return c5.CheckTask_1_5_02();
+                        case 3: return c5.CheckTask_1_5_03();
+                        case 4: return c5.CheckTask_1_5_04();
+                        case 5: return c5.CheckTask_1_5_05();
                         default: return false;
                     }
                 case 6:
+                    var c6 = new PowerPointChecker1_6();
                     switch (taskId)
                     {
-                        case 1: return false;
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return false;
+                        case 1: return c6.CheckTask_1_6_01();
+                        case 2: return c6.CheckTask_1_6_02();
+                        case 3: return c6.CheckTask_1_6_03();
+                        case 4: return c6.CheckTask_1_6_04();
                         default: return false;
                     }
                 case 7:
+                    var c7 = new PowerPointChecker1_7();
                     switch (taskId)
                     {
-                        case 1: return false;
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return false;
+                        case 1: return c7.CheckTask_1_7_01();
+                        case 2: return c7.CheckTask_1_7_02();
+                        case 3: return c7.CheckTask_1_7_03();
+                        case 4: return c7.CheckTask_1_7_04();
                         default: return false;
                     }
                 case 8:
+                    var c8 = new PowerPointChecker1_8();
                     switch (taskId)
                     {
-                        case 1: return false;
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return false;
-                        case 5: return false;
+                        case 1: return c8.CheckTask_1_8_01();
+                        case 2: return c8.CheckTask_1_8_02();
+                        case 3: return c8.CheckTask_1_8_03();
+                        case 4: return c8.CheckTask_1_8_04();
+                        case 5: return c8.CheckTask_1_8_05();
                         default: return false;
                     }
                 case 9:
+                    var c9 = new PowerPointChecker1_9();
                     switch (taskId)
                     {
-                        case 1: return GradeProject9Task1();
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return false;
-                        case 5: return false;
-                        case 6: return GradeProject9Task6();
-                        case 7: return false;
+                        case 1: return c9.CheckTask_1_9_01();
+                        case 2: return c9.CheckTask_1_9_02();
+                        case 3: return c9.CheckTask_1_9_03();
+                        case 4: return c9.CheckTask_1_9_04();
+                        case 5: return c9.CheckTask_1_9_05();
+                        case 6: return c9.CheckTask_1_9_06();
+                        case 7: return c9.CheckTask_1_9_07();
                         default: return false;
                     }
                 case 10:
+                    var c10 = new PowerPointChecker1_10();
                     switch (taskId)
                     {
-                        case 1: return false;
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return false;
-                        case 5: return false;
-                        case 6: return false;
-                        case 7: return false;
+                        case 1: return c10.CheckTask_1_10_01();
+                        case 2: return c10.CheckTask_1_10_02();
+                        case 3: return c10.CheckTask_1_10_03();
+                        case 4: return c10.CheckTask_1_10_04();
+                        case 5: return c10.CheckTask_1_10_05();
+                        case 6: return c10.CheckTask_1_10_06();
+                        case 7: return c10.CheckTask_1_10_07();
                         default: return false;
                     }
                 case 11:
+                    var c11 = new PowerPointChecker1_11();
                     switch (taskId)
                     {
-                        case 1: return false;
-                        case 2: return false;
-                        case 3: return false;
-                        case 4: return false;
-                        case 5: return false;
-                        case 6: return false;
-                        case 7: return false;
+                        case 1: return c11.CheckTask_1_11_01();
+                        case 2: return c11.CheckTask_1_11_02();
+                        case 3: return c11.CheckTask_1_11_03();
+                        case 4: return c11.CheckTask_1_11_04();
+                        case 5: return c11.CheckTask_1_11_05();
+                        case 6: return c11.CheckTask_1_11_06();
+                        case 7: return c11.CheckTask_1_11_07();
                         default: return false;
                     }
                 default:
@@ -194,1184 +363,41 @@ namespace MOS_PowerPoint_app
         }
 
         /// <summary>
-        /// 指定したスライド番号（1 始まり）のスライドを取得する。
+        /// VSTO ログを参照し、余計な操作または許可されない座標変化があれば true（不合格とする）。
+        /// ログファイルが無い場合は false（アドイン未導入時は COM のみで判定）。
         /// </summary>
-        /// <param name="pres">プレゼンテーション。</param>
-        /// <param name="slideNumber">スライド番号（1 始まり）。</param>
-        /// <returns>該当スライド。範囲外または取得失敗時は null。呼び出し元で Marshal.ReleaseComObject すること。</returns>
-        private static Slide GetSlideByNumber(Presentation pres, int slideNumber)
+        private static readonly string DestructiveLogPath = Path.Combine(Path.GetTempPath(), "mos_ppt_destructive_errors.log");
+
+        private bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
         {
-            if (pres == null || slideNumber < 1)
-                return null;
             try
             {
-                Slides slides = pres.Slides;
-                if (slides == null)
-                    return null;
-                try
+                if (!File.Exists(DestructiveLogPath)) return false;
+                var lines = File.ReadAllLines(DestructiveLogPath);
+                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                string legacyPrefix = $"{projectId},{taskId}:";
+                foreach (var line in lines)
                 {
-                    if (slideNumber > slides.Count)
-                        return null;
-                    return slides[slideNumber];
-                }
-                finally
-                {
-                    if (slides != null)
-                    {
-                        try { Marshal.ReleaseComObject(slides); } catch { }
-                    }
+                    if (line.StartsWith(prefix)) return true;
+                    if (attemptNo <= 1 && line.StartsWith(legacyPrefix)) return true;
                 }
             }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// 指定したスライド内で、特定のテキストを含む図形を探す（1 階層のみ）。
-        /// </summary>
-        /// <param name="slide">スライド。</param>
-        /// <param name="searchText">検索するテキスト。</param>
-        /// <returns>該当図形。見つからない場合は null。呼び出し元で Marshal.ReleaseComObject すること。</returns>
-        private static PptShape FindShapeWithText(Slide slide, string searchText)
-        {
-            if (slide == null || string.IsNullOrEmpty(searchText))
-                return null;
-
-            PptShapes shapes = null;
-            try
-            {
-                shapes = slide.Shapes;
-                if (shapes == null)
-                    return null;
-
-                int count = shapes.Count;
-                for (int i = 1; i <= count; i++)
-                {
-                    PptShape sh = null;
-                    try
-                    {
-                        sh = shapes[i];
-                        if (sh.HasTextFrame == MsoTriState.msoTrue)
-                        {
-                            string text = null;
-                            try
-                            {
-                                var pptTf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
-                                text = pptTf.TextRange.Text;
-                            }
-                            catch { }
-                            if (text != null && text.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                PptShape result = sh;
-                                sh = null;
-                                return result;
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        if (sh != null)
-                        {
-                            try { Marshal.ReleaseComObject(sh); } catch { }
-                        }
-                    }
-                }
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
-            finally
-            {
-                if (shapes != null)
-                {
-                    try { Marshal.ReleaseComObject(shapes); } catch { }
-                }
-            }
-        }
-
-        /// <summary>
-        /// スライドのタイトル（またはスライド内のテキスト）に指定文字列を含むスライドを取得する。
-        /// </summary>
-        /// <param name="pres">プレゼンテーション。</param>
-        /// <param name="titlePart">検索する文字列（部分一致、大文字小文字区別なし）。</param>
-        /// <returns>該当スライド。見つからなければ null。呼び出し元で Marshal.ReleaseComObject すること。</returns>
-        private static Slide GetSlideByTitle(Presentation pres, string titlePart)
-        {
-            if (pres == null || string.IsNullOrEmpty(titlePart))
-                return null;
-            try
-            {
-                Slides slides = pres.Slides;
-                if (slides == null) return null;
-                try
-                {
-                    int count = slides.Count;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        Slide slide = null;
-                        try
-                        {
-                            slide = slides[i];
-                            PptShapes shapes = null;
-                            try
-                            {
-                                shapes = slide.Shapes;
-                                if (shapes == null) continue;
-                                int sc = shapes.Count;
-                                for (int j = 1; j <= sc; j++)
-                                {
-                                    PptShape sh = null;
-                                    try
-                                    {
-                                        sh = shapes[j];
-                                        if (sh.HasTextFrame != MsoTriState.msoTrue) continue;
-                                        string text = null;
-                                        try
-                                        {
-                                            var pptTf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
-                                            text = pptTf.TextRange.Text ?? "";
-                                        }
-                                        catch { continue; }
-                                        if (text.IndexOf(titlePart, StringComparison.OrdinalIgnoreCase) >= 0)
-                                        {
-                                            Slide result = slide;
-                                            slide = null;
-                                            return result;
-                                        }
-                                    }
-                                    finally
-                                    {
-                                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                                    }
-                                }
-                            }
-                            finally
-                            {
-                                if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-                            }
-                        }
-                        finally
-                        {
-                            if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-                        }
-                    }
-                    return null;
-                }
-                finally
-                {
-                    if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } }
-                }
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        // ----- Project 1: 基本操作 -----
-
-        private bool GradeProject1Task1()
-        {
-            Slide slide = null;
-            CustomLayout layout = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 4);
-                if (slide == null) return false;
-                try
-                {
-                    layout = slide.CustomLayout;
-                    if (layout == null) return false;
-                    string name = null;
-                    try
-                    {
-                        name = layout.Name ?? "";
-                    }
-                    catch { return false; }
-                    return name.IndexOf("表スライド", StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-                finally
-                {
-                    if (layout != null) { try { Marshal.ReleaseComObject(layout); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        private bool GradeProject1Task2()
-        {
-            // スライド2を複製 → 2枚目と3枚目が同じレイアウトであることを確認
-            Slides slides = null;
-            try
-            {
-                slides = _activePresentation.Slides;
-                if (slides == null || slides.Count < 3) return false;
-                Slide slide2 = null;
-                Slide slide3 = null;
-                try
-                {
-                    slide2 = slides[2];
-                    slide3 = slides[3];
-                    CustomLayout layout2 = null;
-                    CustomLayout layout3 = null;
-                    try
-                    {
-                        layout2 = slide2.CustomLayout;
-                        layout3 = slide3.CustomLayout;
-                        if (layout2 == null || layout3 == null) return false;
-                        string name2 = layout2.Name ?? "";
-                        string name3 = layout3.Name ?? "";
-                        return string.Equals(name2, name3, StringComparison.OrdinalIgnoreCase);
-                    }
-                    finally
-                    {
-                        if (layout2 != null) { try { Marshal.ReleaseComObject(layout2); } catch { } }
-                        if (layout3 != null) { try { Marshal.ReleaseComObject(layout3); } catch { } }
-                    }
-                }
-                finally
-                {
-                    if (slide2 != null) { try { Marshal.ReleaseComObject(slide2); } catch { } }
-                    if (slide3 != null) { try { Marshal.ReleaseComObject(slide3); } catch { } }
-                }
-            }
-            finally
-            {
-                if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } }
-            }
-        }
-
-        private bool GradeProject1Task3()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 3);
-                if (slide == null) return false;
-                try
-                {
-                    return slide.SlideShowTransition.Hidden == MsoTriState.msoTrue;
-                }
-                catch { return false; }
-            }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        /// <summary>Task 4 用: 現在のスライド ID 一覧で削除を検出し、3枚目が削除されていればフラグを立てる。監視タイマーから呼ぶ。</summary>
-        public static void CheckSlideDeletion(List<int> currentSlideIds)
-        {
-            if (currentSlideIds == null)
-                return;
-            if (_previousSlideIds.Count == 0)
-            {
-                _previousSlideIds = new List<int>(currentSlideIds);
-                return;
-            }
-            if (currentSlideIds.Count >= _previousSlideIds.Count)
-            {
-                _previousSlideIds = new List<int>(currentSlideIds);
-                return;
-            }
-            var deletedIds = _previousSlideIds.Except(currentSlideIds).ToList();
-            foreach (int deletedId in deletedIds)
-            {
-                int index = _previousSlideIds.IndexOf(deletedId);
-                if (index == 2)
-                {
-                    Task4PassedByThirdSlideDeletion = true;
-                    break;
-                }
-            }
-            _previousSlideIds = new List<int>(currentSlideIds);
-        }
-
-        /// <summary>Task 4 用: 状態をリセットする（アプリバー表示時やプロジェクト切り替え時に呼ぶ）。</summary>
-        public static void ResetTask4SlideDeletionState()
-        {
-            _previousSlideIds.Clear();
-            Task4PassedByThirdSlideDeletion = false;
-        }
-
-        private bool GradeProject1Task4()
-        {
-            if (Task4PassedByThirdSlideDeletion)
-                return true;
+            catch { }
             return false;
         }
 
-        private bool GradeProject1Task5()
+        private static bool FailsLogChecks(int projectId, int taskId, int attemptNo)
         {
-            // スライド2のレイアウトを「表スライド」に変更
-            Slide slide = null;
-            CustomLayout layout = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 2);
-                if (slide == null) return false;
-                try
-                {
-                    layout = slide.CustomLayout;
-                    if (layout == null) return false;
-                    string name = null;
-                    try
-                    {
-                        name = layout.Name ?? "";
-                    }
-                    catch { return false; }
-                    return name.IndexOf("表スライド", StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-                finally
-                {
-                    if (layout != null) { try { Marshal.ReleaseComObject(layout); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
+            string logPath = PPLogReader.GetLogFilePath();
+            if (!File.Exists(logPath))
+                return false;
 
-        private bool GradeProject1Task6()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 3);
-                if (slide == null) return false;
-                PptShapes shapes = null;
-                try
-                {
-                    shapes = slide.Shapes;
-                    if (shapes == null) return false;
-                    int count = shapes.Count;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        PptShape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            if (sh.HasTextFrame != MsoTriState.msoTrue) continue;
-                            try
-                            {
-                                var tf2 = sh.TextFrame2;
-                                if (tf2 == null) continue;
-                                var col = tf2.Column;
-                                if (col == null) continue;
-                                if (col.Number == 2)
-                                {
-                                    return true;
-                                }
-                            }
-                            catch { /* TextFrame2 not available */ }
-                        }
-                        finally
-                        {
-                            if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                        }
-                    }
-                    return false;
-                }
-                finally
-                {
-                    if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        private bool GradeProject1Task7()
-        {
-            // スライド1枚目の吹き出しに「教育者必見」と入力
-            Slide slide = null;
-            PptShape shape = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 1);
-                if (slide == null) return false;
-                shape = FindShapeWithText(slide, "教育者必見");
-                return shape != null;
-            }
-            finally
-            {
-                if (shape != null) { try { Marshal.ReleaseComObject(shape); } catch { } }
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        // ----- Project 2: アニメーション・画面切り替え -----
-
-        private bool GradeProject2Task1()
-        {
-            Slides slides = null;
-            try
-            {
-                slides = _activePresentation.Slides;
-                if (slides == null) return false;
-                int count = slides.Count;
-                if (count == 0) return false;
-                for (int i = 1; i <= count; i++)
-                {
-                    Slide slide = null;
-                    try
-                    {
-                        slide = slides[i];
-                        try
-                        {
-                            var effect = slide.SlideShowTransition.EntryEffect;
-                            // プッシュ 右から: ppEffectPushRight
-                            if (effect != PpEntryEffect.ppEffectPushRight) return false;
-                        }
-                        catch { return false; }
-                    }
-                    finally
-                    {
-                        if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-                    }
-                }
+            // [Op] は旧リボン上書きで RibbonCommand のみ出力。上書き廃止後は通常該当なし。将来 LogOperation を増やす場合は allowed を調整。
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "RibbonCommand" };
+            if (PPLogReader.HasDisallowedOperations(projectId, taskId, attemptNo, allowed))
                 return true;
-            }
-            catch { return false; }
-            finally
-            {
-                if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } }
-            }
-        }
-
-        private static PptShape Find3DModelShape(Slide slide)
-        {
-            if (slide == null) return null;
-            PptShapes shapes = null;
-            try
-            {
-                shapes = slide.Shapes;
-                if (shapes == null) return null;
-                int count = shapes.Count;
-                for (int i = 1; i <= count; i++)
-                {
-                    PptShape sh = null;
-                    try
-                    {
-                        sh = shapes[i];
-                        try
-                        {
-                            // msoLinked3DModel=31, mso3DModel=30
-                            var st = (MsoShapeType)sh.Type;
-                            if ((int)st == 31 || (int)st == 30) { PptShape r = sh; sh = null; return r; }
-                        }
-                        catch { }
-                        try
-                        {
-                            if (sh.Name != null && sh.Name.IndexOf("3D", StringComparison.OrdinalIgnoreCase) >= 0) { PptShape r = sh; sh = null; return r; }
-                        }
-                        catch { }
-                    }
-                    finally
-                    {
-                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                    }
-                }
-                return null;
-            }
-            catch { return null; }
-            finally
-            {
-                if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-            }
-        }
-
-        private bool GradeProject2Task4()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 4);
-                if (slide == null) return false;
-                PptShape modelShape = null;
-                try
-                {
-                    modelShape = Find3DModelShape(slide);
-                    if (modelShape == null) return false;
-                    TimeLine timeline = null;
-                    try
-                    {
-                        timeline = slide.TimeLine;
-                        if (timeline == null) return false;
-                        Sequence seq = null;
-                        try
-                        {
-                            seq = timeline.MainSequence;
-                            if (seq == null) return false;
-                            int count = seq.Count;
-                            for (int i = 1; i <= count; i++)
-                            {
-                                Effect eff = null;
-                                try
-                                {
-                                    eff = seq[i];
-                                    if (eff == null) continue;
-                                    try
-                                    {
-                                        PptShape effShape = eff.Shape;
-                                        if (effShape != null)
-                                        {
-                                            try
-                                            {
-                                                if (effShape.Id == modelShape.Id)
-                                                {
-                                                    var et = eff.EffectType;
-                                                    try
-                                                    {
-                                                        // ターンテーブル: msoAnimEffectTurntable または数値 (環境により要確認)
-                                                    if (et == (MsoAnimEffect)129) return true;
-                                                    }
-                                                    catch { }
-                                                    try { Marshal.ReleaseComObject(effShape); } catch { }
-                                                    break;
-                                                }
-                                            }
-                                            finally { if (effShape != null) try { Marshal.ReleaseComObject(effShape); } catch { } }
-                                        }
-                                    }
-                                    catch { }
-                                }
-                                finally
-                                {
-                                    if (eff != null) { try { Marshal.ReleaseComObject(eff); } catch { } }
-                                }
-                            }
-                            return false;
-                        }
-                        finally
-                        {
-                            if (seq != null) { try { Marshal.ReleaseComObject(seq); } catch { } }
-                        }
-                    }
-                    finally
-                    {
-                        if (timeline != null) { try { Marshal.ReleaseComObject(timeline); } catch { } }
-                    }
-                }
-                finally
-                {
-                    if (modelShape != null) { try { Marshal.ReleaseComObject(modelShape); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        // ----- Project 3: SmartArt・ズーム -----
-
-        private static PptShape FindSmartArtShape(Slide slide)
-        {
-            if (slide == null) return null;
-            PptShapes shapes = null;
-            try
-            {
-                shapes = slide.Shapes;
-                if (shapes == null) return null;
-                int count = shapes.Count;
-                for (int i = 1; i <= count; i++)
-                {
-                    PptShape sh = null;
-                    try
-                    {
-                        sh = shapes[i];
-                        if (sh.HasSmartArt == MsoTriState.msoTrue) { PptShape r = sh; sh = null; return r; }
-                    }
-                    finally
-                    {
-                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                    }
-                }
-                return null;
-            }
-            catch { return null; }
-            finally
-            {
-                if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-            }
-        }
-
-        private bool GradeProject3Task1()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 5);
-                if (slide == null) return false;
-                PptShape saShape = null;
-                try
-                {
-                    saShape = FindSmartArtShape(slide);
-                    if (saShape == null) return false;
-                    SmartArt smartArt = null;
-                    try
-                    {
-                        smartArt = saShape.SmartArt;
-                        if (smartArt == null) return false;
-                        SmartArtNodes nodes = null;
-                        try
-                        {
-                            nodes = smartArt.AllNodes;
-                            if (nodes == null) return false;
-                            var sb = new System.Text.StringBuilder();
-                            int nCount = nodes.Count;
-                            for (int j = 1; j <= nCount; j++)
-                            {
-                                SmartArtNode node = null;
-                                try
-                                {
-                                    node = nodes[j];
-                                    if (node != null)
-                                    {
-                                        try
-                                        {
-                                            var tf2 = node.TextFrame2;
-                                            if (tf2 != null && tf2.TextRange != null)
-                                            {
-                                                string t = tf2.TextRange.Text ?? "";
-                                                sb.Append(t);
-                                            }
-                                        }
-                                        catch { }
-                                    }
-                                }
-                                finally
-                                {
-                                    if (node != null) { try { Marshal.ReleaseComObject(node); } catch { } }
-                                }
-                            }
-                            string allText = sb.ToString();
-                            return allText.IndexOf("1F受付", StringComparison.OrdinalIgnoreCase) >= 0
-                                && allText.IndexOf("面接室", StringComparison.OrdinalIgnoreCase) >= 0;
-                        }
-                        finally
-                        {
-                            if (nodes != null) { try { Marshal.ReleaseComObject(nodes); } catch { } }
-                        }
-                    }
-                    finally
-                    {
-                        if (smartArt != null) { try { Marshal.ReleaseComObject(smartArt); } catch { } }
-                    }
-                }
-                finally
-                {
-                    if (saShape != null) { try { Marshal.ReleaseComObject(saShape); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        private bool GradeProject3Task2()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 5);
-                if (slide == null) return false;
-                PptShape saShape = null;
-                try
-                {
-                    saShape = FindSmartArtShape(slide);
-                    if (saShape == null) return false;
-                    SmartArt smartArt = null;
-                    try
-                    {
-                        smartArt = saShape.SmartArt;
-                        if (smartArt == null) return false;
-                        try
-                        {
-                            // 塗りつぶし アクセント5: SmartArt.Color と Application.SmartArtColors で比較
-                            var appliedColor = smartArt.Color;
-                            if (appliedColor == null) return false;
-                            if (_app == null) return false;
-                            try
-                            {
-                                var accent5 = _app.SmartArtColors[14]; // インデックスは環境により要確認
-                                if (accent5 != null && appliedColor.Equals(accent5)) return true;
-                            }
-                            catch { }
-                            for (int idx = 1; idx <= 20; idx++)
-                            {
-                                try
-                                {
-                                    var style = _app.SmartArtColors[idx];
-                                    if (style != null && appliedColor.Equals(style)) return true;
-                                }
-                                catch { break; }
-                            }
-                            return false;
-                        }
-                        catch { return false; }
-                    }
-                    finally
-                    {
-                        if (smartArt != null) { try { Marshal.ReleaseComObject(smartArt); } catch { } }
-                    }
-                }
-                finally
-                {
-                    if (saShape != null) { try { Marshal.ReleaseComObject(saShape); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        // ----- Project 4: 図の書式設定・配置 -----
-
-        private const double PositionTolerance = 2.0;
-
-        private static bool IsPictureShape(PptShape sh)
-        {
-            try
-            {
-                int t = (int)sh.Type;
-                return t == (int)MsoShapeType.msoPicture || t == 11;
-            }
-            catch { return false; }
-        }
-
-        private bool GradeProject4Task4()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByTitle(_activePresentation, "THANK YOU");
-                if (slide == null) return false;
-                PptShapes shapes = null;
-                try
-                {
-                    shapes = slide.Shapes;
-                    if (shapes == null) return false;
-                    PptShape rightmostPicture = null;
-                    float maxRight = float.MinValue;
-                    int count = shapes.Count;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        PptShape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            if (!IsPictureShape(sh)) continue;
-                            float left = (float)sh.Left;
-                            float width = (float)sh.Width;
-                            float right = left + width;
-                            if (right > maxRight)
-                            {
-                                maxRight = right;
-                                if (rightmostPicture != null) { try { Marshal.ReleaseComObject(rightmostPicture); } catch { } }
-                                rightmostPicture = sh;
-                                sh = null;
-                            }
-                        }
-                        finally
-                        {
-                            if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                        }
-                    }
-                    if (rightmostPicture == null) return false;
-                    try
-                    {
-                        Microsoft.Office.Interop.PowerPoint.PictureFormat pf = null;
-                        try
-                        {
-                            pf = (Microsoft.Office.Interop.PowerPoint.PictureFormat)rightmostPicture.PictureFormat;
-                            if (pf == null) return false;
-                            float cr = pf.CropRight;
-                            float cl = pf.CropLeft;
-                            float ct = pf.CropTop;
-                            float cb = pf.CropBottom;
-                            return cr > 0 || cl > 0 || ct > 0 || cb > 0;
-                        }
-                        finally
-                        {
-                            if (pf != null) { try { Marshal.ReleaseComObject(pf); } catch { } }
-                        }
-                    }
-                    finally
-                    {
-                        if (rightmostPicture != null) { try { Marshal.ReleaseComObject(rightmostPicture); } catch { } }
-                    }
-                }
-                finally
-                {
-                    if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        private bool GradeProject4Task5()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 5);
-                if (slide == null) return false;
-                PptShapes shapes = null;
-                try
-                {
-                    shapes = slide.Shapes;
-                    if (shapes == null) return false;
-                    PptShape leftPic = null;
-                    PptShape rightPic = null;
-                    float minLeft = float.MaxValue;
-                    float maxLeft = float.MinValue;
-                    int count = shapes.Count;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        PptShape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            if (!IsPictureShape(sh)) continue;
-                            float left = (float)sh.Left;
-                            if (left < minLeft)
-                            {
-                                minLeft = left;
-                                if (leftPic != null) { try { Marshal.ReleaseComObject(leftPic); } catch { } }
-                                leftPic = sh;
-                                sh = null;
-                            }
-                        }
-                        finally
-                        {
-                            if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                        }
-                    }
-                    for (int i = 1; i <= count; i++)
-                    {
-                        PptShape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            if (!IsPictureShape(sh)) continue;
-                            float left = (float)sh.Left;
-                            if (left > maxLeft)
-                            {
-                                maxLeft = left;
-                                if (rightPic != null) { try { Marshal.ReleaseComObject(rightPic); } catch { } }
-                                rightPic = sh;
-                                sh = null;
-                            }
-                        }
-                        finally
-                        {
-                            if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                        }
-                    }
-                    if (leftPic == null || rightPic == null || leftPic.Id == rightPic.Id) return false;
-                    try
-                    {
-                        float leftTop = (float)leftPic.Top;
-                        float rightTop = (float)rightPic.Top;
-                        return Math.Abs(rightTop - leftTop) <= PositionTolerance;
-                    }
-                    finally
-                    {
-                        if (leftPic != null) { try { Marshal.ReleaseComObject(leftPic); } catch { } }
-                        if (rightPic != null) { try { Marshal.ReleaseComObject(rightPic); } catch { } }
-                    }
-                }
-                finally
-                {
-                    if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        private bool GradeProject4Task6()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 3);
-                if (slide == null) return false;
-                PptShapes shapes = null;
-                try
-                {
-                    shapes = slide.Shapes;
-                    if (shapes == null) return false;
-                    PptShape shSmart = null, shTablet = null, shMonitor = null;
-                    int count = shapes.Count;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        PptShape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            string name = null;
-                            string alt = null;
-                            try { name = sh.Name ?? ""; } catch { }
-                            try { alt = sh.AlternativeText ?? ""; } catch { }
-                            string combined = name + " " + alt;
-                            if (combined.IndexOf("スマホ", StringComparison.OrdinalIgnoreCase) >= 0) { shSmart = sh; sh = null; }
-                            else if (combined.IndexOf("タブレット", StringComparison.OrdinalIgnoreCase) >= 0) { shTablet = sh; sh = null; }
-                            else if (combined.IndexOf("モニター", StringComparison.OrdinalIgnoreCase) >= 0) { shMonitor = sh; sh = null; }
-                        }
-                        finally
-                        {
-                            if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                        }
-                    }
-                    if (shSmart == null || shTablet == null || shMonitor == null) return false;
-                    try
-                    {
-                        int zSmart = shSmart.ZOrderPosition;
-                        int zTablet = shTablet.ZOrderPosition;
-                        int zMonitor = shMonitor.ZOrderPosition;
-                        return zSmart > zTablet && zTablet > zMonitor;
-                    }
-                    finally
-                    {
-                        if (shSmart != null) { try { Marshal.ReleaseComObject(shSmart); } catch { } }
-                        if (shTablet != null) { try { Marshal.ReleaseComObject(shTablet); } catch { } }
-                        if (shMonitor != null) { try { Marshal.ReleaseComObject(shMonitor); } catch { } }
-                    }
-                }
-                finally
-                {
-                    if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        // ----- Project 9: グラフ・ハイパーリンク -----
-
-        private const int XlBarClustered = 57;
-
-        private bool GradeProject9Task1()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 2);
-                if (slide == null) return false;
-                PptShapes shapes = null;
-                try
-                {
-                    shapes = slide.Shapes;
-                    if (shapes == null) return false;
-                    int count = shapes.Count;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        PptShape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            if (sh.HasChart != MsoTriState.msoTrue) continue;
-                            Chart chart = null;
-                            try
-                            {
-                                chart = sh.Chart;
-                                if (chart == null) continue;
-                                try
-                                {
-                                    int ct = (int)chart.ChartType;
-                                    return ct == XlBarClustered;
-                                }
-                                finally
-                                {
-                                    if (chart != null) { try { Marshal.ReleaseComObject(chart); } catch { } }
-                                }
-                            }
-                            catch { continue; }
-                        }
-                        finally
-                        {
-                            if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
-                        }
-                    }
-                    return false;
-                }
-                finally
-                {
-                    if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
-                }
-            }
-            catch { return false; }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
-        }
-
-        private const string ExpectedHyperlinkAddressTask9_6 = "https://www.jica.go.jp/activities/issues/natural_env/index.html";
-
-        private bool GradeProject9Task6()
-        {
-            Slide slide = null;
-            try
-            {
-                slide = GetSlideByNumber(_activePresentation, 1);
-                if (slide == null) return false;
-                PptShape shape = null;
-                try
-                {
-                    shape = FindShapeWithText(slide, "お問い合わせ");
-                    if (shape == null) return false;
-                    try
-                    {
-                        Microsoft.Office.Interop.PowerPoint.TextFrame tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)shape.TextFrame;
-                        if (tf == null) return false;
-                        TextRange tr = null;
-                        try
-                        {
-                            tr = tf.TextRange;
-                            if (tr == null) return false;
-                            ActionSettings acts = null;
-                            try
-                            {
-                                acts = tr.ActionSettings;
-                                if (acts == null) return false;
-                                ActionSetting act = null;
-                                try
-                                {
-                                    act = acts[PpMouseActivation.ppMouseClick];
-                                    if (act == null) return false;
-                                    if (act.Action != PpActionType.ppActionHyperlink) return false;
-                                    Hyperlink hyp = null;
-                                    try
-                                    {
-                                        hyp = act.Hyperlink;
-                                        if (hyp != null)
-                                        {
-                                            string addr = (hyp.Address ?? "").Trim();
-                                            if (string.Equals(addr, ExpectedHyperlinkAddressTask9_6, StringComparison.OrdinalIgnoreCase))
-                                                return true;
-                                        }
-                                    }
-                                    finally
-                                    {
-                                        if (hyp != null) { try { Marshal.ReleaseComObject(hyp); } catch { } }
-                                    }
-                                }
-                                finally
-                                {
-                                    if (act != null) { try { Marshal.ReleaseComObject(act); } catch { } }
-                                }
-                            }
-                            finally
-                            {
-                                if (acts != null) { try { Marshal.ReleaseComObject(acts); } catch { } }
-                            }
-                            try
-                            {
-                                int r = 1;
-                                while (true)
-                                {
-                                    TextRange run = null;
-                                    try
-                                    {
-                                        run = tr.Runs(r, 1);
-                                        if (run == null) break;
-                                        ActionSettings runActs = null;
-                                        try
-                                        {
-                                            runActs = run.ActionSettings;
-                                            if (runActs == null) { r++; continue; }
-                                            ActionSetting runAct = null;
-                                            try
-                                            {
-                                                runAct = runActs[PpMouseActivation.ppMouseClick];
-                                                if (runAct != null && runAct.Action == PpActionType.ppActionHyperlink)
-                                                {
-                                                    Hyperlink runHyp = null;
-                                                    try
-                                                    {
-                                                        runHyp = runAct.Hyperlink;
-                                                        if (runHyp != null)
-                                                        {
-                                                            string addr = (runHyp.Address ?? "").Trim();
-                                                            if (string.Equals(addr, ExpectedHyperlinkAddressTask9_6, StringComparison.OrdinalIgnoreCase))
-                                                                return true;
-                                                        }
-                                                    }
-                                                    finally
-                                                    {
-                                                        if (runHyp != null) { try { Marshal.ReleaseComObject(runHyp); } catch { } }
-                                                    }
-                                                }
-                                            }
-                                            finally
-                                            {
-                                                if (runAct != null) { try { Marshal.ReleaseComObject(runAct); } catch { } }
-                                            }
-                                        }
-                                        finally
-                                        {
-                                            if (runActs != null) { try { Marshal.ReleaseComObject(runActs); } catch { } }
-                                        }
-                                    }
-                                    finally
-                                    {
-                                        if (run != null) { try { Marshal.ReleaseComObject(run); } catch { } }
-                                    }
-                                    r++;
-                                }
-                            }
-                            catch { }
-                            return false;
-                        }
-                        finally
-                        {
-                            if (tr != null) { try { Marshal.ReleaseComObject(tr); } catch { } }
-                        }
-                    }
-                    finally
-                    {
-                        if (shape != null) { try { Marshal.ReleaseComObject(shape); } catch { } }
-                    }
-                }
-                catch { return false; }
-            }
-            finally
-            {
-                if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-            }
+            
+            return false;
         }
 
         public void Dispose()
@@ -1386,24 +412,27 @@ namespace MOS_PowerPoint_app
                 return;
             if (disposing)
             {
-                try
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
                 {
-                    if (_activePresentation != null)
+                    try
                     {
-                        Marshal.ReleaseComObject(_activePresentation);
-                        _activePresentation = null;
+                        if (_activePresentation != null)
+                        {
+                            Marshal.ReleaseComObject(_activePresentation);
+                            _activePresentation = null;
+                        }
                     }
-                }
-                catch { }
-                try
-                {
-                    if (_app != null)
+                    catch { }
+                    try
                     {
-                        Marshal.ReleaseComObject(_app);
-                        _app = null;
+                        if (_app != null)
+                        {
+                            Marshal.ReleaseComObject(_app);
+                            _app = null;
+                        }
                     }
+                    catch { }
                 }
-                catch { }
             }
             _disposed = true;
         }

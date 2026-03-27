@@ -17,8 +17,12 @@ namespace MOS_PowerPoint_app.Views
     /// </summary>
     public partial class ResultWindow : Window
     {
+        private Dictionary<int, bool[]> _projectTaskCompletedStates; // 解答済み状態を保持
         private Dictionary<int, bool[]> _projectTaskFlaggedStates; // 「あとで見直す」フラグ状態
         private Dictionary<int, bool[]> _projectTaskViewedStates; // 閲覧状態（未読問題の追跡用）
+        private Dictionary<int, List<bool>> _allProjectScoringResults; // 方式A: 結果表示時に実行した全プロジェクトの採点結果（projectId → タスクごと正否）
+        private Dictionary<int, List<bool>> _initialProjectScoringResults; // 初回採点結果の保持
+        private HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private int _groupId = 1;
         private List<ResultProjectInfo> _allProjects; // すべてのプロジェクトを保持
         private bool _showingWrongOnly = false; // フィルター状態
@@ -26,15 +30,20 @@ namespace MOS_PowerPoint_app.Views
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
         public Action OnEndRequested { get; set; } // 終了ボタン押下時（PowerPoint終了・メイン画面に戻る）
 
-        public ResultWindow(Dictionary<int, bool[]> projectTaskFlaggedStates = null, 
+        public ResultWindow(Dictionary<int, bool[]> projectTaskCompletedStates = null,
+                           Dictionary<int, bool[]> projectTaskFlaggedStates = null, 
                            Dictionary<int, bool[]> projectTaskViewedStates = null, 
-                           int groupId = 1)
+                           int groupId = 1,
+                           Dictionary<int, List<bool>> allProjectScoringResults = null)
         {
             InitializeComponent();
+            _projectTaskCompletedStates = projectTaskCompletedStates ?? new Dictionary<int, bool[]>();
             _projectTaskFlaggedStates = projectTaskFlaggedStates ?? new Dictionary<int, bool[]>();
             _projectTaskViewedStates = projectTaskViewedStates ?? new Dictionary<int, bool[]>();
+            _allProjectScoringResults = allProjectScoringResults ?? new Dictionary<int, List<bool>>();
+            _initialProjectScoringResults = CloneScoringResults(_allProjectScoringResults);
             _groupId = groupId;
-            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, groupId: {_groupId}");
+            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}");
             
             // ウィンドウが読み込まれた後にデータを読み込む（非同期）
             this.Loaded += ResultWindow_Loaded;
@@ -87,59 +96,15 @@ namespace MOS_PowerPoint_app.Views
                     {
                         WrongCountTextBlock.Text = "0";
                         TotalCountTextBlock.Text = $"/ {fallbackTotal}";
-                        AccuracyTextBlock.Text = "100%";
+                        CorrectCountTextBlock.Text = $"{fallbackTotal}";
+                        CorrectTotalCountTextBlock.Text = $"/ {fallbackTotal}";
+                        AccuracyTextBlock.Text = "初回 100.0% / 修正後 100.0%";
                     });
                     await LoadProjectDataAsync();
                     return;
                 }
 
-                int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
-                
-                // 全タスクを対象に✖の問題数を計算（「あとで見直す」フラグ + 未読問題）
-                int totalWrongTasks = 0;
-                
-                foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
-                {
-                    if (project.Tasks == null) continue;
-                    
-                    // 「あとで見直す」フラグ状態と閲覧状態を取得
-                    bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) 
-                        ? _projectTaskFlaggedStates[project.ProjectId] 
-                        : new bool[0];
-                    bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) 
-                        ? _projectTaskViewedStates[project.ProjectId] 
-                        : new bool[0];
-                    
-                    foreach (var task in project.Tasks)
-                    {
-                        // タスクIDは1始まり、配列は0始まりなので -1
-                        int arrayIndex = task.TaskId - 1;
-                        
-                        bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
-                        bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
-                        
-                        // 「あとで見直す」または未読の場合は✖としてカウント
-                        if (isFlagged || isUnread)
-                        {
-                            totalWrongTasks++;
-                        }
-                    }
-                }
-
-                // 正答率を計算（正答数 = 総数 - ✖数）
-                int correctCount = totalTasks - totalWrongTasks;
-                double accuracy = totalTasks > 0 ? (double)correctCount / totalTasks * 100.0 : 0.0;
-                int accuracyPercent = (int)Math.Round(accuracy);
-
-                System.Diagnostics.Debug.WriteLine($"[ResultWindow] Total tasks: {totalTasks}, Total ✖ tasks: {totalWrongTasks}, Accuracy: {accuracyPercent}%");
-
-                // UIスレッドで更新
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    WrongCountTextBlock.Text = $"{totalWrongTasks}";
-                    TotalCountTextBlock.Text = $"/ {totalTasks}";
-                    AccuracyTextBlock.Text = $"{accuracyPercent}%";
-                });
+                int latestWrongTasks = UpdateSummary(projectData);
 
                 // 結果を表示（非同期で読み込む）
                 await LoadProjectDataAsync();
@@ -149,7 +114,7 @@ namespace MOS_PowerPoint_app.Views
                 {
                     try
                     {
-                        await Task.Run(() => ExportScoringCsvToDesktop(totalWrongTasks, _allProjects));
+                        await Task.Run(() => ExportScoringCsvToDesktop(latestWrongTasks, _allProjects));
                         _csvExported = true;
                     }
                     catch (Exception csvEx)
@@ -226,7 +191,11 @@ namespace MOS_PowerPoint_app.Views
                     {
                         foreach (var task in project.Tasks)
                         {
-                            if (task.ResultMark == "✖")
+                            if (task.ResultMark == "〇")
+                            {
+                                task.ResultColor = Brushes.Green; // 〇は緑色に設定
+                            }
+                            else if (task.ResultMark == "✖")
                             {
                                 task.ResultColor = Brushes.Red;
                             }
@@ -298,7 +267,10 @@ namespace MOS_PowerPoint_app.Views
                 {
                     foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
                     {
-                        // 「あとで見直す」フラグ状態と閲覧状態を取得
+                        // 各状態を取得
+                        bool[] completedStates = _projectTaskCompletedStates.ContainsKey(project.ProjectId) 
+                            ? _projectTaskCompletedStates[project.ProjectId] 
+                            : new bool[0];
                         bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) 
                             ? _projectTaskFlaggedStates[project.ProjectId] 
                             : new bool[0];
@@ -314,19 +286,32 @@ namespace MOS_PowerPoint_app.Views
                                 // タスクIDは1始まり、配列は0始まりなので -1
                                 int arrayIndex = task.TaskId - 1;
                                 
+                                bool isCompleted = arrayIndex >= 0 && arrayIndex < completedStates.Length && completedStates[arrayIndex];
                                 bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
                                 bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                                 
                                 string resultMark;
-                                if (isUnread)
+                                // 方式A: 全プロジェクト採点結果がある場合はそれを優先（あとで見直すは従来どおり✖）
+                                bool? scoringPassed = null;
+                                if (_allProjectScoringResults != null && _allProjectScoringResults.ContainsKey(project.ProjectId))
+                                {
+                                    var scoreList = _allProjectScoringResults[project.ProjectId];
+                                    if (arrayIndex >= 0 && arrayIndex < scoreList.Count)
+                                        scoringPassed = scoreList[arrayIndex];
+                                }
+                                if (scoringPassed.HasValue)
+                                {
+                                    resultMark = isFlagged ? "✖" : (scoringPassed.Value ? "〇" : "✖");
+                                }
+                                else if (isUnread)
                                 {
                                     // 未閲覧: 最初の未閲覧のみ「時間切れ」、以降は空白
                                     resultMark = (project.ProjectId == firstProjectId && task.TaskId == firstTaskId) ? "時間切れ" : "";
                                 }
                                 else
                                 {
-                                    // 閲覧済み: フラグありなら✖、なしなら空白
-                                    resultMark = isFlagged ? "✖" : "";
+                                    // 閲覧済み: フラグありなら✖、完了かつフラグなしなら〇
+                                    resultMark = (isCompleted && !isFlagged) ? "〇" : "✖";
                                 }
                                 
                                 return new ResultTaskInfo
@@ -336,7 +321,8 @@ namespace MOS_PowerPoint_app.Views
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
                                     ResultMark = resultMark,
-                                    ResultColor = null // 後でUIスレッドで設定
+                                    ResultColor = null, // 後でUIスレッドで設定
+                                    IsInitiallyWrong = _initialWrongTaskKeys.Contains(GetTaskKey(project.ProjectId, task.TaskId))
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
                         };
@@ -529,6 +515,16 @@ namespace MOS_PowerPoint_app.Views
                 {
                     try
                     {
+                        // AppBarWindowに結果画面からの遷移フラグと参照をセット
+                        var appBarWindow = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
+                        if (appBarWindow != null)
+                        {
+                            appBarWindow.SetFromResultWindow(true);
+                            appBarWindow.SetResultWindow(this);
+                            appBarWindow.SetInitialWrongTaskKeys(_initialWrongTaskKeys);
+                            appBarWindow.TryPrepareRetryAttemptFromResult(taskInfo.ProjectId, taskInfo.TaskId);
+                        }
+
                         // UI更新の機会を与える
                         await Task.Delay(50);
                         
@@ -544,6 +540,129 @@ namespace MOS_PowerPoint_app.Views
                     }
                 }
             }
+        }
+
+        public void ApplyRetryScoreResult(int projectId, int taskId, bool? passed, bool isError)
+        {
+            if (isError || !passed.HasValue)
+                return;
+
+            if (!_allProjectScoringResults.ContainsKey(projectId))
+                _allProjectScoringResults[projectId] = new List<bool>();
+            var scoreList = _allProjectScoringResults[projectId];
+            int index = taskId - 1;
+            while (scoreList.Count <= index)
+                scoreList.Add(false);
+            scoreList[index] = passed.Value;
+
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    ProjectData projectData = await LoadProjectDataModelAsync();
+                    if (projectData != null)
+                    {
+                        UpdateSummary(projectData);
+                        await LoadProjectDataAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] ApplyRetryScoreResult error: {ex.Message}");
+                }
+            });
+        }
+
+        private async Task<ProjectData> LoadProjectDataModelAsync()
+        {
+            return await Task.Run(() =>
+            {
+                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
+                if (!File.Exists(jsonPath))
+                {
+                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
+                }
+                if (!File.Exists(jsonPath))
+                    return null;
+                string jsonContent = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);
+                return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
+            });
+        }
+
+        private int UpdateSummary(ProjectData projectData)
+        {
+            int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
+            int initialWrong = CalculateWrongCount(projectData, _initialProjectScoringResults, true);
+            int latestWrong = CalculateWrongCount(projectData, _allProjectScoringResults, false);
+            CaptureInitialWrongTasks(projectData);
+
+            int latestCorrect = totalTasks - latestWrong;
+            double initialAccuracy = totalTasks > 0 ? (double)(totalTasks - initialWrong) / totalTasks * 100.0 : 0.0;
+            double latestAccuracy = totalTasks > 0 ? (double)latestCorrect / totalTasks * 100.0 : 0.0;
+
+            Dispatcher.Invoke(() =>
+            {
+                WrongCountTextBlock.Text = $"{latestWrong}";
+                TotalCountTextBlock.Text = $"/ {totalTasks}";
+                CorrectCountTextBlock.Text = $"{latestCorrect}";
+                CorrectTotalCountTextBlock.Text = $"/ {totalTasks}";
+                AccuracyTextBlock.Text = $"初回 {initialAccuracy:F1}% / 修正後 {latestAccuracy:F1}%";
+            });
+            return latestWrong;
+        }
+
+        private int CalculateWrongCount(ProjectData projectData, Dictionary<int, List<bool>> scoringResults, bool collectInitialWrong)
+        {
+            int totalWrongTasks = 0;
+            bool useScoringResults = scoringResults != null && scoringResults.Count > 0;
+            foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
+            {
+                if (project.Tasks == null) continue;
+                bool[] completedStates = _projectTaskCompletedStates.ContainsKey(project.ProjectId) ? _projectTaskCompletedStates[project.ProjectId] : new bool[0];
+                bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) ? _projectTaskFlaggedStates[project.ProjectId] : new bool[0];
+                bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) ? _projectTaskViewedStates[project.ProjectId] : new bool[0];
+                List<bool> scoreList = useScoringResults && scoringResults.ContainsKey(project.ProjectId) ? scoringResults[project.ProjectId] : null;
+                foreach (var task in project.Tasks)
+                {
+                    int arrayIndex = task.TaskId - 1;
+                    bool isCompleted = arrayIndex >= 0 && arrayIndex < completedStates.Length && completedStates[arrayIndex];
+                    bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
+                    bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
+                    bool isWrong;
+                    if (scoreList != null && arrayIndex >= 0 && arrayIndex < scoreList.Count)
+                        isWrong = isFlagged || !scoreList[arrayIndex];
+                    else
+                        isWrong = isFlagged || isUnread || !isCompleted;
+
+                    if (isWrong)
+                    {
+                        totalWrongTasks++;
+                        if (collectInitialWrong)
+                            _initialWrongTaskKeys.Add(GetTaskKey(project.ProjectId, task.TaskId));
+                    }
+                }
+            }
+            return totalWrongTasks;
+        }
+
+        private void CaptureInitialWrongTasks(ProjectData projectData)
+        {
+            if (_initialWrongTaskKeys.Count > 0) return;
+            CalculateWrongCount(projectData, _initialProjectScoringResults, true);
+        }
+
+        private static Dictionary<int, List<bool>> CloneScoringResults(Dictionary<int, List<bool>> source)
+        {
+            var clone = new Dictionary<int, List<bool>>();
+            if (source == null) return clone;
+            foreach (var kvp in source)
+                clone[kvp.Key] = kvp.Value != null ? new List<bool>(kvp.Value) : new List<bool>();
+            return clone;
+        }
+
+        private static string GetTaskKey(int projectId, int taskId)
+        {
+            return $"{projectId}-{taskId}";
         }
     }
 
@@ -561,5 +680,6 @@ namespace MOS_PowerPoint_app.Views
         public int TaskId { get; set; }
         public string ResultMark { get; set; }
         public Brush ResultColor { get; set; }
+        public bool IsInitiallyWrong { get; set; }
     }
 }

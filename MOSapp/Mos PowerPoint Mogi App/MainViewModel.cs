@@ -269,7 +269,10 @@ namespace MOS_PowerPoint_app
 
                 try
                 {
-                    // PowerPointアプリケーションを取得または作成（メインスレッドで同期的に実行＝体感速度優先）
+                    // プロジェクト起動前にタスク情報をクリアし、アドイン側の古いスナップショットとの比較を防止
+                    Libraries.PPLogReader.ClearCurrentTaskFile();
+
+                    // PowerPointアプリケーションを取得または作成
                     PowerPointApp pptApp = null;
                     try
                     {
@@ -368,7 +371,10 @@ namespace MOS_PowerPoint_app
                     bool passed = false;
                     try
                     {
-                        passed = grader.GradeTask(CurrentProject.ProjectId, task.TaskId);
+                        // 1タスクごとに current_task を更新し、VSTO 側の snapshot が追いつくのを短時間待つ。
+                        int attemptNo = Libraries.PPTaskAttemptRegistry.GetAttempt(CurrentProject.ProjectId, task.TaskId);
+                        grader.StartTaskAndWaitForSnapshot(CurrentProject.ProjectId, task.TaskId, attemptNo, 2000, 50);
+                        passed = grader.GradeTask(CurrentProject.ProjectId, task.TaskId, attemptNo);
                     }
                     catch
                     {
@@ -398,16 +404,21 @@ namespace MOS_PowerPoint_app
         private void ExecuteResetAllProjects(object parameter)
         {
             var result = MessageBox.Show(
-                "すべてのPowerPointプロジェクト（演習・応用編の全プロジェクト）をテンプレートからリセットします。\n現在の変更内容は失われます。実行しますか？",
+                "すべてのPowerPointプロジェクトをテンプレートからリセットします。\n現在の変更内容は失われます。実行しますか？",
                 "すべてをリセットする",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
 
+            try { Libraries.PPTaskAttemptRegistry.ClearAll(); } catch { }
+
+            // 全プロジェクトリセット時のみ採点用証跡も消す（単体リセットでは残す）
+            try { Libraries.PPLogReader.ClearTaskEvidence(); } catch { }
+
             var errors = new System.Collections.Generic.List<string>();
             int done = 0;
-            foreach (int groupId in new[] { 1, 3 })
+            foreach (int groupId in new[] { 1 }) // Tab1のみリセットし、Tab3（応用編）は除外
             {
                 for (int projectId = 1; projectId <= 11; projectId++)
                 {
