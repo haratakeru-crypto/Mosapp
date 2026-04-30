@@ -588,7 +588,7 @@ namespace MOS_PowerPoint_app.Views
             }
         }
 
-        /// <summary>プロジェクト切替が 300ms 以上かかる場合のみ「準備中」オーバーレイを表示する（速い遷移ではチラつきを抑える）。</summary>
+        /// <summary>プレゼンを開き直す処理が 300ms 以上かかる場合のみ「準備中」オーバーレイを表示する（速い遷移ではチラつきを抑える）。</summary>
         private const int PrepareProjectOverlayDelayMs = 300;
 
         private static Window CreatePrepareProjectOverlayWindow()
@@ -613,7 +613,7 @@ namespace MOS_PowerPoint_app.Views
                     {
                         new TextBlock
                         {
-                            Text = "次のプロジェクトを準備しています。\nしばらくお待ちください...",
+                            Text = "プロジェクトを開いています。\nしばらくお待ちください...",
                             FontSize = 14,
                             TextWrapping = TextWrapping.Wrap,
                             TextAlignment = TextAlignment.Center,
@@ -2085,7 +2085,7 @@ namespace MOS_PowerPoint_app.Views
         private async Task MoveToNextProjectAsync()
         {
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
-            // 最終プロジェクトで「次」は「すべて完了」になるため、「次のプロジェクトを準備」オーバーレイは出さない
+            // 最終プロジェクトで「次」は「すべて完了」になるため、プレゼン準備オーバーレイは出さない
             if (_currentProjectId >= maxProjectId)
                 await MoveToNextProjectCoreAsync();
             else
