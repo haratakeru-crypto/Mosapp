@@ -1,0 +1,155 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asmv1:assembly xsi:schemaLocation="urn:schemas-microsoft-com:asm.v1 assembly.adaptive.xsd" manifestVersion="1.0" xmlns:asmv1="urn:schemas-microsoft-com:asm.v1" xmlns="urn:schemas-microsoft-com:asm.v2" xmlns:asmv2="urn:schemas-microsoft-com:asm.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:co.v1="urn:schemas-microsoft-com:clickonce.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns:co.v2="urn:schemas-microsoft-com:clickonce.v2">
+  <asmv1:assemblyIdentity name="MOSExcelMogiApp.exe" version="1.0.0.7" publicKeyToken="e7221601514f5ac7" language="neutral" processorArchitecture="amd64" type="win32" />
+  <application />
+  <entryPoint>
+    <assemblyIdentity name="MOSExcelMogiApp" version="1.0.0.0" language="neutral" processorArchitecture="amd64" />
+    <commandLine file="MOSExcelMogiApp.exe" parameters="" />
+  </entryPoint>
+  <trustInfo>
+    <security>
+      <applicationRequestMinimum>
+        <PermissionSet Unrestricted="true" ID="Custom" SameSite="site" />
+        <defaultAssemblyRequest permissionSetReference="Custom" />
+      </applicationRequestMinimum>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          UAC マニフェスト オプション
+          Windows のユーザー アカウント制御のレベルを変更するには、
+          requestedExecutionLevel ノードを以下のいずれかで置換します。
+
+        <requestedExecutionLevel  level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel  level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel  level="highestAvailable" uiAccess="false" />
+
+         下位互換性を保つためにファイルおよびレジストリの仮想化を使用する場合、
+         requestedExecutionLevel ノードを削除します。
+    -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentOS>
+      <osVersionInfo>
+        <os majorVersion="5" minorVersion="1" buildNumber="2600" servicePackMajor="0" />
+      </osVersionInfo>
+    </dependentOS>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="preRequisite" allowDelayedBinding="true">
+      <assemblyIdentity name="Microsoft.Windows.CommonLanguageRuntime" version="4.0.30319.0" />
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="DocumentFormat.OpenXml.dll" size="6354560">
+      <assemblyIdentity name="DocumentFormat.OpenXml" version="3.3.0.0" publicKeyToken="8FB06CB64D019A17" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>KYFqT8oe4B3u+8/Hd/tXtxYb7KGmzyHumtDzOV686jA=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="DocumentFormat.OpenXml.Framework.dll" size="471680">
+      <assemblyIdentity name="DocumentFormat.OpenXml.Framework" version="3.3.0.0" publicKeyToken="8FB06CB64D019A17" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>FyRclk7sFcDyGNsOwwaJsBRcC99yu27QRdM5KhanrDI=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="MOSExcelMogiApp.exe" size="487848">
+      <assemblyIdentity name="MOSExcelMogiApp" version="1.0.0.0" language="neutral" processorArchitecture="amd64" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>iXMHwG7OGkiD3PlStOGv94zH2L3rGxYfHn2gS3CtfyA=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Newtonsoft.Json.dll" size="711952">
+      <assemblyIdentity name="Newtonsoft.Json" version="13.0.0.0" publicKeyToken="30AD4FE6B2A6AEED" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>4eJ697B+7t9c5xqSVfBCKBam/FhJpIPGcU4bRyBE+p0=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <file name="Assets\config.json" size="5125">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>P9IBZqxCZKxVkT88TuJUJ6MIPlBLw+d0oreKRg3aSxA=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="MOSExcelMogiApp.exe.config" size="187">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>+CM46OnHRrXZXNLMx7+U3V3iubiYL//d8hGOR13lDhU=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\CSV\解答手順あり模擬試験①問題文.csv" size="18558">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>spemExg3r/NuLk054H3nZ92VXNI5cJ9C27ZoMIAPCM4=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\JSON\MOS演習問題文一覧.json" size="14309">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>W5WEno/bIY2tFQdDypb+pktI+gM3Yppou6fhMUlAj6w=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\JSON\MOS模擬アプリ問題文一覧.json" size="14307">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>UxFWpbhrFQf5p6qGZhkWi9uK23IuVcFwYpjfKaYatac=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\JSON\MOS模擬試験①問題文一覧.json" size="11583">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>JI2685GOqxI8aXaH2ftEtqhGms7j8Vk6IsJEWqg0WDg=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\JSON\MOS模擬試験②問題文一覧.json" size="11333">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>aMZvTTjAeeYNCvSIHYtWRL+Ff4q1/S3R+l47ACCCyeI=</dsig:DigestValue>
+    </hash>
+  </file>
+<publisherIdentity name="CN=PC425\kouza" issuerKeyHash="678d563d268fde463510e9b4f6095a3167573ca9" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>cqCbAkGwyN5TrPZhRq6a1x/inBuN/eLnL98PUJRt1uk=</DigestValue></Reference></SignedInfo><SignatureValue>tnkMNghDv92gaBioxiqftCiXZG9V36D4ciVygGPtO6LX5HUtZXE973zjnUAT6jzC2TX5/LkMkI1TzVv8DEhAKCKUq4PXoZ85hA5+3ELVIg8gPl6NwhWDyLMJWHmqX/yLzQuo4eR78hHCEvCg+XOFShaNqpuVVNiqlR2oMJyf72U=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>z/21Ockh9p9NSGh0DvUk7jX+K9APlqaApvl1sSxrZw9CR2I6iunTrv4urKdPpa1ImXQHizbeX3iQFmxhZ99ZV49F56ulPPqdgE+caZC752O2SwHmYqDo7CAxDjVHhWKfiDqBWAfYqvO1UZ1Hm+keC96F/x6NKYuxUByKCnVSmyU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="e9d66d94500fdf2fe7e2fd8d1b9ce21fd79aae4661f6ac53dec8b041029ba072" Description="" Url=""><as:assemblyIdentity name="MOSExcelMogiApp.exe" version="1.0.0.7" publicKeyToken="e7221601514f5ac7" language="neutral" processorArchitecture="amd64" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=PC425\kouza</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>/bVR9Ol631WKW4Vbe0rkawHGKvxQYSCGz0hnx8SSSgU=</DigestValue></Reference></SignedInfo><SignatureValue>UdmSBoDm8MJOfg7zsWdVYg6kweh1DdRERWoJHU7fvAEBq50CF9Uvi48lm5YQ1YPlqSrl88WwKAB1BeafsfmD1W7uUWPWihfLBqnwEjssTmrJ+Y775CORECiUtxHcCb6xRMeuNNz9bVr5yOYxCOYkI7fgLh+P2t3faXkrOALc7No=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>z/21Ockh9p9NSGh0DvUk7jX+K9APlqaApvl1sSxrZw9CR2I6iunTrv4urKdPpa1ImXQHizbeX3iQFmxhZ99ZV49F56ulPPqdgE+caZC752O2SwHmYqDo7CAxDjVHhWKfiDqBWAfYqvO1UZ1Hm+keC96F/x6NKYuxUByKCnVSmyU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBxTCCAS6gAwIBAgIQMGxLe9yQEotGiX8u38Fh7DANBgkqhkiG9w0BAQsFADAhMR8wHQYDVQQDHhYAUABDADQAMgA1AFwAawBvAHUAegBhMB4XDTI1MTEwNzA4MTgyMloXDTI2MTEwNzE0MTgyMlowITEfMB0GA1UEAx4WAFAAQwA0ADIANQBcAGsAbwB1AHoAYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAz/21Ockh9p9NSGh0DvUk7jX+K9APlqaApvl1sSxrZw9CR2I6iunTrv4urKdPpa1ImXQHizbeX3iQFmxhZ99ZV49F56ulPPqdgE+caZC752O2SwHmYqDo7CAxDjVHhWKfiDqBWAfYqvO1UZ1Hm+keC96F/x6NKYuxUByKCnVSmyUCAwEAATANBgkqhkiG9w0BAQsFAAOBgQAWLF5sy8+SX6PdaSTFrVTjGYwVQikWpWWTKSK87nl6va0IPa+DzaozdghHFggSO2eZw8KbUPS1ASXxVrRgqjREu74IZV+O6dEY8AnufmPF7gO5VsoVYBHctk/wQLavJgTqOflHLm1M5iAG/XfYys2BkNx8+KuIgLEh3jXBrgWyQA==</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>

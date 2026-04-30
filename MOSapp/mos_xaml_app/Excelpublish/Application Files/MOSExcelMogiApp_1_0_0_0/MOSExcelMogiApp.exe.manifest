@@ -1,0 +1,95 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asmv1:assembly xsi:schemaLocation="urn:schemas-microsoft-com:asm.v1 assembly.adaptive.xsd" manifestVersion="1.0" xmlns:asmv1="urn:schemas-microsoft-com:asm.v1" xmlns="urn:schemas-microsoft-com:asm.v2" xmlns:asmv2="urn:schemas-microsoft-com:asm.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:co.v1="urn:schemas-microsoft-com:clickonce.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns:co.v2="urn:schemas-microsoft-com:clickonce.v2">
+  <asmv1:assemblyIdentity name="MOSExcelMogiApp.exe" version="1.0.0.0" publicKeyToken="e7221601514f5ac7" language="neutral" processorArchitecture="amd64" type="win32" />
+  <application />
+  <entryPoint>
+    <assemblyIdentity name="MOSExcelMogiApp" version="1.0.0.0" language="neutral" processorArchitecture="amd64" />
+    <commandLine file="MOSExcelMogiApp.exe" parameters="" />
+  </entryPoint>
+  <trustInfo>
+    <security>
+      <applicationRequestMinimum>
+        <PermissionSet Unrestricted="true" ID="Custom" SameSite="site" />
+        <defaultAssemblyRequest permissionSetReference="Custom" />
+      </applicationRequestMinimum>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          UAC マニフェスト オプション
+          Windows のユーザー アカウント制御のレベルを変更するには、
+          requestedExecutionLevel ノードを以下のいずれかで置換します。
+
+        <requestedExecutionLevel  level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel  level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel  level="highestAvailable" uiAccess="false" />
+
+         下位互換性を保つためにファイルおよびレジストリの仮想化を使用する場合、
+         requestedExecutionLevel ノードを削除します。
+    -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentOS>
+      <osVersionInfo>
+        <os majorVersion="5" minorVersion="1" buildNumber="2600" servicePackMajor="0" />
+      </osVersionInfo>
+    </dependentOS>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="preRequisite" allowDelayedBinding="true">
+      <assemblyIdentity name="Microsoft.Windows.CommonLanguageRuntime" version="4.0.30319.0" />
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="MOSExcelMogiApp.exe" size="102824">
+      <assemblyIdentity name="MOSExcelMogiApp" version="1.0.0.0" language="neutral" processorArchitecture="amd64" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>SbO6CbMInxzceb+1QrgOpdLRQ3h2PVjYWOnddudqHkY=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Newtonsoft.Json.dll" size="711952">
+      <assemblyIdentity name="Newtonsoft.Json" version="13.0.0.0" publicKeyToken="30AD4FE6B2A6AEED" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>4eJ697B+7t9c5xqSVfBCKBam/FhJpIPGcU4bRyBE+p0=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <file name="Assets\config.json" size="5295">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>gz62xOVLLLitU3aIAT+OHPUzUfSjXvkWr2MRhMC8f58=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="MOSExcelMogiApp.exe.config" size="187">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>+CM46OnHRrXZXNLMx7+U3V3iubiYL//d8hGOR13lDhU=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\JSON\MOS模擬アプリ問題文一覧.json" size="14251">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>YFHbKq/j9y2YTbYIQhDsZwdFmX9wPTUl47A5oC12N2s=</dsig:DigestValue>
+    </hash>
+  </file>
+<publisherIdentity name="CN=PC425\kouza" issuerKeyHash="678d563d268fde463510e9b4f6095a3167573ca9" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>si/CenyJIF0r/zYXD4iu9dd57T1nuJxeWt7sLLVGJc8=</DigestValue></Reference></SignedInfo><SignatureValue>NbbeiD4qLeXU4je2+1pQih5Fcb9PxLyrMcgamk4E21qEbPtVbxpBQKV9qK5wOHPH3HKW/bzWk/3amj5qatpCKoliWs9IqvztMRtRZp8akL0R0PLdBv/YybjuhWXbRb8EyONWJwXFXsnXXupWME10X/26bgsgaNYz3wlCxqa+Lsk=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>z/21Ockh9p9NSGh0DvUk7jX+K9APlqaApvl1sSxrZw9CR2I6iunTrv4urKdPpa1ImXQHizbeX3iQFmxhZ99ZV49F56ulPPqdgE+caZC752O2SwHmYqDo7CAxDjVHhWKfiDqBWAfYqvO1UZ1Hm+keC96F/x6NKYuxUByKCnVSmyU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="cf2546b52cecde5a5e9cb8673ded79d7f5ae880f1736ff2b5d20897c7ac22fb2" Description="" Url=""><as:assemblyIdentity name="MOSExcelMogiApp.exe" version="1.0.0.0" publicKeyToken="e7221601514f5ac7" language="neutral" processorArchitecture="amd64" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=PC425\kouza</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>kdK7fui04hle8v8ZB9vaqs6EJ2+Noi1L0bzVkSimO0Q=</DigestValue></Reference></SignedInfo><SignatureValue>eDMbBrGz88NWFdl7vOYCPESpwKYUsHx2MhS+PiplgIRKzVNHiNNC5jefu3Bt6t0JmoUEForchosTu6yxAHyEk4GY/5KJ8mdzkm2uLMGvI9SvyVoyAcohJIcPQHXx/HRVhwLwJGGWNoyUsgkh8Csiehw2aWvRjNfIrmHsZDFAEAs=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>z/21Ockh9p9NSGh0DvUk7jX+K9APlqaApvl1sSxrZw9CR2I6iunTrv4urKdPpa1ImXQHizbeX3iQFmxhZ99ZV49F56ulPPqdgE+caZC752O2SwHmYqDo7CAxDjVHhWKfiDqBWAfYqvO1UZ1Hm+keC96F/x6NKYuxUByKCnVSmyU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBxTCCAS6gAwIBAgIQMGxLe9yQEotGiX8u38Fh7DANBgkqhkiG9w0BAQsFADAhMR8wHQYDVQQDHhYAUABDADQAMgA1AFwAawBvAHUAegBhMB4XDTI1MTEwNzA4MTgyMloXDTI2MTEwNzE0MTgyMlowITEfMB0GA1UEAx4WAFAAQwA0ADIANQBcAGsAbwB1AHoAYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAz/21Ockh9p9NSGh0DvUk7jX+K9APlqaApvl1sSxrZw9CR2I6iunTrv4urKdPpa1ImXQHizbeX3iQFmxhZ99ZV49F56ulPPqdgE+caZC752O2SwHmYqDo7CAxDjVHhWKfiDqBWAfYqvO1UZ1Hm+keC96F/x6NKYuxUByKCnVSmyUCAwEAATANBgkqhkiG9w0BAQsFAAOBgQAWLF5sy8+SX6PdaSTFrVTjGYwVQikWpWWTKSK87nl6va0IPa+DzaozdghHFggSO2eZw8KbUPS1ASXxVrRgqjREu74IZV+O6dEY8AnufmPF7gO5VsoVYBHctk/wQLavJgTqOflHLm1M5iAG/XfYys2BkNx8+KuIgLEh3jXBrgWyQA==</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>

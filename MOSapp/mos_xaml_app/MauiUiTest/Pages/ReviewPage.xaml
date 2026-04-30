@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MOSExcelMogiApp.Maui.Pages.ReviewPage"
+             Title="レビューページ - 全問題一覧"
+             BackgroundColor="#F5F5F5">
+    
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- ヘッダー -->
+        <Border Grid.Row="0" BackgroundColor="#1E40AF" Padding="20,15">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- タイマー表示 -->
+                <Frame Grid.Column="0" 
+                       BackgroundColor="White" 
+                       Padding="12,8" 
+                       Margin="0,0,20,0"
+                       HasShadow="False">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="🕐" 
+                               FontSize="18" 
+                               TextColor="#1E40AF" 
+                               VerticalOptions="Center"/>
+                        <Label x:Name="TimerTextBlock" 
+                               Text="50:00:00" 
+                               FontFamily="Consolas" 
+                               FontSize="18" 
+                               TextColor="#1E40AF" 
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </Frame>
+                
+                <Label Grid.Column="1" 
+                       Text="レビューページ - 全問題一覧" 
+                       TextColor="White" 
+                       FontSize="24" 
+                       FontAttributes="Bold"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"/>
+                
+                <Button Grid.Column="2" 
+                        x:Name="CloseButton" 
+                        Text="✕" 
+                        BackgroundColor="Transparent" 
+                        TextColor="White" 
+                        FontSize="20" 
+                        FontAttributes="Bold"
+                        WidthRequest="40" 
+                        HeightRequest="40"
+                        Clicked="CloseButton_Clicked"
+                        IsVisible="False"/>
+            </Grid>
+        </Border>
+        
+        <!-- メインコンテンツ -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Margin="20" Spacing="20">
+                <Label Text="任意の問題に戻るには、その問題をクリックします。" 
+                       FontSize="14" 
+                       TextColor="#6B7280" 
+                       HorizontalOptions="Center"/>
+                
+                <!-- プロジェクト一覧 -->
+                <CollectionView x:Name="ProjectsCollectionView">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame BackgroundColor="White" 
+                                   BorderColor="#E5E7EB" 
+                                   Padding="20" 
+                                   Margin="0,0,0,20"
+                                   HasShadow="False">
+                                <VerticalStackLayout Spacing="15">
+                                    <!-- プロジェクトタイトル -->
+                                    <Label Text="{Binding ProjectTitle}" 
+                                           FontSize="20" 
+                                           FontAttributes="Bold"
+                                           TextColor="#1E40AF"/>
+                                    
+                                    <!-- テーブル形式のタスク一覧 -->
+                                    <Grid RowDefinitions="Auto,*">
+                                        <!-- テーブルヘッダー -->
+                                        <Grid Grid.Row="0" 
+                                              BackgroundColor="#F8FAFC" 
+                                              Padding="15,10">
+                                            <Grid ColumnDefinitions="*,120,120">
+                                                <Label Grid.Column="0" 
+                                                       Text="プロジェクト番号・タスク番号" 
+                                                       FontSize="19" 
+                                                       FontAttributes="Bold" 
+                                                       TextColor="#374151"/>
+                                                <Label Grid.Column="1" 
+                                                       Text="解答済み" 
+                                                       FontSize="19" 
+                                                       FontAttributes="Bold" 
+                                                       TextColor="#374151"
+                                                       HorizontalOptions="Center"/>
+                                                <Label Grid.Column="2" 
+                                                       Text="あとで見直す" 
+                                                       FontSize="19" 
+                                                       FontAttributes="Bold" 
+                                                       TextColor="#374151"
+                                                       HorizontalOptions="Center"/>
+                                            </Grid>
+                                        </Grid>
+                                        
+                                        <!-- タスク一覧 -->
+                                        <CollectionView Grid.Row="1" 
+                                                       ItemsSource="{Binding Tasks}">
+                                            <CollectionView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid ColumnDefinitions="*,120,120" 
+                                                          Padding="15,10"
+                                                          BackgroundColor="Transparent">
+                                                        <!-- タスク情報 -->
+                                                        <Border Grid.Column="0" 
+                                                                BackgroundColor="Transparent" 
+                                                                Padding="15,10"
+                                                                StrokeThickness="0">
+                                                            <Border.GestureRecognizers>
+                                                                <TapGestureRecognizer Tapped="TaskButton_Tapped"/>
+                                                            </Border.GestureRecognizers>
+                                                            <VerticalStackLayout Spacing="4">
+                                                                <Label Text="{Binding TaskTitle}" 
+                                                                       FontSize="19" 
+                                                                       FontAttributes="Bold" 
+                                                                       TextColor="#374151"/>
+                                                                <Label Text="{Binding Description}" 
+                                                                       FontSize="17" 
+                                                                       TextColor="#6B7280" 
+                                                                       LineHeight="21"/>
+                                                            </VerticalStackLayout>
+                                                        </Border>
+                                                        
+                                                        <!-- 解答済み列 -->
+                                                        <Label Grid.Column="1" 
+                                                               x:Name="CompletedMark" 
+                                                               Text="✓" 
+                                                               FontSize="20" 
+                                                               TextColor="#10B981" 
+                                                               FontAttributes="Bold" 
+                                                               HorizontalOptions="Center"
+                                                               VerticalOptions="Center"
+                                                               IsVisible="False"/>
+                                                        
+                                                        <!-- あとで見直す列 -->
+                                                        <Label Grid.Column="2" 
+                                                               x:Name="FlaggedMark" 
+                                                               Text="🚩" 
+                                                               FontSize="20" 
+                                                               HorizontalOptions="Center"
+                                                               VerticalOptions="Center"
+                                                               IsVisible="False"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </CollectionView.ItemTemplate>
+                                        </CollectionView>
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </ScrollView>
+        
+        <!-- フッター -->
+        <Frame Grid.Row="2" 
+                BackgroundColor="White" 
+                BorderColor="#E5E7EB" 
+                HasShadow="False"
+                Padding="20,15">
+            <Grid ColumnDefinitions="*,Auto,*,Auto">
+                <Label Grid.Column="0" 
+                       Text="全問題を確認できます" 
+                       TextColor="#6B7280" 
+                       FontSize="14"
+                       VerticalOptions="Center"/>
+                
+                <!-- 試験終了ボタンを中央に配置 -->
+                <Button Grid.Column="1" 
+                        x:Name="EndExamButton" 
+                        Text="試験終了" 
+                        BackgroundColor="#DC2626" 
+                        TextColor="White" 
+                        Padding="25,10" 
+                        FontAttributes="Bold" 
+                        FontSize="14"
+                        Clicked="EndExamButton_Clicked"
+                        VerticalOptions="Center"
+                        Margin="0,0,10,0"/>
+                
+                <!-- スペーサー -->
+                <Grid Grid.Column="2"/>
+                
+                <!-- 終了ボタンを右側に配置 -->
+                <Button Grid.Column="3" 
+                        x:Name="CloseButtonFooter" 
+                        Text="終了" 
+                        BackgroundColor="#1E40AF" 
+                        TextColor="White" 
+                        Padding="20,10" 
+                        FontAttributes="None"
+                        Clicked="CloseButton_Clicked"
+                        VerticalOptions="Center"/>
+            </Grid>
+        </Frame>
+    </Grid>
+</ContentPage>
+

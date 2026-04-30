@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{C01302E0-98C1-4F0D-93BD-385BA3BC400A}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>MOSExcelMogiApp</RootNamespace>
+    <AssemblyName>MOSExcelMogiApp</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <LangVersion>8.0</LangVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <UseWPF>true</UseWPF>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>12</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <PublishWizardCompleted>true</PublishWizardCompleted>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>x64</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>x64</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ManifestCertificateThumbprint>0171A7E31309D0851A2307D15E08DE52059DED51</ManifestCertificateThumbprint>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ManifestKeyFile>MOSExcelMogiApp_TemporaryKey.pfx</ManifestKeyFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <GenerateManifests>true</GenerateManifests>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignManifests>true</SignManifests>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xaml">
+      <RequiredTargetFramework>4.0</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml, Version=3.3.0.0, Culture=neutral, PublicKeyToken=8fb06cb64d019a17, processorArchitecture=MSIL">
+      <HintPath>packages\DocumentFormat.OpenXml.3.3.0\lib\net46\DocumentFormat.OpenXml.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml.Framework, Version=3.3.0.0, Culture=neutral, PublicKeyToken=8fb06cb64d019a17, processorArchitecture=MSIL">
+      <HintPath>packages\DocumentFormat.OpenXml.Framework.3.3.0\lib\net46\DocumentFormat.OpenXml.Framework.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Office.Interop.Excel, Version=15.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c, processorArchitecture=MSIL">
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="AppBarWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ScoringResultDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\UiTestAppBarWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ReviewPageWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ImageWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ResultWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ObjectSelectedWarningWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="AppBarWindow.xaml.cs">
+      <DependentUpon>AppBarWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\ScoringResultDialog.xaml.cs">
+      <DependentUpon>ScoringResultDialog.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\UiTestAppBarWindow.xaml.cs">
+      <DependentUpon>UiTestAppBarWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\ReviewPageWindow.xaml.cs">
+      <DependentUpon>ReviewPageWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\ImageWindow.xaml.cs">
+      <DependentUpon>ImageWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\ResultWindow.xaml.cs">
+      <DependentUpon>ResultWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\ObjectSelectedWarningWindow.xaml.cs">
+      <DependentUpon>ObjectSelectedWarningWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Core\Ports\Primary\IExcelCheckerService.cs" />
+    <Compile Include="Core\Ports\Secondary\IExcelCheckerRepository.cs" />
+    <Compile Include="Core\Adapters\ExcelCheckerService.cs" />
+    <Compile Include="Core\Models\ProjectInfo.cs" />
+    <Compile Include="Infrastructure\ExcelCheckerRepository.cs" />
+    <Compile Include="Models\ExamResultStorage.cs" />
+    <Compile Include="Ui\ViewModels\MainViewModel.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_1.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_2.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_3.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_4.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_5.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_6.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_7.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_8.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_9.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_10.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_1.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_2.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_3.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_4.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_5.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_6.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_7.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_8.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_9.cs" />
+    <Compile Include="Libraries\Group2\ExcelChecker2_10.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_1.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_2.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_3.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_4.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_5.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_6.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_7.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_8.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_9.cs" />
+    <Compile Include="Libraries\Group3\ExcelChecker3_10.cs" />
+    <Compile Include="Libraries\ExcelLogReader.cs" />
+    <Compile Include="Libraries\ExcelApplicationManager.cs" />
+    <Compile Include="Libraries\ExcelTaskValidationConfig.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <None Include="MOSExcelMogiApp_TemporaryKey.pfx" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <Content Include="Assets\config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS模擬アプリ問題文一覧.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS模擬試験①問題文一覧.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS模擬試験②問題文一覧.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS演習問題文一覧.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\CSV\解答手順あり模擬試験①問題文.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="ExcelAddIn1\ExcelAddIn1.csproj">
+      <Project>{6A7617F7-8A21-464D-9EE8-7964AFA06EF3}</Project>
+      <Name>ExcelAddIn1</Name>
+    </ProjectReference>
+    <BootstrapperPackage Include=".NETFramework,Version=v4.8">
+      <Visible>False</Visible>
+      <ProductName>Microsoft .NET Framework 4.8 %28x86 および x64%29</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="AfterPublish">
+    <PropertyGroup>
+      <_AddInOutDir>$(ProjectDir)ExcelAddIn1\bin\$(Configuration)\</_AddInOutDir>
+      <_AddInPublishDir>$(ProjectDir)$(PublishUrl)ExcelAddIn1\</_AddInPublishDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(_AddInPublishDir)" />
+    <Exec Command="xcopy /Y /E &quot;$(_AddInOutDir)*.*&quot; &quot;$(_AddInPublishDir)&quot;" IgnoreExitCode="false" />
+    <WriteLinesToFile File="$(_AddInPublishDir)README.txt" Lines="Excel 用 VSTO アドイン（採点連携用）;;1. 本フォルダ内の ExcelAddIn1.vsto をダブルクリックしてインストールしてください。;2. 初回はセキュリティの警告が出る場合があります。信頼してインストールしてください。;3. インストール後、Excel を起動するとアドインが読み込まれ、模擬アプリの採点が正しく動作します。" Overwrite="true" Encoding="UTF-8" />
+    <Message Importance="high" Text="VSTO アドインを発行フォルダにコピーしました: $(_AddInPublishDir)" />
+  </Target>
+</Project>

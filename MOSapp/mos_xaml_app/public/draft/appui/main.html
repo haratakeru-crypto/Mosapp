@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOS Excel リハーサル試験</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .excel-ribbon {
+            background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+        }
+        .excel-cell {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+        }
+        .excel-cell.selected {
+            background: #3b82f6;
+            color: white;
+        }
+        .data-bar {
+            background: linear-gradient(to right, #10b981, #34d399);
+            height: 20px;
+            border-radius: 2px;
+        }
+        .data-bar-container {
+            background: #f3f4f6;
+            border-radius: 2px;
+            padding: 2px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden">
+    <!-- Excel Application Window -->
+    <div class="h-screen flex flex-col">
+        <!-- UI Test Button Bar -->
+        <div class="bg-blue-600 text-white px-4 py-2 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <button class="bg-white text-blue-600 px-4 py-2 rounded font-medium hover:bg-gray-100 transition-colors">
+                    UIテスト
+                </button>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-sm">テストモード</span>
+            </div>
+        </div>
+
+        <!-- Excel Top Bar -->
+        <div class="bg-white border-b border-gray-300 flex items-center justify-between px-4 py-2">
+            <div class="flex items-center space-x-4">
+                <span class="text-blue-600 font-medium">自動保存</span>
+                <span class="font-semibold">Excel.xlsx - Excel</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="bg-gray-100 rounded px-3 py-1 text-sm">検索</div>
+                <div class="flex space-x-1">
+                    <div class="w-6 h-6 bg-gray-300 rounded"></div>
+                    <div class="w-6 h-6 bg-gray-300 rounded"></div>
+                    <div class="w-6 h-6 bg-red-500 rounded"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Excel Ribbon -->
+        <div class="excel-ribbon border-b border-gray-300">
+            <div class="flex space-x-6 px-4 py-2">
+                <span class="font-semibold">ファイル</span>
+                <span class="font-semibold bg-blue-100 px-2 py-1 rounded">ホーム</span>
+                <span class="font-semibold">挿入</span>
+                <span class="font-semibold">描画</span>
+                <span class="font-semibold">ページレイアウト</span>
+                <span class="font-semibold">数式</span>
+                <span class="font-semibold">データ</span>
+                <span class="font-semibold">校閲</span>
+                <span class="font-semibold">表示</span>
+                <span class="font-semibold">自動化</span>
+                <span class="font-semibold">ヘルプ</span>
+            </div>
+            
+            <!-- Ribbon Groups -->
+            <div class="px-4 py-3 border-t border-gray-200">
+                <div class="flex space-x-8">
+                    <!-- Clipboard Group -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-600">クリップボード</span>
+                        <div class="flex space-x-1">
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">✂</div>
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">📋</div>
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">📄</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Font Group -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-600">フォント</span>
+                        <select class="border border-gray-300 rounded px-2 py-1">
+                            <option>ゴシック</option>
+                        </select>
+                        <select class="border border-gray-300 rounded px-2 py-1">
+                            <option>11</option>
+                        </select>
+                        <div class="flex space-x-1">
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center font-bold">B</div>
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center italic">I</div>
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center underline">U</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Number Group -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-600">数値</span>
+                        <select class="border border-gray-300 rounded px-2 py-1">
+                            <option>標準</option>
+                        </select>
+                        <div class="flex space-x-1">
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center text-sm">%</div>
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center text-sm">¥</div>
+                            <div class="w-8 h-8 bg-gray-200 rounded flex items-center justify-center text-sm">,</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formula Bar -->
+        <div class="bg-white border-b border-gray-300 flex items-center px-4 py-2">
+            <span class="font-mono text-sm mr-2">S16</span>
+            <div class="flex-1 border border-gray-300 rounded px-2 py-1 bg-white"></div>
+        </div>
+
+        <!-- Excel Grid Area -->
+        <div class="flex-1 bg-white p-4 relative">
+            <!-- Column Headers -->
+            <div class="flex mb-2">
+                <div class="w-12 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold"></div>
+                <div class="flex">
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">A</div>
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">B</div>
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">C</div>
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">D</div>
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">E</div>
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">F</div>
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">G</div>
+                    <div class="w-20 h-6 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">H</div>
+                </div>
+            </div>
+
+            <!-- Row with Data Bars -->
+            <div class="flex mb-2">
+                <div class="w-12 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">1</div>
+                <div class="w-20 h-8 excel-cell flex items-center justify-center text-sm">16</div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+            </div>
+
+            <div class="flex mb-2">
+                <div class="w-12 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">2</div>
+                <div class="w-20 h-8 excel-cell flex items-center justify-center text-sm">100</div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+            </div>
+
+            <div class="flex mb-2">
+                <div class="w-12 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">3</div>
+                <div class="w-20 h-8 excel-cell flex items-center justify-center text-sm">16</div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+            </div>
+
+            <div class="flex mb-2">
+                <div class="w-12 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">4</div>
+                <div class="w-20 h-8 excel-cell flex items-center justify-center text-sm">21</div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+            </div>
+
+            <div class="flex mb-2">
+                <div class="w-12 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">5</div>
+                <div class="w-20 h-8 excel-cell flex items-center justify-center text-sm">70</div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+            </div>
+
+            <div class="flex mb-2">
+                <div class="w-12 h-8 bg-gray-100 border border-gray-300 flex items-center justify-center text-xs font-semibold">6</div>
+                <div class="w-20 h-8 excel-cell selected flex items-center justify-center text-sm">17</div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+                <div class="w-20 h-8 excel-cell"></div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="absolute bottom-4 left-4 right-4 bg-white border-t border-gray-300 flex items-center justify-between px-4 py-2">
+                <span class="text-sm">入力</span>
+                <span class="text-sm text-gray-600">アクセシビリティ: 問題ありません</span>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm">Excel</span>
+                    <div class="w-6 h-6 bg-gray-300 rounded flex items-center justify-center">+</div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm">100%</span>
+                        <div class="w-20 h-2 bg-gray-300 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay Instruction Panel -->
+        <div class="absolute bottom-0 left-0 right-0 bg-white border-t-4 border-blue-800">
+            <!-- Panel Header -->
+            <div class="bg-blue-800 text-white px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-lg">🕐</span>
+                        <span class="font-mono text-lg">00:00:00</span>
+                    </div>
+                    <button class="bg-gray-200 text-blue-800 px-4 py-1 rounded font-medium">レビューページ</button>
+                </div>
+                
+                <div class="text-center">
+                    <h1 class="text-lg font-semibold">プロジェクト 1/1: リハーサル試験</h1>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button class="bg-gray-200 text-blue-800 px-4 py-1 rounded font-medium">リセット</button>
+                    <button class="bg-gray-200 text-blue-800 px-4 py-1 rounded font-medium">次のプロジェクト</button>
+                    <div class="w-6 h-6 bg-white rounded flex items-center justify-center">
+                        <span class="text-blue-800 text-sm">↓</span>
+                    </div>
+                    <div class="w-6 h-6 bg-white rounded flex items-center justify-center">
+                        <span class="text-blue-800 text-sm">□</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Content -->
+            <div class="bg-white px-6 py-6">
+                <!-- Navigation -->
+                <div class="flex items-center justify-center mb-6">
+                    <button class="w-8 h-8 bg-gray-300 rounded flex items-center justify-center">←</button>
+                    <div class="mx-4 w-8 h-8 bg-white border-2 border-gray-400 rounded flex items-center justify-center font-semibold">1</div>
+                    <button class="w-8 h-8 bg-gray-300 rounded flex items-center justify-center">→</button>
+                </div>
+
+                <!-- Instructions -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                    <p class="text-gray-800 mb-4 leading-relaxed">
+                        これは、Excel のリハーサル試験です。この試験の目的は、環境が適切にセットアップされていることを確認することです。
+                    </p>
+                    <p class="text-gray-800 leading-relaxed">
+                        「Excel」 ワークシートで、セルA6の値を『50』に変更します。
+                    </p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-center space-x-8">
+                    <button class="text-blue-800 font-medium hover:underline">解答済みにする</button>
+                    <div class="w-px h-6 bg-gray-300"></div>
+                    <button class="text-blue-800 font-medium hover:underline">あとで見直す</button>
+                    <div class="w-px h-6 bg-gray-300"></div>
+                    <button class="text-blue-800 font-medium hover:underline">試験後にコメントする</button>
+                </div>
+            </div>
+
+            <!-- Panel Footer -->
+            <div class="bg-blue-800 text-white px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span class="text-lg">⚙️</span>
+                    <span class="text-sm">99999</span>
+                </div>
+                <div></div>
+                <div></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

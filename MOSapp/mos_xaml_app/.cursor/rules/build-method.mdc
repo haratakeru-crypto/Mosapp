@@ -1,0 +1,21 @@
+---
+description: 
+alwaysApply: true
+---
+
+## ビルドコマンド
+
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" .\MOSExcelMogiApp.csproj /p:Configuration=Debug
+```
+
+## Publishコマンド
+```powershell
+ & "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" -t:Publish -p:Configuration=Release -p:RuntimeIdentifier=win-x64 -p:SelfContained=true /p:PublishSingleFile=true
+```
+
+## 起動コマンド
+
+```powershell
+.\bin\Debug\PositionExcelApp.exe
+```
