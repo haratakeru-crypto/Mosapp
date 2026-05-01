@@ -92,6 +92,9 @@ namespace Ui.ViewModels
         private ProjectInfo _currentProject;
         private ExcelApp _sharedExcelApp;
 
+        /// <summary>試験終了処理の二重起動防止（タイマー経路と終了ボタン確認の競合など）。新規プロジェクト開始時に 0 に戻す。</summary>
+        private int _endExamShutdownStarted;
+
         /// <summary>
         /// アプリが利用する Excel インスタンスを取得（無ければ作成）。
         /// Process.Start による別インスタンス起動や GetActiveObject の取り違えを避けるため、1インスタンスに固定して使い回す。
@@ -175,6 +178,11 @@ namespace Ui.ViewModels
         public event EventHandler UiTestRequested;
         public event EventHandler CurrentProjectChanged;
         public event EventHandler OpenReviewPageRequested;
+
+        /// <summary>
+        /// シェル起動後に共有 Excel への接続試行が UI スレッドで終わったときに発火する。アプリバーが Excel を再配置するために使う。
+        /// </summary>
+        public event EventHandler SharedExcelApplicationAttached;
 
         public MainViewModel(IExcelCheckerService excelCheckerService)
         {
@@ -689,6 +697,8 @@ namespace Ui.ViewModels
                     return;
                 }
 
+                Interlocked.Exchange(ref _endExamShutdownStarted, 0);
+
                 if (parameter is ProjectViewModel pvm)
                 {
                     CurrentProject = new ProjectInfo
@@ -808,6 +818,10 @@ namespace Ui.ViewModels
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"[TryAttachSharedExcelApplicationAfterShellOpen] {ex.Message}");
+                    }
+                    finally
+                    {
+                        SharedExcelApplicationAttached?.Invoke(this, EventArgs.Empty);
                     }
                 }));
             });
@@ -1568,8 +1582,8 @@ namespace Ui.ViewModels
                 {
                     Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
                         excelPid,
-                        10000,
-                        5000,
+                        20000,
+                        8000,
                         "[CloseExcelApplication]");
                 }
             }
@@ -2030,17 +2044,35 @@ namespace Ui.ViewModels
         
         private void ExecuteEndExam(object parameter)
         {
+            if (Interlocked.CompareExchange(ref _endExamShutdownStarted, 1, 0) != 0)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExecuteEndExam] duplicate call ignored");
+                return;
+            }
+
             IsExcelOverlayVisible = false;
             CurrentProject = null;
             ResultMessage = "試験を終了しました。";
-            
-            // すべてのExcelワークブックを保存してから閉じる（非同期で実行）
-            Task.Run(() =>
+
+            // Office COM は STA 上で扱う（スレッドプール MTA の Task.Run は不安定になり得る）
+            var shutdownThread = new Thread(() =>
             {
-                SaveAllExcelWorkbooks();
-                CloseExcelApplication();
-            });
-            
+                try
+                {
+                    SaveAllExcelWorkbooks();
+                    CloseExcelApplication();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ExecuteEndExam] Excel shutdown: {ex.Message}");
+                }
+            })
+            {
+                IsBackground = true
+            };
+            shutdownThread.SetApartmentState(ApartmentState.STA);
+            shutdownThread.Start();
+
             // ExamEndedイベントを発火してアプリバーを閉じ、メインウィンドウを再表示
             ExamEnded?.Invoke(this, EventArgs.Empty);
             ShowMainWindowRequested?.Invoke(this, EventArgs.Empty);

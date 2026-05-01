@@ -120,7 +120,10 @@ namespace MOSExcelMogiApp
             
             // レビューページ表示要求イベントを購読
             _viewModel.OpenReviewPageRequested += OnOpenReviewPageRequested;
-            
+
+            // シェル起動後の共有 Excel 接続完了時に Excel ウィンドウを再配置（起動直後のずれを解消）
+            _viewModel.SharedExcelApplicationAttached += OnSharedExcelApplicationAttached;
+
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] Constructor completed");
         }
 
@@ -1437,9 +1440,20 @@ namespace MOSExcelMogiApp
 
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
+            // モーダル確認中も DispatcherTimer は進むため、先に止めないと Timer_Tick から試験終了が走り Excel が先に閉じることがある
+            bool timerWasEnabled = _timer != null && _timer.IsEnabled;
+            if (timerWasEnabled)
+                _timer.Stop();
+
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
+            {
                 _viewModel.EndExamCommand.Execute(null);
+                return;
+            }
+
+            if (timerWasEnabled && !MainWindow.IsTimerDisabled)
+                _timer?.Start();
         }
 
         private void OnExamEnded(object sender, EventArgs e)
@@ -1535,6 +1549,21 @@ namespace MOSExcelMogiApp
             ReviewPageButton_Click(sender, new RoutedEventArgs());
         }
 
+        private void OnSharedExcelApplicationAttached(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    SetWindowPosition();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[AppBarWindow] OnSharedExcelApplicationAttached: {ex.Message}");
+                }
+            }), DispatcherPriority.Background);
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             ClearCurrentTaskFile();
@@ -1546,6 +1575,7 @@ namespace MOSExcelMogiApp
                 _viewModel.ExamEnded -= OnExamEnded;
                 _viewModel.CurrentProjectChanged -= OnCurrentProjectChanged;
                 _viewModel.OpenReviewPageRequested -= OnOpenReviewPageRequested;
+                _viewModel.SharedExcelApplicationAttached -= OnSharedExcelApplicationAttached;
             }
             base.OnClosed(e);
         }
