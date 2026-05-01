@@ -72,6 +72,19 @@ namespace ExcelAddIn1
             {
                 var ws = sh as Excel.Worksheet;
                 if (ws == null) return;
+                try 
+                { 
+                    Excel.Range sel = Application.Selection as Excel.Range;
+                    if (sel != null)
+                    {
+                        _lastRangeSelectionAddress = sel.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing);
+                        if (_lastRangeSelectionAddress.Contains("]"))
+                        {
+                            _lastRangeSelectionAddress = _lastRangeSelectionAddress.Substring(_lastRangeSelectionAddress.IndexOf("]") + 1);
+                        }
+                    }
+                } 
+                catch { }
                 TryStoreSnapshot(ws, readFreeze: true, logChanges: true, trigger: LayoutChangeTrigger.SheetActivate);
             }
             catch (Exception ex)
@@ -87,6 +100,19 @@ namespace ExcelAddIn1
                 if (wb == null) return;
                 var ws = wb.ActiveSheet as Excel.Worksheet;
                 if (ws == null) return;
+                try 
+                { 
+                    Excel.Range sel = Application.Selection as Excel.Range;
+                    if (sel != null)
+                    {
+                        _lastRangeSelectionAddress = sel.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing);
+                        if (_lastRangeSelectionAddress.Contains("]"))
+                        {
+                            _lastRangeSelectionAddress = _lastRangeSelectionAddress.Substring(_lastRangeSelectionAddress.IndexOf("]") + 1);
+                        }
+                    }
+                } 
+                catch { }
                 TryStoreSnapshot(ws, readFreeze: true, logChanges: true, trigger: LayoutChangeTrigger.WindowActivate);
             }
             catch (Exception ex)

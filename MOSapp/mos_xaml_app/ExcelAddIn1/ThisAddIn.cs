@@ -16,6 +16,7 @@ namespace ExcelAddIn1
         private int _currentTaskTaskId = -1;
         private int _currentTaskAttemptNo = 1;
         private bool _ignoreNextAutoLayoutChangeAfterTaskStart;
+        private string _lastRangeSelectionAddress;
         private enum LayoutChangeTrigger
         {
             Other = 0,
@@ -61,8 +62,10 @@ namespace ExcelAddIn1
             ((Excel.AppEvents_Event)Application).NewWorkbook += Application_NewWorkbook;
             Application.SheetChange += Application_SheetChange;
             Application.SheetActivate += Application_SheetActivate;
+            Application.SheetSelectionChange += Application_SheetSelectionChange;
             Application.WindowActivate += Application_WindowActivate;
             Application.WorkbookBeforeClose += Application_WorkbookBeforeClose;
+            Application.WorkbookNewChart += Application_WorkbookNewChart;
             _eventHooksRegistered = true;
             WriteDiagnostic("Application event hooks registered");
         }
@@ -75,8 +78,10 @@ namespace ExcelAddIn1
             ((Excel.AppEvents_Event)Application).NewWorkbook -= Application_NewWorkbook;
             Application.SheetChange -= Application_SheetChange;
             Application.SheetActivate -= Application_SheetActivate;
+            Application.SheetSelectionChange -= Application_SheetSelectionChange;
             Application.WindowActivate -= Application_WindowActivate;
             Application.WorkbookBeforeClose -= Application_WorkbookBeforeClose;
+            Application.WorkbookNewChart -= Application_WorkbookNewChart;
             _eventHooksRegistered = false;
             WriteDiagnostic("Application event hooks unregistered");
         }
@@ -119,6 +124,55 @@ namespace ExcelAddIn1
             {
                 System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Application_SheetChange: " + ex.Message);
                 WriteDiagnostic("Application_SheetChange error: " + ex.Message);
+            }
+        }
+
+        private void Application_SheetSelectionChange(object sheet, Excel.Range target)
+        {
+            try
+            {
+                _lastRangeSelectionAddress = target?.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing) ?? "";
+                if (_lastRangeSelectionAddress.Contains("]"))
+                {
+                    _lastRangeSelectionAddress = _lastRangeSelectionAddress.Substring(_lastRangeSelectionAddress.IndexOf("]") + 1);
+                }
+            }
+            catch { }
+        }
+
+        private void Application_WorkbookNewChart(Excel.Workbook Wb, Excel.Chart Ch)
+        {
+            try
+            {
+                string selectionAddress = "";
+                Excel.Range selection = Application.Selection as Excel.Range;
+                if (selection != null)
+                {
+                    selectionAddress = selection.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing);
+                }
+                else
+                {
+                    selectionAddress = _lastRangeSelectionAddress;
+                }
+
+                if (string.IsNullOrEmpty(selectionAddress))
+                {
+                    selectionAddress = "NoSelection";
+                }
+
+                // Remove workbook name from address if present (e.g. [book.xlsx]Sheet1!$A$1 -> Sheet1!$A$1)
+                if (selectionAddress.Contains("]"))
+                {
+                    selectionAddress = selectionAddress.Substring(selectionAddress.IndexOf("]") + 1);
+                }
+
+                Logger.LogOperation("AddChart", $"Name={Ch.Name} Selection={selectionAddress}");
+                WriteDiagnostic($"AddChart: Name={Ch.Name} Selection={selectionAddress}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Application_WorkbookNewChart: " + ex.Message);
+                WriteDiagnostic("Application_WorkbookNewChart error: " + ex.Message);
             }
         }
 

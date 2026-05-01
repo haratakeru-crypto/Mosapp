@@ -37,7 +37,8 @@ namespace Libraries
         SetPageScaling,
         SetTableStyle,          // テーブルスタイル/テーブルデザイン変更
         ResizeTable,            // テーブル範囲の拡張・縮小
-        AddConditionalFormat    // 条件付き書式の追加・変更
+        AddConditionalFormat,   // 条件付き書式の追加・変更
+        AddChart                // グラフの新規作成
     }
 
     [Flags]
@@ -94,6 +95,7 @@ namespace Libraries
                 case ExcelOperationType.InsertShapeOrImage:
                 case ExcelOperationType.DeleteShapeOrImage:
                 case ExcelOperationType.MoveOrResizeShape:
+                case ExcelOperationType.AddChart:
                     return ExcelValidationExemptFlags.ShapeOrImage;
                 case ExcelOperationType.SetPrintArea:
                 case ExcelOperationType.SetPrintTitle:

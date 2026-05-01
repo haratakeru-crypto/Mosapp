@@ -282,6 +282,81 @@ namespace Libraries
             return result;
         }
 
+        /// <summary>
+        /// 指定されたグラフが作成された際の選択範囲（Selection）をログから取得する。
+        /// </summary>
+        public static string GetChartCreationSelection(int projectId, int taskId, int attemptNo, string chartName, string targetSheetName = null)
+        {
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo);
+            string finalSelection = null;
+
+            string normChart = NormalizeChartName(chartName);
+            // グラフ番号部分のみ抽出 (例: "5年間売上 グラフ 1" -> "グラフ1")
+            string chartNumOnly = Regex.Match(normChart, @"グラフ\d+").Value;
+
+            foreach (var op in ops)
+            {
+                if (!string.Equals(op.Type, "AddChart", StringComparison.OrdinalIgnoreCase)) continue;
+
+                string detail = op.Detail;
+                if (string.IsNullOrEmpty(detail)) continue;
+
+                var nameMatch = Regex.Match(detail, @"Name=(.*?) Selection=");
+                var selectionMatch = Regex.Match(detail, @"Selection=(.*)$");
+
+                if (nameMatch.Success && selectionMatch.Success)
+                {
+                    string loggedName = nameMatch.Groups[1].Value.Trim();
+                    string loggedSelection = selectionMatch.Groups[1].Value.Trim();
+
+                    string normLogged = NormalizeChartName(loggedName);
+                    
+                    // シート名が指定されている場合は、Selection内のシート名を確認
+                    if (!string.IsNullOrEmpty(targetSheetName))
+                    {
+                        // 全角半角無視してシート名が含まれているか確認
+                        if (!NormalizeChartName(loggedSelection).Contains(NormalizeChartName(targetSheetName) + "!"))
+                        {
+                            continue;
+                        }
+                    }
+
+                    // 名前の一致確認 (番号部分が一致するか、または全体が含まれているか)
+                    bool nameMatches = normLogged.Contains(normChart) || normChart.Contains(normLogged);
+                    if (!string.IsNullOrEmpty(chartNumOnly) && normLogged.Contains(chartNumOnly))
+                    {
+                        nameMatches = true;
+                    }
+
+                    if (nameMatches)
+                    {
+                        finalSelection = loggedSelection;
+                    }
+                }
+            }
+            return finalSelection;
+        }
+
+        private static string NormalizeChartName(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return "";
+            
+            char[] chars = input.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+            {
+                if (chars[i] >= '０' && chars[i] <= '９')
+                    chars[i] = (char)(chars[i] - '０' + '0');
+                else if (chars[i] >= 'Ａ' && chars[i] <= 'Ｚ')
+                    chars[i] = (char)(chars[i] - 'Ａ' + 'A');
+                else if (chars[i] >= 'ａ' && chars[i] <= 'ｚ')
+                    chars[i] = (char)(chars[i] - 'ａ' + 'a');
+            }
+            string normalized = new string(chars).ToUpper().Replace("'", "");
+            
+            // 空白・制御文字削除
+            return Regex.Replace(normalized, @"\s+", "");
+        }
+
         private static void ParseTaskStart(string line, out int projectId, out int taskId, out int attemptNo)
         {
             projectId = -1;

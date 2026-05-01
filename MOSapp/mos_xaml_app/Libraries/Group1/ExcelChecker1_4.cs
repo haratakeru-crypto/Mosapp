@@ -105,14 +105,21 @@ namespace Libraries.Group1
                     if (chart.ChartType != Excel.XlChartType.xlColumnStacked) continue;
 
                     Excel.SeriesCollection seriesColl = (Excel.SeriesCollection)chart.SeriesCollection();
-                    if (seriesColl.Count == 2)
+                    if (seriesColl.Count != 2) continue;
+
+                    // 作成時の選択範囲をチェック (プロジェクト4, タスク2)
+                    string targetSheet = "5年間売上";
+                    string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 2, 1, chart.Name, targetSheet);
+                    if (loggedSelection == null) return false;
+
+                    if (!IsSelectionCorrect(loggedSelection, targetSheet, "A4:C10"))
                     {
-                        Console.WriteLine("[DEBUG] Task 4-2 Passed.");
-                        return true;
+                        return false;
                     }
+
+                    return true;
                 }
 
-                Console.WriteLine("[DEBUG] Task 4-2 Failed.");
                 return false;
             });
         }
@@ -134,7 +141,7 @@ namespace Libraries.Group1
                     Excel.Chart chart = co.Chart;
                     int type = (int)chart.ChartType;
 
-                    bool isPie = (type == -4102) || (type == 5) || (type == -4103);
+                    bool isPie = (type == -4102) || (type == 5) || (type == -4103) || (type == (int)Excel.XlChartType.xl3DPie);
                     if (!isPie) continue;
 
                     Excel.SeriesCollection sc = (Excel.SeriesCollection)chart.SeriesCollection();
@@ -142,12 +149,24 @@ namespace Libraries.Group1
 
                     if (co.Left > boundaryX + 10)
                     {
-                        Console.WriteLine($"[DEBUG] Task 4-3 Passed. Left: {co.Left} > Boundary: {boundaryX} + 10");
+                        // 作成時の選択範囲をチェック (プロジェクト4, タスク3)
+                        string targetSheet = "下半期売上";
+                        string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 3, 1, chart.Name, targetSheet);
+                        if (loggedSelection == null)
+                        {
+                            Console.WriteLine($"[DEBUG] Task 4-3 Failed: Chart creation log not found for {chart.Name}.");
+                            return false;
+                        }
+
+                        if (!IsSelectionCorrect(loggedSelection, targetSheet, "A4:A10,H4:H10"))
+                        {
+                            return false;
+                        }
+
                         return true;
                     }
                 }
 
-                Console.WriteLine("[DEBUG] Task 4-3 Failed.");
                 return false;
             });
         }
@@ -344,6 +363,42 @@ namespace Libraries.Group1
             return null;
         }
 
+        private bool IsSelectionCorrect(string loggedSelection, string targetSheet, string targetAddress)
+        {
+            if (string.IsNullOrEmpty(loggedSelection)) return false;
+
+            // 1. シート名の検証 (全角半角・引用符無視)
+            string normLogged = NormalizeString(loggedSelection).ToUpper();
+            string normTargetSheet = NormalizeString(targetSheet).ToUpper();
+
+            if (!normLogged.Contains(normTargetSheet + "!"))
+            {
+                return false;
+            }
+
+            // 2. セル範囲の抽出
+            string selection = loggedSelection.Contains("!") ? loggedSelection.Substring(loggedSelection.IndexOf("!") + 1) : loggedSelection;
+            
+            // 絶対参照の $ を削除
+            selection = selection.Replace("$", "");
+
+            string normSelection = NormalizeString(selection).ToUpper();
+            string normTargetAddr = NormalizeString(targetAddress).ToUpper();
+
+            // カンマ区切りの複数範囲に対応するため、各エリアをソートして比較
+            var loggedAreas = normSelection.Split(',').OrderBy(a => a).ToList();
+            var targetAreas = normTargetAddr.Split(',').OrderBy(a => a).ToList();
+
+            if (loggedAreas.Count != targetAreas.Count) return false;
+
+            for (int i = 0; i < loggedAreas.Count; i++)
+            {
+                if (loggedAreas[i] != targetAreas[i]) return false;
+            }
+
+            return true;
+        }
+
         private string NormalizeString(string input)
         {
             if (string.IsNullOrEmpty(input)) return "";
@@ -365,7 +420,7 @@ namespace Libraries.Group1
                     chars[i] = (char)(chars[i] - 'ａ' + 'a');
                 }
             }
-            string normalized = new string(chars);
+            string normalized = new string(chars).ToUpper().Replace("'", "");
             
             // 空白・制御文字削除
             return Regex.Replace(normalized, @"\s+", "");
