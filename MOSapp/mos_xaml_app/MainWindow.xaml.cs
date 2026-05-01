@@ -536,7 +536,7 @@ namespace MOSExcelMogiApp
                         // Initialフォルダへのコピーに失敗しても、プロジェクトファイルのリセットは成功しているので続行
                     }
                     
-                    // リセット後にExcelファイルを開き直し、読み取り専用を解除してInitialフォルダに保存する
+                    // リセット後、現在のプロジェクトなら Excel でブックを開き直す（シェル起動）
                     if (_viewModel?.CurrentProject != null)
                     {
                         var currentProject = _viewModel.CurrentProject;
@@ -558,161 +558,17 @@ namespace MOSExcelMogiApp
                                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Created directory: {initialFolderPath}");
                             }
                             
-                            // Excelファイルを開く前に、再度読み取り専用属性を確認・解除
+                            // テンプレートコピー済み。COM で空 Excel を先に立てず、シェルで開き直す（アプリバーからのリセットでスタート画面が残るのを防ぐ）
                             FileInfo projectFileInfo = new FileInfo(projectFilePath);
                             if (projectFileInfo.IsReadOnly)
                             {
                                 projectFileInfo.IsReadOnly = false;
                                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from project file before opening Excel");
                             }
-                            
-                            // COM のみで開き直す（Process.Start との二重起動で読み取り専用コピーが付くのを防ぐ）
-                            ExcelApp excelApp = null;
-                            ExcelWorkbook workbook = null;
 
-                            ExcelWorkbook OpenProjectWorkbook(ExcelApp app, string path)
-                            {
-                                string nameOnly = System.IO.Path.GetFileName(path);
-                                foreach (ExcelWorkbook wb in app.Workbooks)
-                                {
-                                    try
-                                    {
-                                        if (wb.FullName.Equals(path, StringComparison.OrdinalIgnoreCase) ||
-                                            wb.Name.Equals(nameOnly, StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Found existing workbook: {wb.Name}");
-                                            return wb;
-                                        }
-                                    }
-                                    catch
-                                    {
-                                        /* ignore */
-                                    }
-                                }
-
-                                var opened = app.Workbooks.Open(
-                                    path,
-                                    UpdateLinks: false,
-                                    ReadOnly: false,
-                                    Format: Type.Missing,
-                                    Password: Type.Missing,
-                                    WriteResPassword: Type.Missing,
-                                    IgnoreReadOnlyRecommended: true,
-                                    Origin: Microsoft.Office.Interop.Excel.XlPlatform.xlWindows,
-                                    Delimiter: Type.Missing,
-                                    Editable: true,
-                                    Notify: false,
-                                    Converter: Type.Missing,
-                                    AddToMru: false,
-                                    Local: false,
-                                    CorruptLoad: Microsoft.Office.Interop.Excel.XlCorruptLoad.xlNormalLoad);
-                                System.Diagnostics.Debug.WriteLine($"[ResetProject] Opened workbook: {opened.Name}");
-                                return opened;
-                            }
-
-                            try
-                            {
-                                excelApp = _viewModel.GetOrCreateExcelApplication();
-                                excelApp.Visible = false;
-
-                                workbook = OpenProjectWorkbook(excelApp, projectFilePath);
-
-                                // Initialフォルダに保存（上書き）
-                                bool originalDisplayAlerts = excelApp.DisplayAlerts;
-                                try
-                                {
-                                    excelApp.DisplayAlerts = false;
-                                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Disabled Excel display alerts for automatic overwrite");
-
-                                    workbook.SaveAs(
-                                        initialFilePath,
-                                        Microsoft.Office.Interop.Excel.XlFileFormat.xlOpenXMLWorkbook,
-                                        Password: Type.Missing,
-                                        WriteResPassword: Type.Missing,
-                                        ReadOnlyRecommended: false,
-                                        CreateBackup: false,
-                                        AccessMode: Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange,
-                                        ConflictResolution: Microsoft.Office.Interop.Excel.XlSaveConflictResolution.xlLocalSessionChanges,
-                                        AddToMru: false,
-                                        TextCodepage: Type.Missing,
-                                        TextVisualLayout: Type.Missing,
-                                        Local: false);
-
-                                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Saved workbook to Initial folder: {initialFilePath}");
-                                }
-                                finally
-                                {
-                                    excelApp.DisplayAlerts = originalDisplayAlerts;
-                                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Restored Excel display alerts to original state");
-                                }
-
-                                System.Threading.Thread.Sleep(200);
-                                FileInfo initialFileInfo = new FileInfo(initialFilePath);
-                                if (initialFileInfo.IsReadOnly)
-                                {
-                                    initialFileInfo.IsReadOnly = false;
-                                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from Initial folder file");
-                                }
-
-                                workbook.Close(SaveChanges: false);
-                                System.Diagnostics.Debug.WriteLine($"[ResetProject] Closed workbook after SaveAs to Initial");
-                                try
-                                {
-                                    Marshal.ReleaseComObject(workbook);
-                                }
-                                catch (Exception rex)
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Release workbook: {rex.Message}");
-                                }
-
-                                workbook = null;
-
-                                workbook = OpenProjectWorkbook(excelApp, projectFilePath);
-                                excelApp.Visible = true;
-                                try
-                                {
-                                    excelApp.WindowState = Microsoft.Office.Interop.Excel.XlWindowState.xlNormal;
-                                }
-                                catch
-                                {
-                                    /* ignore */
-                                }
-
-                                System.Diagnostics.Debug.WriteLine($"[ResetProject] Reopened project file via COM: {projectFilePath}");
-                                // 表示中のブックは Excel が保持。RCW を finally で解放しないよう参照を外す。
-                                workbook = null;
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[ResetProject] Error processing Excel file: {ex.Message}\n{ex.StackTrace}");
-
-                                try
-                                {
-                                    var fallbackApp = _viewModel.GetOrCreateExcelApplication();
-                                    fallbackApp.Visible = false;
-                                    OpenProjectWorkbook(fallbackApp, projectFilePath);
-                                    fallbackApp.Visible = true;
-                                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Fallback: opened project file via COM");
-                                }
-                                catch (Exception openEx)
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Fallback open failed: {openEx.Message}");
-                                }
-                            }
-                            finally
-                            {
-                                if (workbook != null)
-                                {
-                                    try
-                                    {
-                                        Marshal.ReleaseComObject(workbook);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Error releasing workbook: {ex.Message}");
-                                    }
-                                }
-                            }
+                            string pathToOpen = File.Exists(initialFilePath) ? initialFilePath : projectFilePath;
+                            _viewModel.OpenExcelWorkbookAfterResetByShell(pathToOpen);
+                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Reopened workbook via shell: {pathToOpen}");
                         }
                     }
                     

@@ -813,6 +813,55 @@ namespace Ui.ViewModels
             });
         }
 
+        /// <summary>
+        /// リセット完了後など、空の Excel を先に COM 起動せずブックを開き直す（<see cref="ExecuteOpenProject"/> と同様）。
+        /// </summary>
+        public void OpenExcelWorkbookAfterResetByShell(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                System.Diagnostics.Debug.WriteLine($"[OpenExcelWorkbookAfterResetByShell] skip: invalid path {filePath}");
+                return;
+            }
+
+            bool opened = false;
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = filePath,
+                    UseShellExecute = true
+                });
+                opened = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OpenExcelWorkbookAfterResetByShell] shell-open failed: {ex.Message}");
+            }
+
+            if (!opened)
+                opened = StartExcelWithFile(filePath);
+
+            if (!opened)
+            {
+                System.Diagnostics.Debug.WriteLine("[OpenExcelWorkbookAfterResetByShell] failed to start Excel");
+                return;
+            }
+
+            if (CurrentProject != null)
+            {
+                CurrentProject = new ProjectInfo
+                {
+                    Name = CurrentProject.Name,
+                    FilePath = filePath,
+                    Group = CurrentProject.Group,
+                    ProjectNumber = CurrentProject.ProjectNumber
+                };
+            }
+
+            TryAttachSharedExcelApplicationAfterShellOpen();
+        }
+
         public string GetProjectFilePath(int groupId, int projectId)
         {
             // プロジェクトを開く場合は、必ずInitialフォルダから開く
