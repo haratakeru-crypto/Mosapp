@@ -87,6 +87,7 @@ namespace Ui.ViewModels
         private string _selectedFilePath;
         private string _resultMessage;
         private bool _isExcelOverlayVisible;
+        private bool _isShutdownWaitOverlayVisible;
         private bool _showScoreButton;
         private bool _showPauseButton;
         private ProjectInfo _currentProject;
@@ -94,6 +95,9 @@ namespace Ui.ViewModels
 
         /// <summary>試験終了処理の二重起動防止（タイマー経路と終了ボタン確認の競合など）。新規プロジェクト開始時に 0 に戻す。</summary>
         private int _endExamShutdownStarted;
+
+        /// <summary>試験終了スレッドの保存・Quit が終わるまでシグナル。初期は完了済み。</summary>
+        private readonly ManualResetEventSlim _excelShutdownFinished = new ManualResetEventSlim(true);
 
         /// <summary>
         /// アプリが利用する Excel インスタンスを取得（無ければ作成）。
@@ -245,6 +249,18 @@ namespace Ui.ViewModels
             set
             {
                 _isExcelOverlayVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
+        /// <summary>前試験の Excel 終了待ちの全画面オーバーレイ（プロジェクト選択で連打したときのフィードバック）</summary>
+        public bool IsShutdownWaitOverlayVisible
+        {
+            get => _isShutdownWaitOverlayVisible;
+            set
+            {
+                if (_isShutdownWaitOverlayVisible == value) return;
+                _isShutdownWaitOverlayVisible = value;
                 OnPropertyChanged();
             }
         }
@@ -606,6 +622,9 @@ namespace Ui.ViewModels
                 ResultMessage = "エラー: プロジェクトIDが指定されていません。";
                 return;
             }
+
+            if (!WaitForExcelShutdownToCompleteBeforeOpeningProject())
+                return;
 
             string filePath = GetProjectFilePath(projectId);
             if (string.IsNullOrEmpty(filePath))
@@ -1582,8 +1601,8 @@ namespace Ui.ViewModels
                 {
                     Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
                         excelPid,
-                        20000,
                         8000,
+                        3000,
                         "[CloseExcelApplication]");
                 }
             }
@@ -2054,6 +2073,8 @@ namespace Ui.ViewModels
             CurrentProject = null;
             ResultMessage = "試験を終了しました。";
 
+            _excelShutdownFinished.Reset();
+
             // Office COM は STA 上で扱う（スレッドプール MTA の Task.Run は不安定になり得る）
             var shutdownThread = new Thread(() =>
             {
@@ -2065,6 +2086,10 @@ namespace Ui.ViewModels
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExecuteEndExam] Excel shutdown: {ex.Message}");
+                }
+                finally
+                {
+                    _excelShutdownFinished.Set();
                 }
             })
             {
@@ -2079,20 +2104,103 @@ namespace Ui.ViewModels
         }
 
         /// <summary>
+        /// 前試験の Excel 終了スレッドが完了するまで待つ。完了しない場合は ResultMessage を設定して false。
+        /// </summary>
+        private bool WaitForExcelShutdownToCompleteBeforeOpeningProject()
+        {
+            if (_excelShutdownFinished.Wait(0))
+                return true;
+
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] 前試験の Excel 終了処理の完了を待機しています…");
+            const int maxWaitMs = 12_000;
+            const int overlayDelayMs = 400;
+            var disp = Application.Current?.Dispatcher;
+            var sw = Stopwatch.StartNew();
+            var overlayShown = false;
+            try
+            {
+                while (sw.ElapsedMilliseconds < maxWaitMs)
+                {
+                    if (_excelShutdownFinished.Wait(50))
+                        return true;
+
+                    if (!overlayShown && sw.ElapsedMilliseconds >= overlayDelayMs)
+                    {
+                        IsShutdownWaitOverlayVisible = true;
+                        overlayShown = true;
+                        disp?.Invoke(() => { }, DispatcherPriority.Loaded);
+                    }
+                    else
+                    {
+                        disp?.Invoke(() => { }, DispatcherPriority.Background);
+                    }
+                }
+
+                ResultMessage =
+                    "終了処理の完了に時間がかかっています。少し待ってから、もう一度プロジェクトを開いてください。";
+                System.Diagnostics.Debug.WriteLine("[MainViewModel] Excel 終了待機がタイムアウトしました");
+                return false;
+            }
+            finally
+            {
+                IsShutdownWaitOverlayVisible = false;
+            }
+        }
+
+        /// <summary>
+        /// 保存用に Excel.Application を取得。共有参照を優先し、失敗時は ROT 登録まで短時間リトライする。
+        /// </summary>
+        private static bool TryAcquireExcelApplicationForSave(ExcelApp sharedRef, int maxWaitMs, out ExcelApp app, out bool releaseComObjectWhenDone)
+        {
+            app = null;
+            releaseComObjectWhenDone = false;
+
+            if (sharedRef != null)
+            {
+                try
+                {
+                    _ = sharedRef.Visible;
+                    app = sharedRef;
+                    releaseComObjectWhenDone = false;
+                    return true;
+                }
+                catch
+                {
+                    /* GetActiveObject へ */
+                }
+            }
+
+            var sw = Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < maxWaitMs)
+            {
+                try
+                {
+                    app = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                    releaseComObjectWhenDone = true;
+                    return true;
+                }
+                catch
+                {
+                    Thread.Sleep(100);
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// 開いているすべてのExcelワークブックを保存する（閉じない）。
         /// </summary>
         private void SaveAllExcelWorkbooks()
         {
-            ExcelApp excelApp = null;
-            try
+            const int acquireWaitMs = 3000;
+            if (!TryAcquireExcelApplicationForSave(_sharedExcelApp, acquireWaitMs, out var excelApp, out var releaseApp))
             {
-                excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-            }
-            catch
-            {
-                System.Diagnostics.Debug.WriteLine("[SaveAllExcelWorkbooks] Excelアプリケーションが見つかりません");
+                System.Diagnostics.Debug.WriteLine(
+                    "[SaveAllExcelWorkbooks] Excel を取得できませんでした（既に終了済み、または ROT 未登録の可能性）");
                 return;
             }
+
             try
             {
                 foreach (ExcelWorkbook wb in excelApp.Workbooks)
@@ -2110,7 +2218,7 @@ namespace Ui.ViewModels
             }
             finally
             {
-                if (excelApp != null)
+                if (releaseApp && excelApp != null)
                 {
                     try { Marshal.ReleaseComObject(excelApp); } catch { }
                 }
