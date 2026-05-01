@@ -19,7 +19,7 @@ namespace Libraries
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool AllowSetForegroundWindow(uint dwProcessId);
 
-        private static readonly string AddinDiagPath = Path.Combine(Path.GetTempPath(), "mos_excel_addin_diag.txt");
+        private static readonly string AddinDiagPath = ExcelLogReader.GetDiagnosticLogPath();
         private const string AddinStartupCompletedMarker = "Startup completed";
 
         public static ExcelApp GetOrCreateExcelApplication(bool makeVisible, int timeoutMs = 30000)

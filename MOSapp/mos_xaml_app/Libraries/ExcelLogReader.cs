@@ -49,6 +49,23 @@ namespace Libraries
             catch { }
         }
 
+        /// <summary>指定したプロジェクトに関連する破壊的操作エラーログのみをクリアします。</summary>
+        public static void ClearDestructiveLogForProject(int projectId)
+        {
+            try
+            {
+                string path = GetDestructiveLogPath();
+                if (!File.Exists(path)) return;
+
+                string prefix = $"{projectId},";
+                var lines = File.ReadAllLines(path);
+                var keptLines = lines.Where(l => !l.StartsWith(prefix)).ToList();
+
+                File.WriteAllLines(path, keptLines);
+            }
+            catch { }
+        }
+
         public static void ClearDestructiveLog()
         {
             try
@@ -59,12 +76,75 @@ namespace Libraries
             catch { }
         }
 
-        /// <summary>VSTO が追記する操作ログ（%TEMP%\mos_excel_log.txt）。リセット時に破壊的操作判定の入力をクリアする。</summary>
+        /// <summary>指定したプロジェクトに関連する操作ログ（%TEMP%\mos_excel_log.txt）をクリアします。</summary>
+        public static void ClearOperationLogForProject(int projectId)
+        {
+            try
+            {
+                string path = GetLogFilePath();
+                if (!File.Exists(path)) return;
+
+                var lines = File.ReadAllLines(path);
+                var keptLines = new List<string>();
+                int currentLineProjectId = -1;
+
+                foreach (var line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    // [TaskStart] 行のチェック
+                    int taskStartIdx = line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase);
+                    if (taskStartIdx >= 0)
+                    {
+                        ParseTaskStart(line, out currentLineProjectId, out _, out _);
+                        if (currentLineProjectId != projectId)
+                        {
+                            keptLines.Add(line);
+                        }
+                        continue;
+                    }
+
+                    // 明示的なプロジェクト接頭辞（例: [Task 1-2-1]）のチェック
+                    string projectPrefix = $"[Task {projectId}-";
+                    if (line.IndexOf(projectPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        // リセット対象プロジェクトの行なのでスキップ
+                        continue;
+                    }
+
+                    // 文脈上のプロジェクトIDが一致しない（または不明な）場合は保持
+                    if (currentLineProjectId != projectId)
+                    {
+                        keptLines.Add(line);
+                    }
+                }
+
+                File.WriteAllLines(path, keptLines);
+            }
+            catch { }
+        }
+
         public static void ClearOperationLog()
         {
             try
             {
                 string path = GetLogFilePath();
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch { }
+        }
+
+        public static string GetDiagnosticLogPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_excel_addin_diag.txt");
+        }
+
+        /// <summary>VSTO アドイン自体の動作ログ（%TEMP%\mos_excel_addin_diag.txt）をクリアします。</summary>
+        public static void ClearDiagnosticLog()
+        {
+            try
+            {
+                string path = GetDiagnosticLogPath();
                 if (File.Exists(path)) File.Delete(path);
             }
             catch { }

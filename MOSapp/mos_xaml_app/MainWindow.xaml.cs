@@ -36,6 +36,9 @@ namespace MOSExcelMogiApp
         
         public MainWindow()
         {
+            // アプリ起動時にアドインの診断ログをクリアして肥大化を防ぐ
+            ExcelLogReader.ClearDiagnosticLog();
+
             InitializeComponent();
             
             // Dependency Injection setup
@@ -288,8 +291,8 @@ namespace MOSExcelMogiApp
         {
             try
             {
-                ExcelLogReader.ClearOperationLog();
-                ExcelLogReader.ClearDestructiveLog();
+                ExcelLogReader.ClearOperationLogForProject(projectId);
+                ExcelLogReader.ClearDestructiveLogForProject(projectId);
 
                 // 実際に開いているファイルパスを取得
                 string projectFilePath = null;
