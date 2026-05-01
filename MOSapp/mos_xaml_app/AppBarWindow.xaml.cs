@@ -134,9 +134,7 @@ namespace MOSExcelMogiApp
             {
                 var sharedExcel = _viewModel?.TryGetSharedExcelApplication();
                 if (sharedExcel != null)
-                {
                     PositionExcelWindow();
-                }
             }
             catch
             {
@@ -1124,7 +1122,7 @@ namespace MOSExcelMogiApp
                 
                 // 現在のタイマー残り時間と状態情報を渡す（groupIdも追加）
                 var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, groupId);
-                reviewWindow.OnNavigateToTask = NavigateToTask;
+                reviewWindow.OnNavigateToTask = (g, p, t) => NavigateToTask(p, t, g);
                 reviewWindow.Closed += (s, args) => 
                 {
                     // レビューページが閉じられたらメインウィンドウを再表示
@@ -1143,7 +1141,8 @@ namespace MOSExcelMogiApp
             }
         }
 
-        public void NavigateToTask(int projectId, int taskId)
+        /// <param name="groupIdOverride">結果画面・レビューから遷移するときのグループ。null のときは <see cref="Ui.ViewModels.MainViewModel.CurrentProject"/> から推定。</param>
+        public void NavigateToTask(int projectId, int taskId, int? groupIdOverride = null)
         {
             System.Diagnostics.Debug.WriteLine($"[AppBarWindow] NavigateToTask called: ProjectId={projectId}, TaskId={taskId}");
 
@@ -1154,6 +1153,13 @@ namespace MOSExcelMogiApp
             }
             _isNavigatingToTask = true;
             _pendingTaskId = taskId;
+
+            if (_viewModel != null && !_viewModel.WaitForExcelShutdownToCompleteBeforeOpeningProject())
+            {
+                _isNavigatingToTask = false;
+                _pendingTaskId = null;
+                return;
+            }
             
             // AppBarWindowを確実に表示（既に表示されている場合は何もしない）
             try
@@ -1182,7 +1188,8 @@ namespace MOSExcelMogiApp
             catch (InvalidOperationException ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error showing window (may be closing): {ex.Message}");
-                // ウィンドウが閉じられている場合は無視して続行
+                _isNavigatingToTask = false;
+                _pendingTaskId = null;
                 return; // NavigateToTaskを中断
             }
             
@@ -1198,13 +1205,15 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Set current project: {_currentProjectId}, current task: {_currentTaskId}");
                 
                 // Excelファイルを開く処理を追加
-                int groupId = 1; // デフォルト
-                if (_viewModel?.CurrentProject != null)
+                int groupId = 1;
+                if (groupIdOverride.HasValue && groupIdOverride.Value > 0)
+                    groupId = groupIdOverride.Value;
+                else if (_viewModel?.CurrentProject != null)
                 {
                     string groupStr = _viewModel.CurrentProject.Group.Replace("Group ", "");
                     int.TryParse(groupStr, out groupId);
                 }
-                
+
                 // プロジェクトファイルパスを取得
                 string filePath = _viewModel.GetProjectFilePath(groupId, projectId);
                 
@@ -1212,15 +1221,40 @@ namespace MOSExcelMogiApp
                 {
                     System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Opening Excel file: {filePath}");
 
-                    // Excel を COM で取得（起動中ならそれを使う／無ければ新規起動）
+                    // Excel を COM で取得（起動中ならそれを使う／無ければ新規起動→最後にシェル起動＋ROT 接続）
                     try
                     {
                         excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
                     }
                     catch (COMException)
                     {
-                        // COMオートメーション起動を避け、通常起動→接続に寄せる
-                        excelApp = ExcelApplicationManager.GetOrCreateExcelApplication(makeVisible: true, timeoutMs: 30000);
+                        if (_viewModel == null)
+                            throw;
+
+                        // 先に対象ブックをシェルで開き短時間で ROT 接続（スタート画面の空 Excel 起動より優先）
+                        excelApp = _viewModel.TryOpenWorkbookByShellAndAttachRunningExcel(
+                            filePath,
+                            delayMs: 600,
+                            attachTimeoutMs: 8000);
+
+                        if (excelApp == null)
+                        {
+                            try
+                            {
+                                excelApp = ExcelApplicationManager.GetOrCreateExcelApplication(makeVisible: true, timeoutMs: 15000);
+                            }
+                            catch (Exception ex2)
+                            {
+                                excelApp = _viewModel.TryOpenWorkbookByShellAndAttachRunningExcel(
+                                    filePath,
+                                    delayMs: 1000,
+                                    attachTimeoutMs: 12000);
+                                if (excelApp == null)
+                                    throw new InvalidOperationException(
+                                        "Excel に接続できませんでした。しばらくしてから再度お試しください。",
+                                        ex2);
+                            }
+                        }
                     }
 
                     // 既に開いているなら Activate、無ければ Open（Process.Start による多重起動を避ける）
@@ -1268,10 +1302,14 @@ namespace MOSExcelMogiApp
                         
                         // イベントハンドラーを再登録
                         _viewModel.CurrentProjectChanged += OnCurrentProjectChanged;
+
+                        // 共有参照へ載せ替え（ここで Release しない。ViewModel が保持し SharedExcelApplicationAttached で再配置）
+                        _viewModel.PublishSharedExcelApplication(excelApp);
+                        excelApp = null;
                     }
 
-                    // Excel ウィンドウの配置を少し遅延して実行（起動直後のハンドル未確定を避ける）
-                    var delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+                    // ハンドル確定の遅れ対策: プロジェクト切替と同程度の遅延でもう一度配置
+                    var delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
                     delayTimer.Tick += (s, e) =>
                     {
                         delayTimer.Stop();

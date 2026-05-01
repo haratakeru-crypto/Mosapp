@@ -174,7 +174,37 @@ namespace Ui.ViewModels
         {
             _sharedExcelApp = null;
         }
-        
+
+        /// <summary>
+        /// AppBar の <c>NavigateToTask</c> 等で取得した Excel を共有参照に載せ替え、アプリバーへ再配置を通知する。
+        /// （取得だけして <see cref="_sharedExcelApp"/> に載せないと <c>PositionExcelWindow</c> が空振りする）
+        /// </summary>
+        public void PublishSharedExcelApplication(ExcelApp app)
+        {
+            if (app == null)
+                return;
+
+            var previous = _sharedExcelApp;
+            _sharedExcelApp = app;
+
+            if (previous != null)
+            {
+                try
+                {
+                    if (!ReferenceEquals(previous, app))
+                        Marshal.ReleaseComObject(previous);
+                }
+                catch
+                {
+                    /* ignore */
+                }
+            }
+
+            Application.Current?.Dispatcher?.BeginInvoke(
+                new Action(() => SharedExcelApplicationAttached?.Invoke(this, EventArgs.Empty)),
+                DispatcherPriority.Background);
+        }
+
         public event EventHandler ExamEnded;
         public event EventHandler ShowAppBarRequested;
         public event EventHandler HideMainWindowRequested;
@@ -893,6 +923,45 @@ namespace Ui.ViewModels
             }
 
             TryAttachSharedExcelApplicationAfterShellOpen();
+        }
+
+        /// <summary>
+        /// 結果画面からのタスク遷移など、<c>GetActiveObject</c> が失敗したときのフォールバック用。
+        /// シェルでブックを開き、短い待機のあと ROT から実行中の Excel に接続する（<see cref="ExecuteOpenProject"/> と同系統）。
+        /// </summary>
+        public ExcelApp TryOpenWorkbookByShellAndAttachRunningExcel(string filePath, int delayMs = 600, int attachTimeoutMs = 8000)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return null;
+
+            bool opened = false;
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = filePath,
+                    UseShellExecute = true
+                });
+                opened = true;
+            }
+            catch (Exception)
+            {
+            }
+
+            if (!opened)
+                opened = StartExcelWithFile(filePath);
+
+            if (!opened)
+                return null;
+
+            Thread.Sleep(delayMs);
+
+            using (OleMessageFilterScope.Enter())
+            {
+                return Libraries.ExcelApplicationManager.TryAttachRunningExcelApplication(
+                    makeVisible: true,
+                    timeoutMs: attachTimeoutMs);
+            }
         }
 
         public string GetProjectFilePath(int groupId, int projectId)
@@ -2105,13 +2174,13 @@ namespace Ui.ViewModels
 
         /// <summary>
         /// 前試験の Excel 終了スレッドが完了するまで待つ。完了しない場合は ResultMessage を設定して false。
+        /// プロジェクト選択のほか、結果画面からのタスク遷移などでも利用する。
         /// </summary>
-        private bool WaitForExcelShutdownToCompleteBeforeOpeningProject()
+        public bool WaitForExcelShutdownToCompleteBeforeOpeningProject()
         {
             if (_excelShutdownFinished.Wait(0))
                 return true;
 
-            System.Diagnostics.Debug.WriteLine("[MainViewModel] 前試験の Excel 終了処理の完了を待機しています…");
             const int maxWaitMs = 12_000;
             const int overlayDelayMs = 400;
             var disp = Application.Current?.Dispatcher;
@@ -2138,7 +2207,6 @@ namespace Ui.ViewModels
 
                 ResultMessage =
                     "終了処理の完了に時間がかかっています。少し待ってから、もう一度プロジェクトを開いてください。";
-                System.Diagnostics.Debug.WriteLine("[MainViewModel] Excel 終了待機がタイムアウトしました");
                 return false;
             }
             finally
@@ -2195,11 +2263,7 @@ namespace Ui.ViewModels
         {
             const int acquireWaitMs = 3000;
             if (!TryAcquireExcelApplicationForSave(_sharedExcelApp, acquireWaitMs, out var excelApp, out var releaseApp))
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    "[SaveAllExcelWorkbooks] Excel を取得できませんでした（既に終了済み、または ROT 未登録の可能性）");
                 return;
-            }
 
             try
             {
@@ -2208,11 +2272,9 @@ namespace Ui.ViewModels
                     try
                     {
                         wb.Save();
-                        System.Diagnostics.Debug.WriteLine($"[SaveAllExcelWorkbooks] 保存しました: {wb.Name}");
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[SaveAllExcelWorkbooks] 保存エラー {wb?.Name}: {ex.Message}");
                     }
                 }
             }

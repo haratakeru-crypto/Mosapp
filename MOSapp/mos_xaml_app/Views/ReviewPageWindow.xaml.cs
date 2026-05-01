@@ -53,7 +53,8 @@ namespace MOSExcelMogiApp.Views
         // #endregion
 
         public ICommand NavigateToTaskCommand { get; private set; }
-        public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
+        /// <summary>グループID、プロジェクトID、タスクIDの順。</summary>
+        public Action<int, int, int> OnNavigateToTask { get; set; }
         private DispatcherTimer _timer;
         private TimeSpan _remainingTime;
         private int _groupId = 1; // Group番号（1=模擬①, 2=模擬②, 3=演習）
@@ -143,6 +144,7 @@ namespace MOSExcelMogiApp.Views
                             {
                                 TaskTitle = $"タスク {task.TaskId}",
                                 Description = RemoveQuotes(task.Description),
+                                GroupId = _groupId,
                                 ProjectId = project.ProjectId,
                                 TaskId = task.TaskId
                             }).ToList() ?? new List<ReviewTaskInfo>()
@@ -506,7 +508,7 @@ namespace MOSExcelMogiApp.Views
                     _timer?.Stop();
                     
                     // ナビゲーションを実行
-                    OnNavigateToTask(taskInfo.ProjectId, taskInfo.TaskId);
+                    OnNavigateToTask(taskInfo.GroupId > 0 ? taskInfo.GroupId : _groupId, taskInfo.ProjectId, taskInfo.TaskId);
                     
                     System.Diagnostics.Debug.WriteLine("ナビゲーション実行完了");
                     
@@ -742,12 +744,12 @@ namespace MOSExcelMogiApp.Views
                                     appBarWindow.Activate();
 
                                     // 重要: 表示中のAppBarWindowに直接ナビゲートする（デリゲートの参照先が古い可能性があるため）
-                                    appBarWindow.NavigateToTask(projectId, taskId);
+                                    appBarWindow.NavigateToTask(projectId, taskId, _groupId);
                                     return;
                                 }
 
                                 // フォールバック: 既存の経路（AppBarWindowが見つからない場合）
-                                OnNavigateToTask(projectId, taskId);
+                                OnNavigateToTask(_groupId, projectId, taskId);
                             };
                         }
                         else
@@ -781,7 +783,7 @@ namespace MOSExcelMogiApp.Views
                                     appBarWindow.Activate();
                                     
                                     // NavigateToTaskを呼び出す
-                                    appBarWindow.NavigateToTask(projectId, taskId);
+                                    appBarWindow.NavigateToTask(projectId, taskId, _groupId);
                                 };
                             }
                         }
@@ -2093,6 +2095,7 @@ namespace MOSExcelMogiApp.Views
     {
         public string TaskTitle { get; set; }
         public string Description { get; set; }
+        public int GroupId { get; set; }
         public int ProjectId { get; set; }
         public int TaskId { get; set; }
     }

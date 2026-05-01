@@ -327,6 +327,7 @@ namespace MOSExcelMogiApp.Views
                                 {
                                     TaskTitle = $"タスク {task.TaskId}",
                                     Description = RemoveQuotes(task.Description),
+                                    GroupId = _groupId,
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
                                     ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
@@ -377,6 +378,7 @@ namespace MOSExcelMogiApp.Views
                                 {
                                     TaskTitle = $"タスク {task.TaskId}",
                                     Description = RemoveQuotes(task.Description),
+                                    GroupId = _groupId,
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
                                     ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
@@ -920,8 +922,6 @@ namespace MOSExcelMogiApp.Views
         {
             if (sender is FrameworkElement element && element.DataContext is ResultTaskInfo taskInfo)
             {
-                System.Diagnostics.Debug.WriteLine($"[ResultWindow] Task clicked: ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
-                
                 if (taskInfo.ProjectId > 0 && taskInfo.TaskId > 0)
                 {
                     try
@@ -932,7 +932,6 @@ namespace MOSExcelMogiApp.Views
                         // AppBarWindowが存在しない、または閉じられている場合は新しく作成
                         if (appBarWindow == null || !appBarWindow.IsLoaded)
                         {
-                            System.Diagnostics.Debug.WriteLine("[ResultWindow] AppBarWindow not found or closed, creating new one");
                             
                             // MainWindowからViewModelを取得
                             var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
@@ -974,7 +973,8 @@ namespace MOSExcelMogiApp.Views
                         await Task.Delay(50);
                         // 重要: 表示しているAppBarWindowインスタンスに対して直接ナビゲートする
                         // （OnNavigateToTask は古いAppBarWindowのデリゲートを保持している可能性があるため）
-                        appBarWindow.NavigateToTask(taskInfo.ProjectId, taskInfo.TaskId);
+                        var gid = taskInfo.GroupId > 0 ? taskInfo.GroupId : _groupId;
+                        appBarWindow.NavigateToTask(taskInfo.ProjectId, taskInfo.TaskId, gid);
                         
                         // NavigateToTaskの処理が完了するまで少し待つ
                         await Task.Delay(100);
@@ -1002,6 +1002,7 @@ namespace MOSExcelMogiApp.Views
     {
         public string TaskTitle { get; set; }
         public string Description { get; set; }
+        public int GroupId { get; set; }
         public int ProjectId { get; set; }
         public int TaskId { get; set; }
         public string ResultMark { get; set; }

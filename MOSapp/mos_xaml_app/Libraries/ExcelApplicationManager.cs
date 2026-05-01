@@ -46,11 +46,18 @@ namespace Libraries
             bool launchSucceeded = false;
             try
             {
+                var swLaunch = Stopwatch.StartNew();
                 launchedPid = StartExcelProcess();
                 if (launchedPid <= 0)
                     throw new InvalidOperationException("Excel を起動できませんでした。");
 
                 app = WaitForActiveExcelApplicationForPid(launchedPid, timeoutMs);
+                if (app == null)
+                {
+                    int remaining = Math.Max(2000, timeoutMs - (int)swLaunch.ElapsedMilliseconds);
+                    app = WaitForActiveExcelApplication(remaining);
+                }
+
                 if (app == null)
                     throw new InvalidOperationException("起動後の Excel へ接続できませんでした。");
 
