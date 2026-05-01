@@ -50,21 +50,17 @@ namespace Libraries
                 if (launchedPid <= 0)
                     throw new InvalidOperationException("Excel を起動できませんでした。");
 
-                // VSTO アドインが Startup completed を出すまで待機（タブ注入競合の抑止）
-                WaitForVstoStartupByPid(launchedPid, timeoutMs);
-
-                // GetActiveObject は「別プロセスの Excel」と取り違えることがあるため、起動 PID と一致するまで待つ
                 app = WaitForActiveExcelApplicationForPid(launchedPid, timeoutMs);
                 if (app == null)
                     throw new InvalidOperationException("起動後の Excel へ接続できませんでした。");
 
                 TrySetVisible(app, makeVisible);
+                WaitForVstoStartupIfPossible(app, 5000);
                 launchSucceeded = true;
                 return app;
             }
             finally
             {
-                // Process.Start 済みだが接続失敗等で例外になった場合、白画面だけ残る EXCEL を PID 単位で終了させる
                 if (!launchSucceeded && launchedPid > 0)
                 {
                     EnsureExcelProcessExited(
@@ -74,6 +70,21 @@ namespace Libraries
                         "[GetOrCreateExcelApplication] failed launch cleanup");
                 }
             }
+        }
+
+        /// <summary>
+        /// 起動済みの Excel のみ ROT から取得する。新規プロセスは起動しない（シェル起動後の COM 接続用）。
+        /// </summary>
+        public static ExcelApp TryAttachRunningExcelApplication(bool makeVisible, int timeoutMs = 15000)
+        {
+            var app = WaitForActiveExcelApplication(timeoutMs);
+            if (app == null)
+                return null;
+
+            TrySetVisible(app, makeVisible);
+            int vstoWaitMs = Math.Min(timeoutMs, 8000);
+            WaitForVstoStartupIfPossible(app, vstoWaitMs);
+            return app;
         }
 
         private static ExcelApp TryGetActiveExcelApplication()
@@ -122,7 +133,6 @@ namespace Libraries
                 Thread.Sleep(250);
             }
 
-            // タイムアウト: 別 PID の Excel に誤接続しないよう null（呼び出し側で例外・クリーンアップ）
             return null;
         }
 
@@ -279,6 +289,7 @@ namespace Libraries
             {
                 if (IsAddinStartupCompleted(excelPid))
                     return;
+
                 Thread.Sleep(200);
             }
         }
@@ -326,8 +337,9 @@ namespace Libraries
                     var psi = new ProcessStartInfo
                     {
                         FileName = path,
-                        // /e: 起動スクリーンや新規ブックの抑制寄せ（add-inロードの抑止はしない）
-                        Arguments = "/e",
+                        // /e を付けると環境によって ROT 登録(=GetActiveObject)が遅延するため、
+                        // 通常起動にして Application 取得を安定させる。
+                        Arguments = "",
                         UseShellExecute = true
                     };
                     var proc = Process.Start(psi);

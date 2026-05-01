@@ -33,6 +33,55 @@ namespace Ui.ViewModels
 
     public class MainViewModel : INotifyPropertyChanged
     {
+        [ComImport]
+        [Guid("00000016-0000-0000-C000-000000000046")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IOleMessageFilter
+        {
+            [PreserveSig]
+            int HandleInComingCall(int dwCallType, IntPtr hTaskCaller, int dwTickCount, IntPtr lpInterfaceInfo);
+
+            [PreserveSig]
+            int RetryRejectedCall(IntPtr hTaskCallee, int dwTickCount, int dwRejectType);
+
+            [PreserveSig]
+            int MessagePending(IntPtr hTaskCallee, int dwTickCount, int dwPendingType);
+        }
+
+        /// <summary>
+        /// Office COM 呼び出し中の RPC_E_CALL_REJECTED を自動リトライする OLE message filter。
+        /// この ViewModel 内に閉じた実装にして、csproj 取り込み漏れの影響を受けないようにする。
+        /// </summary>
+        private sealed class OleMessageFilterScope : IOleMessageFilter, IDisposable
+        {
+            private IOleMessageFilter _oldFilter;
+            private bool _disposed;
+
+            private OleMessageFilterScope() { }
+
+            public static OleMessageFilterScope Enter()
+            {
+                var scope = new OleMessageFilterScope();
+                CoRegisterMessageFilter(scope, out scope._oldFilter);
+                return scope;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                CoRegisterMessageFilter(_oldFilter, out _);
+                _oldFilter = null;
+            }
+
+            int IOleMessageFilter.HandleInComingCall(int dwCallType, IntPtr hTaskCaller, int dwTickCount, IntPtr lpInterfaceInfo) => 0;
+            int IOleMessageFilter.RetryRejectedCall(IntPtr hTaskCallee, int dwTickCount, int dwRejectType) => dwRejectType == 2 ? 100 : -1;
+            int IOleMessageFilter.MessagePending(IntPtr hTaskCallee, int dwTickCount, int dwPendingType) => 2;
+
+            [DllImport("Ole32.dll")]
+            private static extern int CoRegisterMessageFilter(IOleMessageFilter newFilter, out IOleMessageFilter oldFilter);
+        }
+
         private readonly IExcelCheckerService _excelCheckerService;
         private int _selectedTabIndex;
         private string _selectedFilePath;
@@ -93,71 +142,26 @@ namespace Ui.ViewModels
             throw lastException ?? new InvalidOperationException("Excel を起動できませんでした。");
         }
 
-        private const int HResultRpcCallRejected = unchecked((int)0x80010001);
-        private const int HResultRpcServerCallRetryLater = unchecked((int)0x8001010A);
-
-        private static bool IsTransientExcelComError(COMException ex)
+        /// <summary>
+        /// 既存の共有 Excel 参照を返す（無効なら null）。新規起動はしない。
+        /// </summary>
+        public ExcelApp TryGetSharedExcelApplication()
         {
-            return ex != null &&
-                   (ex.HResult == HResultRpcCallRejected || ex.HResult == HResultRpcServerCallRetryLater);
-        }
-
-        /// <summary>既に開いているブックからフルパス一致で検索。</summary>
-        private static ExcelWorkbook FindWorkbookByFullPath(ExcelApp excelApp, string targetFullPathLower)
-        {
-            if (excelApp == null) return null;
-            foreach (ExcelWorkbook wb in excelApp.Workbooks)
+            if (_sharedExcelApp == null) return null;
+            try
             {
-                try
-                {
-                    string wbFullLower = (wb.FullName != null ? Path.GetFullPath(wb.FullName) : wb.Name).ToLowerInvariant();
-                    if (wbFullLower == targetFullPathLower)
-                        return wb;
-                }
-                catch { }
+                _ = _sharedExcelApp.Hwnd;
+                return _sharedExcelApp;
             }
-            return null;
-        }
-
-        /// <summary>起動直後の RPC_E_* に対し Workbooks.Open を再試行し、対象パスのブックが列挙されるまで待つ。</summary>
-        private ExcelWorkbook OpenProjectWorkbookWithRetry(ExcelApp excelApp, string filePath, string targetFullPathLower)
-        {
-            const int maxAttempts = 12;
-            const int delayMs = 350;
-
-            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            catch
             {
-                var existing = FindWorkbookByFullPath(excelApp, targetFullPathLower);
-                if (existing != null)
-                    return existing;
-
-                try
-                {
-                    excelApp.Workbooks.Open(filePath, ReadOnly: false);
-                }
-                catch (COMException ex) when (IsTransientExcelComError(ex))
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[OpenProjectWorkbookWithRetry] attempt {attempt}/{maxAttempts} transient COM 0x{ex.HResult:X8}");
-                    Thread.Sleep(delayMs);
-                    continue;
-                }
-
-                existing = FindWorkbookByFullPath(excelApp, targetFullPathLower);
-                if (existing != null)
-                    return existing;
-
-                System.Diagnostics.Debug.WriteLine(
-                    $"[OpenProjectWorkbookWithRetry] attempt {attempt}/{maxAttempts} book not listed after Open, retry");
-                Thread.Sleep(delayMs);
+                _sharedExcelApp = null;
+                return null;
             }
-
-            throw new InvalidOperationException(
-                "Excel がプロジェクトファイルを開けませんでした。しばらく待ってから再度お試しください。");
         }
 
         /// <summary>
-        /// 結果に戻る等で Excel プロセスを外部から終了した後、無効な COM 参照を捨てる。
+        /// 結果に戻る等で Excel プロセスを外部から終了したあと、無効な COM 参照を捨てる。
         /// </summary>
         public void ClearSharedExcelApplication()
         {
@@ -609,7 +613,7 @@ namespace Ui.ViewModels
                 System.Diagnostics.Debug.WriteLine($"File not found: {filePath}");
                 return;
             }
-            
+
             // Initialフォルダのファイルの場合、該当するInitialフォルダ内のすべてのファイルの読み取り専用属性を解除
             if (filePath.Contains("Initial"))
             {
@@ -657,25 +661,36 @@ namespace Ui.ViewModels
                     // 読み取り専用属性の解除に失敗しても、ファイルを開く処理は続行
                 }
             }
-            
-            System.Diagnostics.Debug.WriteLine($"Opening Excel file: {filePath}");
 
             try
             {
-                // Process.Start だと別のExcelインスタンスが前面化され「白紙Excel」に切り替わることがあるため、
-                // アプリ側で保持するExcelインスタンスに対してブックを開く/アクティブ化する。
-                var excelApp = GetOrCreateExcelApplication();
-                string targetFullPathLower = Path.GetFullPath(filePath).ToLowerInvariant();
-                ExcelWorkbook targetWorkbook = OpenProjectWorkbookWithRetry(excelApp, filePath, targetFullPathLower);
+                // 主経路: 既定の関連付けで開く（余計な excel.exe 起動による Book1 を避ける）。失敗時のみ excel.exe にパスを渡す。
+                bool opened = false;
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = filePath,
+                        UseShellExecute = true
+                    });
+                    opened = true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] shell-open failed: {ex.Message}");
+                }
 
-                try { targetWorkbook.Activate(); } catch { }
-                try { excelApp.Visible = true; } catch { }
-                EnsureExcelWindowVisibleAndForeground(excelApp, targetWorkbook);
-                
-                // プロジェクト情報を設定
+                if (!opened)
+                    opened = StartExcelWithFile(filePath);
+
+                if (!opened)
+                {
+                    ResultMessage = "エラー: Excel を起動できませんでした。";
+                    return;
+                }
+
                 if (parameter is ProjectViewModel pvm)
                 {
-                    // Use ProjectViewModel data directly
                     CurrentProject = new ProjectInfo
                     {
                         Name = pvm.Name,
@@ -686,11 +701,9 @@ namespace Ui.ViewModels
                 }
                 else
                 {
-                    // Parse from string projectId
                     var parts = projectId.Split('-');
                     string groupName = parts.Length > 0 ? $"Group {parts[0].Replace("tab", "").Replace("project", "")}" : "Unknown";
                     string projectName = parts.Length > 1 ? $"Project {parts[1]}" : "Unknown";
-                    
                     CurrentProject = new ProjectInfo
                     {
                         Name = $"{groupName} - {projectName}",
@@ -699,15 +712,16 @@ namespace Ui.ViewModels
                         ProjectNumber = parts.Length > 1 && int.TryParse(parts[1], out int num) ? num : 0
                     };
                 }
-                
+
                 IsExcelOverlayVisible = true;
                 ResultMessage = $"Excelファイルを開きました: {Path.GetFileName(filePath)}";
-                
-                // メインウィンドウを非表示にしてアプリバーを表示
-                ShowAppBar();
+                TryAttachSharedExcelApplicationAfterShellOpen();
+
+                Application.Current?.Dispatcher?.BeginInvoke(new Action(ShowAppBar), DispatcherPriority.Background);
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] failed error={ex.GetType().Name}:{ex.Message}");
                 ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
             }
         }
@@ -716,6 +730,87 @@ namespace Ui.ViewModels
         {
             Process[] excelProcesses = Process.GetProcessesByName("EXCEL");
             return excelProcesses.Length > 0;
+        }
+
+        private static bool StartExcelWithFile(string filePath)
+        {
+            string[] candidates = new[]
+            {
+                "excel.exe",
+                @"C:\Program Files\Microsoft Office\root\Office16\EXCEL.EXE",
+                @"C:\Program Files (x86)\Microsoft Office\root\Office16\EXCEL.EXE"
+            };
+
+            foreach (var excelPath in candidates)
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = excelPath,
+                        Arguments = $"\"{filePath}\"",
+                        UseShellExecute = true
+                    };
+                    if (Process.Start(psi) != null)
+                        return true;
+                }
+                catch
+                {
+                    // try next
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// シェルでブックを開いたあと、UI をブロックせず ROT へ接続して <see cref="_sharedExcelApp"/> を設定する。
+        /// 失敗してもユーザー操作は完了済みのため例外は握りつぶす。
+        /// </summary>
+        private void TryAttachSharedExcelApplicationAfterShellOpen()
+        {
+            Task.Run(() =>
+            {
+                Thread.Sleep(1500);
+                var disp = Application.Current?.Dispatcher;
+                if (disp == null)
+                    return;
+
+                disp.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+                {
+                    try
+                    {
+                        if (_sharedExcelApp != null)
+                        {
+                            try
+                            {
+                                _ = _sharedExcelApp.Visible;
+                                return;
+                            }
+                            catch
+                            {
+                                _sharedExcelApp = null;
+                            }
+                        }
+
+                        using (OleMessageFilterScope.Enter())
+                        {
+                            var attached = Libraries.ExcelApplicationManager.TryAttachRunningExcelApplication(
+                                makeVisible: true,
+                                timeoutMs: 15000);
+                            if (attached != null)
+                                _sharedExcelApp = attached;
+                            else
+                                System.Diagnostics.Debug.WriteLine(
+                                    "[TryAttachSharedExcelApplicationAfterShellOpen] no running Excel in ROT (skipped new launch)");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[TryAttachSharedExcelApplicationAfterShellOpen] {ex.Message}");
+                    }
+                }));
+            });
         }
 
         public string GetProjectFilePath(int groupId, int projectId)
@@ -1737,15 +1832,6 @@ namespace Ui.ViewModels
 
         private void ExecuteNextProject(object parameter)
         {
-            // #region agent log
-            try
-            {
-                var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                var data = new Dictionary<string, object> { ["currentProject"] = CurrentProject?.ProjectNumber, ["hasCurrentProject"] = CurrentProject != null };
-                File.AppendAllText(logPath, Newtonsoft.Json.JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "MainViewModel.ExecuteNextProject", message = "entry", data, sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-            }
-            catch { }
-            // #endregion
             if (CurrentProject == null)
             {
                 return;
@@ -1815,7 +1901,6 @@ namespace Ui.ViewModels
 
                     if (targetWorkbook == null)
                     {
-                        // ReadOnly推奨（ユーザー作業の保存はアプリ側のコピー運用に任せる）
                         targetWorkbook = excelApp.Workbooks.Open(nextFilePath, ReadOnly: false);
                     }
 
@@ -1826,14 +1911,6 @@ namespace Ui.ViewModels
                 {
                     // 共有インスタンスを使い回すため Release しない
                 }
-                // #region agent log
-                try
-                {
-                    var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                    File.AppendAllText(logPath, Newtonsoft.Json.JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "MainViewModel.ExecuteNextProject", message = "Process.Start done", data = new { nextFilePath, nextProjectNumber }, sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-                }
-                catch { }
-                // #endregion
                 // プロジェクト情報を更新
                 CurrentProject = new ProjectInfo
                 {
@@ -1842,14 +1919,6 @@ namespace Ui.ViewModels
                     Group = $"Group {groupId}",
                     ProjectNumber = nextProjectNumber
                 };
-                // #region agent log
-                try
-                {
-                    var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                    File.AppendAllText(logPath, Newtonsoft.Json.JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "MainViewModel.ExecuteNextProject", message = "CurrentProject set", data = new { nextProjectNumber }, sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-                }
-                catch { }
-                // #endregion
                 OnPropertyChanged(nameof(IsNextProjectVisible));
                 ResultMessage = $"次のプロジェクトに移動しました: {Path.GetFileName(nextFilePath)}";
             }

@@ -111,7 +111,6 @@ namespace MOSExcelMogiApp
             LoadTasks();
             UpdateTaskDisplay();
             WriteCurrentTaskFile();
-            SetWindowPosition();
             
             // 試験終了時にアプリバーを閉じるイベントを購読
             _viewModel.ExamEnded += OnExamEnded;
@@ -127,8 +126,19 @@ namespace MOSExcelMogiApp
 
         private void SetWindowPosition()
         {
-            // Excelのウィンドウを配置
-            PositionExcelWindow();
+            // Excel の共有参照が確立した後のみ配置を行う（初期化中の新規起動・競合を避ける）
+            try
+            {
+                var sharedExcel = _viewModel?.TryGetSharedExcelApplication();
+                if (sharedExcel != null)
+                {
+                    PositionExcelWindow();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
 
             // ウィンドウハンドルを取得
             IntPtr hWnd = new WindowInteropHelper(this).Handle;
@@ -182,12 +192,12 @@ namespace MOSExcelMogiApp
         {
             try
             {
-                // まずアプリが保持しているExcelインスタンスの Hwnd を使う（別インスタンスを掴んで白紙Excelに切り替わるのを防ぐ）
+                // まずアプリが保持しているExcelインスタンスの Hwnd を使う（ここで新規起動はしない）
                 IntPtr excelHwnd = IntPtr.Zero;
                 uint processId = 0;
                 try
                 {
-                    var sharedExcel = _viewModel?.GetOrCreateExcelApplication();
+                    var sharedExcel = _viewModel?.TryGetSharedExcelApplication();
                     if (sharedExcel != null)
                     {
                         int hwnd = 0;

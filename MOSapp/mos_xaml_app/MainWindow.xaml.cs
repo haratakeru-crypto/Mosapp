@@ -474,7 +474,7 @@ namespace MOSExcelMogiApp
                     // テンプレートファイルをプロジェクトファイルにコピー
                     // 読み取り専用ファイルからでもコピー可能
                     File.Copy(templatePath, projectFilePath, overwrite: true);
-                    
+
                     System.Diagnostics.Debug.WriteLine($"[ResetProject] Project file reset successfully: {projectFilePath}");
                     
                     // ファイルサイズを確認
@@ -519,6 +519,7 @@ namespace MOSExcelMogiApp
                     try
                     {
                         File.Copy(projectFilePath, initialFilePath, overwrite: true);
+
                         System.Diagnostics.Debug.WriteLine($"[ResetProject] Copied project file to Initial folder: {initialFilePath}");
                         
                         // Initialフォルダのファイルの読み取り専用属性を解除
