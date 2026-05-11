@@ -1621,7 +1621,7 @@ namespace Ui.ViewModels
             ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
         }
         
-        private void CloseExcelApplication()
+        public void CloseExcelApplication()
         {
             ExcelApp excelApp = null;
             ExcelWorkbook activeWorkbook = null;

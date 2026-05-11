@@ -41,6 +41,48 @@ namespace ExcelAddIn1
             }
         }
 
+        /// <summary>現在のタスク文脈（<see cref="LogOperation"/> の接頭辞に使われる値）。</summary>
+        public static void GetCurrentTaskContext(out int projectId, out int taskId, out int attemptNo)
+        {
+            lock (LockObject)
+            {
+                projectId = _currentProjectId;
+                taskId = _currentTaskId;
+                attemptNo = _currentAttemptNo;
+            }
+        }
+
+        /// <summary>
+        /// 一時的にタスク文脈を差し替えて <paramref name="action"/> を実行する（同一スレッド・再入可能）。
+        /// Backstage 開閉など、ログ記録時だけ過去のタスク文脈を使う用途。
+        /// </summary>
+        public static void RunWithTaskContext(int projectId, int taskId, int attemptNo, Action action)
+        {
+            if (action == null) return;
+            lock (LockObject)
+            {
+                int prevP = _currentProjectId;
+                int prevT = _currentTaskId;
+                int prevA = _currentAttemptNo;
+                try
+                {
+                    if (projectId > 0 && taskId > 0)
+                    {
+                        _currentProjectId = projectId;
+                        _currentTaskId = taskId;
+                        _currentAttemptNo = attemptNo < 1 ? 1 : attemptNo;
+                    }
+                    action();
+                }
+                finally
+                {
+                    _currentProjectId = prevP;
+                    _currentTaskId = prevT;
+                    _currentAttemptNo = prevA;
+                }
+            }
+        }
+
         public static void LogTaskStart(int projectId, int taskId, int attemptNo = 1)
         {
             try

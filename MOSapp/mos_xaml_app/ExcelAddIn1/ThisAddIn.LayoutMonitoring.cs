@@ -113,7 +113,8 @@ namespace ExcelAddIn1
                     }
                 } 
                 catch { }
-                TryStoreSnapshot(ws, readFreeze: true, logChanges: true, trigger: LayoutChangeTrigger.WindowActivate);
+                // WindowActivate は実運用で発火頻度が低いため、主ログ経路としては使わず保険的にスナップショットだけ更新する。
+                TryStoreSnapshot(ws, readFreeze: true, logChanges: false, trigger: LayoutChangeTrigger.WindowActivate);
             }
             catch (Exception ex)
             {
@@ -172,19 +173,26 @@ namespace ExcelAddIn1
             if (snap == null) return;
 
             string key = GetSheetKey(ws);
+
             if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
             {
                 _layoutSnapshots[key] = snap.Value;
                 return;
             }
 
-            if (snap.Value.Equals(old))
-                return;
+            bool sheetDiff = !snap.Value.Equals(old);
 
-            if (logChanges)
-                CompareAndLogLayoutChanges(old, snap.Value, ws, trigger);
+            // TaskStart 直後の自動レイアウト差分は1回だけ抑止。実際にログ対象の差分があるときだけ消費する。
+            bool suppressLayoutLog = false;
+            if (logChanges && sheetDiff)
+                suppressLayoutLog = TryConsumeAutoLayoutSuppression(trigger);
 
-            _layoutSnapshots[key] = snap.Value;
+            if (sheetDiff)
+            {
+                if (logChanges)
+                    CompareAndLogLayoutChanges(old, snap.Value, ws, suppressLayoutLog, trigger);
+                _layoutSnapshots[key] = snap.Value;
+            }
         }
 
         private static SheetLayoutSnapshot? BuildSnapshot(Excel.Worksheet ws, bool readFreeze)
@@ -226,7 +234,8 @@ namespace ExcelAddIn1
                     ConditionalFormatSignature = BuildConditionalFormatSignature(ws),
                     UsedRowCount = SafeGetUsedRangeRowCount(ws),
                     UsedColumnCount = SafeGetUsedRangeColumnCount(ws),
-                    CellFormatSignature = BuildCellFormatSignature(ws)
+                    CellFormatSignature = BuildCellFormatSignature(ws),
+                    HyperlinkSignature = BuildHyperlinkSignature(ws)
                 };
 
                 if (readFreeze && TryGetFreezeForActiveSheet(ws, out bool freeze, out int splitRow, out int splitCol))
@@ -414,29 +423,95 @@ namespace ExcelAddIn1
         {
             try
             {
-                Excel.AutoFilter af = ws.AutoFilter;
-                if (af == null) return "";
+                var parts = new List<string>();
 
-                string afRange = "";
-                try { afRange = af.Range?.Address[false, false] ?? ""; } catch { }
-
-                var parts = new List<string> { afRange };
-                int count = 0;
-                try { count = af.Filters.Count; } catch { }
-
-                for (int i = 1; i <= count; i++)
+                // Filter 署名
+                try
                 {
-                    try
+                    Excel.AutoFilter af = ws.AutoFilter;
+                    if (af != null)
                     {
-                        var filter = af.Filters[i] as Excel.Filter;
-                        if (filter == null || !filter.On) continue;
-                        string c1 = SafeObjectToText(filter.Criteria1);
-                        string c2 = SafeObjectToText(filter.Criteria2);
-                        int op = 0;
-                        try { op = (int)filter.Operator; } catch { }
-                        parts.Add($"{i}:{op}:{c1}:{c2}");
+                        string afRange = "";
+                        try { afRange = af.Range?.Address[false, false] ?? ""; } catch { }
+
+                        parts.Add("AFR:" + afRange);
+                        int count = 0;
+                        try { count = af.Filters.Count; } catch { }
+
+                        for (int i = 1; i <= count; i++)
+                        {
+                            try
+                            {
+                                var filter = af.Filters[i] as Excel.Filter;
+                                if (filter == null || !filter.On) continue;
+                                string c1 = SafeObjectToText(filter.Criteria1);
+                                string c2 = SafeObjectToText(filter.Criteria2);
+                                int op = 0;
+                                try { op = (int)filter.Operator; } catch { }
+                                parts.Add($"AF:{i}:{op}:{c1}:{c2}");
+                            }
+                            catch { }
+                        }
                     }
-                    catch { }
+                    else
+                    {
+                        parts.Add("AFR:");
+                    }
+                }
+                catch
+                {
+                    parts.Add("AFERR");
+                }
+
+                // Sort 署名（並べ替えを拾うため、Worksheet.Sort のキー・順序を含める）
+                try
+                {
+                    Excel.Sort sort = ws.Sort;
+                    if (sort != null)
+                    {
+                        string sortRange = "";
+                        try { sortRange = sort.Rng?.Address[false, false] ?? ""; } catch { }
+                        string header = "";
+                        try { header = SafeObjectToText(sort.Header); } catch { }
+                        string orientation = "";
+                        try { orientation = SafeObjectToText(sort.Orientation); } catch { }
+                        string method = "";
+                        try { method = SafeObjectToText(sort.SortMethod); } catch { }
+                        string matchCase = "";
+                        try { matchCase = SafeObjectToText(sort.MatchCase); } catch { }
+
+                        parts.Add($"SR:{sortRange}:H={header}:O={orientation}:M={method}:C={matchCase}");
+
+                        Excel.SortFields fields = null;
+                        try { fields = sort.SortFields; } catch { }
+                        int sfCount = 0;
+                        try { sfCount = fields?.Count ?? 0; } catch { }
+                        for (int i = 1; i <= sfCount; i++)
+                        {
+                            try
+                            {
+                                Excel.SortField sf = fields[i];
+                                string key = "";
+                                try { key = sf.Key?.Address[false, false] ?? ""; } catch { }
+                                string order = "";
+                                try { order = SafeObjectToText(sf.Order); } catch { }
+                                string sortOn = "";
+                                try { sortOn = SafeObjectToText(sf.SortOn); } catch { }
+                                string dataOption = "";
+                                try { dataOption = SafeObjectToText(sf.DataOption); } catch { }
+                                parts.Add($"SF:{i}:{key}:ON={sortOn}:ORD={order}:OPT={dataOption}");
+                            }
+                            catch { }
+                        }
+                    }
+                    else
+                    {
+                        parts.Add("SR:");
+                    }
+                }
+                catch
+                {
+                    parts.Add("SRERR");
                 }
 
                 return string.Join("|", parts);
@@ -689,9 +764,406 @@ namespace ExcelAddIn1
             }
         }
 
-        private void CompareAndLogLayoutChanges(SheetLayoutSnapshot oldS, SheetLayoutSnapshot newS, Excel.Worksheet ws, LayoutChangeTrigger trigger)
+        /// <summary>シート上のハイパーリンク集合の署名（挿入・変更・削除の差分検知用）。</summary>
+        private static string BuildHyperlinkSignature(Excel.Worksheet ws)
         {
-            bool suppressLayoutLog = TryConsumeAutoLayoutSuppression(trigger);
+            var parts = new List<string>();
+            try
+            {
+                Excel.Hyperlinks hls = ws.Hyperlinks;
+                if (hls == null) return "";
+
+                int count = 0;
+                try { count = hls.Count; } catch { }
+                for (int i = 1; i <= count; i++)
+                {
+                    try
+                    {
+                        Excel.Hyperlink hl = hls[i];
+                        string addr = "";
+                        try { addr = hl.Address ?? ""; } catch { }
+                        string sub = "";
+                        try { sub = hl.SubAddress ?? ""; } catch { }
+                        string rng = "";
+                        try { rng = hl.Range?.Address[false, false] ?? ""; } catch { }
+                        parts.Add($"{rng}|{addr}|{sub}");
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            parts.Sort(StringComparer.Ordinal);
+            return string.Join("|", parts);
+        }
+
+        /// <summary>
+        /// <see cref="Application_SheetChange"/> 後にハイパーリンク集合だけ比較する。
+        /// ハイパーリンク挿入直後にシート切替が無くても <c>[Op] InsertHyperlink</c> を残す。
+        /// </summary>
+        private void TryDetectHyperlinkChangeAfterSheetChange(object sheet)
+        {
+            var ws = sheet as Excel.Worksheet;
+            if (ws == null) return;
+            try
+            {
+                string key = GetSheetKey(ws);
+                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
+                    return;
+
+                string newHl = BuildHyperlinkSignature(ws);
+                if (old.HyperlinkSignature == newHl) return;
+
+                string sheetName = "";
+                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
+
+                Logger.LogOperation("InsertHyperlink", $"{sheetName}!HyperlinkChanged");
+
+                // HyperlinkSignature だけ更新すると他フィールドが古くなり次の TryStoreSnapshot で誤差分になるためフル更新する
+                SheetLayoutSnapshot? fullSnap = BuildSnapshot(ws, readFreeze: false);
+                if (fullSnap != null)
+                    _layoutSnapshots[key] = fullSnap.Value;
+                else
+                {
+                    SheetLayoutSnapshot updated = old;
+                    updated.HyperlinkSignature = newHl;
+                    _layoutSnapshots[key] = updated;
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("TryDetectHyperlinkChangeAfterSheetChange: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// タスク切替直前に、開いている全ブックの各シートでハイパーリンク署名だけ前後比較し、
+        /// 差分があれば指定タスク文脈で <c>InsertHyperlink</c> を1回記録してからフルスナップショットを更新する。
+        /// </summary>
+        private void FlushPendingHyperlinkDiffsForTask(int projectId, int taskId, int attemptNo)
+        {
+            if (projectId <= 0 || taskId <= 0 || Application == null) return;
+            try
+            {
+                foreach (Excel.Workbook wb in Application.Workbooks)
+                {
+                    try
+                    {
+                        foreach (Excel.Worksheet ws in wb.Worksheets)
+                        {
+                            try
+                            {
+                                string key = GetSheetKey(ws);
+                                string newHl = BuildHyperlinkSignature(ws);
+
+                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
+                                {
+                                    SheetLayoutSnapshot? baseline = BuildSnapshot(ws, readFreeze: false);
+                                    if (baseline != null)
+                                        _layoutSnapshots[key] = baseline.Value;
+                                    continue;
+                                }
+
+                                if (old.HyperlinkSignature == newHl)
+                                    continue;
+
+                                string sheetName = "";
+                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
+
+                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                                {
+                                    Logger.LogOperation("InsertHyperlink", $"{sheetName}!HyperlinkChanged;Trigger=BoundaryFlush");
+                                });
+
+                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
+                                if (snap != null)
+                                    _layoutSnapshots[key] = snap.Value;
+                            }
+                            catch (Exception exInner)
+                            {
+                                WriteDiagnostic("FlushPendingHyperlinkDiffsForTask sheet: " + exInner.Message);
+                            }
+                        }
+                    }
+                    catch (Exception exWb)
+                    {
+                        WriteDiagnostic("FlushPendingHyperlinkDiffsForTask workbook: " + exWb.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("FlushPendingHyperlinkDiffsForTask: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// タスク切替直前に、各シートの UsedRange 行/列数の差分を旧タスク文脈で確定する。
+        /// Window/Sheet activate に依存せず、同一シート継続時の取りこぼしを減らす。
+        /// </summary>
+        private void FlushPendingStructureDiffsForTask(int projectId, int taskId, int attemptNo)
+        {
+            if (projectId <= 0 || taskId <= 0 || Application == null) return;
+            try
+            {
+                foreach (Excel.Workbook wb in Application.Workbooks)
+                {
+                    try
+                    {
+                        foreach (Excel.Worksheet ws in wb.Worksheets)
+                        {
+                            try
+                            {
+                                string key = GetSheetKey(ws);
+                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
+                                if (snap == null) continue;
+
+                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
+                                {
+                                    _layoutSnapshots[key] = snap.Value;
+                                    continue;
+                                }
+
+                                SheetLayoutSnapshot now = snap.Value;
+                                bool rowChanged = old.UsedRowCount != now.UsedRowCount;
+                                bool colChanged = old.UsedColumnCount != now.UsedColumnCount;
+                                if (!rowChanged && !colChanged)
+                                    continue;
+
+                                string sheetName = "";
+                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
+
+                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                                {
+                                    if (rowChanged)
+                                    {
+                                        if (now.UsedRowCount > old.UsedRowCount)
+                                            Logger.LogOperation("InsertRows", $"{sheetName}!Rows:{old.UsedRowCount}->{now.UsedRowCount};Trigger=BoundaryFlush");
+                                        else
+                                            Logger.LogOperation("DeleteRows", $"{sheetName}!Rows:{old.UsedRowCount}->{now.UsedRowCount};Trigger=BoundaryFlush");
+                                    }
+
+                                    if (colChanged)
+                                    {
+                                        if (now.UsedColumnCount > old.UsedColumnCount)
+                                            Logger.LogOperation("InsertColumns", $"{sheetName}!Cols:{old.UsedColumnCount}->{now.UsedColumnCount};Trigger=BoundaryFlush");
+                                        else
+                                            Logger.LogOperation("DeleteColumns", $"{sheetName}!Cols:{old.UsedColumnCount}->{now.UsedColumnCount};Trigger=BoundaryFlush");
+                                    }
+                                });
+
+                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
+                                _layoutSnapshots[key] = now;
+                            }
+                            catch (Exception exInner)
+                            {
+                                WriteDiagnostic("FlushPendingStructureDiffsForTask sheet: " + exInner.Message);
+                            }
+                        }
+                    }
+                    catch (Exception exWb)
+                    {
+                        WriteDiagnostic("FlushPendingStructureDiffsForTask workbook: " + exWb.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("FlushPendingStructureDiffsForTask: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// タスク切替直前に、各シートの図形差分（追加/削除/移動・サイズ変更）を旧タスク文脈で確定する。
+        /// </summary>
+        private void FlushPendingShapeDiffsForTask(int projectId, int taskId, int attemptNo)
+        {
+            if (projectId <= 0 || taskId <= 0 || Application == null) return;
+            try
+            {
+                foreach (Excel.Workbook wb in Application.Workbooks)
+                {
+                    try
+                    {
+                        foreach (Excel.Worksheet ws in wb.Worksheets)
+                        {
+                            try
+                            {
+                                string key = GetSheetKey(ws);
+                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
+                                if (snap == null) continue;
+
+                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
+                                {
+                                    _layoutSnapshots[key] = snap.Value;
+                                    continue;
+                                }
+
+                                SheetLayoutSnapshot now = snap.Value;
+                                bool shapeCountChanged = old.ShapeCount != now.ShapeCount;
+                                bool shapeGeomChanged = old.ShapeGeometrySignature != now.ShapeGeometrySignature;
+                                if (!shapeCountChanged && !shapeGeomChanged)
+                                    continue;
+
+                                string sheetName = "";
+                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
+
+                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                                {
+                                    if (shapeCountChanged)
+                                    {
+                                        if (now.ShapeCount > old.ShapeCount)
+                                            Logger.LogOperation("InsertShapeOrImage", $"{sheetName}!Count:{old.ShapeCount}->{now.ShapeCount};Trigger=BoundaryFlush");
+                                        else
+                                            Logger.LogOperation("DeleteShapeOrImage", $"{sheetName}!Count:{old.ShapeCount}->{now.ShapeCount};Trigger=BoundaryFlush");
+                                    }
+                                    else if (shapeGeomChanged)
+                                    {
+                                        Logger.LogOperation("MoveOrResizeShape", $"{sheetName}!Count={now.ShapeCount};Trigger=BoundaryFlush");
+                                    }
+                                });
+
+                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
+                                _layoutSnapshots[key] = now;
+                            }
+                            catch (Exception exInner)
+                            {
+                                WriteDiagnostic("FlushPendingShapeDiffsForTask sheet: " + exInner.Message);
+                            }
+                        }
+                    }
+                    catch (Exception exWb)
+                    {
+                        WriteDiagnostic("FlushPendingShapeDiffsForTask workbook: " + exWb.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("FlushPendingShapeDiffsForTask: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// タスク切替直前に、各シートの並べ替え/フィルター署名の差分を旧タスク文脈で確定する。
+        /// </summary>
+        private void FlushPendingSortFilterDiffsForTask(int projectId, int taskId, int attemptNo)
+        {
+            if (projectId <= 0 || taskId <= 0 || Application == null) return;
+            try
+            {
+                foreach (Excel.Workbook wb in Application.Workbooks)
+                {
+                    try
+                    {
+                        foreach (Excel.Worksheet ws in wb.Worksheets)
+                        {
+                            try
+                            {
+                                string key = GetSheetKey(ws);
+                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
+                                if (snap == null) continue;
+
+                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
+                                {
+                                    _layoutSnapshots[key] = snap.Value;
+                                    continue;
+                                }
+
+                                SheetLayoutSnapshot now = snap.Value;
+                                if (old.SortFilterSignature == now.SortFilterSignature)
+                                    continue;
+
+                                string sheetName = "";
+                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
+
+                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                                {
+                                    Logger.LogOperation("SortOrFilter", $"{sheetName}!{now.SortFilterSignature};Trigger=BoundaryFlush");
+                                });
+
+                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
+                                _layoutSnapshots[key] = now;
+                            }
+                            catch (Exception exInner)
+                            {
+                                WriteDiagnostic("FlushPendingSortFilterDiffsForTask sheet: " + exInner.Message);
+                            }
+                        }
+                    }
+                    catch (Exception exWb)
+                    {
+                        WriteDiagnostic("FlushPendingSortFilterDiffsForTask workbook: " + exWb.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("FlushPendingSortFilterDiffsForTask: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// タスク切替直前に、各シートのテーブルスタイル差分を旧タスク文脈で確定する。
+        /// </summary>
+        private void FlushPendingTableStyleDiffsForTask(int projectId, int taskId, int attemptNo)
+        {
+            if (projectId <= 0 || taskId <= 0 || Application == null) return;
+            try
+            {
+                foreach (Excel.Workbook wb in Application.Workbooks)
+                {
+                    try
+                    {
+                        foreach (Excel.Worksheet ws in wb.Worksheets)
+                        {
+                            try
+                            {
+                                string key = GetSheetKey(ws);
+                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
+                                if (snap == null) continue;
+
+                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
+                                {
+                                    _layoutSnapshots[key] = snap.Value;
+                                    continue;
+                                }
+
+                                SheetLayoutSnapshot now = snap.Value;
+                                if (old.TableStyleSignature == now.TableStyleSignature)
+                                    continue;
+
+                                string sheetName = "";
+                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
+
+                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                                {
+                                    Logger.LogOperation("SetTableStyle", $"{sheetName}!{now.TableStyleSignature};Trigger=BoundaryFlush");
+                                });
+
+                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
+                                _layoutSnapshots[key] = now;
+                            }
+                            catch (Exception exInner)
+                            {
+                                WriteDiagnostic("FlushPendingTableStyleDiffsForTask sheet: " + exInner.Message);
+                            }
+                        }
+                    }
+                    catch (Exception exWb)
+                    {
+                        WriteDiagnostic("FlushPendingTableStyleDiffsForTask workbook: " + exWb.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("FlushPendingTableStyleDiffsForTask: " + ex.Message);
+            }
+        }
+
+        private void CompareAndLogLayoutChanges(SheetLayoutSnapshot oldS, SheetLayoutSnapshot newS, Excel.Worksheet ws, bool suppressLayoutLog, LayoutChangeTrigger trigger)
+        {
             string sheetName = "";
             try
             {
@@ -751,6 +1223,9 @@ namespace ExcelAddIn1
 
             if (!suppressLayoutLog && oldS.SortFilterSignature != newS.SortFilterSignature)
                 Logger.LogOperation("SortOrFilter", $"{sheetName}!{newS.SortFilterSignature}");
+
+            if (!suppressLayoutLog && oldS.HyperlinkSignature != newS.HyperlinkSignature)
+                Logger.LogOperation("InsertHyperlink", $"{sheetName}!HyperlinkChanged");
 
             if (!suppressLayoutLog && oldS.ShapeCount != newS.ShapeCount)
             {
@@ -840,6 +1315,7 @@ namespace ExcelAddIn1
             public int UsedRowCount;
             public int UsedColumnCount;
             public string CellFormatSignature;
+            public string HyperlinkSignature;
             public bool? FreezePanes;
             public int? SplitRow;
             public int? SplitColumn;
@@ -879,6 +1355,7 @@ namespace ExcelAddIn1
                     && UsedRowCount == other.UsedRowCount
                     && UsedColumnCount == other.UsedColumnCount
                     && CellFormatSignature == other.CellFormatSignature
+                    && HyperlinkSignature == other.HyperlinkSignature
                     && FreezePanes == other.FreezePanes
                     && SplitRow == other.SplitRow
                     && SplitColumn == other.SplitColumn;

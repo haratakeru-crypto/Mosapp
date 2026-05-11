@@ -25,7 +25,7 @@ namespace Libraries
         SetPrintTitle,          // タイトル行/タイトル列の設定
         SetHeaderFooter,        // ヘッダー/フッターの設定
         SetFreezePanes,         // ウィンドウ枠の固定
-        SetWorkbookProperty,    // 文書プロパティ（タグ等）の変更
+        SetWorkbookProperty,    // Backstage 経由の文書プロパティ変更（ログ詳細は変更キーのカンマ区切り）
         ManageNamedRange,       // 名前定義の追加・削除・参照先変更
         ImportExternalData,     // 外部データ取り込み（テキスト/CSV等）
         SetPageBreak,           // 改ページ位置の設定
@@ -254,7 +254,7 @@ namespace Libraries
                         case 1: // 売上報告・数式表示
                             return ExcelValidationExemptFlags.WorkbookProperty;
                         case 2: // 受注明細・並べ替え
-                            return ExcelValidationExemptFlags.RangeEdit;
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
                         case 3: // 下半期売上・アイコンセット
                         case 4: // 下半期売上・条件付き書式
                         case 7: // 下半期売上・書式変更（アクセシビリティ）

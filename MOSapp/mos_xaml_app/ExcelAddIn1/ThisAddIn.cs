@@ -17,6 +17,11 @@ namespace ExcelAddIn1
         private int _currentTaskAttemptNo = 1;
         private bool _ignoreNextAutoLayoutChangeAfterTaskStart;
         private string _lastRangeSelectionAddress;
+
+        // ダブルクリック編集モード→確定（実値変更なし）でも SheetChange が飛ぶケース対策
+        private string _pendingDoubleClickEditKey;
+        private string _pendingDoubleClickEditOldValue;
+        private string _pendingDoubleClickEditOldFormula;
         private enum LayoutChangeTrigger
         {
             Other = 0,
@@ -61,6 +66,7 @@ namespace ExcelAddIn1
             // NewWorkbook は AppEvents_Event と _Application の両方にあり曖昧になるため明示キャストする
             ((Excel.AppEvents_Event)Application).NewWorkbook += Application_NewWorkbook;
             Application.SheetChange += Application_SheetChange;
+            Application.SheetBeforeDoubleClick += Application_SheetBeforeDoubleClick;
             Application.SheetActivate += Application_SheetActivate;
             Application.SheetSelectionChange += Application_SheetSelectionChange;
             Application.WindowActivate += Application_WindowActivate;
@@ -77,6 +83,7 @@ namespace ExcelAddIn1
             Application.WorkbookOpen -= Application_WorkbookOpen;
             ((Excel.AppEvents_Event)Application).NewWorkbook -= Application_NewWorkbook;
             Application.SheetChange -= Application_SheetChange;
+            Application.SheetBeforeDoubleClick -= Application_SheetBeforeDoubleClick;
             Application.SheetActivate -= Application_SheetActivate;
             Application.SheetSelectionChange -= Application_SheetSelectionChange;
             Application.WindowActivate -= Application_WindowActivate;
@@ -117,8 +124,20 @@ namespace ExcelAddIn1
                 string operationType = IsFormulaEdit(target) ? "EditCellFormula" : "EditCellValue";
                 // ユーザー編集が始まったら、TaskStart 直後の自動差分スキップを解除する。
                 _ignoreNextAutoLayoutChangeAfterTaskStart = false;
-                Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
-                WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
+
+                if (ShouldSuppressNoOpDoubleClickEdit(sheet, target))
+                {
+                    WriteDiagnostic($"SheetChange suppressed (no-op double click): {sheetName}!{NormalizeAddress(address)}");
+                }
+                else
+                {
+                    Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
+                    WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
+                }
+
+                ClearPendingDoubleClickCapture();
+
+                TryDetectHyperlinkChangeAfterSheetChange(sheet);
             }
             catch (Exception ex)
             {
@@ -136,8 +155,119 @@ namespace ExcelAddIn1
                 {
                     _lastRangeSelectionAddress = _lastRangeSelectionAddress.Substring(_lastRangeSelectionAddress.IndexOf("]") + 1);
                 }
+
+                // 選択変更のたびにハイパーリンク集合を照合（ダイアログ挿入後に別セルを選ぶまで SheetChange が無いケースの補足）
+                TryDetectHyperlinkChangeAfterSheetChange(sheet);
             }
             catch { }
+        }
+
+        private void Application_SheetBeforeDoubleClick(object sh, Excel.Range target, ref bool cancel)
+        {
+            try
+            {
+                // Cancel はしない（操作感維持）。ただし「編集開始直前の値」を一時保存して、実値変更なしの SheetChange を抑止する。
+                string key = BuildPendingEditKey(sh, target);
+                if (string.IsNullOrEmpty(key))
+                {
+                    ClearPendingDoubleClickCapture();
+                    return;
+                }
+
+                _pendingDoubleClickEditKey = key;
+                _pendingDoubleClickEditOldValue = SafeRangeValueText(target);
+                _pendingDoubleClickEditOldFormula = SafeRangeFormulaText(target);
+            }
+            catch
+            {
+                ClearPendingDoubleClickCapture();
+            }
+        }
+
+        private bool ShouldSuppressNoOpDoubleClickEdit(object sh, Excel.Range target)
+        {
+            try
+            {
+                if (target == null) return false;
+                if (string.IsNullOrEmpty(_pendingDoubleClickEditKey)) return false;
+
+                // 複数セルの変更は対象外（貼り付けなどの検知を落とさない）
+                try
+                {
+                    if (target.CountLarge > 1) return false;
+                }
+                catch { return false; }
+
+                string keyNow = BuildPendingEditKey(sh, target);
+                if (!string.Equals(keyNow, _pendingDoubleClickEditKey, StringComparison.Ordinal))
+                    return false;
+
+                string newValue = SafeRangeValueText(target);
+                string newFormula = SafeRangeFormulaText(target);
+
+                bool sameValue = string.Equals(newValue ?? "", _pendingDoubleClickEditOldValue ?? "", StringComparison.Ordinal);
+                bool sameFormula = string.Equals(newFormula ?? "", _pendingDoubleClickEditOldFormula ?? "", StringComparison.Ordinal);
+                return sameValue && sameFormula;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string BuildPendingEditKey(object sh, Excel.Range target)
+        {
+            try
+            {
+                if (target == null) return null;
+
+                string sheetName = "";
+                try
+                {
+                    dynamic s = sh;
+                    sheetName = Convert.ToString(s?.Name) ?? "";
+                }
+                catch { }
+
+                string addr = "";
+                try { addr = target.Address[false, false] ?? ""; } catch { }
+                if (string.IsNullOrEmpty(sheetName) || string.IsNullOrEmpty(addr)) return null;
+                return sheetName + "!" + NormalizeAddress(addr);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string SafeRangeValueText(Excel.Range r)
+        {
+            try
+            {
+                object v = r.Value2;
+                if (v == null) return "";
+                // 単一セル想定。型の差（数値/文字列/日付）を吸収するため文字列化して比較する。
+                return Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            }
+            catch { return ""; }
+        }
+
+        private static string SafeRangeFormulaText(Excel.Range r)
+        {
+            try
+            {
+                object f = r.Formula;
+                if (f == null) return "";
+                return Convert.ToString(f, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            }
+            catch { return ""; }
+        }
+
+        private void ClearPendingDoubleClickCapture()
+        {
+            _pendingDoubleClickEditKey = null;
+            _pendingDoubleClickEditOldValue = null;
+            _pendingDoubleClickEditOldFormula = null;
         }
 
         private void Application_WorkbookNewChart(Excel.Workbook Wb, Excel.Chart Ch)
@@ -225,6 +355,20 @@ namespace ExcelAddIn1
 
                 if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId && attemptNo == _currentTaskAttemptNo)
                     return;
+
+                int prevProjectId = _currentTaskProjectId;
+                int prevTaskId = _currentTaskTaskId;
+                int prevAttemptNo = _currentTaskAttemptNo;
+
+                // タスク切替直前に未確定差分を「旧タスク」文脈で確定し、同一シート継続時の取りこぼしを防ぐ。
+                if (prevProjectId > 0 && prevTaskId > 0)
+                {
+                    FlushPendingStructureDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
+                    FlushPendingSortFilterDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
+                    FlushPendingTableStyleDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
+                    FlushPendingShapeDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
+                    FlushPendingHyperlinkDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
+                }
 
                 _currentTaskProjectId = projectId;
                 _currentTaskTaskId = taskId;

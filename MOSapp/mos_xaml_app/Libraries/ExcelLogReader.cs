@@ -163,7 +163,8 @@ namespace Libraries
             out string message)
         {
             message = null;
-            var ops = GetOperationsForTask(projectId, taskId, attemptNo);
+            // 破壊的操作の判定は、常に「最新のタスク試行」のみを対象とする
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo, latestOnly: true);
             bool useRangeGate = ExcelTaskValidationConfig.ShouldDenyOutsideAllowedRanges(projectId, taskId);
             List<string> allowedRanges = useRangeGate
                 ? ExcelTaskValidationConfig.GetAllowedRanges(projectId, taskId)
@@ -319,7 +320,7 @@ namespace Libraries
             return n;
         }
 
-        private static List<(string Type, string Detail)> GetOperationsForTask(int projectId, int taskId, int attemptNo)
+        private static List<(string Type, string Detail)> GetOperationsForTask(int projectId, int taskId, int attemptNo, bool latestOnly = false)
         {
             var result = new List<(string Type, string Detail)>();
             string path = GetLogFilePath();
@@ -340,6 +341,11 @@ namespace Libraries
                     {
                         ParseTaskStart(line, out curP, out curT, out curA);
                         inTarget = (curP == projectId && curT == taskId && curA == attemptNo);
+                        
+                        if (inTarget && latestOnly)
+                        {
+                            result.Clear();
+                        }
                         continue;
                     }
 

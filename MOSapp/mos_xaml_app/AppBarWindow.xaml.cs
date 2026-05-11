@@ -1103,8 +1103,9 @@ namespace MOSExcelMogiApp
                 // closeWorkbook: false にして、ワークブックは開いたままにする
                 if (_viewModel != null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Auto-saving current project before opening review page");
-                    _viewModel.SaveCurrentExcelProject(closeWorkbook: false);
+                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Saving and closing current project before opening review page");
+                    _viewModel.SaveCurrentExcelProject(closeWorkbook: true);
+                    _viewModel.CloseExcelApplication();
                 }
 
                 // メインのバーウィンドウを非表示にする

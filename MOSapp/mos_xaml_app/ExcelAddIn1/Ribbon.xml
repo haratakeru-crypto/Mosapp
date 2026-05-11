@@ -11,4 +11,6 @@
       </tab>
     </tabs>
   </ribbon>
+  <!-- ファイルタブ（Backstage）の開閉。情報パネル由来の文書プロパティ変更をタスク文脈固定で記録する。 -->
+  <backstage onShow="OnBackstageShow" onHide="OnBackstageHide" />
 </customUI>

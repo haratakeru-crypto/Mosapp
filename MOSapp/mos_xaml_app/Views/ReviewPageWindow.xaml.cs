@@ -58,7 +58,10 @@ namespace MOSExcelMogiApp.Views
         private DispatcherTimer _timer;
         private TimeSpan _remainingTime;
         private int _groupId = 1; // Group番号（1=模擬①, 2=模擬②, 3=演習）
-        
+
+        /// <summary>採点ワークフロー（STAスレッド）内で取得した Excel。Task.Run(MTA) からの COM 呼び出し失敗を避けるため共有する。</summary>
+        private ExcelApp _scoringExcelApp;
+
         private Dictionary<int, bool[]> _projectTaskCompletedStates;
         private Dictionary<int, bool[]> _projectTaskFlaggedStates;
         
@@ -639,24 +642,8 @@ namespace MOSExcelMogiApp.Views
                     });
                     await Task.Delay(80);
                     
-                    // 採点開始直後に既存の Excel を非表示にする（試験中に開いたExcelが前面に出ないように）
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        try
-                        {
-                            var excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                            if (excelApp != null)
-                            {
-                                excelApp.Visible = false;
-                                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Set existing Excel to Visible=false for scoring");
-                                Marshal.ReleaseComObject(excelApp);
-                            }
-                        }
-                        catch
-                        {
-                            // Excel が起動していない場合は無視
-                        }
-                    });
+                    // 採点中は Excel を表示したままにする（Visible=false だと ActiveWorkbook が付かず ActivateExcelFile が失敗しうる）。
+                    // 前面は「採点中」オーバーレイの Topmost で抑える。
 
                     // Excel などに前面を奪われることがあるため、短時間だけ最前面を維持する
                     var overlayTopmostTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
@@ -678,12 +665,13 @@ namespace MOSExcelMogiApp.Views
                     };
                     overlayTopmostTimer.Start();
                     
-                    // すべてのプロジェクトの採点を実行（バックグラウンド・Excelは非表示）
-                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Starting to score all projects...");
-                    await Task.Run(() => ScoreAllProjects());
-                    
-                    // 採点が完了したらExcelアプリケーションを閉じる（バックグラウンドで実行）
-                    await Task.Run(() => CloseExcelApplication());
+                    // Excel COM は STA 上で呼ぶ（Task.Run のスレッドプールは MTA になり、GetActiveObject / Workbooks が失敗しうる）
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Starting to score all projects (STA)...");
+                    await RunStaAsync(() =>
+                    {
+                        ScoreAllProjects();
+                        CloseExcelApplication();
+                    });
                     
                     // 「採点中です」オーバーレイを閉じる
                     await Dispatcher.InvokeAsync(() =>
@@ -844,6 +832,225 @@ namespace MOSExcelMogiApp.Views
                 });
             }
         }
+
+        /// <summary>Excel COM 用に専用 STA スレッドで処理を実行する（MTA からの呼び出しは不安定）。</summary>
+        private static Task RunStaAsync(Action action)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    action();
+                    tcs.TrySetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "MOS_ExcelScoring_STA"
+            };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return tcs.Task;
+        }
+
+        private static string NormalizeExcelPath(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                return string.Empty;
+
+            try
+            {
+                return Path.GetFullPath(filePath).ToLowerInvariant();
+            }
+            catch
+            {
+                return filePath.Trim().ToLowerInvariant();
+            }
+        }
+
+        private bool IsWorkbookOpenInScoringSession(string filePath)
+        {
+            var excelApp = _scoringExcelApp;
+            if (excelApp == null || string.IsNullOrEmpty(filePath))
+                return false;
+
+            var normalizedTargetPath = NormalizeExcelPath(filePath);
+            try
+            {
+                if (excelApp.Workbooks == null)
+                    return false;
+
+                foreach (ExcelWorkbook wb in excelApp.Workbooks)
+                {
+                    try
+                    {
+                        if (NormalizeExcelPath(wb.FullName) == normalizedTargetPath)
+                            return true;
+                    }
+                    catch { }
+                    finally
+                    {
+                        try { Marshal.ReleaseComObject(wb); } catch { }
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        /// <summary>採点中に保持している Application を返す（採点中にROTへ戻らない）。</summary>
+        private ExcelApp GetExcelApplicationForScoringOptional(out bool releaseWhenDone)
+        {
+            releaseWhenDone = false;
+            return _scoringExcelApp;
+        }
+
+        /// <summary>
+        /// 採点専用 Excel.Application を取得する（採点中にROT再取得しない）。
+        /// </summary>
+        private ExcelApp EnsureScoringExcelApplication(bool makeVisible, int timeoutMs, string caller)
+        {
+            if (_scoringExcelApp != null)
+            {
+                try
+                {
+                    // stale COM proxy（Excel再起動後の死んだ参照）検知
+                    int hwnd = _scoringExcelApp.Hwnd;
+                    int wbCount = _scoringExcelApp.Workbooks?.Count ?? 0;
+                    try { _scoringExcelApp.Visible = makeVisible; } catch { }
+                    AgentLog(
+                        location: caller,
+                        message: "excel_cached_ok",
+                        data: new { hwnd, wbCount, timeoutMs, makeVisible },
+                        runId: "pre-fix",
+                        hypothesisId: "F");
+                    if (wbCount == 0)
+                    {
+                        AgentLog(
+                            location: caller,
+                            message: "excel_cached_empty",
+                            data: new { hwnd, wbCount },
+                            runId: "pre-fix",
+                            hypothesisId: "F");
+                    }
+                    return _scoringExcelApp;
+                }
+                catch (COMException cex)
+                {
+                    AgentLog(
+                        location: caller,
+                        message: "excel_cached_stale_released",
+                        data: new { hResult = $"0x{cex.HResult:X8}", cex.Message },
+                        runId: "pre-fix",
+                        hypothesisId: "F");
+                    try { Marshal.ReleaseComObject(_scoringExcelApp); } catch { }
+                    _scoringExcelApp = null;
+                }
+                catch (Exception ex)
+                {
+                    AgentLog(
+                        location: caller,
+                        message: "excel_cached_stale_released_noncom",
+                        data: new { ex = ex.Message },
+                        runId: "pre-fix",
+                        hypothesisId: "F");
+                    try { Marshal.ReleaseComObject(_scoringExcelApp); } catch { }
+                    _scoringExcelApp = null;
+                }
+            }
+
+            try
+            {
+                _scoringExcelApp = new ExcelApp();
+                try { _scoringExcelApp.DisplayAlerts = false; } catch { }
+                try { ApplyScoringWindowLayout(_scoringExcelApp); } catch { }
+                try { _scoringExcelApp.Visible = makeVisible; } catch { }
+                AgentLog(
+                    location: caller,
+                    message: "excel_dedicated_created",
+                    data: new { timeoutMs, makeVisible, hwnd = _scoringExcelApp?.Hwnd ?? 0 },
+                    runId: "pre-fix",
+                    hypothesisId: "F");
+                return _scoringExcelApp;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[{caller}] Dedicated Excel creation failed: {ex.Message}");
+                AgentLog(
+                    location: caller,
+                    message: "excel_dedicated_create_failed",
+                    data: new { ex = ex.Message, timeoutMs, makeVisible },
+                    runId: "pre-fix",
+                    hypothesisId: "F");
+                return null;
+            }
+        }
+
+        private void TryReplaceWithWorkbookBackedExcel(bool makeVisible, int timeoutMs, string caller, string logMessage)
+        {
+            if (_scoringExcelApp == null) return;
+
+            int currentWbCount = 0;
+            try
+            {
+                currentWbCount = _scoringExcelApp.Workbooks?.Count ?? 0;
+            }
+            catch
+            {
+                currentWbCount = 0;
+            }
+            if (currentWbCount > 0) return;
+
+            try
+            {
+                var reattached = ExcelApplicationManager.TryAttachRunningExcelApplication(
+                    makeVisible: makeVisible,
+                    timeoutMs: Math.Min(timeoutMs, 8000));
+                if (reattached == null) return;
+
+                int reattachWbCount = 0;
+                int reattachHwnd = 0;
+                try
+                {
+                    reattachWbCount = reattached.Workbooks?.Count ?? 0;
+                    reattachHwnd = reattached.Hwnd;
+                }
+                catch
+                {
+                    reattachWbCount = 0;
+                    reattachHwnd = 0;
+                }
+
+                AgentLog(
+                    location: caller,
+                    message: logMessage,
+                    data: new { reattachHwnd, reattachWbCount },
+                    runId: "pre-fix",
+                    hypothesisId: "F");
+
+                if (reattachWbCount <= 0)
+                {
+                    try { Marshal.ReleaseComObject(reattached); } catch { }
+                    return;
+                }
+
+                if (!object.ReferenceEquals(_scoringExcelApp, reattached))
+                {
+                    try { Marshal.ReleaseComObject(_scoringExcelApp); } catch { }
+                }
+                _scoringExcelApp = reattached;
+            }
+            catch
+            {
+                // keep current _scoringExcelApp
+            }
+        }
         
         private void ScoreAllProjects()
         {
@@ -851,6 +1058,7 @@ namespace MOSExcelMogiApp.Views
             {
                 // ExamResultStorageをクリア
                 Models.ExamResultStorage.Clear();
+                _scoringExcelApp = null;
                 // #region agent log
                 AgentLog(
                     location: "ReviewPageWindow.ScoreAllProjects",
@@ -923,7 +1131,7 @@ namespace MOSExcelMogiApp.Views
                 // ステップ1: 既に開いているファイルを確認し、必要に応じて開く
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Step 1: Checking Excel files...");
                 
-                // すべてのファイルが既に開いているかを確認
+                // すべてのファイルが既に開いているかを確認（採点セッション内のみ）
                 List<string> filesToOpen = new List<string>();
                 foreach (var project in projectList)
                 {
@@ -934,7 +1142,7 @@ namespace MOSExcelMogiApp.Views
                     }
                     
                     // ファイルが既に開いているかチェック
-                    bool isAlreadyOpen = IsExcelFileOpen(project.filePath);
+                    bool isAlreadyOpen = IsWorkbookOpenInScoringSession(project.filePath);
                     
                     if (isAlreadyOpen)
                     {
@@ -954,8 +1162,8 @@ namespace MOSExcelMogiApp.Views
                     }
                 }
                 
-                // 必要なファイルをCOMで非表示のまま開く
-                OpenExcelFilesInBackground(filesToOpen);
+                // 必要なファイルを開き、開けたことを確認する（先頭失敗で全崩れしないため）。
+                EnsureProjectWorkbooksReady(filesToOpen);
                 // #region agent log
                 AgentLog(
                     location: "ReviewPageWindow.ScoreAllProjects",
@@ -1009,22 +1217,30 @@ namespace MOSExcelMogiApp.Views
                     {
                         // ファイルを明示的にアクティブにする（重要！）
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Activating Excel file for project {project.projectId}: {project.filePath}");
-                        bool activated = ActivateExcelFile(project.filePath);
+                        bool activated = TryActivateProjectWorkbook(project.filePath, isFirstProject: idx == 0);
                         // #region agent log
                         string activeWorkbook = null;
                         string activeWorkbookPath = null;
                         int openWorkbookCount = -1;
                         int excelHwnd = 0;
+                        bool releaseLogApp = false;
+                        ExcelApp logApp = null;
                         try
                         {
-                            var excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                            openWorkbookCount = excelApp?.Workbooks?.Count ?? -1;
-                            activeWorkbook = excelApp?.ActiveWorkbook?.Name;
-                            activeWorkbookPath = excelApp?.ActiveWorkbook?.FullName;
-                            excelHwnd = excelApp?.Hwnd ?? 0;
-                            if (excelApp != null) Marshal.ReleaseComObject(excelApp);
+                            logApp = GetExcelApplicationForScoringOptional(out releaseLogApp);
+                            openWorkbookCount = logApp?.Workbooks?.Count ?? -1;
+                            activeWorkbook = logApp?.ActiveWorkbook?.Name;
+                            activeWorkbookPath = logApp?.ActiveWorkbook?.FullName;
+                            excelHwnd = logApp?.Hwnd ?? 0;
                         }
                         catch { }
+                        finally
+                        {
+                            if (releaseLogApp && logApp != null)
+                            {
+                                try { Marshal.ReleaseComObject(logApp); } catch { }
+                            }
+                        }
                         AgentLog(
                             location: "ReviewPageWindow.ScoreAllProjects",
                             message: "after_activate",
@@ -1036,33 +1252,70 @@ namespace MOSExcelMogiApp.Views
                         {
                             System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] ERROR: Could not activate Excel file for project {project.projectId}");
                             System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] File path: {project.filePath}");
-                            
-                            // アクティブ化に失敗した場合もfalseを保存
-                            var falseResults = new List<bool>();
-                            for (int i = 0; i < project.taskCount; i++)
-                            {
-                                falseResults.Add(false);
-                            }
-                            Models.ExamResultStorage.SaveProjectResult(project.projectId, falseResults);
-                            // #region agent log
+
+                            // 先頭プロジェクト失敗時は復旧リトライを強める。
+                            activated = TryActivateProjectWorkbook(project.filePath, isFirstProject: idx == 0);
                             AgentLog(
                                 location: "ReviewPageWindow.ScoreAllProjects",
-                                message: "activate_failed_saved_all_false",
-                                data: new { projectId = project.projectId, expectedPath = project.filePath, taskCount = project.taskCount },
+                                message: "after_activate_retry_once",
+                                data: new { projectId = project.projectId, activated, expectedPath = project.filePath },
                                 runId: "pre-fix",
                                 hypothesisId: "B");
-                            // #endregion
-                            continue;
+
+                            if (!activated)
+                            {
+                                // アクティブ化に失敗した場合もfalseを保存
+                                var falseResults = new List<bool>();
+                                for (int i = 0; i < project.taskCount; i++)
+                                {
+                                    falseResults.Add(false);
+                                }
+                                Models.ExamResultStorage.SaveProjectResult(project.projectId, falseResults);
+                                // #region agent log
+                                AgentLog(
+                                    location: "ReviewPageWindow.ScoreAllProjects",
+                                    message: "activate_failed_saved_all_false",
+                                    data: new { projectId = project.projectId, expectedPath = project.filePath, taskCount = project.taskCount },
+                                    runId: "pre-fix",
+                                    hypothesisId: "B");
+                                // #endregion
+                                continue;
+                            }
                         }
                         
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Successfully activated file for project {project.projectId}");
                         
                         // ファイルがアクティブになるまで十分に待つ
                         System.Threading.Thread.Sleep(1500);
+
+                        // 採点直前に再度アクティブ化して、直前に別ブックへ戻る現象を抑止する。
+                        bool activatedBeforeScoring = ActivateExcelFile(project.filePath);
+                        AgentLog(
+                            location: "ReviewPageWindow.ScoreAllProjects",
+                            message: "after_activate_before_scoring",
+                            data: new { projectId = project.projectId, activatedBeforeScoring, expectedPath = project.filePath },
+                            runId: "pre-fix",
+                            hypothesisId: "B");
+                        if (!activatedBeforeScoring)
+                        {
+                            var falseResults = new List<bool>();
+                            for (int i = 0; i < project.taskCount; i++)
+                            {
+                                falseResults.Add(false);
+                            }
+                            Models.ExamResultStorage.SaveProjectResult(project.projectId, falseResults);
+                            AgentLog(
+                                location: "ReviewPageWindow.ScoreAllProjects",
+                                message: "activate_before_scoring_failed_saved_all_false",
+                                data: new { projectId = project.projectId, expectedPath = project.filePath, taskCount = project.taskCount },
+                                runId: "pre-fix",
+                                hypothesisId: "B");
+                            continue;
+                        }
                         
                         // 採点を実行
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Starting scoring for project {project.projectId}");
-                        var results = ExecuteScoringForProject(project.libraryName, project.taskCount);
+                        var results = ExecuteScoringForProject(project.libraryName, project.taskCount, project.filePath);
                         
                         // 採点結果を保存
                         Models.ExamResultStorage.SaveProjectResult(project.projectId, results);
@@ -1126,8 +1379,81 @@ namespace MOSExcelMogiApp.Views
                 // #endregion
             }
         }
+
+        private bool EnsureProjectWorkbooksReady(List<string> filesToOpen)
+        {
+            if (filesToOpen == null || filesToOpen.Count == 0) return true;
+
+            // 初期起動時は COM 接続が不安定なことがあるため、短い待機を挟んで複数回確認する。
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                OpenExcelFilesInBackground(filesToOpen);
+                Thread.Sleep(500);
+
+                bool allReady = true;
+                foreach (var filePath in filesToOpen)
+                {
+                    if (!IsWorkbookOpenInScoringSession(filePath))
+                    {
+                        allReady = false;
+                        break;
+                    }
+                }
+
+                AgentLog(
+                    location: "ReviewPageWindow.ScoreAllProjects",
+                    message: "workbooks_ready_check",
+                    data: new { attempt, maxAttempts, requestedCount = filesToOpen.Count, allReady },
+                    runId: "pre-fix",
+                    hypothesisId: "B");
+
+                if (allReady) return true;
+            }
+
+            return false;
+        }
+
+        private bool TryActivateProjectWorkbook(string filePath, bool isFirstProject)
+        {
+            int maxAttempts = isFirstProject ? 4 : 2;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                if (ActivateExcelFile(filePath))
+                {
+                    AgentLog(
+                        location: "ReviewPageWindow.ActivateExcelFile",
+                        message: "activate_project_retry_result",
+                        data: new { filePath, attempt, maxAttempts, success = true, isFirstProject },
+                        runId: "pre-fix",
+                        hypothesisId: "B");
+                    return true;
+                }
+
+                // 次試行前に接続再取得 + 対象ブック開き直しを行う。
+                try
+                {
+                    EnsureScoringExcelApplication(
+                        makeVisible: true,
+                        timeoutMs: 15000,
+                        caller: "ReviewPageWindow.TryActivateProjectWorkbook");
+                }
+                catch { }
+
+                OpenExcelFilesInBackground(new List<string> { filePath });
+                Thread.Sleep(isFirstProject ? 900 : 500);
+            }
+
+            AgentLog(
+                location: "ReviewPageWindow.ActivateExcelFile",
+                message: "activate_project_retry_result",
+                data: new { filePath, attempt = maxAttempts, maxAttempts, success = false, isFirstProject },
+                runId: "pre-fix",
+                hypothesisId: "B");
+            return false;
+        }
         
-        private List<bool> ExecuteScoringForProject(string libraryName, int taskCount)
+        private List<bool> ExecuteScoringForProject(string libraryName, int taskCount, string expectedFilePath)
         {
             var results = new List<bool>();
             
@@ -1138,15 +1464,23 @@ namespace MOSExcelMogiApp.Views
                 string activeWbName = null;
                 string activeWbFullName = null;
                 int excelHwnd = 0;
+                bool releaseEntryApp = false;
+                ExcelApp entryApp = null;
                 try
                 {
-                    var excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                    activeWbName = excelApp?.ActiveWorkbook?.Name;
-                    activeWbFullName = excelApp?.ActiveWorkbook?.FullName;
-                    excelHwnd = excelApp?.Hwnd ?? 0;
-                    if (excelApp != null) Marshal.ReleaseComObject(excelApp);
+                    entryApp = GetExcelApplicationForScoringOptional(out releaseEntryApp);
+                    activeWbName = entryApp?.ActiveWorkbook?.Name;
+                    activeWbFullName = entryApp?.ActiveWorkbook?.FullName;
+                    excelHwnd = entryApp?.Hwnd ?? 0;
                 }
                 catch { }
+                finally
+                {
+                    if (releaseEntryApp && entryApp != null)
+                    {
+                        try { Marshal.ReleaseComObject(entryApp); } catch { }
+                    }
+                }
                 AgentLog(
                     location: "ReviewPageWindow.ExecuteScoringForProject",
                     message: "entry",
@@ -1310,6 +1644,24 @@ namespace MOSExcelMogiApp.Views
                         
                         for (int i = 1; i <= taskCount; i++)
                         {
+                            // タスク実行ごとに対象ブックを再アクティブ化し、ActiveWorkbook 依存チェッカーのぶれを抑止する。
+                            if (!string.IsNullOrEmpty(expectedFilePath))
+                            {
+                                bool activatedForTask = ActivateExcelFile(expectedFilePath);
+                                AgentLog(
+                                    location: "ReviewPageWindow.ExecuteScoringForProject",
+                                    message: "task_pre_activate",
+                                    data: new { libraryName, taskIndex = i, expectedFilePath, activatedForTask },
+                                    runId: "pre-fix",
+                                    hypothesisId: "B");
+                                if (!activatedForTask)
+                                {
+                                    // 対象ブックを確定できないタスクは誤判定回避のため false 扱いにする。
+                                    results.Add(false);
+                                    continue;
+                                }
+                            }
+
                             // MainViewModelと同じロジックで複数のメソッド名形式を試す
                             string[] methodNames;
                             if (groupId == "1")
@@ -1335,22 +1687,40 @@ namespace MOSExcelMogiApp.Views
                             foreach (string methodName in methodNames)
                             {
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Looking for method: {methodName}");
+                                // 遷移経路差で ActiveWorkbook がぶれないよう、まず _Impl(string filePath) を優先して呼ぶ。
+                                MethodInfo implMethod = checkerType.GetMethod(
+                                    methodName + "_Impl",
+                                    BindingFlags.Instance | BindingFlags.NonPublic);
                                 MethodInfo method = checkerType.GetMethod(methodName);
                                 
-                                if (method != null)
+                                if (implMethod != null || method != null)
                                 {
                                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method found: {methodName}");
                                     // #region agent log
                                     AgentLog(
                                         location: "ReviewPageWindow.ExecuteScoringForProject",
                                         message: "method_found",
-                                        data: new { libraryName, taskIndex = i, methodName },
+                                        data: new
+                                        {
+                                            libraryName,
+                                            taskIndex = i,
+                                            methodName,
+                                            invokeMode = implMethod != null ? "impl_with_file_path" : "public_no_args"
+                                        },
                                         runId: "pre-fix",
                                         hypothesisId: "C");
                                     // #endregion
                                     try
                                     {
-                                        bool result = (bool)method.Invoke(checkerInstance, null);
+                                        bool result;
+                                        if (implMethod != null && !string.IsNullOrEmpty(expectedFilePath))
+                                        {
+                                            result = (bool)implMethod.Invoke(checkerInstance, new object[] { expectedFilePath });
+                                        }
+                                        else
+                                        {
+                                            result = (bool)method.Invoke(checkerInstance, null);
+                                        }
                                         result = ApplyDestructiveValidation(parsedProjectId, i, result);
                                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method {methodName} result: {result}");
                                         results.Add(result);
@@ -1527,27 +1897,16 @@ namespace MOSExcelMogiApp.Views
         
         private void CloseExcelApplication()
         {
-            ExcelApp excelApp = null;
+            ExcelApp excelApp = _scoringExcelApp;
+            _scoringExcelApp = null;
             int excelPid = -1;
 
             try
             {
                 System.Diagnostics.Debug.WriteLine("[CloseExcelApplication] Starting Excel closure process");
 
-                try
-                {
-                    excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch (COMException)
-                {
-                    System.Diagnostics.Debug.WriteLine("[CloseExcelApplication] No Excel application is running");
+                if (excelApp == null)
                     return;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[CloseExcelApplication] Error getting Excel application: {ex.Message}");
-                    return;
-                }
 
                 if (excelApp != null)
                 {
@@ -1648,20 +2007,20 @@ namespace MOSExcelMogiApp.Views
         {
             try
             {
-                // 優先順位1: 現在Excelで開いているファイルをチェック（ユーザーが作業中のファイル）
-                string openFilePath = GetOpenExcelFileForProject(groupId, projectId);
-                if (!string.IsNullOrEmpty(openFilePath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found open Excel file: {openFilePath}");
-                    return openFilePath;
-                }
-                
-                // 優先順位2: Initialフォルダをチェック（ユーザーが作業しているファイル）
+                // 優先順位1: Initialフォルダを最優先（採点対象を固定して結果ぶれを防ぐ）
                 string initialPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
                 if (File.Exists(initialPath))
                 {
                     System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found Initial folder file: {initialPath}");
                     return initialPath;
+                }
+                
+                // 優先順位2: config.jsonのinitialDataFileをチェック
+                string initialDataFile = projectConfig["initialDataFile"]?.ToString();
+                if (!string.IsNullOrEmpty(initialDataFile) && File.Exists(initialDataFile))
+                {
+                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found initialDataFile in config: {initialDataFile}");
+                    return initialDataFile;
                 }
                 
                 // 優先順位3: config.jsonのexcelFileをチェック
@@ -1672,12 +2031,12 @@ namespace MOSExcelMogiApp.Views
                     return excelFile;
                 }
                 
-                // 優先順位4: config.jsonのinitialDataFileをチェック
-                string initialDataFile = projectConfig["initialDataFile"]?.ToString();
-                if (!string.IsNullOrEmpty(initialDataFile) && File.Exists(initialDataFile))
+                // 優先順位4: 現在Excelで開いているファイルをチェック（最後のフォールバック）
+                string openFilePath = GetOpenExcelFileForProject(groupId, projectId);
+                if (!string.IsNullOrEmpty(openFilePath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found initialDataFile in config: {initialDataFile}");
-                    return initialDataFile;
+                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found open Excel file (fallback): {openFilePath}");
+                    return openFilePath;
                 }
                 
                 // 優先順位5: Tabフォルダのパスを自動生成
@@ -1758,43 +2117,38 @@ namespace MOSExcelMogiApp.Views
             ExcelApp excelApp = null;
             try
             {
-                try
-                {
-                    excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    // Excelが開いていない場合はfalse
-                    return false;
-                }
-                
+                // 採点中は専用Excelのみを参照し、ROTへ戻らない
+                excelApp = _scoringExcelApp;
                 if (excelApp != null && excelApp.Workbooks != null)
                 {
-                    string fileName = Path.GetFileName(filePath);
+                    string normalizedTargetPath = NormalizeExcelPath(filePath);
                     foreach (ExcelWorkbook wb in excelApp.Workbooks)
                     {
                         try
                         {
-                            if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                                wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                            // 同名ファイル（project1.xlsx など）を別フォルダから誤認しないよう、フルパス一致のみで判定する。
+                            string wbFullName = wb.FullName;
+                            if (!string.IsNullOrEmpty(wbFullName))
                             {
-                                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Excel file is already open: {wb.Name}");
-                                return true;
+                                string normalizedWorkbookPath = NormalizeExcelPath(wbFullName);
+                                if (normalizedWorkbookPath == normalizedTargetPath)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Excel file is already open: {wb.Name} ({wbFullName})");
+                                    return true;
+                                }
                             }
                         }
                         catch (Exception ex)
                         {
                             System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error checking workbook: {ex.Message}");
                         }
+                        finally
+                        {
+                            try { Marshal.ReleaseComObject(wb); } catch { }
+                        }
                     }
-                    Marshal.ReleaseComObject(excelApp.Workbooks);
                 }
-                
-                if (excelApp != null)
-                {
-                    Marshal.ReleaseComObject(excelApp);
-                }
-                
+
                 return false;
             }
             catch (Exception ex)
@@ -1810,20 +2164,27 @@ namespace MOSExcelMogiApp.Views
         /// </summary>
         private void OpenExcelFilesInBackground(List<string> filesToOpen)
         {
-            if (filesToOpen == null || filesToOpen.Count == 0) return;
+            if (filesToOpen == null || filesToOpen.Count == 0)
+            {
+                // すべて既に開いている場合でも、採点と同じ Application 参照を STA 上で掴んでおく
+                EnsureScoringExcelApplication(
+                    makeVisible: true,
+                    timeoutMs: 15000,
+                    caller: "ReviewPageWindow.OpenExcelFilesInBackground");
+                return;
+            }
             
             ExcelApp excelApp = null;
             try
             {
-                try
+                excelApp = EnsureScoringExcelApplication(
+                    makeVisible: true,
+                    timeoutMs: 30000,
+                    caller: "ReviewPageWindow.OpenExcelFilesInBackground");
+                if (excelApp == null)
                 {
-                    excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                    excelApp.Visible = false;
-                }
-                catch
-                {
-                    // COMオートメーション起動を避け、通常起動→接続に寄せる
-                    excelApp = ExcelApplicationManager.GetOrCreateExcelApplication(makeVisible: false, timeoutMs: 30000);
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] OpenExcelFilesInBackground: failed to acquire Excel application");
+                    return;
                 }
                 
                 foreach (string filePath in filesToOpen)
@@ -1831,6 +2192,10 @@ namespace MOSExcelMogiApp.Views
                     try
                     {
                         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) continue;
+                        if (IsWorkbookOpenInScoringSession(filePath))
+                        {
+                            continue;
+                        }
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Opening Excel file (background): {filePath}");
                         excelApp.Workbooks.Open(filePath,
                             UpdateLinks: false,
@@ -1861,34 +2226,78 @@ namespace MOSExcelMogiApp.Views
             }
             // excelAppは解放しない（ScoreAllProjectsでGetActiveObjectにより再利用する）
         }
+
+        /// <summary>
+        /// 採点用: Excel を表示したうえでブック／ウィンドウをアクティブにする（非表示のままだと ActiveWorkbook が付かないことがある）。
+        /// </summary>
+        private static void TryActivateWorkbookForScoring(ExcelApp excelApp, ExcelWorkbook wb)
+        {
+            if (excelApp == null || wb == null) return;
+            try
+            {
+                excelApp.Visible = true;
+            }
+            catch { }
+            try { wb.Activate(); } catch { }
+            Microsoft.Office.Interop.Excel.Windows wins = null;
+            Microsoft.Office.Interop.Excel.Window win = null;
+            try
+            {
+                wins = wb.Windows;
+                if (wins != null && wins.Count >= 1)
+                {
+                    win = wins[1];
+                    try { win.WindowState = Microsoft.Office.Interop.Excel.XlWindowState.xlNormal; } catch { }
+                    win.Activate();
+                }
+            }
+            catch { }
+            finally
+            {
+                if (win != null) { try { Marshal.ReleaseComObject(win); } catch { } }
+                if (wins != null) { try { Marshal.ReleaseComObject(wins); } catch { } }
+            }
+        }
+
+        private static void ApplyScoringWindowLayout(ExcelApp excelApp)
+        {
+            if (excelApp == null) return;
+            try { excelApp.WindowState = Microsoft.Office.Interop.Excel.XlWindowState.xlNormal; } catch { }
+            try { excelApp.Left = 150; } catch { }
+            try { excelApp.Top = 100; } catch { }
+            try { excelApp.Width = 900; } catch { }
+            try { excelApp.Height = 620; } catch { }
+        }
         
         // Excelファイルをアクティブにするメソッド
         private bool ActivateExcelFile(string filePath)
         {
+            return ActivateExcelFileInternal(filePath, allowRetryOnComException: true);
+        }
+
+        private bool ActivateExcelFileInternal(string filePath, bool allowRetryOnComException)
+        {
             ExcelApp excelApp = null;
             try
             {
-                try
-                {
-                    excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Excel application not found");
+                excelApp = EnsureScoringExcelApplication(
+                    makeVisible: true,
+                    timeoutMs: 30000,
+                    caller: "ReviewPageWindow.ActivateExcelFile");
+                if (excelApp == null)
                     return false;
-                }
                 
                 if (excelApp != null && excelApp.Workbooks != null)
                 {
                     // 正規化したパスで比較（大文字小文字を統一）
-                    string normalizedFilePath = Path.GetFullPath(filePath).ToLowerInvariant();
+                    string normalizedFilePath = NormalizeExcelPath(filePath);
                     
                     foreach (ExcelWorkbook wb in excelApp.Workbooks)
                     {
                         try
                         {
                             string wbFullName = wb.FullName;
-                            string normalizedWbPath = Path.GetFullPath(wbFullName).ToLowerInvariant();
+                            string normalizedWbPath = NormalizeExcelPath(wbFullName);
                             
                             System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] Comparing:");
                             System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile]   Target: {normalizedFilePath}");
@@ -1898,12 +2307,12 @@ namespace MOSExcelMogiApp.Views
                             if (normalizedWbPath == normalizedFilePath)
                             {
                                 System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] Match found! Activating workbook: {wb.Name}");
-                                wb.Activate();
+                                TryActivateWorkbookForScoring(excelApp, wb);
 
                                 // 採点側（ExcelChecker）は ActiveWorkbook を参照して filePath を取得するものがあるため、
                                 // "ActiveWorkbookが期待したブックになった" ことを確認してから true を返す。
                                 // Active切替が遅延することがあるためポーリングする。
-                                const int timeoutMs = 5000;
+                                const int timeoutMs = 10000;
                                 const int pollIntervalMs = 100;
                                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -1914,7 +2323,7 @@ namespace MOSExcelMogiApp.Views
                                         var active = excelApp.ActiveWorkbook;
                                         if (active != null && !string.IsNullOrEmpty(active.FullName))
                                         {
-                                            var normalizedActivePath = Path.GetFullPath(active.FullName).ToLowerInvariant();
+                                            var normalizedActivePath = NormalizeExcelPath(active.FullName);
                                             if (normalizedActivePath == normalizedFilePath)
                                             {
                                                 // #region agent log
@@ -1941,6 +2350,28 @@ namespace MOSExcelMogiApp.Views
                                     {
                                         // ignore and keep polling
                                     }
+                                    Thread.Sleep(pollIntervalMs);
+                                }
+
+                                // 再試行: ウィンドウ単位のアクティブ化
+                                TryActivateWorkbookForScoring(excelApp, wb);
+                                sw = System.Diagnostics.Stopwatch.StartNew();
+                                while (sw.ElapsedMilliseconds < 3000)
+                                {
+                                    try
+                                    {
+                                        var active = excelApp.ActiveWorkbook;
+                                        if (active != null && !string.IsNullOrEmpty(active.FullName))
+                                        {
+                                            var normalizedActivePath = NormalizeExcelPath(active.FullName);
+                                            if (normalizedActivePath == normalizedFilePath)
+                                            {
+                                                Marshal.ReleaseComObject(wb);
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                    catch { }
                                     Thread.Sleep(pollIntervalMs);
                                 }
 
@@ -1977,13 +2408,90 @@ namespace MOSExcelMogiApp.Views
                     }
                     
                     System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] No matching workbook found for: {filePath}");
+                    if (TryOpenWorkbookInCurrentExcel(excelApp, filePath))
+                    {
+                        return true;
+                    }
                 }
                 
+                return false;
+            }
+            catch (COMException cex)
+            {
+                AgentLog(
+                    location: "ReviewPageWindow.ActivateExcelFile",
+                    message: "activate_com_exception",
+                    data: new { hResult = $"0x{cex.HResult:X8}", cex.Message, filePath, allowRetryOnComException },
+                    runId: "pre-fix",
+                    hypothesisId: "F");
+                // COM不整合時は採点専用インスタンスを作り直して1回だけ再試行
+                try { if (_scoringExcelApp != null) Marshal.ReleaseComObject(_scoringExcelApp); } catch { }
+                _scoringExcelApp = null;
+                if (allowRetryOnComException)
+                {
+                    EnsureScoringExcelApplication(
+                        makeVisible: true,
+                        timeoutMs: 30000,
+                        caller: "ReviewPageWindow.ActivateExcelFile");
+                    AgentLog(
+                        location: "ReviewPageWindow.ActivateExcelFile",
+                        message: "activate_retry_once_after_com_exception",
+                        data: new { filePath },
+                        runId: "pre-fix",
+                        hypothesisId: "F");
+                    return ActivateExcelFileInternal(filePath, allowRetryOnComException: false);
+                }
                 return false;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] Error: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool TryOpenWorkbookInCurrentExcel(ExcelApp excelApp, string filePath)
+        {
+            if (excelApp == null || string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return false;
+
+            try
+            {
+                var wb = excelApp.Workbooks.Open(filePath,
+                    UpdateLinks: false,
+                    ReadOnly: false,
+                    Format: Type.Missing,
+                    Password: Type.Missing,
+                    WriteResPassword: Type.Missing,
+                    IgnoreReadOnlyRecommended: true,
+                    Origin: Microsoft.Office.Interop.Excel.XlPlatform.xlWindows,
+                    Delimiter: Type.Missing,
+                    Editable: true,
+                    Notify: false,
+                    Converter: Type.Missing,
+                    AddToMru: false,
+                    Local: false,
+                    CorruptLoad: Microsoft.Office.Interop.Excel.XlCorruptLoad.xlNormalLoad);
+                if (wb == null) return false;
+
+                try
+                {
+                    TryActivateWorkbookForScoring(excelApp, wb);
+                    var active = excelApp.ActiveWorkbook;
+                    if (active == null || string.IsNullOrEmpty(active.FullName))
+                        return false;
+                    var normalizedActivePath = NormalizeExcelPath(active.FullName);
+                    var normalizedTargetPath = NormalizeExcelPath(filePath);
+                    return normalizedActivePath == normalizedTargetPath;
+                }
+                finally
+                {
+                    try { Marshal.ReleaseComObject(wb); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] TryOpenWorkbookInCurrentExcel failed: {ex.Message}");
                 return false;
             }
         }
