@@ -93,6 +93,22 @@ namespace ExcelAddIn1
             }
         }
 
+        private void Application_SheetDeactivate(object sh)
+        {
+            try
+            {
+                var ws = sh as Excel.Worksheet;
+                if (ws == null) return;
+
+                // シートが裏に隠れる直前に、現在の状態を保存し差分があればログに記録する。
+                TryStoreSnapshot(ws, readFreeze: true, logChanges: true);
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("Application_SheetDeactivate: " + ex.Message);
+            }
+        }
+
         private void Application_WindowActivate(Excel.Workbook wb, Excel.Window wn)
         {
             try
@@ -1159,6 +1175,60 @@ namespace ExcelAddIn1
             catch (Exception ex)
             {
                 WriteDiagnostic("FlushPendingTableStyleDiffsForTask: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// タスク切替直前に、現在選択されているすべてのシート（ActiveSheet含む）のレイアウト差分を旧タスク文脈で確定する。
+        /// 印刷設定や書式などは全シート回すと重いため、ユーザーが直前まで触っていた可能性が高い選択シートのみに限定してチェックする。
+        /// </summary>
+        private void FlushPendingSelectedSheetsLayoutDiffsForTask(int projectId, int taskId, int attemptNo)
+        {
+            if (projectId <= 0 || taskId <= 0 || Application == null) return;
+            try
+            {
+                Excel.Window activeWindow = Application.ActiveWindow;
+                if (activeWindow == null) return;
+
+                Excel.Sheets selectedSheets = activeWindow.SelectedSheets;
+                if (selectedSheets == null) return;
+
+                foreach (object sh in selectedSheets)
+                {
+                    try
+                    {
+                        var ws = sh as Excel.Worksheet;
+                        if (ws == null) continue;
+
+                        string key = GetSheetKey(ws);
+                        SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: true);
+                        if (snap == null) continue;
+
+                        if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
+                        {
+                            _layoutSnapshots[key] = snap.Value;
+                            continue;
+                        }
+
+                        SheetLayoutSnapshot now = snap.Value;
+                        if (!now.Equals(old))
+                        {
+                            Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                            {
+                                CompareAndLogLayoutChanges(old, now, ws, suppressLayoutLog: false, trigger: LayoutChangeTrigger.Other);
+                            });
+                            _layoutSnapshots[key] = now;
+                        }
+                    }
+                    catch (Exception exSheet)
+                    {
+                        WriteDiagnostic("FlushPendingSelectedSheetsLayoutDiffsForTask sheet error: " + exSheet.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("FlushPendingSelectedSheetsLayoutDiffsForTask: " + ex.Message);
             }
         }
 

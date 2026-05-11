@@ -6,39 +6,45 @@ namespace Libraries
     /// <summary>
     /// Excel 破壊的操作検知で使用する操作カテゴリ。
     /// VSTO ログの operationType と 1:1 で合わせて運用する想定。
+    /// 
+    /// [発火タイミングの補足]
+    /// ・[即時発火]: 操作した瞬間に記録。
+    /// ・[タスク切替時フラッシュ]: タスク切替時に「全ブックの全シート」を走査して記録。
+    /// ・[SheetDeactivate ＋ タスク切替時]: シート切替時、またはタスク切替時に「選択中のシートのみ」を走査して記録。
+    /// ・[ハイブリッド]: 即時発火とタスク切替時（全シート走査）の両方で検知。
     /// </summary>
     public enum ExcelOperationType
     {
-        EditCellValue,          // セル値の入力・上書き（手入力、貼り付けなど）
-        EditCellFormula,        // 数式の入力・変更
-        EditCellFormat,         // セル書式変更（表示形式、フォント、配置、罫線、塗りつぶし等）
-        InsertRows,             // 行の挿入
-        DeleteRows,             // 行の削除
-        InsertColumns,          // 列の挿入
-        DeleteColumns,          // 列の削除
-        InsertShapeOrImage,     // 図形/画像/アイコン/テキストボックス等の追加
-        DeleteShapeOrImage,     // 図形/画像等の削除
-        MoveOrResizeShape,      // 図形/画像等の移動・サイズ変更・整列
-        InsertHyperlink,        // ハイパーリンクの挿入・変更
-        SortOrFilter,           // 並べ替え・フィルター実行
-        SetPrintArea,           // 印刷範囲の設定
-        SetPrintTitle,          // タイトル行/タイトル列の設定
-        SetHeaderFooter,        // ヘッダー/フッターの設定
-        SetFreezePanes,         // ウィンドウ枠の固定
-        SetWorkbookProperty,    // Backstage 経由の文書プロパティ変更（ログ詳細は変更キーのカンマ区切り）
-        ManageNamedRange,       // 名前定義の追加・削除・参照先変更
-        ImportExternalData,     // 外部データ取り込み（テキスト/CSV等）
-        SetPageBreak,           // 改ページ位置の設定
-        /// <summary>印刷の向き（PageSetup.Orientation）。</summary>
+        EditCellValue,          // [即時発火] セル値の入力・上書き（手入力、貼り付けなど）
+        EditCellFormula,        // [即時発火] 数式の入力・変更
+        EditCellFormat,         // [SheetDeactivate ＋ タスク切替時] セル書式変更（表示形式、フォント、配置、罫線、塗りつぶし等）
+        InsertRows,             // [タスク切替時フラッシュ] 行の挿入
+        DeleteRows,             // [タスク切替時フラッシュ] 行の削除
+        InsertColumns,          // [タスク切替時フラッシュ] 列の挿入
+        DeleteColumns,          // [タスク切替時フラッシュ] 列の削除
+        InsertShapeOrImage,     // [タスク切替時フラッシュ] 図形/画像/アイコン/テキストボックス等の追加
+        DeleteShapeOrImage,     // [タスク切替時フラッシュ] 図形/画像等の削除
+        MoveOrResizeShape,      // [タスク切替時フラッシュ] 図形/画像等の移動・サイズ変更・整列
+        InsertHyperlink,        // [ハイブリッド] ハイパーリンクの挿入・変更 (SheetChange後＋タスク切替時)
+        SortOrFilter,           // [タスク切替時フラッシュ] 並べ替え・フィルター実行
+        SetPrintArea,           // [SheetDeactivate ＋ タスク切替時] 印刷範囲の設定
+        SetPrintTitle,          // [SheetDeactivate ＋ タスク切替時] タイトル行/タイトル列の設定
+        SetHeaderFooter,        // [SheetDeactivate ＋ タスク切替時] ヘッダー/フッターの設定
+        SetFreezePanes,         // [SheetDeactivate ＋ タスク切替時] ウィンドウ枠の固定
+        SetWorkbookProperty,    // [即時発火] Backstage 経由の文書プロパティ変更（ログ詳細は変更キーのカンマ区切り）
+        ManageNamedRange,       // [SheetDeactivate ＋ タスク切替時] 名前定義の追加・削除・参照先変更
+        ImportExternalData,     // [SheetDeactivate ＋ タスク切替時] 外部データ取り込み（テキスト/CSV等）
+        SetPageBreak,           // [SheetDeactivate ＋ タスク切替時] 改ページ位置の設定
+        /// <summary>[SheetDeactivate ＋ タスク切替時] 印刷の向き（PageSetup.Orientation）。</summary>
         SetPageOrientation,
-        /// <summary>余白（PageSetup の各 Margin）。</summary>
+        /// <summary>[SheetDeactivate ＋ タスク切替時] 余白（PageSetup の各 Margin）。</summary>
         SetPageMargins,
-        /// <summary>用紙サイズ・拡大/縮小・ページに合わせる・Zoom 等（PageSetup のスケーリング系）。</summary>
+        /// <summary>[SheetDeactivate ＋ タスク切替時] 用紙サイズ・拡大/縮小・ページに合わせる・Zoom 等（PageSetup のスケーリング系）。</summary>
         SetPageScaling,
-        SetTableStyle,          // テーブルスタイル/テーブルデザイン変更
-        ResizeTable,            // テーブル範囲の拡張・縮小
-        AddConditionalFormat,   // 条件付き書式の追加・変更
-        AddChart                // グラフの新規作成
+        SetTableStyle,          // [タスク切替時フラッシュ] テーブルスタイル/テーブルデザイン変更
+        ResizeTable,            // [SheetDeactivate ＋ タスク切替時] テーブル範囲の拡張・縮小
+        AddConditionalFormat,   // [SheetDeactivate ＋ タスク切替時] 条件付き書式の追加・変更
+        AddChart                // [即時発火] グラフの新規作成
     }
 
     [Flags]
