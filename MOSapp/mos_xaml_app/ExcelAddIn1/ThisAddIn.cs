@@ -365,14 +365,8 @@ namespace ExcelAddIn1
                 // タスク切替直前に未確定差分を「旧タスク」文脈で確定し、同一シート継続時の取りこぼしを防ぐ。
                 if (prevProjectId > 0 && prevTaskId > 0)
                 {
-                    // 重い PageSetup 等を含む一括チェックを最優先で行う（後続の個別フラッシュによるスナップショット更新で差分が消えるのを防ぐため）。
-                    FlushPendingSelectedSheetsLayoutDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
-
-                    FlushPendingStructureDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
-                    FlushPendingSortFilterDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
-                    FlushPendingTableStyleDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
-                    FlushPendingShapeDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
-                    FlushPendingHyperlinkDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
+                    // 選択シートのレイアウトを先に確定したうえで、全シートは BuildSnapshot を1回／シートにまとめる。
+                    FlushPendingBoundaryDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
                 }
 
                 _currentTaskProjectId = projectId;

@@ -705,10 +705,24 @@ namespace MOSExcelMogiApp.Views
                     
                     // 結果画面ウィンドウを表示（UIスレッドで実行、非同期で表示）
                     ResultWindow resultWindow = null;
-                    
+                    var initialPresentationTcs = new TaskCompletionSource<bool>();
+                    EventHandler onInitialPresentationCompleted = null;
+
                     await Dispatcher.InvokeAsync(() =>
                     {
                         resultWindow = new ResultWindow(allResults, _groupId);
+                        onInitialPresentationCompleted = (_, __) =>
+                        {
+                            try
+                            {
+                                resultWindow.InitialPresentationCompleted -= onInitialPresentationCompleted;
+                            }
+                            catch { }
+
+                            initialPresentationTcs.TrySetResult(true);
+                        };
+                        resultWindow.InitialPresentationCompleted += onInitialPresentationCompleted;
+
                         resultWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                         resultWindow.Topmost = true;
                         
@@ -780,15 +794,27 @@ namespace MOSExcelMogiApp.Views
                         resultWindow.Show();
                         resultWindow.Activate();
                     }, DispatcherPriority.Normal);
-                    
-                    // ResultWindowが完全に読み込まれるまで待つ（Loadedイベントの非同期処理を含む）
-                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Waiting for ResultWindow to fully load...");
-                    await Task.Delay(500); // Loadedイベントが発火するまで待つ
-                    
-                    // さらにデータ読み込みが完了するまで待つ
-                    await Task.Delay(1000); // データ読み込みが完了するまで待つ
-                    
-                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] ResultWindow should be loaded");
+
+                    // ResultWindow の初回データ表示完了まで待つ（固定 500ms+1000ms より短く終わることが多い）
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Waiting for ResultWindow initial presentation...");
+                    const int resultWindowInitialTimeoutMs = 8000;
+                    Task timeoutTask = Task.Delay(resultWindowInitialTimeoutMs);
+                    Task completed = await Task.WhenAny(initialPresentationTcs.Task, timeoutTask).ConfigureAwait(true);
+                    if (completed != initialPresentationTcs.Task)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] ResultWindow initial presentation timed out; proceeding.");
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            try
+                            {
+                                if (resultWindow != null && onInitialPresentationCompleted != null)
+                                    resultWindow.InitialPresentationCompleted -= onInitialPresentationCompleted;
+                            }
+                            catch { }
+                        });
+                    }
+
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] ResultWindow initial presentation gate passed");
                     
                     // ReviewPageWindowを非表示にする（閉じるとResultWindowに影響する可能性があるため）
                     await Dispatcher.InvokeAsync(() =>
@@ -1452,7 +1478,80 @@ namespace MOSExcelMogiApp.Views
                 hypothesisId: "B");
             return false;
         }
-        
+
+        /// <summary>1タスク分の CheckTask / CheckTask_Impl の解決結果。タスクループ内の GetMethod 繰り返しを避ける。</summary>
+        private sealed class CheckTaskMethodBinding
+        {
+            public MethodInfo ImplMethod;
+            public MethodInfo PublicMethod;
+            public string ResolvedMethodName;
+
+            public static string[] GetMethodNameCandidates(string groupId, string projectId, int taskIndex)
+            {
+                if (groupId == "1")
+                {
+                    return new[]
+                    {
+                        $"CheckTask_1_{projectId}_{taskIndex:D2}",
+                        $"CheckTask_1_{projectId}_0{taskIndex}",
+                        $"CheckTask_{groupId}_{projectId}_{taskIndex:D2}",
+                        $"CheckTask_{groupId}_{projectId}_0{taskIndex}"
+                    };
+                }
+
+                return new[]
+                {
+                    $"CheckTask_{groupId}_{projectId}_{taskIndex:D2}",
+                    $"CheckTask_{groupId}_{projectId}_0{taskIndex}",
+                    $"CheckTask_1_{projectId}_{taskIndex:D2}",
+                    $"CheckTask_1_{projectId}_0{taskIndex}"
+                };
+            }
+
+            public static CheckTaskMethodBinding TryResolve(Type checkerType, string groupId, string projectId, int taskIndex)
+            {
+                string[] methodNames = GetMethodNameCandidates(groupId, projectId, taskIndex);
+
+                foreach (string methodName in methodNames)
+                {
+                    MethodInfo implMethod = checkerType.GetMethod(
+                        methodName + "_Impl",
+                        BindingFlags.Instance | BindingFlags.NonPublic);
+                    MethodInfo method = checkerType.GetMethod(methodName);
+                    if (implMethod == null && method == null)
+                        continue;
+
+                    return new CheckTaskMethodBinding
+                    {
+                        ImplMethod = implMethod,
+                        PublicMethod = method,
+                        ResolvedMethodName = methodName
+                    };
+                }
+
+                return null;
+            }
+
+            /// <summary>既存ロジックと同じ分岐でチェッカーを呼び出す。</summary>
+            public bool TryInvoke(object checkerInstance, string expectedFilePath, out bool result)
+            {
+                result = false;
+                if (ImplMethod != null && !string.IsNullOrEmpty(expectedFilePath))
+                {
+                    result = (bool)ImplMethod.Invoke(checkerInstance, new object[] { expectedFilePath });
+                    return true;
+                }
+
+                if (PublicMethod != null)
+                {
+                    result = (bool)PublicMethod.Invoke(checkerInstance, null);
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
         private List<bool> ExecuteScoringForProject(string libraryName, int taskCount, string expectedFilePath)
         {
             var results = new List<bool>();
@@ -1629,19 +1728,23 @@ namespace MOSExcelMogiApp.Views
                             runId: "pre-fix",
                             hypothesisId: "C");
                         // #endregion
-                        
-                        // デバッグ: 利用可能なメソッドをすべて表示
+
+#if DEBUG
+                        // Release では GetMethods 全列挙を避ける（採点時間への影響が大きい）
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Available methods in {checkerType.Name}:");
                         foreach (var method in checkerType.GetMethods())
                         {
                             if (method.Name.StartsWith("CheckTask"))
-                            {
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] - {method.Name}");
-                            }
                         }
-                        
+#endif
+
                         object checkerInstance = Activator.CreateInstance(checkerType);
-                        
+
+                        var taskBindings = new CheckTaskMethodBinding[taskCount];
+                        for (int ti = 1; ti <= taskCount; ti++)
+                            taskBindings[ti - 1] = CheckTaskMethodBinding.TryResolve(checkerType, groupId, projectId, ti);
+
                         for (int i = 1; i <= taskCount; i++)
                         {
                             // タスク実行ごとに対象ブックを再アクティブ化し、ActiveWorkbook 依存チェッカーのぶれを抑止する。
@@ -1662,115 +1765,73 @@ namespace MOSExcelMogiApp.Views
                                 }
                             }
 
-                            // MainViewModelと同じロジックで複数のメソッド名形式を試す
-                            string[] methodNames;
-                            if (groupId == "1")
-                            {
-                                methodNames = new string[] {
-                                    $"CheckTask_1_{projectId}_{i:D2}",          // CheckTask_1_1_01 (優先)
-                                    $"CheckTask_1_{projectId}_0{i}",            // CheckTask_1_1_01
-                                    $"CheckTask_{groupId}_{projectId}_{i:D2}",  // CheckTask_1_1_01 (fallback)
-                                    $"CheckTask_{groupId}_{projectId}_0{i}"     // CheckTask_1_1_01 (fallback)
-                                };
-                            }
-                            else
-                            {
-                                methodNames = new string[] {
-                                    $"CheckTask_{groupId}_{projectId}_{i:D2}",  // CheckTask_2_1_01
-                                    $"CheckTask_{groupId}_{projectId}_0{i}",    // CheckTask_2_1_01
-                                    $"CheckTask_1_{projectId}_{i:D2}",          // CheckTask_1_1_01 (fallback)
-                                    $"CheckTask_1_{projectId}_0{i}"             // CheckTask_1_1_01 (fallback)
-                                };
-                            }
-                            
-                            bool methodFound = false;
-                            foreach (string methodName in methodNames)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Looking for method: {methodName}");
-                                // 遷移経路差で ActiveWorkbook がぶれないよう、まず _Impl(string filePath) を優先して呼ぶ。
-                                MethodInfo implMethod = checkerType.GetMethod(
-                                    methodName + "_Impl",
-                                    BindingFlags.Instance | BindingFlags.NonPublic);
-                                MethodInfo method = checkerType.GetMethod(methodName);
-                                
-                                if (implMethod != null || method != null)
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method found: {methodName}");
-                                    // #region agent log
-                                    AgentLog(
-                                        location: "ReviewPageWindow.ExecuteScoringForProject",
-                                        message: "method_found",
-                                        data: new
-                                        {
-                                            libraryName,
-                                            taskIndex = i,
-                                            methodName,
-                                            invokeMode = implMethod != null ? "impl_with_file_path" : "public_no_args"
-                                        },
-                                        runId: "pre-fix",
-                                        hypothesisId: "C");
-                                    // #endregion
-                                    try
-                                    {
-                                        bool result;
-                                        if (implMethod != null && !string.IsNullOrEmpty(expectedFilePath))
-                                        {
-                                            result = (bool)implMethod.Invoke(checkerInstance, new object[] { expectedFilePath });
-                                        }
-                                        else
-                                        {
-                                            result = (bool)method.Invoke(checkerInstance, null);
-                                        }
-                                        result = ApplyDestructiveValidation(parsedProjectId, i, result);
-                                        System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method {methodName} result: {result}");
-                                        results.Add(result);
-                                        // #region agent log
-                                        AgentLog(
-                                            location: "ReviewPageWindow.ExecuteScoringForProject",
-                                            message: "method_result",
-                                            data: new { libraryName, taskIndex = i, methodName, result },
-                                            runId: "pre-fix",
-                                            hypothesisId: "C");
-                                        // #endregion
-                                        methodFound = true;
-                                        break;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error invoking method {methodName}: {ex.Message}");
-                                        System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
-                                        // エラー時はfalseとして扱う
-                                        results.Add(false);
-                                        // #region agent log
-                                        AgentLog(
-                                            location: "ReviewPageWindow.ExecuteScoringForProject",
-                                            message: "method_invoke_exception",
-                                            data: new { libraryName, taskIndex = i, methodName, ex = ex.Message },
-                                            runId: "pre-fix",
-                                            hypothesisId: "E");
-                                        // #endregion
-                                        methodFound = true;
-                                        break;
-                                    }
-                                }
-                                else
-                                {
-                                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method not found: {methodName}");
-                                }
-                            }
-                            
-                            if (!methodFound)
+                            CheckTaskMethodBinding binding = taskBindings[i - 1];
+                            string[] triedNames = CheckTaskMethodBinding.GetMethodNameCandidates(groupId, projectId, i);
+                            if (binding == null)
                             {
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] No method found for task {i}, returning false");
                                 results.Add(false);
-                                // #region agent log
                                 AgentLog(
                                     location: "ReviewPageWindow.ExecuteScoringForProject",
                                     message: "no_method_for_task_saved_false",
-                                    data: new { libraryName, taskIndex = i, tried = methodNames },
+                                    data: new { libraryName, taskIndex = i, tried = triedNames },
                                     runId: "pre-fix",
                                     hypothesisId: "C");
-                                // #endregion
+                                continue;
+                            }
+
+                            string resolvedName = binding.ResolvedMethodName;
+                            string invokeMode = (binding.ImplMethod != null && !string.IsNullOrEmpty(expectedFilePath))
+                                ? "impl_with_file_path"
+                                : "public_no_args";
+                            AgentLog(
+                                location: "ReviewPageWindow.ExecuteScoringForProject",
+                                message: "method_found",
+                                data: new
+                                {
+                                    libraryName,
+                                    taskIndex = i,
+                                    methodName = resolvedName,
+                                    invokeMode
+                                },
+                                runId: "pre-fix",
+                                hypothesisId: "C");
+
+                            try
+                            {
+                                if (!binding.TryInvoke(checkerInstance, expectedFilePath, out bool invokeResult))
+                                {
+                                    results.Add(false);
+                                    AgentLog(
+                                        location: "ReviewPageWindow.ExecuteScoringForProject",
+                                        message: "no_method_for_task_saved_false",
+                                        data: new { libraryName, taskIndex = i, tried = triedNames, note = "binding_resolve_mismatch" },
+                                        runId: "pre-fix",
+                                        hypothesisId: "C");
+                                    continue;
+                                }
+
+                                invokeResult = ApplyDestructiveValidation(parsedProjectId, i, invokeResult);
+                                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method {resolvedName} result: {invokeResult}");
+                                results.Add(invokeResult);
+                                AgentLog(
+                                    location: "ReviewPageWindow.ExecuteScoringForProject",
+                                    message: "method_result",
+                                    data: new { libraryName, taskIndex = i, methodName = resolvedName, result = invokeResult },
+                                    runId: "pre-fix",
+                                    hypothesisId: "C");
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error invoking method {resolvedName}: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
+                                results.Add(false);
+                                AgentLog(
+                                    location: "ReviewPageWindow.ExecuteScoringForProject",
+                                    message: "method_invoke_exception",
+                                    data: new { libraryName, taskIndex = i, methodName = resolvedName, ex = ex.Message },
+                                    runId: "pre-fix",
+                                    hypothesisId: "E");
                             }
                         }
                     }

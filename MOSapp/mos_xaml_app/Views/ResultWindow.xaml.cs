@@ -23,6 +23,8 @@ namespace MOSExcelMogiApp.Views
         private bool _showingWrongOnly = false; // フィルター状態
         private bool _csvExported = false; // CSV出力を1回だけ行うためのフラグ
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
+        /// <summary>初回の <see cref="LoadResultsAsync"/>（問題文・一覧の読み込み含む）が完了したときに1回だけ発火する。</summary>
+        public event EventHandler InitialPresentationCompleted;
         // 採点直後のスナップショット（復習前の正答率計算用）
         private Dictionary<int, List<bool>> _initialProjectResults;
 
@@ -68,11 +70,25 @@ namespace MOSExcelMogiApp.Views
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // UI更新の機会を与える
-            await Task.Delay(50);
-            
-            // 非同期でデータを読み込む
-            await LoadResultsAsync();
+            try
+            {
+                // UI更新の機会を与える
+                await Task.Delay(50);
+
+                // 非同期でデータを読み込む
+                await LoadResultsAsync();
+            }
+            finally
+            {
+                try
+                {
+                    InitialPresentationCompleted?.Invoke(this, EventArgs.Empty);
+                }
+                catch
+                {
+                    // ignore subscriber errors
+                }
+            }
         }
 
         protected override void OnClosed(EventArgs e)

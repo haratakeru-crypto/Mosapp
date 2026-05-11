@@ -853,71 +853,22 @@ namespace ExcelAddIn1
         }
 
         /// <summary>
-        /// タスク切替直前に、開いている全ブックの各シートでハイパーリンク署名だけ前後比較し、
-        /// 差分があれば指定タスク文脈で <c>InsertHyperlink</c> を1回記録してからフルスナップショットを更新する。
+        /// タスク切替直前の境界フラッシュ。選択シートのレイアウト（PageSetup 等）を先に確定し、
+        /// 全ワークブックの構造・並べ替え/フィルター・テーブルスタイル・図形・ハイパーリンクは
+        /// 各シートで <see cref="BuildSnapshot"/> を1回だけ実行してまとめて判定する。
         /// </summary>
-        private void FlushPendingHyperlinkDiffsForTask(int projectId, int taskId, int attemptNo)
+        private void FlushPendingBoundaryDiffsForTask(int projectId, int taskId, int attemptNo)
         {
-            if (projectId <= 0 || taskId <= 0 || Application == null) return;
-            try
-            {
-                foreach (Excel.Workbook wb in Application.Workbooks)
-                {
-                    try
-                    {
-                        foreach (Excel.Worksheet ws in wb.Worksheets)
-                        {
-                            try
-                            {
-                                string key = GetSheetKey(ws);
-                                string newHl = BuildHyperlinkSignature(ws);
-
-                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
-                                {
-                                    SheetLayoutSnapshot? baseline = BuildSnapshot(ws, readFreeze: false);
-                                    if (baseline != null)
-                                        _layoutSnapshots[key] = baseline.Value;
-                                    continue;
-                                }
-
-                                if (old.HyperlinkSignature == newHl)
-                                    continue;
-
-                                string sheetName = "";
-                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
-
-                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
-                                {
-                                    Logger.LogOperation("InsertHyperlink", $"{sheetName}!HyperlinkChanged;Trigger=BoundaryFlush");
-                                });
-
-                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
-                                if (snap != null)
-                                    _layoutSnapshots[key] = snap.Value;
-                            }
-                            catch (Exception exInner)
-                            {
-                                WriteDiagnostic("FlushPendingHyperlinkDiffsForTask sheet: " + exInner.Message);
-                            }
-                        }
-                    }
-                    catch (Exception exWb)
-                    {
-                        WriteDiagnostic("FlushPendingHyperlinkDiffsForTask workbook: " + exWb.Message);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteDiagnostic("FlushPendingHyperlinkDiffsForTask: " + ex.Message);
-            }
+            if (projectId <= 0 || taskId <= 0) return;
+            FlushPendingSelectedSheetsLayoutDiffsForTask(projectId, taskId, attemptNo);
+            FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(projectId, taskId, attemptNo);
         }
 
         /// <summary>
-        /// タスク切替直前に、各シートの UsedRange 行/列数の差分を旧タスク文脈で確定する。
-        /// Window/Sheet activate に依存せず、同一シート継続時の取りこぼしを減らす。
+        /// 全ブック各シートについて、旧スナップショットと現在状態を1回の <c>BuildSnapshot</c> で比較し、
+        /// 差分カテゴリをまとめてログしてからスナップショットを更新する。
         /// </summary>
-        private void FlushPendingStructureDiffsForTask(int projectId, int taskId, int attemptNo)
+        private void FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(int projectId, int taskId, int attemptNo)
         {
             if (projectId <= 0 || taskId <= 0 || Application == null) return;
             try
@@ -943,8 +894,17 @@ namespace ExcelAddIn1
                                 SheetLayoutSnapshot now = snap.Value;
                                 bool rowChanged = old.UsedRowCount != now.UsedRowCount;
                                 bool colChanged = old.UsedColumnCount != now.UsedColumnCount;
-                                if (!rowChanged && !colChanged)
+                                bool sortFilterChanged = old.SortFilterSignature != now.SortFilterSignature;
+                                bool tableStyleChanged = old.TableStyleSignature != now.TableStyleSignature;
+                                bool shapeCountChanged = old.ShapeCount != now.ShapeCount;
+                                bool shapeGeomChanged = old.ShapeGeometrySignature != now.ShapeGeometrySignature;
+                                bool hyperlinkChanged = old.HyperlinkSignature != now.HyperlinkSignature;
+
+                                if (!rowChanged && !colChanged && !sortFilterChanged && !tableStyleChanged
+                                    && !shapeCountChanged && !shapeGeomChanged && !hyperlinkChanged)
+                                {
                                     continue;
+                                }
 
                                 string sheetName = "";
                                 try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
@@ -966,66 +926,13 @@ namespace ExcelAddIn1
                                         else
                                             Logger.LogOperation("DeleteColumns", $"{sheetName}!Cols:{old.UsedColumnCount}->{now.UsedColumnCount};Trigger=BoundaryFlush");
                                     }
-                                });
 
-                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
-                                _layoutSnapshots[key] = now;
-                            }
-                            catch (Exception exInner)
-                            {
-                                WriteDiagnostic("FlushPendingStructureDiffsForTask sheet: " + exInner.Message);
-                            }
-                        }
-                    }
-                    catch (Exception exWb)
-                    {
-                        WriteDiagnostic("FlushPendingStructureDiffsForTask workbook: " + exWb.Message);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteDiagnostic("FlushPendingStructureDiffsForTask: " + ex.Message);
-            }
-        }
+                                    if (sortFilterChanged)
+                                        Logger.LogOperation("SortOrFilter", $"{sheetName}!{now.SortFilterSignature};Trigger=BoundaryFlush");
 
-        /// <summary>
-        /// タスク切替直前に、各シートの図形差分（追加/削除/移動・サイズ変更）を旧タスク文脈で確定する。
-        /// </summary>
-        private void FlushPendingShapeDiffsForTask(int projectId, int taskId, int attemptNo)
-        {
-            if (projectId <= 0 || taskId <= 0 || Application == null) return;
-            try
-            {
-                foreach (Excel.Workbook wb in Application.Workbooks)
-                {
-                    try
-                    {
-                        foreach (Excel.Worksheet ws in wb.Worksheets)
-                        {
-                            try
-                            {
-                                string key = GetSheetKey(ws);
-                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
-                                if (snap == null) continue;
+                                    if (tableStyleChanged)
+                                        Logger.LogOperation("SetTableStyle", $"{sheetName}!{now.TableStyleSignature};Trigger=BoundaryFlush");
 
-                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
-                                {
-                                    _layoutSnapshots[key] = snap.Value;
-                                    continue;
-                                }
-
-                                SheetLayoutSnapshot now = snap.Value;
-                                bool shapeCountChanged = old.ShapeCount != now.ShapeCount;
-                                bool shapeGeomChanged = old.ShapeGeometrySignature != now.ShapeGeometrySignature;
-                                if (!shapeCountChanged && !shapeGeomChanged)
-                                    continue;
-
-                                string sheetName = "";
-                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
-
-                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
-                                {
                                     if (shapeCountChanged)
                                     {
                                         if (now.ShapeCount > old.ShapeCount)
@@ -1037,144 +944,28 @@ namespace ExcelAddIn1
                                     {
                                         Logger.LogOperation("MoveOrResizeShape", $"{sheetName}!Count={now.ShapeCount};Trigger=BoundaryFlush");
                                     }
+
+                                    if (hyperlinkChanged)
+                                        Logger.LogOperation("InsertHyperlink", $"{sheetName}!HyperlinkChanged;Trigger=BoundaryFlush");
                                 });
 
-                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
                                 _layoutSnapshots[key] = now;
                             }
                             catch (Exception exInner)
                             {
-                                WriteDiagnostic("FlushPendingShapeDiffsForTask sheet: " + exInner.Message);
+                                WriteDiagnostic("FlushPendingWorkbookSheetsBoundaryDiffsSinglePass sheet: " + exInner.Message);
                             }
                         }
                     }
                     catch (Exception exWb)
                     {
-                        WriteDiagnostic("FlushPendingShapeDiffsForTask workbook: " + exWb.Message);
+                        WriteDiagnostic("FlushPendingWorkbookSheetsBoundaryDiffsSinglePass workbook: " + exWb.Message);
                     }
                 }
             }
             catch (Exception ex)
             {
-                WriteDiagnostic("FlushPendingShapeDiffsForTask: " + ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// タスク切替直前に、各シートの並べ替え/フィルター署名の差分を旧タスク文脈で確定する。
-        /// </summary>
-        private void FlushPendingSortFilterDiffsForTask(int projectId, int taskId, int attemptNo)
-        {
-            if (projectId <= 0 || taskId <= 0 || Application == null) return;
-            try
-            {
-                foreach (Excel.Workbook wb in Application.Workbooks)
-                {
-                    try
-                    {
-                        foreach (Excel.Worksheet ws in wb.Worksheets)
-                        {
-                            try
-                            {
-                                string key = GetSheetKey(ws);
-                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
-                                if (snap == null) continue;
-
-                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
-                                {
-                                    _layoutSnapshots[key] = snap.Value;
-                                    continue;
-                                }
-
-                                SheetLayoutSnapshot now = snap.Value;
-                                if (old.SortFilterSignature == now.SortFilterSignature)
-                                    continue;
-
-                                string sheetName = "";
-                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
-
-                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
-                                {
-                                    Logger.LogOperation("SortOrFilter", $"{sheetName}!{now.SortFilterSignature};Trigger=BoundaryFlush");
-                                });
-
-                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
-                                _layoutSnapshots[key] = now;
-                            }
-                            catch (Exception exInner)
-                            {
-                                WriteDiagnostic("FlushPendingSortFilterDiffsForTask sheet: " + exInner.Message);
-                            }
-                        }
-                    }
-                    catch (Exception exWb)
-                    {
-                        WriteDiagnostic("FlushPendingSortFilterDiffsForTask workbook: " + exWb.Message);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteDiagnostic("FlushPendingSortFilterDiffsForTask: " + ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// タスク切替直前に、各シートのテーブルスタイル差分を旧タスク文脈で確定する。
-        /// </summary>
-        private void FlushPendingTableStyleDiffsForTask(int projectId, int taskId, int attemptNo)
-        {
-            if (projectId <= 0 || taskId <= 0 || Application == null) return;
-            try
-            {
-                foreach (Excel.Workbook wb in Application.Workbooks)
-                {
-                    try
-                    {
-                        foreach (Excel.Worksheet ws in wb.Worksheets)
-                        {
-                            try
-                            {
-                                string key = GetSheetKey(ws);
-                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
-                                if (snap == null) continue;
-
-                                if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
-                                {
-                                    _layoutSnapshots[key] = snap.Value;
-                                    continue;
-                                }
-
-                                SheetLayoutSnapshot now = snap.Value;
-                                if (old.TableStyleSignature == now.TableStyleSignature)
-                                    continue;
-
-                                string sheetName = "";
-                                try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
-
-                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
-                                {
-                                    Logger.LogOperation("SetTableStyle", $"{sheetName}!{now.TableStyleSignature};Trigger=BoundaryFlush");
-                                });
-
-                                // フラッシュ後はフルスナップショットへ更新し、後続トリガーとの二重記録を防ぐ。
-                                _layoutSnapshots[key] = now;
-                            }
-                            catch (Exception exInner)
-                            {
-                                WriteDiagnostic("FlushPendingTableStyleDiffsForTask sheet: " + exInner.Message);
-                            }
-                        }
-                    }
-                    catch (Exception exWb)
-                    {
-                        WriteDiagnostic("FlushPendingTableStyleDiffsForTask workbook: " + exWb.Message);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                WriteDiagnostic("FlushPendingTableStyleDiffsForTask: " + ex.Message);
+                WriteDiagnostic("FlushPendingWorkbookSheetsBoundaryDiffsSinglePass: " + ex.Message);
             }
         }
 
