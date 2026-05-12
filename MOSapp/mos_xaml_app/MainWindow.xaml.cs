@@ -62,7 +62,23 @@ namespace MOSExcelMogiApp
         {
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
+            {
                 e.Cancel = true;
+                return;
+            }
+
+            try
+            {
+                // 終了処理中にカーソルを待機状態にする
+                this.Cursor = Cursors.Wait;
+                
+                // Excel を確実に閉じる（同期実行して完了を待つことでゾンビプロセスを防止）
+                _viewModel?.CloseExcelApplication();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Error during closing cleanup: {ex.Message}");
+            }
         }
         
         private void OnShowAppBarRequested(object sender, EventArgs e)
