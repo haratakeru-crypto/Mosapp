@@ -1,0 +1,176 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+
+namespace MOS_Word_app
+{
+    /// <summary>
+    /// MainWindow.xaml の相互作用ロジック
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        private MainViewModel _viewModel;
+        private Views.UiTestAppBarWindow _appBarWindow;
+
+        /// <summary>タイマー無効化フラグ。デフォルトは一時停止。プロジェクト一覧で「タイマーを使用」にチェックで有効。</summary>
+        public static bool IsTimerDisabled { get; private set; } = true;
+
+        public MainWindow()
+        {
+            InitializeComponent();
+
+            _viewModel = new MainViewModel();
+            DataContext = _viewModel;
+
+            _viewModel.ShowAppBarRequested += OnShowAppBarRequested;
+            _viewModel.HideMainWindowRequested += OnHideMainWindowRequested;
+            _viewModel.ShowMainWindowRequested += OnShowMainWindowRequested;
+            _viewModel.ExamEnded += OnExamEnded;
+            _viewModel.ScoreCompleted += OnScoreCompleted;
+
+            Loaded += MainWindow_Loaded;
+            Closing += MainWindow_Closing;
+        }
+
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes)
+                e.Cancel = true;
+        }
+
+        private void OnShowAppBarRequested(object sender, EventArgs e)
+        {
+            if (_appBarWindow == null || !_appBarWindow.IsLoaded)
+            {
+                var project = _viewModel.CurrentProject;
+                if (project != null)
+                {
+                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, _viewModel.ShowPauseButton);
+                    _appBarWindow.Closed += (s, args) =>
+                    {
+                        this.Show();
+                        this.Activate();
+                        _appBarWindow = null;
+                    };
+                }
+            }
+            if (_appBarWindow != null)
+            {
+                _appBarWindow.Show();
+            }
+        }
+
+        private void OnHideMainWindowRequested(object sender, EventArgs e)
+        {
+            this.Hide();
+        }
+
+        private void OnShowMainWindowRequested(object sender, EventArgs e)
+        {
+            this.Show();
+            this.Activate();
+        }
+
+        private void OnExamEnded(object sender, EventArgs e)
+        {
+            _appBarWindow = null;
+        }
+
+        private void OnScoreCompleted(object sender, EventArgs e)
+        {
+            var results = _viewModel?.TaskResults;
+            if (results == null || results.Count == 0)
+                return;
+            var dialog = new Views.ScoreResultWindow(results);
+            dialog.Owner = this;
+            dialog.ShowDialog();
+        }
+
+        private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            IsTimerDisabled = false;
+        }
+
+        private void TimerCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            IsTimerDisabled = true;
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            if (_viewModel != null)
+            {
+                _viewModel.ShowAppBarRequested -= OnShowAppBarRequested;
+                _viewModel.HideMainWindowRequested -= OnHideMainWindowRequested;
+                _viewModel.ShowMainWindowRequested -= OnShowMainWindowRequested;
+                _viewModel.ExamEnded -= OnExamEnded;
+            }
+            _appBarWindow?.Close();
+            base.OnClosed(e);
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            // #region agent log
+            try
+            {
+                var line1 = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"Loaded entry\",\"data\":{\"autoOpenGroupId\":" + (App.AutoOpenGroupId?.ToString() ?? "null") + ",\"autoOpenProjectId\":" + (App.AutoOpenProjectId?.ToString() ?? "null") + ",\"projectGroupsCount\":" + (_viewModel.ProjectGroups?.Count ?? 0) + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"C\"}\n";
+                var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
+                try { System.IO.File.AppendAllText(logPath, line1); } catch { System.IO.File.AppendAllText(System.AppDomain.CurrentDomain.BaseDirectory + "debug.log", line1); }
+            }
+            catch { }
+            // #endregion
+
+            if (!App.AutoOpenGroupId.HasValue || !App.AutoOpenProjectId.HasValue)
+            {
+                // #region agent log
+                try { System.IO.File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"early return no AutoOpen\",\"data\":{\"autoOpenGroupId\":" + (App.AutoOpenGroupId?.ToString() ?? "null") + ",\"autoOpenProjectId\":" + (App.AutoOpenProjectId?.ToString() ?? "null") + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H2\"}\n"); } catch { }
+                // #endregion
+                return;
+            }
+
+            int groupId = App.AutoOpenGroupId.Value;
+            int projectId = App.AutoOpenProjectId.Value;
+            App.ClearAutoOpen();
+
+            var group = _viewModel.ProjectGroups?.FirstOrDefault(g => g.GroupId == groupId);
+            var project = group?.Projects?.FirstOrDefault(p => p.ProjectId == projectId);
+
+            // #region agent log
+            try
+            {
+                var canExec = project != null && _viewModel.OpenProjectCommand.CanExecute(project);
+                var line2 = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"project resolve\",\"data\":{\"groupFound\":" + (group != null).ToString().ToLowerInvariant() + ",\"projectFound\":" + (project != null).ToString().ToLowerInvariant() + ",\"canExecute\":" + canExec.ToString().ToLowerInvariant() + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"D\"}\n";
+                var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
+                try { System.IO.File.AppendAllText(logPath, line2); } catch { System.IO.File.AppendAllText(System.AppDomain.CurrentDomain.BaseDirectory + "debug.log", line2); }
+            }
+            catch { }
+            // #endregion
+
+            if (project == null)
+            {
+                // #region agent log
+                try { System.IO.File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"project is null\",\"data\":{\"groupId\":" + groupId + ",\"projectId\":" + projectId + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H2\"}\n"); } catch { }
+                // #endregion
+                return;
+            }
+
+            if (_viewModel.OpenProjectCommand.CanExecute(project))
+            {
+                _viewModel.OpenProjectCommand.Execute(project);
+            }
+        }
+    }
+}
