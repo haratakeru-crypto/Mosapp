@@ -12,6 +12,19 @@ namespace Libraries
     public static class ExcelLogReader
     {
         private static readonly Regex CellRegex = new Regex(@"^([A-Z]+)(\d+)$", RegexOptions.Compiled);
+        private static string[] _logLinesCache;
+
+        /// <summary>採点時にログ読み取りを高速化するため、全行をメモリにキャッシュします。</summary>
+        public static void SetLogLinesCache(string[] lines)
+        {
+            _logLinesCache = lines;
+        }
+
+        /// <summary>キャッシュをクリアします。</summary>
+        public static void ClearLogLinesCache()
+        {
+            _logLinesCache = null;
+        }
 
         public static string GetLogFilePath()
         {
@@ -328,7 +341,13 @@ namespace Libraries
 
             try
             {
-                string[] lines = File.ReadAllLines(path);
+                string[] lines = _logLinesCache;
+                if (lines == null)
+                {
+                    if (!File.Exists(path)) return result;
+                    lines = File.ReadAllLines(path);
+                }
+                
                 bool inTarget = false;
                 int curP = -1, curT = -1, curA = 1;
                 string explicitPrefix = $"[Task {projectId}-{taskId}-{attemptNo}]";

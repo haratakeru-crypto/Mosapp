@@ -62,6 +62,9 @@ namespace MOSExcelMogiApp.Views
         /// <summary>採点ワークフロー（STAスレッド）内で取得した Excel。Task.Run(MTA) からの COM 呼び出し失敗を避けるため共有する。</summary>
         private ExcelApp _scoringExcelApp;
 
+        /// <summary>バックグラウンドで実行中のExcel終了タスク。採点開始前に完了を待機するために使用します。</summary>
+        public static Task PendingExcelCloseTask { get; set; }
+
         private Dictionary<int, bool[]> _projectTaskCompletedStates;
         private Dictionary<int, bool[]> _projectTaskFlaggedStates;
         
@@ -581,6 +584,15 @@ namespace MOSExcelMogiApp.Views
                 // UI更新の機会を与える
                 await Task.Delay(100);
                 
+                // バックグラウンドでExcelの終了処理が走っている場合は、完了を待つ
+                if (PendingExcelCloseTask != null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Waiting for background Excel close task to finish...");
+                    try { await PendingExcelCloseTask; } catch { }
+                    PendingExcelCloseTask = null;
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Background Excel close task finished.");
+                }
+                
                 try
                 {
                     // AppBarWindow（下の問題領域）を閉じる（UIスレッドで実行）
@@ -930,6 +942,33 @@ namespace MOSExcelMogiApp.Views
             return false;
         }
 
+        /// <summary>
+        /// 採点セッションの ActiveWorkbook が期待したパスと一致しているかを軽量に確認する。
+        /// 一致している場合は再アクティブ化を省略できる。
+        /// </summary>
+        private bool IsExpectedWorkbookAlreadyActive(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return false;
+
+            var excelApp = _scoringExcelApp;
+            if (excelApp == null)
+                return false;
+
+            try
+            {
+                var active = excelApp.ActiveWorkbook;
+                if (active == null || string.IsNullOrEmpty(active.FullName))
+                    return false;
+
+                return NormalizeExcelPath(active.FullName) == NormalizeExcelPath(filePath);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         /// <summary>採点中に保持している Application を返す（採点中にROTへ戻らない）。</summary>
         private ExcelApp GetExcelApplicationForScoringOptional(out bool releaseWhenDone)
         {
@@ -1093,6 +1132,20 @@ namespace MOSExcelMogiApp.Views
                     runId: "pre-fix",
                     hypothesisId: "A");
                 // #endregion
+
+                // 採点時間を短縮するため、ログファイルを一括読み込みしてキャッシュする
+                string logPath = ExcelLogReader.GetLogFilePath();
+                if (System.IO.File.Exists(logPath))
+                {
+                    try
+                    {
+                        ExcelLogReader.SetLogLinesCache(System.IO.File.ReadAllLines(logPath));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ScoreAllProjects] Failed to cache log: {ex.Message}");
+                    }
+                }
                 
                 // config.jsonを読み込む
                 string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
@@ -1311,8 +1364,8 @@ namespace MOSExcelMogiApp.Views
                         
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Successfully activated file for project {project.projectId}");
                         
-                        // ファイルがアクティブになるまで十分に待つ
-                        System.Threading.Thread.Sleep(1500);
+                        // 以前の固定待機(350ms)を短縮。
+                        System.Threading.Thread.Sleep(100);
 
                         // 採点直前に再度アクティブ化して、直前に別ブックへ戻る現象を抑止する。
                         bool activatedBeforeScoring = ActivateExcelFile(project.filePath);
@@ -1404,6 +1457,11 @@ namespace MOSExcelMogiApp.Views
                     hypothesisId: "E");
                 // #endregion
             }
+            finally
+            {
+                // キャッシュをクリア
+                ExcelLogReader.ClearLogLinesCache();
+            }
         }
 
         private bool EnsureProjectWorkbooksReady(List<string> filesToOpen)
@@ -1415,7 +1473,7 @@ namespace MOSExcelMogiApp.Views
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 OpenExcelFilesInBackground(filesToOpen);
-                Thread.Sleep(500);
+                Thread.Sleep(200);
 
                 bool allReady = true;
                 foreach (var filePath in filesToOpen)
@@ -1750,18 +1808,12 @@ namespace MOSExcelMogiApp.Views
                             // タスク実行ごとに対象ブックを再アクティブ化し、ActiveWorkbook 依存チェッカーのぶれを抑止する。
                             if (!string.IsNullOrEmpty(expectedFilePath))
                             {
-                                bool activatedForTask = ActivateExcelFile(expectedFilePath);
-                                AgentLog(
-                                    location: "ReviewPageWindow.ExecuteScoringForProject",
-                                    message: "task_pre_activate",
-                                    data: new { libraryName, taskIndex = i, expectedFilePath, activatedForTask },
-                                    runId: "pre-fix",
-                                    hypothesisId: "B");
-                                if (!activatedForTask)
+                                // 既に対象ブックがアクティブなら重い ActivateExcelFile を呼ばない。
+                                // 初回タスク(i=1)は直前のプロジェクト単位アクティブ化で成功しているはずなので、より軽量にチェック。
+                                bool alreadyActive = IsExpectedWorkbookAlreadyActive(expectedFilePath);
+                                if (!alreadyActive)
                                 {
-                                    // 対象ブックを確定できないタスクは誤判定回避のため false 扱いにする。
-                                    results.Add(false);
-                                    continue;
+                                    ActivateExcelFile(expectedFilePath);
                                 }
                             }
 
@@ -2297,6 +2349,12 @@ namespace MOSExcelMogiApp.Views
             try
             {
                 excelApp.Visible = true;
+                // Excel ウィンドウを最前面へ（ユーザーの要望：レビューページの後ろに隠れないようにする）
+                IntPtr hwnd = new IntPtr(excelApp.Hwnd);
+                if (hwnd != IntPtr.Zero)
+                {
+                    SetForegroundWindow(hwnd);
+                }
             }
             catch { }
             try { wb.Activate(); } catch { }
@@ -2315,8 +2373,8 @@ namespace MOSExcelMogiApp.Views
             catch { }
             finally
             {
-                if (win != null) { try { Marshal.ReleaseComObject(win); } catch { } }
-                if (wins != null) { try { Marshal.ReleaseComObject(wins); } catch { } }
+                try { if (win != null) Marshal.ReleaseComObject(win); } catch { }
+                try { if (wins != null) Marshal.ReleaseComObject(wins); } catch { }
             }
         }
 
@@ -2352,7 +2410,54 @@ namespace MOSExcelMogiApp.Views
                 {
                     // 正規化したパスで比較（大文字小文字を統一）
                     string normalizedFilePath = NormalizeExcelPath(filePath);
-                    
+
+                    // 既に ActiveWorkbook が期待パスなら、再アクティブ化と長いポーリングをスキップする。
+                    ExcelWorkbook activeEarly = null;
+                    try
+                    {
+                        activeEarly = excelApp.ActiveWorkbook;
+                        if (activeEarly != null)
+                        {
+                            try
+                            {
+                                string activeFull = activeEarly.FullName;
+                                if (!string.IsNullOrEmpty(activeFull))
+                                {
+                                    string normalizedActiveEarly = NormalizeExcelPath(activeFull);
+                                    if (!string.IsNullOrEmpty(normalizedFilePath) &&
+                                        normalizedActiveEarly == normalizedFilePath)
+                                    {
+                                        AgentLog(
+                                            location: "ReviewPageWindow.ActivateExcelFile",
+                                            message: "short_circuit_already_active",
+                                            data: new
+                                            {
+                                                expected = filePath,
+                                                excelHwnd = excelApp?.Hwnd ?? 0,
+                                                activeFullName = activeFull
+                                            },
+                                            runId: "pre-fix",
+                                            hypothesisId: "A");
+                                        System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] Short-circuit: already active {activeFull}");
+                                        return true;
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                try { Marshal.ReleaseComObject(activeEarly); } catch { }
+                                activeEarly = null;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        if (activeEarly != null)
+                        {
+                            try { Marshal.ReleaseComObject(activeEarly); } catch { }
+                        }
+                    }
+
                     foreach (ExcelWorkbook wb in excelApp.Workbooks)
                     {
                         try
@@ -2372,8 +2477,8 @@ namespace MOSExcelMogiApp.Views
 
                                 // 採点側（ExcelChecker）は ActiveWorkbook を参照して filePath を取得するものがあるため、
                                 // "ActiveWorkbookが期待したブックになった" ことを確認してから true を返す。
-                                // Active切替が遅延することがあるためポーリングする。
-                                const int timeoutMs = 10000;
+                                // 以前は10秒待機していたが、不一致時は数秒待っても変わらないことが多いため大幅に短縮（1.5秒）。
+                                const int timeoutMs = 1500;
                                 const int pollIntervalMs = 100;
                                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -2387,7 +2492,6 @@ namespace MOSExcelMogiApp.Views
                                             var normalizedActivePath = NormalizeExcelPath(active.FullName);
                                             if (normalizedActivePath == normalizedFilePath)
                                             {
-                                                // #region agent log
                                                 AgentLog(
                                                     location: "ReviewPageWindow.ActivateExcelFile",
                                                     message: "active_match_found",
@@ -2400,47 +2504,35 @@ namespace MOSExcelMogiApp.Views
                                                     },
                                                     runId: "pre-fix",
                                                     hypothesisId: "A");
-                                                // #endregion
                                                 System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] ActiveWorkbook switched successfully: {active.FullName}");
                                                 Marshal.ReleaseComObject(wb);
                                                 return true;
                                             }
                                         }
                                     }
-                                    catch
-                                    {
-                                        // ignore and keep polling
-                                    }
-                                    Thread.Sleep(pollIntervalMs);
-                                }
-
-                                // 再試行: ウィンドウ単位のアクティブ化
-                                TryActivateWorkbookForScoring(excelApp, wb);
-                                sw = System.Diagnostics.Stopwatch.StartNew();
-                                while (sw.ElapsedMilliseconds < 3000)
-                                {
-                                    try
-                                    {
-                                        var active = excelApp.ActiveWorkbook;
-                                        if (active != null && !string.IsNullOrEmpty(active.FullName))
-                                        {
-                                            var normalizedActivePath = NormalizeExcelPath(active.FullName);
-                                            if (normalizedActivePath == normalizedFilePath)
-                                            {
-                                                Marshal.ReleaseComObject(wb);
-                                                return true;
-                                            }
-                                        }
-                                    }
                                     catch { }
+
+                                    // 500ms 経過しても切り替わらない場合は、ウィンドウ単位のアクティブ化を試みる
+                                    if (sw.ElapsedMilliseconds > 500)
+                                    {
+                                        TryActivateWorkbookForScoring(excelApp, wb);
+                                    }
+
                                     Thread.Sleep(pollIntervalMs);
                                 }
 
-                                // ここまで来たら、wb.Activate() は呼べたが ActiveWorkbook が切り替わっていない
+                                // タイムアウトしたが、wb.Activate() は成功しているはずなので、
+                                // 名前だけでも一致すれば許容する（OneDrive等のパス不一致対策）。
                                 try
                                 {
-                                    var active = excelApp.ActiveWorkbook;
-                                    // #region agent log
+                                    var activeFinal = excelApp.ActiveWorkbook;
+                                    if (activeFinal != null && string.Equals(activeFinal.Name, Path.GetFileName(filePath), StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] Warning: FullPath mismatch but Name matches. Proceeding.");
+                                        Marshal.ReleaseComObject(wb);
+                                        return true;
+                                    }
+
                                     AgentLog(
                                         location: "ReviewPageWindow.ActivateExcelFile",
                                         message: "active_timeout_or_mismatch",
@@ -2448,13 +2540,11 @@ namespace MOSExcelMogiApp.Views
                                         {
                                             expected = filePath,
                                             excelHwnd = excelApp?.Hwnd ?? 0,
-                                            activeFullName = active?.FullName,
+                                            activeFullName = activeFinal?.FullName,
                                             elapsedMs = sw.ElapsedMilliseconds
                                         },
                                         runId: "pre-fix",
                                         hypothesisId: "A");
-                                    // #endregion
-                                    System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] ActiveWorkbook did not match after timeout. Active={(active?.FullName ?? "null")}, Expected={filePath}");
                                 }
                                 catch { }
 

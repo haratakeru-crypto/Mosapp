@@ -2002,7 +2002,7 @@ namespace Ui.ViewModels
                 
                 // UIの応答性を高めるため、Excelの保存・終了処理をバックグラウンドで行う
                 //（特に CloseExcelApplication はプロセス終了を待機するため時間がかかる場合がある）
-                var shutdownThread = new Thread(() =>
+                ReviewPageWindow.PendingExcelCloseTask = Task.Run(() =>
                 {
                     try
                     {
@@ -2013,12 +2013,7 @@ namespace Ui.ViewModels
                     {
                         System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Background shutdown error: {ex.Message}");
                     }
-                })
-                {
-                    IsBackground = true
-                };
-                shutdownThread.SetApartmentState(ApartmentState.STA);
-                shutdownThread.Start();
+                });
 
                 // UIスレッドでは即座にレビューページ遷移イベントを発火させる
                 OpenReviewPageRequested?.Invoke(this, EventArgs.Empty);

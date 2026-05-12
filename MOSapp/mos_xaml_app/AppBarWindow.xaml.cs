@@ -1105,7 +1105,19 @@ namespace MOSExcelMogiApp
                 {
                     System.Diagnostics.Debug.WriteLine("[AppBarWindow] Saving and closing current project before opening review page");
                     _viewModel.SaveCurrentExcelProject(closeWorkbook: true);
-                    _viewModel.CloseExcelApplication();
+                    
+                    // Excelの終了プロセス（QuitとKill待機）はUIスレッドをブロックするため、非同期で実行する
+                    ReviewPageWindow.PendingExcelCloseTask = Task.Run(() => 
+                    {
+                        try
+                        {
+                            _viewModel.CloseExcelApplication();
+                        }
+                        catch (Exception innerEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error closing Excel async: {innerEx.Message}");
+                        }
+                    });
                 }
 
                 // メインのバーウィンドウを非表示にする
