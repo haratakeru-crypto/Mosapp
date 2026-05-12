@@ -176,8 +176,9 @@ namespace Libraries
             out string message)
         {
             message = null;
-            // 破壊的操作の判定は、常に「最新のタスク試行」のみを対象とする
-            var ops = GetOperationsForTask(projectId, taskId, attemptNo, latestOnly: true);
+            // 破壊的操作の判定は、同一タスク内の全試行（セッション）の操作を合算して判定する。
+            // 以前は latestOnly: true だったが、タスクを切り替えて戻るだけで違反が消えてしまうのを防ぐため false に変更。
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo, latestOnly: false);
             bool useRangeGate = ExcelTaskValidationConfig.ShouldDenyOutsideAllowedRanges(projectId, taskId);
             List<string> allowedRanges = useRangeGate
                 ? ExcelTaskValidationConfig.GetAllowedRanges(projectId, taskId)

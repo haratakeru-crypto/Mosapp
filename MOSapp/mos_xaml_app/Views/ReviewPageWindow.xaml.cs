@@ -583,7 +583,82 @@ namespace MOSExcelMogiApp.Views
                 
                 // UI更新の機会を与える
                 await Task.Delay(100);
-                
+
+                // 「採点中です」オーバーレイを表示（即座にフィードバックを出す）
+                Window scoringOverlay = null;
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    scoringOverlay = new Window
+                    {
+                        Title = "採点中",
+                        Width = 320,
+                        Height = 140,
+                        WindowStyle = WindowStyle.None,
+                        WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                        Owner = this,
+                        ShowInTaskbar = false,
+                        ResizeMode = ResizeMode.NoResize,
+                        Topmost = true,
+                        ShowActivated = true,
+                        Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
+                        BorderThickness = new Thickness(2)
+                    };
+                    var stack = new StackPanel
+                    {
+                        Margin = new Thickness(24),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    var text = new TextBlock
+                    {
+                        Text = "採点中です",
+                        FontSize = 18,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(0, 0, 0, 12),
+                        Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
+                    };
+                    var progress = new System.Windows.Controls.ProgressBar
+                    {
+                        IsIndeterminate = true,
+                        Height = 20,
+                        Width = 260
+                    };
+                    stack.Children.Add(text);
+                    stack.Children.Add(progress);
+                    scoringOverlay.Content = stack;
+                    scoringOverlay.Show();
+                    try
+                    {
+                        scoringOverlay.Activate();
+                        scoringOverlay.Focus();
+                    }
+                    catch { }
+                });
+
+                // Excel などに前面を奪われることがあるため、短時間だけ最前面を維持する
+                var overlayTopmostTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+                int overlayRetryCount = 0;
+                overlayTopmostTimer.Tick += (s, args) =>
+                {
+                    overlayRetryCount++;
+                    if (scoringOverlay == null || !scoringOverlay.IsVisible || overlayRetryCount > 20)
+                    {
+                        overlayTopmostTimer.Stop();
+                        return;
+                    }
+                    try
+                    {
+                        scoringOverlay.Topmost = true;
+                        scoringOverlay.Activate();
+                    }
+                    catch { }
+                };
+                overlayTopmostTimer.Start();
+
+                // UIスレッドで描画させるために少し待機
+                await Task.Delay(50);
+
                 // バックグラウンドでExcelの終了処理が走っている場合は、完了を待つ
                 if (PendingExcelCloseTask != null)
                 {
@@ -598,84 +673,8 @@ namespace MOSExcelMogiApp.Views
                     // AppBarWindow（下の問題領域）を閉じる（UIスレッドで実行）
                     await Dispatcher.InvokeAsync(() => CloseAppBarWindows(), DispatcherPriority.Background);
                     
-                    // UI更新の機会を与える
-                    await Task.Delay(50);
+                    // 以降、重い採点処理へ
                     
-                    // 「採点中です」オーバーレイを表示（表ではローディング、裏でExcel採点）
-                    Window scoringOverlay = null;
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        scoringOverlay = new Window
-                        {
-                            Title = "採点中",
-                            Width = 320,
-                            Height = 140,
-                            WindowStyle = WindowStyle.None,
-                            WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                            Owner = this,
-                            ShowInTaskbar = false,
-                            ResizeMode = ResizeMode.NoResize,
-                            Topmost = true,
-                            ShowActivated = true,
-                            Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
-                            BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
-                            BorderThickness = new Thickness(2)
-                        };
-                        var stack = new StackPanel
-                        {
-                            Margin = new Thickness(24),
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            VerticalAlignment = VerticalAlignment.Center
-                        };
-                        var text = new TextBlock
-                        {
-                            Text = "採点中です",
-                            FontSize = 18,
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            Margin = new Thickness(0, 0, 0, 12),
-                            Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
-                        };
-                        var progress = new System.Windows.Controls.ProgressBar
-                        {
-                            IsIndeterminate = true,
-                            Height = 20,
-                            Width = 260
-                        };
-                        stack.Children.Add(text);
-                        stack.Children.Add(progress);
-                        scoringOverlay.Content = stack;
-                        scoringOverlay.Show();
-                        try
-                        {
-                            scoringOverlay.Activate();
-                            scoringOverlay.Focus();
-                        }
-                        catch { }
-                    });
-                    await Task.Delay(80);
-                    
-                    // 採点中は Excel を表示したままにする（Visible=false だと ActiveWorkbook が付かず ActivateExcelFile が失敗しうる）。
-                    // 前面は「採点中」オーバーレイの Topmost で抑える。
-
-                    // Excel などに前面を奪われることがあるため、短時間だけ最前面を維持する
-                    var overlayTopmostTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
-                    int overlayRetryCount = 0;
-                    overlayTopmostTimer.Tick += (s, args) =>
-                    {
-                        overlayRetryCount++;
-                        if (scoringOverlay == null || !scoringOverlay.IsVisible || overlayRetryCount > 20)
-                        {
-                            overlayTopmostTimer.Stop();
-                            return;
-                        }
-                        try
-                        {
-                            scoringOverlay.Topmost = true;
-                            scoringOverlay.Activate();
-                        }
-                        catch { }
-                    };
-                    overlayTopmostTimer.Start();
                     
                     // Excel COM は STA 上で呼ぶ（Task.Run のスレッドプールは MTA になり、GetActiveObject / Workbooks が失敗しうる）
                     System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Starting to score all projects (STA)...");
