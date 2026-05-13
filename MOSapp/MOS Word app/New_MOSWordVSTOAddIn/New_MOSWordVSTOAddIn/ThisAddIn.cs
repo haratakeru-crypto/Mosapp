@@ -22,6 +22,7 @@ namespace New_MOSWordVSTOAddIn
         private string _lastPageBorderFingerprint;
         private bool? _lastHeading1LineSimple;
         private bool? _lastWatermarkFound;
+        private int _lastLaptopWrapType = -1;
 
         /// <summary>リボンが既にログした直後のポーリング二重記録を抑止する（約2ティック）。</summary>
         private int _suppressOrientationPollLogs;
@@ -321,6 +322,59 @@ namespace New_MOSWordVSTOAddIn
                             Logger.LogCommand("Watermark");
                         }
                         _lastWatermarkFound = hasWatermark;
+                    }
+                    catch { }
+
+                    // 5-1, 5-2: 画像レイアウトの検知（5月21日...段落付近）
+                    try
+                    {
+                        Word.Range searchRange = doc.Content;
+                        Word.Find find = searchRange.Find;
+                        find.ClearFormatting();
+                        find.Text = "5月21日より5日間の";
+                        if (find.Execute())
+                        {
+                            Word.Range paraRange = searchRange.Paragraphs[1].Range;
+                            int paraStart = paraRange.Start;
+                            int paraEnd = paraRange.End;
+
+                            int currentWrapType = -1; // -1: なし, 0: 行内, 1: 四角形など
+
+                            // 行内画像チェック
+                            if (paraRange.InlineShapes.Count > 0)
+                            {
+                                currentWrapType = 0; // Inline
+                            }
+                            else
+                            {
+                                // 浮動画像（Shape）チェック
+                                foreach (Word.Shape sh in doc.Shapes)
+                                {
+                                    try
+                                    {
+                                        int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
+                                        if (anchor >= paraStart && anchor <= paraEnd)
+                                        {
+                                            if (sh.WrapFormat.Type == Word.WdWrapType.wdWrapSquare) currentWrapType = 1;
+                                            else currentWrapType = 2; // その他
+                                            break;
+                                        }
+                                    }
+                                    finally { Marshal.ReleaseComObject(sh); }
+                                }
+                            }
+
+                            if (_lastLaptopWrapType != currentWrapType)
+                            {
+                                if (currentWrapType == 0) Logger.LogCommand("WrapInline");
+                                else if (currentWrapType == 1) Logger.LogCommand("WrapSquare");
+                            }
+                            _lastLaptopWrapType = currentWrapType;
+                            
+                            Marshal.ReleaseComObject(paraRange);
+                        }
+                        Marshal.ReleaseComObject(find);
+                        Marshal.ReleaseComObject(searchRange);
                     }
                     catch { }
                 }
