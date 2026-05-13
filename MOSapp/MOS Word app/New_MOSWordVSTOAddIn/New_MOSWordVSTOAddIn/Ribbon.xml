@@ -21,6 +21,8 @@
     <command idMso="ConvertTextToTable" onAction="CommandOnAction" />
     <command idMso="ReviewDeleteComment" onAction="CommandOnAction" />
   </commands>
+
+
   <ribbon>
     <tabs>
       <tab id="tabMOSDebug" label="MOSデバッグ" insertAfterMso="Help">

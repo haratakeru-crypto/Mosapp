@@ -21,6 +21,7 @@ namespace New_MOSWordVSTOAddIn
         private string _lastOrientationFingerprint;
         private string _lastPageBorderFingerprint;
         private bool? _lastHeading1LineSimple;
+        private bool? _lastWatermarkFound;
 
         /// <summary>リボンが既にログした直後のポーリング二重記録を抑止する（約2ティック）。</summary>
         private int _suppressOrientationPollLogs;
@@ -139,6 +140,12 @@ namespace New_MOSWordVSTOAddIn
                 _lastPageBorderFingerprint = GetPageBorderFingerprint(doc);
                 _lastHeading1LineSimple = IsHeading1LineSimplePattern(doc);
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
+
+                // 4-5: ベースライン取得
+                try {
+                    string xml = doc.WordOpenXML;
+                    _lastWatermarkFound = !string.IsNullOrEmpty(xml) && xml.Contains("下書き");
+                } catch { _lastWatermarkFound = false; }
             }
             catch
             {
@@ -303,6 +310,19 @@ namespace New_MOSWordVSTOAddIn
                         Logger.LogCommand("ColumnBreak");
                     }
                     _lastColumnBreakCount = columnBreakCount;
+
+                    // 4-5: 透かしの検知（WordOpenXML を使用）
+                    try
+                    {
+                        string xml = doc.WordOpenXML;
+                        bool hasWatermark = !string.IsNullOrEmpty(xml) && xml.Contains("下書き");
+                        if (hasWatermark && (!_lastWatermarkFound.HasValue || !_lastWatermarkFound.Value))
+                        {
+                            Logger.LogCommand("Watermark");
+                        }
+                        _lastWatermarkFound = hasWatermark;
+                    }
+                    catch { }
                 }
             }
             catch
@@ -310,6 +330,7 @@ namespace New_MOSWordVSTOAddIn
                 // ドキュメント未表示などで COM エラーになることがあるため無視
             }
         }
+
 
         /// <summary>
         /// キーボードフォーカスが文書編集ペイン（_WwG）上にないとき true。

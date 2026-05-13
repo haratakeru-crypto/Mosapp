@@ -1,3 +1,4 @@
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Ribbon.xml
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Assets\config.json
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\References\JSON\MOS模擬アプリ問題文一覧_PowerPoint.json
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\MOS模擬アプリ問題文一覧_PowerPoint.json
@@ -9,6 +10,7 @@ C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos 
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos PowerPoint Mogi App.exe
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Mos PowerPoint Mogi App.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Newtonsoft.Json.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointAddIn1.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_1.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_10.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_11.dll
@@ -21,6 +23,10 @@ C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Powe
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_8.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_9.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointCheckerCommon.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Office.Tools.Common.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.VisualStudio.Tools.Applications.Runtime.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Office.Tools.Common.v4.0.Utilities.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Office.Tools.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointCheckerCommon.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_1.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_2.pdb
@@ -33,6 +39,7 @@ C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Powe
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_9.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_10.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_11.pdb
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointAddIn1.pdb
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Newtonsoft.Json.xml
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.AssemblyReference.cache
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\UiTestAppBarWindow.baml
@@ -62,10 +69,3 @@ C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos 
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS Powe.03856F61.Up2Date
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.pdb
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Ribbon.xml
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointAddIn1.dll
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Office.Tools.Common.dll
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.VisualStudio.Tools.Applications.Runtime.dll
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Office.Tools.Common.v4.0.Utilities.dll
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Office.Tools.dll
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointAddIn1.pdb
