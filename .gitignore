@@ -1,5 +1,2 @@
 .env.local
-bin/
-obj/
 .vs/
-*.zip
