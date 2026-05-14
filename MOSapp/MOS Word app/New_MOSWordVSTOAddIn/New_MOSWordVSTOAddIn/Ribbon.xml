@@ -20,6 +20,8 @@
     <command idMso="PageBorderAndShadingDialog" onAction="CommandOnAction" />
     <command idMso="ConvertTextToTable" onAction="CommandOnAction" />
     <command idMso="ReviewDeleteComment" onAction="CommandOnAction" />
+    <command idMso="TableColumnsDistribute" onAction="CommandOnAction" />
+
   </commands>
 
 

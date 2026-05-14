@@ -254,6 +254,10 @@ namespace New_MOSWordVSTOAddIn
     <command idMso=""SectionBreakInsert"" onAction=""CommandOnAction"" />
     <command idMso=""PageBorderAndShadingDialog"" onAction=""CommandOnAction"" />
     <command idMso=""ConvertTextToTable"" onAction=""CommandOnAction"" />
+    <command idMso=""TableSplitTable"" onAction=""CommandOnAction"" />
+    <command idMso=""TableSplitCells"" onAction=""CommandOnAction"" />
+    <command idMso=""TableColumnsDistribute"" onAction=""CommandOnAction"" />
+    <command idMso=""TableRepeatHeaderRows"" onAction=""CommandOnAction"" />
   </commands>
   <ribbon>
     <tabs>
