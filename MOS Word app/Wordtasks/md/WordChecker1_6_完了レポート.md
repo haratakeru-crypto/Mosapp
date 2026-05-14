@@ -92,12 +92,40 @@
   2. 登録されていない場合は `<command idMso="..." onAction="CommandOnAction" />` を追加してビルド・再インストール。
   3. ログファイル（`%TEMP%\mos_word_log.txt`）に該当 `idMso` が記録されることを動作確認。
 - `Ribbon.cs` だけ書き換えても XML が読み込まれている限り反映されない点に注意。
-- なお、`TableSplitTable` / `TableSplitCells` のように **そもそも idMso でフックできないコマンド**も存在するため、操作ログ方針を決める前に hookability を確認すること。
+
+### idMso でフックできないコマンドの実例リスト（プロジェクト6・7 で判明）
+以下のコマンドは Ribbon.xml に正しく登録（リビルド・再インストール済み）しても、`onAction` が発火せずログに記録されない。**操作ログ方針を採用する前に hookability を確認すること。**
+
+| idMso | 操作 | 判明したプロジェクト |
+| :--- | :--- | :--- |
+| `TableSplitTable` | 表の分割 | プロジェクト6 |
+| `TableSplitCells` | セルの分割 | プロジェクト6 |
+| `UpgradeDocument` | 互換モードの「変換」 | プロジェクト7-1 |
+
+**共通の対処**：これらは状態の **ユニークなシグネチャ**（XML/COMプロパティの一意な組み合わせ）で代替する。
+- 例：`UpgradeDocument` → `ext == ".doc" && CompatibilityMode == 15` で「変換」直後の状態を一意に検出（7-1）
+- 「変換」操作は **ディスク上のファイル名を変えず**、メモリ内のドキュメント形式のみアップグレードするという挙動を活用
 
 ### COM 利用時の安全策
 - `Marshal.GetActiveObject("Word.Application")` の取得失敗時に `new Application()` を起動するパターンは避ける（採点中に新規 Word プロセスが立ち上がるリスク）。失敗時は素直に `return false` する。
 - COM オブジェクトは取得した順に `Marshal.ReleaseComObject` で解放する。`finally` で `document` を解放するパターンを既存実装に合わせる。
 - 可能な限り COM への依存を減らし、`document.WordOpenXML` を取得した後は XML 上で完結させる。
+
+### COM プロパティの値取得：`.Value` 経由が必須（プロジェクト7-2 で判明）
+- `Document.BuiltInDocumentProperties["Company"]` などの **`DocumentProperty` COM オブジェクト** を直接 `.ToString()` してはいけない。
+  - `.ToString()` は **オブジェクトの型名**（例：`System.__ComObject`）を返すことがあり、実値（例：`"ラビット出版"`）と比較すると**常に false** になる。
+  - これは Office/.NET のバージョン依存で **挙動が変わる**ため、たまたま動いていたコードが突然壊れるリスクがある。
+- 必ず以下のように `.Value` 経由でアクセスする：
+
+```csharp
+dynamic prop = ((dynamic)document.BuiltInDocumentProperties)["Company"];
+string company = prop?.Value?.ToString() ?? "";
+return company == "ラビット出版";
+```
+
+- 同じ作法は `Author`, `Title`, `Subject`, `Keywords`, `Manager` など `BuiltInDocumentProperties` 全般に適用される。
+- 既存のリファレンス実装：`PowerPointChecker1_10.cs` でも `.Value` 経由でアクセスしている（プロジェクト共通ルール）。
+- **混入経路**：他AIが書いた既存実装に `[...]?.ToString()` が紛れ込んでいた。レビュー時に「`BuiltInDocumentProperties[...]` の直後に `.Value` がない」パターンは要チェック。
 
 ### デバッグ手法
 - 判定が想定通りにならない場合は、**段階ごとの結果を出力**するデバッグ関数を一時的に仕込む。

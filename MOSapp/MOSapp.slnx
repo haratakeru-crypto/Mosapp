@@ -14,4 +14,5 @@
   <Project Path="MOS Word app/New_MOSWordVSTOAddIn/New_MOSWordVSTOAddIn/New_MOSWordVSTOAddIn.csproj" Id="07f6198f-2781-45a3-b41a-f75f992d27cf" />
   <Project Path="MOSapp/MOSapp.csproj" Id="db7f1d38-c509-4890-a692-e31c79ca4aa8" />
   <Project Path="mos_xaml_app/MOSExcelMogiApp.csproj" Id="c01302e0-98c1-4f0d-93bd-385ba3bc400a" />
+　<Project Path="wordvstosetup/wordvstosetup.vdproj" Type="Installer">  <Build /></Project>
 </Solution>
