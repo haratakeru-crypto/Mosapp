@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+powershell -ExecutionPolicy Bypass -File ".\Rebuild-And-Install-WordVSTO.ps1"

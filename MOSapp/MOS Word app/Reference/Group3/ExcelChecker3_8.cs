@@ -1,0 +1,213 @@
+using System;
+using System.IO;
+using Microsoft.Office.Interop.Excel;
+
+namespace Libraries.Group3
+{
+    public class ExcelChecker3_8
+    {
+        public bool CheckExcel(string filePath)
+        {
+            return false;
+        }
+
+        // Public CheckTask methods
+        public bool CheckTask_3_8_01()
+        {
+            try
+            {
+                string filePath = GetCurrentExcelFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return false;
+
+                Application excelApp = new Application();
+                Workbook workbook = excelApp.Workbooks.Open(filePath);
+                
+                try
+                {
+                    // Test implementation - always returns false
+                    return false;
+                }
+                finally
+                {
+                    workbook.Close();
+                    excelApp.Quit();
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool CheckTask_3_8_02()
+        {
+            try
+            {
+                string filePath = GetCurrentExcelFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return false;
+
+                Application excelApp = new Application();
+                Workbook workbook = excelApp.Workbooks.Open(filePath);
+                
+                try
+                {
+                    // Test implementation - always returns false
+                    return false;
+                }
+                finally
+                {
+                    workbook.Close();
+                    excelApp.Quit();
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool CheckTask_3_8_03()
+        {
+            try
+            {
+                string filePath = GetCurrentExcelFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return false;
+
+                Application excelApp = new Application();
+                Workbook workbook = excelApp.Workbooks.Open(filePath);
+                
+                try
+                {
+                    // Test implementation - always returns false
+                    return false;
+                }
+                finally
+                {
+                    workbook.Close();
+                    excelApp.Quit();
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool CheckTask_3_8_04()
+        {
+            try
+            {
+                string filePath = GetCurrentExcelFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return false;
+
+                Application excelApp = new Application();
+                Workbook workbook = excelApp.Workbooks.Open(filePath);
+                
+                try
+                {
+                    // Test implementation - always returns false
+                    return false;
+                }
+                finally
+                {
+                    workbook.Close();
+                    excelApp.Quit();
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool CheckTask_3_8_05()
+        {
+            try
+            {
+                string filePath = GetCurrentExcelFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return false;
+
+                Application excelApp = new Application();
+                Workbook workbook = excelApp.Workbooks.Open(filePath);
+                
+                try
+                {
+                    // Test implementation - always returns false
+                    return false;
+                }
+                finally
+                {
+                    workbook.Close();
+                    excelApp.Quit();
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool CheckTask_3_8_06()
+        {
+            try
+            {
+                string filePath = GetCurrentExcelFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return false;
+
+                Application excelApp = new Application();
+                Workbook workbook = excelApp.Workbooks.Open(filePath);
+                
+                try
+                {
+                    // Test implementation - always returns false
+                    return false;
+                }
+                finally
+                {
+                    workbook.Close();
+                    excelApp.Quit();
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Helper methods
+        private string GetCurrentExcelFilePath()
+        {
+            try
+            {
+                Application excelApp = (Application)System.Runtime.InteropServices.Marshal.GetActiveObject("Excel.Application");
+                if (excelApp.ActiveWorkbook != null)
+                {
+                    return excelApp.ActiveWorkbook.FullName;
+                }
+            }
+            catch
+            {
+                // Excel is not running or no active workbook
+            }
+            return string.Empty;
+        }
+
+        private Worksheet FindWorksheet(Workbook workbook, string worksheetName)
+        {
+            foreach (Worksheet worksheet in workbook.Worksheets)
+            {
+                if (worksheet.Name.Equals(worksheetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return worksheet;
+                }
+            }
+            return null;
+        }
+    }
+}

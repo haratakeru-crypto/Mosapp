@@ -1,0 +1,6 @@
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\bin\Release\PowerPointCheckerCommon.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\bin\Release\PowerPointCheckerCommon.pdb
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Release\PowerPointCheckerCommon.csproj.AssemblyReference.cache
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Release\PowerPointCheckerCommon.csproj.CoreCompileInputs.cache
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Release\PowerPointCheckerCommon.dll
+C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Release\PowerPointCheckerCommon.pdb

@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asmv1:assembly xsi:schemaLocation="urn:schemas-microsoft-com:asm.v1 assembly.adaptive.xsd" manifestVersion="1.0" xmlns:asmv1="urn:schemas-microsoft-com:asm.v1" xmlns="urn:schemas-microsoft-com:asm.v2" xmlns:asmv2="urn:schemas-microsoft-com:asm.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:co.v1="urn:schemas-microsoft-com:clickonce.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns:co.v2="urn:schemas-microsoft-com:clickonce.v2">
+  <asmv1:assemblyIdentity name="MOS Word app.exe" version="1.0.0.0" publicKeyToken="7137604d232032cf" language="neutral" processorArchitecture="msil" type="win32" />
+  <application />
+  <entryPoint>
+    <assemblyIdentity name="MOS Word app" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
+    <commandLine file="MOS Word app.exe" parameters="" />
+  </entryPoint>
+  <trustInfo>
+    <security>
+      <applicationRequestMinimum>
+        <PermissionSet Unrestricted="true" ID="Custom" SameSite="site" />
+        <defaultAssemblyRequest permissionSetReference="Custom" />
+      </applicationRequestMinimum>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          UAC マニフェスト オプション
+          Windows のユーザー アカウント制御のレベルを変更するには、
+          requestedExecutionLevel ノードを以下のいずれかで置換します。
+
+        <requestedExecutionLevel  level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel  level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel  level="highestAvailable" uiAccess="false" />
+
+         下位互換性を保つためにファイルおよびレジストリの仮想化を使用する場合、
+         requestedExecutionLevel ノードを削除します。
+    -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentOS>
+      <osVersionInfo>
+        <os majorVersion="5" minorVersion="1" buildNumber="2600" servicePackMajor="0" />
+      </osVersionInfo>
+    </dependentOS>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="preRequisite" allowDelayedBinding="true">
+      <assemblyIdentity name="Microsoft.Windows.CommonLanguageRuntime" version="4.0.30319.0" />
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="MOS Word app.exe" size="151464">
+      <assemblyIdentity name="MOS Word app" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>z76N8C/uty78bpqgxCsAC3cTYWYrH52WwRTn+eHc6FY=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Newtonsoft.Json.dll" size="721320">
+      <assemblyIdentity name="Newtonsoft.Json" version="13.0.0.0" publicKeyToken="30AD4FE6B2A6AEED" language="neutral" processorArchitecture="msil" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+        <dsig:DigestValue>8MB68OhNTdTaS9eCO6RTW8BIGzv2I+1Atlm2gUemu3U=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <file name="MOS Word app.exe.config" size="187">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>+CM46OnHRrXZXNLMx7+U3V3iubiYL//d8hGOR13lDhU=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="MOSWord教材用採点表.csv" size="796">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>KPxsyw9ApZD6ls1bqT4I9tfspb9KQmmE1QmG84l+AFE=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="Reference\CSV\MOSボタンアプリ正誤判定表.csv" size="5069">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>yGfWaM1ybEJ9Cbm4kJp+JBXkerMUFODOUu8jmwRDWRg=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="Reference\CSV\MOS模擬アプリ正誤判定表251120_.txt" size="22903">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>6vmVEASMi0QVjAs/iZq2fCvSYufN07oWhtj9VWOnfto=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="Reference\CSV\MOS模擬アプリ正誤判定表251120_挿入入力のみ.csv" size="6353">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>2Mt/P5w7wW3WAvqTBfGW/OH48aMN4EkN8WxYmzfp3LQ=</dsig:DigestValue>
+    </hash>
+  </file>
+  <file name="References\JSON\MOS模擬アプリ問題文一覧_Word.json" size="12916">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
+      <dsig:DigestValue>3U/cGmKCDqZLSJvoj2Fis7pZAcDfugPPhbg7m/p4F8g=</dsig:DigestValue>
+    </hash>
+  </file>
+<publisherIdentity name="CN=PC425\kouza" issuerKeyHash="6736734f248958106626bb7e41319a7a8884209d" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>ickjVceBKgNaFLWudawkDYPb6tos83QXLeIW0iUN3j4=</DigestValue></Reference></SignedInfo><SignatureValue>AOuYaz3mFnfAyq87Yv8aDon/WI4JwQ6PqGGtq2lOQV9Tf9t94gqSo+XI1PT4+IrPuAHNGOKGsg6IrqeRVZ30BBVIxLjVSz+kEuwUf/DjW1nh4s6iVZgfcTDMd0DeOkFNvAlD+ALZDep2jekN5tlmDRZuanHAZbimKcjYoeJ/DdY=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>1ZJKeZNy23+9sGsa3M9HJJu+2ogsDH0n1k7Wb2vS5Y4nkVp9HuRC47s1Uj/XrPz7RA/jThjNfjmT+kJ6D5qgAfdpP9a3NRAlwDuPdG0anb0uwgVGtOeFTL23/+KhpQWdWVlr4uPUEX9B14KLZVGu/+VQc83rvsy9XKk+C7Bk0W0=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="3ede0d25d216e22d1774f32cdaeadb830d24ac75aeb5145a032a81c75523c989" Description="" Url=""><as:assemblyIdentity name="MOS Word app.exe" version="1.0.0.0" publicKeyToken="7137604d232032cf" language="neutral" processorArchitecture="msil" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=PC425\kouza</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>VExpGPNwrdmsi74YFUFkB2SbK1alZhSbUh0plPKraEo=</DigestValue></Reference></SignedInfo><SignatureValue>rkYjhkQUODLiaAR2TUDlGqDYtTo3oHPiAylWc3h4/FbA/4/enZ1xK2CJ0hmvX2n3M/jVOsnqwpnq9/eveuGenlZnMpw613MmsTMSOSRd2LHNNv+yq0Skfs19g7/M9oyw8a0/G9uHXZHCWG5k795YJgDRsYZSeIDM90BnzdWW2uc=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>1ZJKeZNy23+9sGsa3M9HJJu+2ogsDH0n1k7Wb2vS5Y4nkVp9HuRC47s1Uj/XrPz7RA/jThjNfjmT+kJ6D5qgAfdpP9a3NRAlwDuPdG0anb0uwgVGtOeFTL23/+KhpQWdWVlr4uPUEX9B14KLZVGu/+VQc83rvsy9XKk+C7Bk0W0=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBxTCCAS6gAwIBAgIQHPHKQKgPHKpJbZ2827g1OTANBgkqhkiG9w0BAQsFADAhMR8wHQYDVQQDHhYAUABDADQAMgA1AFwAawBvAHUAegBhMB4XDTI2MDIxNTE0MDUyMFoXDTI3MDIxNTIwMDUyMFowITEfMB0GA1UEAx4WAFAAQwA0ADIANQBcAGsAbwB1AHoAYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA1ZJKeZNy23+9sGsa3M9HJJu+2ogsDH0n1k7Wb2vS5Y4nkVp9HuRC47s1Uj/XrPz7RA/jThjNfjmT+kJ6D5qgAfdpP9a3NRAlwDuPdG0anb0uwgVGtOeFTL23/+KhpQWdWVlr4uPUEX9B14KLZVGu/+VQc83rvsy9XKk+C7Bk0W0CAwEAATANBgkqhkiG9w0BAQsFAAOBgQCr6+kc+PwMQVj/fAXFZnwrvDtJd5Ea+dHvM4qGaMUENbasD0tKKP9wv/UP+gOof+DnUhC/TGlcv/xERg7qxlygUzF3ZMWLGXMXl02tXMhVjLG13T7cTdVNFFJEyATos/xHUi0LAbufK2a8ydiiJjkAN4A9P1ejIHxIWTCyLzOUfQ==</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>
