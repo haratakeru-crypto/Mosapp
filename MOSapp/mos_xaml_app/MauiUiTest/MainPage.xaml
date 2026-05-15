@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:MOSExcelMogiApp.Maui.Pages"
+             x:Class="MOSExcelMogiApp.Maui.MainPage"
+             Title="MOS Excel App"
+             BackgroundColor="#F5F5F5">
+
+    <Grid RowDefinitions="Auto,*" Padding="0">
+        <!-- UI Test Button Bar -->
+        <Border Grid.Row="0" 
+                BackgroundColor="#2563EB" 
+                StrokeThickness="0"
+                Padding="20,10">
+            <Grid ColumnDefinitions="*,Auto">
+                <Button Grid.Column="0" 
+                        Text="UIテスト" 
+                        BackgroundColor="White" 
+                        TextColor="#2563EB" 
+                        Padding="20,8" 
+                        MinimumWidthRequest="120"
+                        HorizontalOptions="Start"
+                        Clicked="UiTestButton_Clicked"/>
+                <Label Grid.Column="1" 
+                       Text="テストモード" 
+                       TextColor="White" 
+                       FontSize="14" 
+                       VerticalOptions="Center"/>
+            </Grid>
+        </Border>
+        
+        <!-- Main Content -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout
+                Padding="30,20"
+                Spacing="25">
+                <Label
+                    Text="MOS Excel アプリ"
+                    Style="{StaticResource Headline}"
+                    SemanticProperties.HeadingLevel="Level1" />
+
+                <Label
+                    Text="UIテスト機能を起動するには、上部の「UIテスト」ボタンをクリックしてください。"
+                    Style="{StaticResource SubHeadline}"
+                    SemanticProperties.HeadingLevel="Level2" />
+
+                <Button
+                    Text="UIテストを起動" 
+                    SemanticProperties.Hint="UIテストページを開く"
+                    Clicked="UiTestButton_Clicked"
+                    BackgroundColor="#2563EB"
+                    TextColor="White"
+                    Padding="20,15"
+                    HorizontalOptions="Fill" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>
