@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Mos PowerPoint Mogi App/MOS PowerPoint app.csproj" Id="4f05fafa-71ad-413c-9043-25e55e2fa083" />
+  <Project Path="Mos PowerPoint Mogi App/PowerPointAddIn1/PowerPointAddIn1.csproj" Id="594e2ed3-7e45-449f-a149-9b286e3a9846" />
   <Project Path="MOS Word app/Libraries/WordChecker/Group1/WordChecker1_1.csproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567891" />
   <Project Path="MOS Word app/Libraries/WordChecker/Group1/WordChecker1_10.csproj" Id="55452bc6-0080-149c-0625-bed9eb0b2900" />
   <Project Path="MOS Word app/Libraries/WordChecker/Group1/WordChecker1_2.csproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567892" />
