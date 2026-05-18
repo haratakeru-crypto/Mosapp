@@ -145,35 +145,42 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // SmartArt が少なくとも1つ存在し、テキストに「機密性」「完全性」「可用性」のいずれかが含まれるか
-                bool hasSmartArt = false;
-                bool hasRequiredText = false;
-                Shapes shapes = document.Shapes;
-                for (int i = 1; i <= shapes.Count; i++)
+
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // SmartArt関連のパッケージパートを抽出
+                var partMatches = System.Text.RegularExpressions.Regex.Matches(xml, @"<pkg:part pkg:name=""/word/diagrams/([^""]+)""[^>]*>.*?</pkg:part>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                
+                bool hasVennLayout = false;
+                bool hasRequiredTexts = false;
+
+                foreach (System.Text.RegularExpressions.Match match in partMatches)
                 {
-                    Shape shp = null;
-                    try
+                    string partXml = match.Value;
+                    string partName = match.Groups[1].Value;
+
+                    if (partName.Contains("layout"))
                     {
-                        shp = shapes[i];
-                        dynamic shapeType = shp.Type;
-                        if ((int)shapeType == 24) // msoSmartArt (Office 参照なしで整数比較)
+                        if (partXml.Contains(@"urn:microsoft.com/office/officeart/2005/8/layout/venn1"))
                         {
-                            hasSmartArt = true;
-                            if (shp.TextFrame != null && shp.TextFrame.TextRange != null)
-                            {
-                                string t = shp.TextFrame.TextRange.Text ?? "";
-                                if (t.Contains("機密性") || t.Contains("完全性") || t.Contains("可用性")) hasRequiredText = true;
-                            }
+                            hasVennLayout = true;
                         }
                     }
-                    finally { if (shp != null) Marshal.ReleaseComObject(shp); }
+                    else if (partName.Contains("data"))
+                    {
+                        if (partXml.Contains("機密性") && partXml.Contains("完全性") && partXml.Contains("可用性"))
+                        {
+                            hasRequiredTexts = true;
+                        }
+                    }
                 }
-                Marshal.ReleaseComObject(shapes);
-                return hasSmartArt && hasRequiredText;
+
+                return hasVennLayout && hasRequiredTexts;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -184,35 +191,35 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // SmartArt が存在し、かつ Fill など色がデフォルトでない（ユーザーが色変更した）か
-                bool hasSmartArt = false;
-                bool hasColorChange = false;
-                Shapes shapes = document.Shapes;
-                for (int i = 1; i <= shapes.Count; i++)
+
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // SmartArt関連のパッケージパートを抽出
+                var partMatches = System.Text.RegularExpressions.Regex.Matches(xml, @"<pkg:part pkg:name=""/word/diagrams/([^""]+)""[^>]*>.*?</pkg:part>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                
+                bool hasColorfulColors = false;
+
+                foreach (System.Text.RegularExpressions.Match match in partMatches)
                 {
-                    Shape shp = null;
-                    try
+                    string partXml = match.Value;
+                    string partName = match.Groups[1].Value;
+
+                    if (partName.Contains("colors"))
                     {
-                        shp = shapes[i];
-                        dynamic shapeType = shp.Type;
-                        if ((int)shapeType == 24) // msoSmartArt (Office 参照なしで整数比較)
+                        if (partXml.Contains(@"urn:microsoft.com/office/officeart/2005/8/colors/colorful2"))
                         {
-                            hasSmartArt = true;
-                            if (shp.Fill != null)
-                            {
-                                dynamic fillVisible = shp.Fill.Visible;
-                                if ((int)fillVisible != 0) hasColorChange = true;
-                            }
+                            hasColorfulColors = true;
+                            break;
                         }
                     }
-                    finally { if (shp != null) Marshal.ReleaseComObject(shp); }
                 }
-                Marshal.ReleaseComObject(shapes);
-                return hasSmartArt && hasColorChange;
+
+                return hasColorfulColors;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
