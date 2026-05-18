@@ -20,42 +20,32 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
 
-                // 結果として「自動作成の目次2」が選択されているかで判定（Format = wdTOCDistinctive が目次2に相当）
-                TablesOfContents tocs = document.TablesOfContents;
-                bool hasToc = tocs.Count > 0;
-                bool isToc2Format = false;
-                if (hasToc)
+                // XML取得
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // 文書内のすべてのテキストボックス（w:txbxContent）を抽出
+                var txbxMatches = System.Text.RegularExpressions.Regex.Matches(xml, @"<w:txbxContent\b[^>]*>.*?</w:txbxContent>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                
+                foreach (System.Text.RegularExpressions.Match match in txbxMatches)
                 {
-                    try
+                    string shapeXml = match.Value;
+                    // 図形内に目次（TOCフィールド）が挿入されているかチェック
+                    bool hasTOCField = System.Text.RegularExpressions.Regex.IsMatch(shapeXml, @"<w:instrText\b[^>]*>\s*TOC\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    // 「自動作成の目次2」のタイトル「目次」が含まれること
+                    bool hasTOC2Text = shapeXml.Contains("目次");
+
+                    if (hasTOCField && hasTOC2Text)
                     {
-                        dynamic toc = tocs[1];
-                        isToc2Format = ((WdTocFormat)toc.Format) == WdTocFormat.wdTOCDistinctive;
+                        return true;
                     }
-                    catch { }
-                    Marshal.ReleaseComObject(tocs);
-                }
-                else { Marshal.ReleaseComObject(tocs); }
-
-                if (hasToc && isToc2Format)
-                {
-                    System.Diagnostics.Debug.WriteLine("[CheckTask_1_8_01] Result (TOC Format = 自動作成の目次2): true");
-                    return true;
                 }
 
-                // フォーマットで判定できない場合は VSTO ログでフォールバック
-                bool logFileExists = System.IO.File.Exists(LogReader.GetLogFilePath());
-                bool tocAutomatic2Executed = LogReader.HasCommandExecuted("TocAutomatic2");
-                if (logFileExists && tocAutomatic2Executed && hasToc)
-                {
-                    System.Diagnostics.Debug.WriteLine("[CheckTask_1_8_01] Result (VSTO log fallback): true");
-                    return true;
-                }
-                System.Diagnostics.Debug.WriteLine("[CheckTask_1_8_01] Result: false");
                 return false;
             }
             catch { return false; }
@@ -88,32 +78,24 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 脚注の番号書式が「①,②,③･･･」= wdNoteNumberStyleGanada (24)。Section.Range.FootnoteOptions で取得
-                Footnotes footnotes = document.Footnotes;
-                if (footnotes.Count == 0) { Marshal.ReleaseComObject(footnotes); return false; }
-                // ログに脚注挿入があり、脚注が1件以上あれば正解（番号書式の厳密判定を緩和）
-                if (LogReader.HasCommandExecuted("FootnoteInsert"))
-                {
-                    Marshal.ReleaseComObject(footnotes);
-                    return true;
-                }
-                try
-                {
-                    Range secRange = document.Sections[1].Range;
-                    FootnoteOptions opts = secRange.FootnoteOptions;
-                    bool result = (int)opts.NumberStyle == 24; // wdNoteNumberStyleGanada
-                    Marshal.ReleaseComObject(secRange); Marshal.ReleaseComObject(opts); Marshal.ReleaseComObject(footnotes);
-                    return result;
-                }
-                catch
-                {
-                    Marshal.ReleaseComObject(footnotes);
-                    return true; // フォールバック: 脚注が1件以上あれば可
-                }
+
+                // XML取得
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // 1. 脚注設定（w:footnotePr）の中に w:numFmt w:val="decimalEnclosedCircle" が含まれるかチェック
+                // 通常はセクションプロパティ（w:sectPr）内の w:footnotePr に格納される
+                var footnotePrMatch = System.Text.RegularExpressions.Regex.Match(xml, @"<w:footnotePr\b[^>]*>.*?</w:footnotePr>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (!footnotePrMatch.Success) return false;
+
+                string footnotePrXml = footnotePrMatch.Value;
+                bool isCircularNumberStyle = System.Text.RegularExpressions.Regex.IsMatch(footnotePrXml, @"<w:numFmt\b[^>]*w:val=""decimalEnclosedCircle""");
+
+                return isCircularNumberStyle;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -124,18 +106,35 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "参考文献一覧"; find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                // 見出し「参考文献一覧」の先頭に「§」があるか（該当段落の先頭文字を確認）
-                int paraStart = searchRange.Paragraphs[1].Range.Start;
-                Range headRange = document.Range(paraStart, Math.Min(paraStart + 5, document.Content.End));
-                string text = headRange.Text ?? "";
-                Marshal.ReleaseComObject(headRange); Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
-                return text.Contains("§");
+
+                // XML取得
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // 「参考文献」を含む段落を探す（問題文は参考文献一覧だが実機は「参考文献」）
+                var paragraphs = System.Text.RegularExpressions.Regex.Matches(xml, @"<w:p\b[^>]*>.*?</w:p>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                foreach (System.Text.RegularExpressions.Match p in paragraphs)
+                {
+                    string pXml = p.Value;
+                    string pText = System.Text.RegularExpressions.Regex.Replace(pXml, @"<[^>]+>", "").Trim();
+                    if (pText.Contains("参考文献"))
+                    {
+                        // 目次（TOC）のエントリはハイパーリンクやPAGEREFを含むため除外する
+                        if (pXml.Contains("PAGEREF") || pXml.Contains("w:hyperlink")) continue;
+
+                        bool containsSec = pText.Contains("§");
+                        bool containsSym = pXml.Contains("<w:sym ");
+                        
+                        // 記号タグ（<w:sym>）が使われている場合、またはプレーンテキストで§がある場合を許容
+                        return containsSec || containsSym;
+                    }
+                }
+
+                return false;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
