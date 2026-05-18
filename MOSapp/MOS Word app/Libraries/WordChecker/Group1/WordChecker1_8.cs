@@ -230,20 +230,35 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "TOP"; find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                // ハイパーリンクが設定されているかチェック
-                Hyperlinks links = document.Hyperlinks;
-                bool result = links.Count > 0;
-                Marshal.ReleaseComObject(links); Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
-                // ログにハイパーリンク挿入があり、かつリンクがあれば正解
-                if (LogReader.HasCommandExecuted("HyperlinkInsert") && result)
-                    return true;
-                return result;
+
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // "TOP" を含む図形全体のブロック <mc:AlternateContent> を抽出する
+                var alternates = System.Text.RegularExpressions.Regex.Matches(xml, @"<mc:AlternateContent\b[^>]*>.*?</mc:AlternateContent>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                bool hasTopHyperlink = false;
+
+                foreach (System.Text.RegularExpressions.Match alt in alternates)
+                {
+                    string altXml = alt.Value;
+                    if (altXml.Contains("TOP"))
+                    {
+                        // 図形（枠線）自体にハイパーリンクが設定されている場合、
+                        // 互換用の VML タグ <v:shape ... href="#_top" が生成されます。
+                        // これを検証することで、「文字ではなく図形に」「文頭への」リンクが貼られたかを厳密に判定します。
+                        if (altXml.Contains("href=\"#_top\""))
+                        {
+                            hasTopHyperlink = true;
+                            break;
+                        }
+                    }
+                }
+
+                return hasTopHyperlink;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
