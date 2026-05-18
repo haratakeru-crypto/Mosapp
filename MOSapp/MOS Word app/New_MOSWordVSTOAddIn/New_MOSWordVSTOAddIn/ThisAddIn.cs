@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Word = Microsoft.Office.Interop.Word;
 
@@ -41,6 +43,27 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>4-3: 前ティックの Comments.Count。吹き出し本文が Range で読めない環境でも削除を検知する。</summary>
         private int _lastCommentsCountForEco = -1;
 
+        /// <summary>7-1: 前ティックの ActiveDocument.FullName（文書切替でベースライン再取得するため）</summary>
+        private string _p7LastCompatDocFullName;
+
+        /// <summary>7-1: 同一文書での前回 CompatibilityMode。未設定は -1。</summary>
+        private int _p7LastCompatMode = -1;
+
+        private string _p7IntegralTrackedFullName;
+        private bool _p7IntegralLastDetected;
+
+        private const string P7RdTxtFileName = "朗読会.txt";
+        private const string P7RdDocmFileName = "朗読会.docm";
+
+        /// <summary>7-4/7-5: 前ティックで追跡していた ActiveDocument.FullName</summary>
+        private string _p7FileSaveAsTrackedFullName;
+
+        /// <summary>7-4: 前ティックで ActiveDocument が朗読会.txt だったか</summary>
+        private bool _p7FileSaveAsLastTxt;
+
+        /// <summary>7-5: 前ティックで ActiveDocument が朗読会.docm だったか</summary>
+        private bool _p7FileSaveAsLastDocm;
+
         internal void RegisterRibbonLoggedPageOrientation()
         {
             _suppressOrientationPollLogs = 2;
@@ -62,6 +85,7 @@ namespace New_MOSWordVSTOAddIn
             System.Diagnostics.Debug.WriteLine($"[New_MOSWordVSTOAddIn] Log file: {Logger.GetLogFilePath()}");
 
             this.Application.DocumentChange += Application_DocumentChange;
+            this.Application.DocumentBeforeSave += Application_DocumentBeforeSave;
             RefreshBaselineFromActiveDocumentNoLog();
             StartShowAllPolling();
         }
@@ -90,6 +114,7 @@ namespace New_MOSWordVSTOAddIn
             try
             {
                 this.Application.DocumentChange -= Application_DocumentChange;
+                this.Application.DocumentBeforeSave -= Application_DocumentBeforeSave;
             }
             catch
             {
@@ -104,6 +129,25 @@ namespace New_MOSWordVSTOAddIn
         private void Application_DocumentChange()
         {
             RefreshBaselineFromActiveDocumentNoLog();
+        }
+
+        /// <summary>
+        /// 7-4/7-5: 上書き保存時など、保存前から対象ファイル名のとき専用ログを付与する。
+        /// 初回の「名前を付けて保存」は ShowAllPoll で保存後の FullName を検知する。
+        /// </summary>
+        private void Application_DocumentBeforeSave(Word.Document Doc, ref bool SaveAsUI, ref bool Cancel)
+        {
+            try
+            {
+                if (Doc == null) return;
+                string fullName;
+                try { fullName = Doc.FullName; }
+                catch { return; }
+                if (string.IsNullOrEmpty(fullName)) return;
+
+                LogFileSaveAsCommandForPath(fullName);
+            }
+            catch { /* ignore */ }
         }
 
         /// <summary>
@@ -147,6 +191,18 @@ namespace New_MOSWordVSTOAddIn
                     string xml = doc.WordOpenXML;
                     _lastWatermarkFound = !string.IsNullOrEmpty(xml) && xml.Contains("下書き");
                 } catch { _lastWatermarkFound = false; }
+
+                // 7-1: 互換モードのベースライン（ポーリングで 非15→15 の遷移を検知するため）
+                try
+                {
+                    _p7LastCompatDocFullName = doc.FullName;
+                    _p7LastCompatMode = (int)doc.CompatibilityMode;
+                }
+                catch
+                {
+                    _p7LastCompatDocFullName = null;
+                    _p7LastCompatMode = -1;
+                }
             }
             catch
             {
@@ -267,6 +323,28 @@ namespace New_MOSWordVSTOAddIn
                 }
                 _lastOrientationFingerprint = orientFp;
 
+                // 7-1: Ribbon の UpgradeDocument は発火しないため、.doc で CompatibilityMode が非2013→2013 へ遷移したときだけログ（5-1 の「状態 OR ログ」と同型）
+                try
+                {
+                    string fullName = doc.FullName;
+                    string ext = Path.GetExtension(fullName).ToLowerInvariant();
+                    int compat = (int)doc.CompatibilityMode;
+                    const int wdWord2013 = (int)Word.WdCompatibilityMode.wdWord2013;
+
+                    if (!string.Equals(fullName, _p7LastCompatDocFullName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _p7LastCompatDocFullName = fullName;
+                        _p7LastCompatMode = compat;
+                    }
+                    else
+                    {
+                        if (ext == ".doc" && _p7LastCompatMode >= 0 && _p7LastCompatMode != wdWord2013 && compat == wdWord2013)
+                            Logger.LogCommand("UpgradeDocument");
+                        _p7LastCompatMode = compat;
+                    }
+                }
+                catch { }
+
                 // 重い判定（文書全体テキスト化・セクション走査・スタイル解析）は毎回実行しない。
                 // リボン入力欄（フォントサイズ等）でのフォーカス喪失を避けるため、約6秒ごとに間引く。
                 _heavyCheckTickCounter++;
@@ -377,11 +455,105 @@ namespace New_MOSWordVSTOAddIn
                         Marshal.ReleaseComObject(searchRange);
                     }
                     catch { }
+
+                    // 7-3: インテグラル相当ヘッダーが false→true に遷移したとき IntegralHeader をログ（7-4 後の再採点用）。判定は WordChecker1_7 と同一。
+                    try
+                    {
+                        bool nowIntegral = EvaluateIntegralHeaderPresenceForPolling(doc);
+                        string iFull;
+                        try { iFull = doc.FullName; } catch { iFull = null; }
+                        if (!string.IsNullOrEmpty(iFull))
+                        {
+                            if (!string.Equals(iFull, _p7IntegralTrackedFullName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                _p7IntegralTrackedFullName = iFull;
+                                _p7IntegralLastDetected = nowIntegral;
+                            }
+                            else
+                            {
+                                if (!_p7IntegralLastDetected && nowIntegral)
+                                    Logger.LogCommand("IntegralHeader");
+                                _p7IntegralLastDetected = nowIntegral;
+                            }
+                        }
+                    }
+                    catch { }
+
+                    // 7-4/7-5: 保存後に朗読会.txt / 朗読会.docm へ遷移したら専用ログ（事前作成ファイルがあっても、今回の操作のみ記録）
+                    try
+                    {
+                        UpdateFileSaveAsPolling(doc);
+                    }
+                    catch { }
                 }
             }
             catch
             {
                 // ドキュメント未表示などで COM エラーになることがあるため無視
+            }
+        }
+
+        private static bool IsRdTxtSavePath(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return false;
+            return string.Equals(Path.GetFileName(fullName), P7RdTxtFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsRdDocmSavePath(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return false;
+            return string.Equals(Path.GetFileName(fullName), P7RdDocmFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void LogFileSaveAsCommandForPath(string fullName)
+        {
+            if (IsRdTxtSavePath(fullName))
+                Logger.LogCommand("FileSaveAsTxt");
+            else if (IsRdDocmSavePath(fullName))
+                Logger.LogCommand("FileSaveAsDocm");
+        }
+
+        /// <summary>
+        /// 7-4/7-5: ActiveDocument が朗読会.txt / 朗読会.docm へ遷移したときそれぞれ専用ログを付与する。
+        /// </summary>
+        private void UpdateFileSaveAsPolling(Word.Document doc)
+        {
+            if (doc == null) return;
+            string fullName;
+            try { fullName = doc.FullName; }
+            catch { return; }
+            if (string.IsNullOrEmpty(fullName)) return;
+
+            bool nowTxt = IsRdTxtSavePath(fullName);
+            bool nowDocm = IsRdDocmSavePath(fullName);
+
+            if (!string.Equals(fullName, _p7FileSaveAsTrackedFullName, StringComparison.OrdinalIgnoreCase))
+            {
+                bool wasTxt = false;
+                bool wasDocm = false;
+                if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName))
+                {
+                    wasTxt = IsRdTxtSavePath(_p7FileSaveAsTrackedFullName);
+                    wasDocm = IsRdDocmSavePath(_p7FileSaveAsTrackedFullName);
+                }
+
+                if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasTxt && nowTxt)
+                    Logger.LogCommand("FileSaveAsTxt");
+                if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasDocm && nowDocm)
+                    Logger.LogCommand("FileSaveAsDocm");
+
+                _p7FileSaveAsTrackedFullName = fullName;
+                _p7FileSaveAsLastTxt = nowTxt;
+                _p7FileSaveAsLastDocm = nowDocm;
+            }
+            else
+            {
+                if (!_p7FileSaveAsLastTxt && nowTxt)
+                    Logger.LogCommand("FileSaveAsTxt");
+                if (!_p7FileSaveAsLastDocm && nowDocm)
+                    Logger.LogCommand("FileSaveAsDocm");
+                _p7FileSaveAsLastTxt = nowTxt;
+                _p7FileSaveAsLastDocm = nowDocm;
             }
         }
 
@@ -800,6 +972,96 @@ namespace New_MOSWordVSTOAddIn
             {
                 return false;
             }
+        }
+
+        /// <summary>7-3: インテグラル相当ヘッダー（WordChecker1_7 と同ロジック。VSTO ポーリング用）。</summary>
+        private static bool EvaluateIntegralHeaderPresenceForPolling(Word.Document document)
+        {
+            if (document == null) return false;
+            bool usePostCompatFingerprint = false;
+            try
+            {
+                string ext = Path.GetExtension(document.FullName).ToLowerInvariant();
+                usePostCompatFingerprint = ext == ".doc"
+                    && (int)document.CompatibilityMode == (int)Word.WdCompatibilityMode.wdWord2013;
+            }
+            catch { /* ignore */ }
+
+            try
+            {
+                int sectionCount = document.Sections.Count;
+                for (int i = 1; i <= sectionCount; i++)
+                {
+                    foreach (Word.WdHeaderFooterIndex hfType in new[]
+                    {
+                        Word.WdHeaderFooterIndex.wdHeaderFooterPrimary,
+                        Word.WdHeaderFooterIndex.wdHeaderFooterFirstPage,
+                        Word.WdHeaderFooterIndex.wdHeaderFooterEvenPages
+                    })
+                    {
+                        Word.HeaderFooter header = null;
+                        try
+                        {
+                            header = document.Sections[i].Headers[hfType];
+                            if (!header.Exists) continue;
+                            string headerXml = header.Range.WordOpenXML ?? "";
+                            if (HeaderXmlLooksLikeIntegralForPolling(headerXml, usePostCompatFingerprint))
+                                return true;
+                        }
+                        finally
+                        {
+                            if (header != null) Marshal.ReleaseComObject(header);
+                        }
+                    }
+                }
+            }
+            catch { /* ignore */ }
+            return false;
+        }
+
+        private static bool HeaderXmlLooksLikeIntegralForPolling(string xml, bool usePostCompatFingerprint)
+        {
+            if (string.IsNullOrEmpty(xml)) return false;
+            if (ContainsIntegralBuildingBlockMetadataForPolling(xml)) return true;
+            if (HasIntegralStructureFingerprintForPolling(xml)) return true;
+            if (usePostCompatFingerprint && HasIntegralStructureFingerprintAfterCompatForPolling(xml)) return true;
+            return false;
+        }
+
+        private static bool ContainsIntegralBuildingBlockMetadataForPolling(string xml)
+        {
+            if (xml.IndexOf("Integral", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if (Regex.IsMatch(xml, @"w:val\s*=\s*""Integral""", RegexOptions.IgnoreCase)) return true;
+            if (xml.IndexOf("docPart", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (xml.IndexOf("w:sdt", StringComparison.Ordinal) >= 0) return true;
+            return false;
+        }
+
+        private static bool HasIntegralStructureFingerprintForPolling(string xml)
+        {
+            if (xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) < 0) return false;
+            if (xml.IndexOf("w:w=\"1782\"", StringComparison.Ordinal) < 0) return false;
+            if (xml.IndexOf("w:w=\"7286\"", StringComparison.Ordinal) < 0) return false;
+            return true;
+        }
+
+        private static bool HasIntegralStructureFingerprintAfterCompatForPolling(string xml)
+        {
+            if (xml.IndexOf("<w:tbl", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            bool accent2Marker =
+                xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("w:themeFill=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0
+                || xml.IndexOf("w:themeColor=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!accent2Marker) return false;
+            int gridColCount = 0;
+            for (int i = 0; ;)
+            {
+                int p = xml.IndexOf("<w:gridCol", i, StringComparison.Ordinal);
+                if (p < 0) break;
+                gridColCount++;
+                i = p + 10;
+            }
+            return gridColCount >= 2;
         }
 
         #region VSTO で生成されたコード

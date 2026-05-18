@@ -20,6 +20,7 @@
     <command idMso="PageBorderAndShadingDialog" onAction="CommandOnAction" />
     <command idMso="ConvertTextToTable" onAction="CommandOnAction" />
     <command idMso="ReviewDeleteComment" onAction="CommandOnAction" />
+    <command idMso="FileSaveAs" onAction="CommandOnAction" />
     <command idMso="TableColumnsDistribute" onAction="CommandOnAction" />
     <!-- 注: UpgradeDocument は Office 仕様により idMso 経由で onAction フックが発火しない（実機検証で確認済み）。
          7-1 の採点ロジックは State-only（ext=.doc + CompatMode=15 のユニークシグネチャ）で実装されており、

@@ -20,8 +20,9 @@ namespace Libraries
             "4-3",  // コメントの解決 (ReviewResolveComment)
             "6-1",  // 文字列を表に変換 (TableConvertTextToTable)
             "7-1",  // 互換モードの解除 (UpgradeDocument)
-            "7-4",  // テキスト保存 (FileSaveAs)
-            "7-5",  // マクロ有効保存 (FileSaveAs)
+            "7-3",  // インテグラルヘッダー（IntegralHeader ポーリング補助）
+            "7-4",  // テキスト保存 (FileSaveAsTxt)
+            "7-5",  // マクロ有効保存 (FileSaveAsDocm)
             "8-1"   // 目次の挿入 (TocAutomatic2)
         };
 

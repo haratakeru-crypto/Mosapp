@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Office.Interop.Word;
 using Libraries;
 
@@ -38,13 +40,14 @@ namespace Libraries.Group1
                 //    そのため ext=.doc + CompatMode=15 は「変換」ボタン押下を一意に示すシグネチャ。
                 //    （Save As .docx は ext=.docx になるためここで弾かれる → 誤学習防止）
                 string ext = System.IO.Path.GetExtension(document.FullName).ToLowerInvariant();
-                if (ext != ".doc") return false;
+                bool stateOk = ext == ".doc"
+                    && (int)document.CompatibilityMode == (int)WdCompatibilityMode.wdWord2013;
 
-                // 2. 互換モードチェック: wdWord2013 (15) になっているか
-                //    .doc 形式で CompatibilityMode=15 を作る経路は「変換」操作のみ。
-                //    なお、操作ログ（UpgradeDocument）は Office 仕様で idMso フックできず発火しないため
-                //    判定には使用しない（状態のユニーク性で代替）。
-                return (int)document.CompatibilityMode == (int)WdCompatibilityMode.wdWord2013;
+                // 2. 後続タスク（別名保存で .txt 等）のあと ext が変わり stateOk が false になり得る。
+                //    5-1 と同様「現在が合格」または「過去に互換解除したログがある」なら合格。
+                //    UpgradeDocument は Ribbon の idMso では発火しないが、ThisAddIn ポーリングで .doc 上の非15→15 遷移時に記録する。
+                bool logOk = LogReader.HasCommandExecuted("UpgradeDocument");
+                return stateOk || logOk;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -85,70 +88,157 @@ namespace Libraries.Group1
 
         private bool CheckTask_1_7_03(string filePath)
         {
-            // === 採取フェーズ（一時実装）===
-            // 目的：実機で「インテグラル」ヘッダー挿入時に header XML に残る識別タグを特定する。
-            // 使い方：
-            //   1) パターンA（何もしない）で採点ボタン押下 → C:\temp\1_7_03_header_dump.xml を 1_7_03_none.xml に手動リネーム
-            //   2) パターンB（インテグラル挿入）で採点ボタン押下 → 1_7_03_integral.xml にリネーム
-            //   3) パターンC（別ヘッダー：オースティン等）で採点ボタン押下 → 1_7_03_other.xml にリネーム
-            // 採取後に B/C の差分から識別タグを確定し、判定ロジックを実装する。
-            // 採取フェーズ中は判定不能なので必ず false を返す。
-
-            const string dbgDir = @"C:\temp";
-            const string dbgFile = dbgDir + @"\1_7_03_debug.txt";
-            const string dumpFile = dbgDir + @"\1_7_03_header_dump.xml";
-            void Dbg(string msg)
-            {
-                string line = "[1_7_03] " + msg;
-                System.Diagnostics.Debug.WriteLine(line);
-                try
-                {
-                    System.IO.Directory.CreateDirectory(dbgDir);
-                    System.IO.File.AppendAllText(dbgFile,
-                        DateTime.Now.ToString("HH:mm:ss.fff") + " " + line + Environment.NewLine);
-                }
-                catch { /* ignore */ }
-            }
-
-            Application wordApp = null; Document document = null;
+            Application wordApp = null;
+            Document document = null;
             try
             {
-                try
-                {
-                    System.IO.Directory.CreateDirectory(dbgDir);
-                    System.IO.File.WriteAllText(dbgFile, "=== CheckTask_1_7_03 開始 ===" + Environment.NewLine);
-                }
-                catch { }
-
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { Dbg("DBG0: Word.Application 取得失敗"); return false; }
+                catch { return false; }
 
-                string fileName = System.IO.Path.GetFileName(filePath);
+                string fileName = Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
                 {
                     if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase)
                         || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
                     {
-                        document = doc; break;
+                        document = doc;
+                        break;
                     }
                 }
-                if (document == null) { Dbg("DBG0: document が見つからない"); return false; }
+                if (document == null) return false;
 
+                // SaveCopyAs + System.IO.Packaging でのパッケージ読取は、一部環境で参照が解決せずビルド不能となるため採用しない。
+                // 全セクション×各ヘッダー種別の WordOpenXML のみで判定する（論点1: いずれかのヘッダーで一致すれば○）。
+                // 7-1（互換15）かつ拡張子が .doc のとき（変換後～別名保存前）、tblGrid twip 等が変わり得るため補助指紋を OR する。
+                // 7-4 後などヘッダーが読めない／状態が変わったあとも、VSTO ポーリングで記録した IntegralHeader ログがあれば ○（7-1 と同型）。
+                return TryIntegralFromLiveHeaderWordOpenXml(document)
+                    || LogReader.HasCommandExecuted("IntegralHeader");
+            }
+            catch { return false; }
+            finally
+            {
+                if (document != null) Marshal.ReleaseComObject(document);
+            }
+        }
+
+        private bool CheckTask_1_7_04(string filePath)
+        {
+            Application wordApp = null;
+            Document document = null;
+            try
+            {
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
+                catch { return false; }
+
+                string fileName = Path.GetFileName(filePath);
+                foreach (Document doc in wordApp.Documents)
+                {
+                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase)
+                        || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        document = doc;
+                        break;
+                    }
+                }
+                if (document == null) return false;
+
+                // 元 .docx と同一フォルダに「朗読会.txt」が存在するか（課題: 書式なしテキストで保存）
+                string dir = Path.GetDirectoryName(filePath);
+                if (string.IsNullOrEmpty(dir)) return false;
+                string targetTxt = Path.Combine(dir, "朗読会.txt");
+                if (!File.Exists(targetTxt)) return false;
+
+                if (!LogReader.HasCommandExecuted("FileSaveAsTxt")) return false;
+
+                return true;
+            }
+            catch { return false; }
+            finally { if (document != null) Marshal.ReleaseComObject(document); }
+        }
+
+        private bool CheckTask_1_7_05(string filePath)
+        {
+            Application wordApp = null;
+            Document document = null;
+            try
+            {
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
+                catch { return false; }
+
+                string fileName = Path.GetFileName(filePath);
+                foreach (Document doc in wordApp.Documents)
+                {
+                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase)
+                        || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        document = doc;
+                        break;
+                    }
+                }
+                if (document == null) return false;
+
+                // 7-4 と同フォルダ・同ベース名（朗読会）の .docm（課題: マクロ有効＋読み取りパスワード）
+                string dir = Path.GetDirectoryName(filePath);
+                if (string.IsNullOrEmpty(dir)) return false;
+                string targetDocm = Path.Combine(dir, "朗読会.docm");
+                if (!File.Exists(targetDocm)) return false;
+                if (!AppearsEncryptedByReadPassword(targetDocm)) return false;
+                if (!LogReader.HasCommandExecuted("FileSaveAsDocm")) return false;
+
+                return true;
+            }
+            catch { return false; }
+            finally { if (document != null) Marshal.ReleaseComObject(document); }
+        }
+
+        /// <summary>
+        /// 読み取りパスワード付き保存の目安: 暗号化 OOXML は ZIP ではなく CFB（先頭 D0 CF 11 E0）。
+        /// パスワード文字列「abc」の一致までは検証しない。
+        /// </summary>
+        private static bool AppearsEncryptedByReadPassword(string path)
+        {
+            byte[] header = new byte[4];
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                if (fs.Read(header, 0, 4) < 4) return false;
+            }
+
+            // 暗号化 Office 文書（Compound File Binary）
+            if (header[0] == 0xD0 && header[1] == 0xCF && header[2] == 0x11 && header[3] == 0xE0)
+                return true;
+
+            // パスワードなし .docm は ZIP（PK..）
+            if (header[0] == 0x50 && header[1] == 0x4B)
+                return false;
+
+            return false;
+        }
+
+        private string GetCurrentWordFilePath()
+        {
+            Application wordApp = null;
+            try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); if (wordApp.ActiveDocument != null) return wordApp.ActiveDocument.FullName; return null; }
+            catch (COMException) { return null; }
+            finally { if (wordApp != null) Marshal.ReleaseComObject(wordApp); }
+        }
+
+        private static bool TryIntegralFromLiveHeaderWordOpenXml(Document document)
+        {
+            bool usePostCompatFingerprint = false;
+            try
+            {
+                string ext = Path.GetExtension(document.FullName).ToLowerInvariant();
+                usePostCompatFingerprint = ext == ".doc"
+                    && (int)document.CompatibilityMode == (int)WdCompatibilityMode.wdWord2013;
+            }
+            catch { /* ignore */ }
+
+            try
+            {
                 int sectionCount = document.Sections.Count;
-                Dbg($"DBG1: Section数 = {sectionCount}");
-
-                var sb = new System.Text.StringBuilder();
-                sb.AppendLine("<!-- ========================================");
-                sb.AppendLine($"     CheckTask_1_7_03 ダンプ");
-                sb.AppendLine($"     採取日時: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                sb.AppendLine($"     ファイル: {document.FullName}");
-                sb.AppendLine($"     セクション数: {sectionCount}");
-                sb.AppendLine("     ======================================== -->");
-                sb.AppendLine();
-
                 for (int i = 1; i <= sectionCount; i++)
                 {
-                    foreach (var hfType in new[]
+                    foreach (WdHeaderFooterIndex hfType in new[]
                     {
                         WdHeaderFooterIndex.wdHeaderFooterPrimary,
                         WdHeaderFooterIndex.wdHeaderFooterFirstPage,
@@ -159,17 +249,10 @@ namespace Libraries.Group1
                         try
                         {
                             header = document.Sections[i].Headers[hfType];
-                            string headerText = header.Range.Text ?? "";
+                            if (!header.Exists) continue;
                             string headerXml = header.Range.WordOpenXML ?? "";
-                            Dbg($"DBG2: Section[{i}] {hfType} TextLen={headerText.Length}, XMLLen={headerXml.Length}, Exists={header.Exists}");
-                            sb.AppendLine($"<!-- ============ Section[{i}] / {hfType} (Exists={header.Exists}, TextLen={headerText.Length}) ============ -->");
-                            sb.AppendLine($"<!-- Range.Text: {headerText.Replace("\r", "\\r").Replace("\n", "\\n")} -->");
-                            sb.AppendLine(headerXml);
-                            sb.AppendLine();
-                        }
-                        catch (Exception ex)
-                        {
-                            Dbg($"DBG2: Section[{i}] {hfType} エラー: {ex.Message}");
+                            if (HeaderXmlLooksLikeIntegral(headerXml, usePostCompatFingerprint))
+                                return true;
                         }
                         finally
                         {
@@ -177,110 +260,54 @@ namespace Libraries.Group1
                         }
                     }
                 }
-
-                try
-                {
-                    System.IO.File.WriteAllText(dumpFile, sb.ToString());
-                    Dbg($"DBG3: ヘッダーXMLを保存 -> {dumpFile}");
-                }
-                catch (Exception ex)
-                {
-                    Dbg($"DBG3: ヘッダーXML保存失敗: {ex.Message}");
-                }
-
-                Dbg("DBG4: 採取フェーズのため常に false を返却");
-                return false;
             }
-            catch (Exception ex)
-            {
-                Dbg("EXCEPTION: " + ex.GetType().Name + ": " + ex.Message);
-                return false;
-            }
-            finally { if (document != null) Marshal.ReleaseComObject(document); }
+            catch { /* ignore */ }
+            return false;
         }
 
-        private bool CheckTask_1_7_04(string filePath)
+        private static bool HeaderXmlLooksLikeIntegral(string xml, bool usePostCompatFingerprint)
         {
-            Application wordApp = null; Document document = null;
-            try
-            {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
-                document = null; string fileName = System.IO.Path.GetFileName(filePath);
-                foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
-
-                // VSTOログから手順をチェック: FileSaveAsが実行されたか
-                string logFilePath = LogReader.GetLogFilePath();
-                bool logFileExists = System.IO.File.Exists(logFilePath);
-                bool saveAsExecuted = LogReader.HasCommandExecuted("FileSaveAs");
-                System.Diagnostics.Debug.WriteLine($"[CheckTask_1_7_04] Log file exists: {logFileExists}");
-                System.Diagnostics.Debug.WriteLine($"[CheckTask_1_7_04] FileSaveAs executed: {saveAsExecuted}");
-
-                // テキストファイルとして保存されているかチェック（実装は簡略化）
-                bool fileStateCheck = true; // 簡略化のため、常にtrue（実際の実装では保存されたファイル形式を確認）
-
-                // VSTOログがある場合は、VSTOログを優先
-                if (logFileExists && saveAsExecuted)
-                {
-                    bool result = fileStateCheck;
-                    System.Diagnostics.Debug.WriteLine($"[CheckTask_1_7_04] Result (VSTO log check): {result}");
-                    return result;
-                }
-                else
-                {
-                    // ログなし or FileSaveAs 未実行のときは不合格
-                    System.Diagnostics.Debug.WriteLine("[CheckTask_1_7_04] VSTO log not found or command not executed, returning false");
-                    return false;
-                }
-            }
-            catch { return false; }
-            finally { if (document != null) Marshal.ReleaseComObject(document); }
+            if (string.IsNullOrEmpty(xml)) return false;
+            if (ContainsIntegralBuildingBlockMetadata(xml)) return true;
+            if (HasIntegralStructureFingerprint(xml)) return true;
+            if (usePostCompatFingerprint && HasIntegralStructureFingerprintAfterCompat(xml)) return true;
+            return false;
         }
 
-        private bool CheckTask_1_7_05(string filePath)
+        private static bool ContainsIntegralBuildingBlockMetadata(string xml)
         {
-            Application wordApp = null; Document document = null;
-            try
-            {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
-                document = null; string fileName = System.IO.Path.GetFileName(filePath);
-                foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
-
-                // VSTOログから手順をチェック: FileSaveAsが実行されたか
-                string logFilePath = LogReader.GetLogFilePath();
-                bool logFileExists = System.IO.File.Exists(logFilePath);
-                bool saveAsExecuted = LogReader.HasCommandExecuted("FileSaveAs");
-                System.Diagnostics.Debug.WriteLine($"[CheckTask_1_7_05] Log file exists: {logFileExists}");
-                System.Diagnostics.Debug.WriteLine($"[CheckTask_1_7_05] FileSaveAs executed: {saveAsExecuted}");
-
-                // マクロ有効文書として保存され、パスワードが設定されているかチェック（実装は簡略化）
-                bool fileStateCheck = true; // 簡略化のため、常にtrue（実際の実装では保存されたファイル形式とパスワードを確認）
-
-                // VSTOログがある場合は、VSTOログを優先
-                if (logFileExists && saveAsExecuted)
-                {
-                    bool result = fileStateCheck;
-                    System.Diagnostics.Debug.WriteLine($"[CheckTask_1_7_05] Result (VSTO log check): {result}");
-                    return result;
-                }
-                else
-                {
-                    // ログなし or FileSaveAs 未実行のときは不合格
-                    System.Diagnostics.Debug.WriteLine("[CheckTask_1_7_05] VSTO log not found or command not executed, returning false");
-                    return false;
-                }
-            }
-            catch { return false; }
-            finally { if (document != null) Marshal.ReleaseComObject(document); }
+            if (xml.IndexOf("Integral", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if (Regex.IsMatch(xml, @"w:val\s*=\s*""Integral""", RegexOptions.IgnoreCase)) return true;
+            if (xml.IndexOf("docPart", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (xml.IndexOf("w:sdt", StringComparison.Ordinal) >= 0) return true;
+            return false;
         }
 
-        private string GetCurrentWordFilePath()
+        private static bool HasIntegralStructureFingerprint(string xml)
         {
-            Application wordApp = null;
-            try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); if (wordApp.ActiveDocument != null) return wordApp.ActiveDocument.FullName; return null; }
-            catch (COMException) { return null; }
-            finally { if (wordApp != null) Marshal.ReleaseComObject(wordApp); }
+            if (xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) < 0) return false;
+            if (xml.IndexOf("w:w=\"1782\"", StringComparison.Ordinal) < 0) return false;
+            if (xml.IndexOf("w:w=\"7286\"", StringComparison.Ordinal) < 0) return false;
+            return true;
+        }
+
+        private static bool HasIntegralStructureFingerprintAfterCompat(string xml)
+        {
+            if (xml.IndexOf("<w:tbl", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            bool accent2Marker =
+                xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("w:themeFill=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0
+                || xml.IndexOf("w:themeColor=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!accent2Marker) return false;
+            int gridColCount = 0;
+            for (int i = 0; ;)
+            {
+                int p = xml.IndexOf("<w:gridCol", i, StringComparison.Ordinal);
+                if (p < 0) break;
+                gridColCount++;
+                i = p + 10;
+            }
+            return gridColCount >= 2;
         }
     }
 }

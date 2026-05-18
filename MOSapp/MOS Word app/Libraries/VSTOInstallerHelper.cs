@@ -10,9 +10,71 @@ namespace Libraries
     public static class VSTOInstallerHelper
     {
         private const string AddInName = "New_MOSWordVSTOAddIn";
-        private const string RegistryKeyPath = @"Software\Microsoft\Office\Word\Addins\" + AddInName;
+        /// <summary>.vsto 直接インストール時のレジストリ名（マニフェスト keyName と一致）。</summary>
+        private const string RegistryAddInKeyNameFromManifest = "New_MOSWordVSTOAddIn";
+        /// <summary>wordvstosetup.vdproj（MSI）が登録するレジストリ名。</summary>
+        private const string RegistryAddInKeyNameFromMsi = "WordMosVsto";
+
+        private static readonly string[] RegistryAddInKeyNames =
+        {
+            RegistryAddInKeyNameFromManifest,
+            RegistryAddInKeyNameFromMsi,
+        };
+
+        private const string RegistryAddInsBasePath = @"Software\Microsoft\Office\Word\Addins";
         private const string LoadBehaviorValueName = "LoadBehavior";
         private const int LoadBehaviorEnabled = 3; // 起動時に読み込む
+
+        /// <summary>
+        /// Manifest の値から .vsto のローカルパスを取り出す（file:///… と |vstolocal 等に対応）。
+        /// </summary>
+        private static string NormalizeManifestToVstoPath(string manifestRaw)
+        {
+            if (string.IsNullOrWhiteSpace(manifestRaw))
+                return null;
+
+            string s = manifestRaw.Trim();
+            int pipe = s.IndexOf('|');
+            if (pipe >= 0)
+                s = s.Substring(0, pipe);
+
+            if (s.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var uri = new Uri(s);
+                    return uri.LocalPath;
+                }
+                catch
+                {
+                    s = s.Substring("file:///".Length).Replace('/', Path.DirectorySeparatorChar);
+                }
+            }
+            else if (s.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var uri = new Uri(s);
+                    return uri.LocalPath;
+                }
+                catch { }
+            }
+
+            return s.EndsWith(".vsto", StringComparison.OrdinalIgnoreCase) ? s : null;
+        }
+
+        private static bool IsAddInKeyEnabled(RegistryKey addInKey)
+        {
+            if (addInKey == null)
+                return false;
+
+            object loadBehavior = addInKey.GetValue(LoadBehaviorValueName);
+            if (loadBehavior == null)
+                return false;
+
+            int loadBehaviorValue = Convert.ToInt32(loadBehavior);
+            return loadBehaviorValue == LoadBehaviorEnabled;
+        }
 
         /// <summary>
         /// VSTOアドインがインストールされているかチェック
@@ -22,19 +84,17 @@ namespace Libraries
         {
             try
             {
-                // レジストリを確認
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath))
+                foreach (string leaf in RegistryAddInKeyNames)
                 {
-                    if (key == null)
-                        return false;
-
-                    object loadBehavior = key.GetValue(LoadBehaviorValueName);
-                    if (loadBehavior == null)
-                        return false;
-
-                    int loadBehaviorValue = Convert.ToInt32(loadBehavior);
-                    return loadBehaviorValue == LoadBehaviorEnabled;
+                    string path = Path.Combine(RegistryAddInsBasePath, leaf).Replace('/', '\\');
+                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path))
+                    {
+                        if (IsAddInKeyEnabled(key))
+                            return true;
+                    }
                 }
+
+                return false;
             }
             catch (Exception ex)
             {
@@ -51,24 +111,25 @@ namespace Libraries
         {
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath))
+                foreach (string leaf in RegistryAddInKeyNames)
                 {
-                    if (key == null)
-                        return null;
-
-                    object manifestPath = key.GetValue("Manifest");
-                    if (manifestPath == null)
-                        return null;
-
-                    string manifestPathStr = manifestPath.ToString();
-                    // .vstoファイルのパスを取得
-                    if (manifestPathStr.EndsWith(".vsto", StringComparison.OrdinalIgnoreCase))
+                    string path = Path.Combine(RegistryAddInsBasePath, leaf).Replace('/', '\\');
+                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path))
                     {
-                        return manifestPathStr;
-                    }
+                        if (key == null)
+                            continue;
 
-                    return null;
+                        object manifestPath = key.GetValue("Manifest");
+                        if (manifestPath == null)
+                            continue;
+
+                        string vsto = NormalizeManifestToVstoPath(manifestPath.ToString());
+                        if (!string.IsNullOrEmpty(vsto))
+                            return vsto;
+                    }
                 }
+
+                return null;
             }
             catch (Exception ex)
             {
@@ -88,7 +149,7 @@ namespace Libraries
         /// VSTOアドインのビルド出力パス（または配布配置パス）を取得する。
         /// 検索順:
         ///   1) インストーラー配置先（C:\Program Files\Rabbit\wordvstosetup\New_MOSWordVSTOAddIn.vsto 等）
-        ///   2) 開発時フォールバック: 実行ディレクトリの親階層を辿って bin\Debug or bin\Release を検索
+        ///   2) 開発時フォールバック: 実行ディレクトリの親階層を辿って bin\Release（既定）または bin\Debug を検索
         /// </summary>
         /// <returns>.vsto ファイルのパス。見つからなければ null。</returns>
         public static string GetBuildOutputPath()
@@ -102,11 +163,11 @@ namespace Libraries
                 if (File.Exists(installedPath)) return installedPath;
             }
 
-            // 2) 開発時フォールバック: ソースリポジトリ内のビルド出力
+            // 2) 開発時フォールバック: ソースリポジトリ内のビルド出力（Release を配布既定とし先に検索）
             string[] relativeSuffixes = new[]
             {
-                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Debug", vstoFileName),
                 Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Release", vstoFileName),
+                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Debug", vstoFileName),
             };
 
             // 2-a) BaseDirectory 直下および相対パス
