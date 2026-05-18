@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="Mos PowerPoint Mogi App/MOS PowerPoint app.csproj" Id="4f05fafa-71ad-413c-9043-25e55e2fa083" />
-  <Project Path="Mos PowerPoint Mogi App/PowerPointAddIn1/PowerPointAddIn1.csproj" Id="594e2ed3-7e45-449f-a149-9b286e3a9846" />
+  <Project Path="Mos PowerPoint Mogi App/PowerPointAddIn1/PowerPointAddIn1.csproj" Id="594e2ed3-7e45-449f-a149-9b286e3a9846">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
   <Project Path="MOS Word app/Libraries/WordChecker/Group1/WordChecker1_1.csproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567891" />
   <Project Path="MOS Word app/Libraries/WordChecker/Group1/WordChecker1_10.csproj" Id="55452bc6-0080-149c-0625-bed9eb0b2900" />
   <Project Path="MOS Word app/Libraries/WordChecker/Group1/WordChecker1_2.csproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567892" />
@@ -15,4 +17,7 @@
   <Project Path="MOS Word app/New_MOSWordVSTOAddIn/New_MOSWordVSTOAddIn/New_MOSWordVSTOAddIn.csproj" Id="07f6198f-2781-45a3-b41a-f75f992d27cf" />
   <Project Path="MOSapp/MOSapp.csproj" Id="db7f1d38-c509-4890-a692-e31c79ca4aa8" />
   <Project Path="mos_xaml_app/MOSExcelMogiApp.csproj" Id="c01302e0-98c1-4f0d-93bd-385ba3bc400a" />
+  <Project Path="powerpointvstosetup/powerpointvstosetup.vdproj" Type="Installer">
+    <Build Solution="Release|*" />
+  </Project>
 </Solution>
