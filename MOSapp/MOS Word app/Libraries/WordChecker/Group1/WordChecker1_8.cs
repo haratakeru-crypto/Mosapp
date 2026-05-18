@@ -57,17 +57,60 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "マルウェア"; find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                // 脚注が挿入されているかチェック
-                Footnotes footnotes = document.Footnotes;
-                bool result = footnotes.Count > 0;
-                foreach (Footnote fn in footnotes) { if (fn.Range.Text.Contains("電子機器に悪影響を与えるプログラム")) { result = true; break; } Marshal.ReleaseComObject(fn); }
-                Marshal.ReleaseComObject(footnotes); Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return result;
+
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // 1. 脚注定義 (/word/footnotes.xml) から対象テキストを持つ脚注IDを特定する
+                var footnotesPartMatch = System.Text.RegularExpressions.Regex.Match(xml, @"<pkg:part pkg:name=""/word/footnotes.xml""[^>]*>.*?</pkg:part>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (!footnotesPartMatch.Success) return false;
+                string footnotesXml = footnotesPartMatch.Value;
+
+                var footnoteMatches = System.Text.RegularExpressions.Regex.Matches(footnotesXml, @"<w:footnote\b[^>]*w:id=""([^""]+)""[^>]*>.*?</w:footnote>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                string targetFootnoteId = null;
+                foreach (System.Text.RegularExpressions.Match fn in footnoteMatches)
+                {
+                    string fnXml = fn.Value;
+                    string fnText = System.Text.RegularExpressions.Regex.Replace(fnXml, @"<[^>]+>", "");
+                    if (fnText.Contains("電子機器に悪影響を与えるプログラム"))
+                    {
+                        targetFootnoteId = fn.Groups[1].Value;
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(targetFootnoteId)) return false;
+
+                // 2. 本文 (/word/document.xml) の中で「マルウェア」が含まれる最初の段落を特定する
+                var documentPartMatch = System.Text.RegularExpressions.Regex.Match(xml, @"<pkg:part pkg:name=""/word/document.xml""[^>]*>.*?</pkg:part>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                string bodyXml = documentPartMatch.Success ? documentPartMatch.Value : xml;
+
+                var paragraphs = System.Text.RegularExpressions.Regex.Matches(bodyXml, @"<w:p\b[^>]*>.*?</w:p>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                
+                foreach (System.Text.RegularExpressions.Match p in paragraphs)
+                {
+                    string pXml = p.Value;
+                    string pTextOnly = System.Text.RegularExpressions.Regex.Replace(pXml, @"<[^>]+>", "");
+                    
+                    if (pTextOnly.Contains("マルウェア"))
+                    {
+                        // 最初の「マルウェア」段落を発見！
+                        // 脚注の参照タグを一旦 [FOOTNOTE_ID] に置換する
+                        string replacedXml = System.Text.RegularExpressions.Regex.Replace(pXml, @"<w:footnoteReference\b[^>]*w:id=""([^""]+)""[^>]*>", "[FOOTNOTE_$1]");
+                        // 他のXMLタグをすべて削除してプレーンテキスト化
+                        string cleanText = System.Text.RegularExpressions.Regex.Replace(replacedXml, @"<[^>]+>", "");
+                        
+                        // "マルウェア" の直後に [FOOTNOTE_targetFootnoteId] が配置されているかを厳密に検証
+                        string expectedToken = $"マルウェア[FOOTNOTE_{targetFootnoteId}]";
+                        return cleanText.Contains(expectedToken);
+                    }
+                }
+
+                return false;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
