@@ -27,6 +27,7 @@
          7-1 の採点ロジックは State-only（ext=.doc + CompatMode=15 のユニークシグネチャ）で実装されており、
          この登録には依存していない。将来 Office 側で対応された場合に備えて登録は残している。 -->
     <command idMso="UpgradeDocument" onAction="CommandOnAction" />
+    <command idMso="BulletDefineNew" onAction="CommandOnAction" />
 
   </commands>
 
