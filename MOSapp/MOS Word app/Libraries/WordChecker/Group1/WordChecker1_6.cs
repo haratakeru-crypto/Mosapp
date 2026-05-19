@@ -351,7 +351,7 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 13行3列の表が存在し、1行目に「最高売上」「平均売上」「合計売上」があるかチェック
+                // 13行3列の表が存在し、1行目に「最高売上」「平均売上」「合計売上」が左から順に並んでいるかチェック
                 Tables tables = document.Tables;
                 bool result = false;
                 foreach (Table table in tables)
@@ -359,7 +359,15 @@ namespace Libraries.Group1
                     if (table.Rows.Count == 13 && table.Columns.Count == 3)
                     {
                         string row1Text = table.Rows[1].Range.Text;
-                        if (row1Text.Contains("最高売上") && row1Text.Contains("平均売上") && row1Text.Contains("合計売上")) { result = true; break; }
+                        int idx1 = row1Text.IndexOf("最高売上");
+                        int idx2 = row1Text.IndexOf("平均売上");
+                        int idx3 = row1Text.IndexOf("合計売上");
+
+                        if (idx1 >= 0 && idx2 > idx1 && idx3 > idx2)
+                        {
+                            result = true;
+                            break;
+                        }
                     }
                     Marshal.ReleaseComObject(table);
                 }
