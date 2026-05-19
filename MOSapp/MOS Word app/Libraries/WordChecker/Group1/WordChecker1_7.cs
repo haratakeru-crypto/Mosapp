@@ -123,24 +123,9 @@ namespace Libraries.Group1
 
         private bool CheckTask_1_7_04(string filePath)
         {
-            Application wordApp = null;
-            Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { return false; }
-
-                string fileName = Path.GetFileName(filePath);
-                foreach (Document doc in wordApp.Documents)
-                {
-                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase)
-                        || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        document = doc;
-                        break;
-                    }
-                }
-                if (document == null) return false;
+                if (string.IsNullOrEmpty(filePath)) return false;
 
                 // 元 .docx と同一フォルダに「朗読会.txt」が存在するか（課題: 書式なしテキストで保存）
                 string dir = Path.GetDirectoryName(filePath);
@@ -148,12 +133,12 @@ namespace Libraries.Group1
                 string targetTxt = Path.Combine(dir, "朗読会.txt");
                 if (!File.Exists(targetTxt)) return false;
 
+                // 保存時の操作ログが存在するか
                 if (!LogReader.HasCommandExecuted("FileSaveAsTxt")) return false;
 
                 return true;
             }
             catch { return false; }
-            finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
         private bool CheckTask_1_7_05(string filePath)
@@ -185,7 +170,60 @@ namespace Libraries.Group1
                 if (!AppearsEncryptedByReadPassword(targetDocm)) return false;
                 if (!LogReader.HasCommandExecuted("FileSaveAsDocm")) return false;
 
-                return true;
+                // パスワードが「abc」に正しく設定されているかを一時コピーファイルで安全にサイレント検証
+                WdAlertLevel originalAlertLevel = wordApp.DisplayAlerts;
+                Document tempDoc = null;
+                bool passwordOk = false;
+                string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".docm");
+                try
+                {
+                    // 画面上のWordと干渉しないよう、ファイルを一時フォルダに安全に複製
+                    using (var fsIn = new FileStream(targetDocm, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var fsOut = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                    {
+                        fsIn.CopyTo(fsOut);
+                    }
+
+                    wordApp.DisplayAlerts = WdAlertLevel.wdAlertsNone;
+                    
+                    // 非表示かつ読み取り専用で、複製した一時ファイルをパスワード "abc" でオープン試行
+                    tempDoc = wordApp.Documents.Open(
+                        FileName: tempPath,
+                        ConfirmConversions: false,
+                        ReadOnly: true,
+                        AddToRecentFiles: false,
+                        PasswordDocument: "abc",
+                        Visible: false
+                    );
+                    
+                    passwordOk = true;
+                }
+                catch (COMException)
+                {
+                    // パスワードが違う、または未設定の場合は例外が発生するため不合格
+                    passwordOk = false;
+                }
+                finally
+                {
+                    if (tempDoc != null)
+                    {
+                        try { tempDoc.Close(SaveChanges: false); } catch { }
+                        Marshal.ReleaseComObject(tempDoc);
+                    }
+                    // 警告レベルを復元
+                    try { wordApp.DisplayAlerts = originalAlertLevel; } catch { }
+                    // 一時ファイルの確実な削除
+                    try
+                    {
+                        if (File.Exists(tempPath))
+                        {
+                            File.Delete(tempPath);
+                        }
+                    }
+                    catch { }
+                }
+
+                return passwordOk;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
