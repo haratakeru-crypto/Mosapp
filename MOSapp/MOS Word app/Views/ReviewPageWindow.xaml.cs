@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using WordApp = Microsoft.Office.Interop.Word.Application;
+using Libraries;
 
 namespace MOS_Word_app.Views
 {
@@ -369,8 +370,65 @@ namespace MOS_Word_app.Views
             this.Close();
         }
         
+        private static Window CreateScoringOverlayWindow()
+        {
+            return new Window
+            {
+                Title = "採点中",
+                Width = 320,
+                Height = 140,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                WindowStyle = WindowStyle.ToolWindow,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                Topmost = true,
+                Content = new StackPanel
+                {
+                    Margin = new Thickness(16, 14, 16, 14),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = "採点中です。しばらくお待ちください...",
+                            FontSize = 14,
+                            TextAlignment = TextAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            Margin = new Thickness(0, 0, 0, 12)
+                        },
+                        new ProgressBar
+                        {
+                            Height = 14,
+                            IsIndeterminate = true,
+                            Minimum = 0,
+                            Maximum = 100
+                        }
+                    }
+                }
+            };
+        }
+
+        private static DispatcherTimer StartScoringOverlayKeepOnTopTimer(Window overlay)
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer.Tick += (_, __) =>
+            {
+                if (overlay == null || !overlay.IsVisible) return;
+                if (!overlay.IsActive)
+                {
+                    overlay.Topmost = false;
+                    overlay.Topmost = true;
+                    overlay.Activate();
+                }
+            };
+            timer.Start();
+            return timer;
+        }
+
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
+            Window scoringOverlay = null;
+            DispatcherTimer overlayKeepOnTopTimer = null;
             try
             {
                 // ボタンを無効化して再クリックを防止
@@ -395,6 +453,24 @@ namespace MOS_Word_app.Views
                         appBar.Hide();
                     }
                 }, DispatcherPriority.Background);
+                
+                // 採点中オーバーレイ（PowerPoint版と同様・最前面維持）
+                scoringOverlay = CreateScoringOverlayWindow();
+                scoringOverlay.Show();
+                scoringOverlay.Activate();
+                overlayKeepOnTopTimer = StartScoringOverlayKeepOnTopTimer(scoringOverlay);
+                await System.Threading.Tasks.Task.Yield();
+                
+                // 全プロジェクト一括採点（結果画面の 〇/✖ 表示用）
+                await System.Threading.Tasks.Task.Run(() => WordBatchScoring.ScoreAllProjects(_groupId));
+                
+                overlayKeepOnTopTimer?.Stop();
+                overlayKeepOnTopTimer = null;
+                if (scoringOverlay != null)
+                {
+                    try { scoringOverlay.Close(); } catch { }
+                    scoringOverlay = null;
+                }
                 
                 // Wordアプリケーションを閉じる
                 await System.Threading.Tasks.Task.Run(() => CloseWordApplication());
@@ -431,6 +507,11 @@ namespace MOS_Word_app.Views
             }
             catch (Exception ex)
             {
+                if (scoringOverlay != null)
+                {
+                    overlayKeepOnTopTimer?.Stop();
+                    try { scoringOverlay.Close(); } catch { }
+                }
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in EndExamButton_Click: {ex.Message}");
                 await Dispatcher.InvokeAsync(() =>
                 {

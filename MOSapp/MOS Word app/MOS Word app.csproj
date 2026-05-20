@@ -144,6 +144,8 @@
     <Compile Include="Converters.cs" />
     <Compile Include="Libraries\LogReader.cs" />
     <Compile Include="Libraries\ScoreResultStore.cs" />
+    <Compile Include="Libraries\WordBatchScoring.cs" />
+    <Compile Include="Libraries\WordWindowLayoutHelper.cs" />
     <Compile Include="Libraries\VSTOCheckerHelper.cs" />
     <Compile Include="Libraries\VSTOInstallerHelper.cs" />
     <Page Include="TabSearchWindow.xaml">

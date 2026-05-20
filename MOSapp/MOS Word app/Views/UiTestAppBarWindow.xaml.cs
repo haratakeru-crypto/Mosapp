@@ -78,6 +78,9 @@ namespace MOS_Word_app.Views
         // 結果画面から戻ってきたときに「結果画面に戻る」ボタンとして振る舞うための状態
         private Views.ResultWindow _lastResultWindow;
         private bool _isReturnToResultMode = false;
+
+        public int CurrentProjectId => _currentProjectId;
+        public int CurrentGroupId => _groupId;
         
         public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false)
         {
@@ -1639,7 +1642,8 @@ namespace MOS_Word_app.Views
             
             if (_currentProjectId > maxProjectId)
             {
-                // 最後のプロジェクトを超えた場合はレビューページに移動
+                // 最後のプロジェクトを超えた場合はレビューページに移動（再利用時の誤判定防止）
+                _currentProjectId = maxProjectId;
                 System.Diagnostics.Debug.WriteLine($"プロジェクト{maxProjectId}を超えたため、レビューページに移動します");
                 ReviewPageButton_Click(null, null);
                 return;

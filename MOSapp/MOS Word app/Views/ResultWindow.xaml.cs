@@ -90,6 +90,7 @@ namespace MOS_Word_app.Views
 
                 System.Diagnostics.Debug.WriteLine($"[ResultWindow] 問題文JSONを読み込みました: {jsonPath}");
                 int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
+                GetFirstUnviewedWithoutScoringTask(projectData, out int summaryFirstProjectId, out int summaryFirstTaskId);
                 int totalWrongTasks = 0;
                 foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
                 {
@@ -101,8 +102,8 @@ namespace MOS_Word_app.Views
                         int arrayIndex = task.TaskId - 1;
                         bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
                         bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
-                        bool isScoringWrong = ScoreResultStore.IsIncorrect(_groupId, project.ProjectId, task.TaskId);
-                        if (isFlagged || isUnread || isScoringWrong) totalWrongTasks++;
+                        ComputeResultMark(project.ProjectId, task.TaskId, isFlagged, isUnread, summaryFirstProjectId, summaryFirstTaskId, out bool countsAsWrong);
+                        if (countsAsWrong) totalWrongTasks++;
                     }
                 }
 
@@ -125,6 +126,7 @@ namespace MOS_Word_app.Views
                         foreach (var task in project.Tasks ?? Enumerable.Empty<ResultTaskInfo>())
                         {
                             if (task.ResultMark == "✖") task.ResultColor = Brushes.Red;
+                            else if (task.ResultMark == "〇") task.ResultColor = Brushes.Green;
                             else if (task.ResultMark == "時間切れ") task.ResultColor = new SolidColorBrush(Color.FromRgb(0xB4, 0x53, 0x09));
                             else task.ResultColor = Brushes.Transparent;
                         }
@@ -152,7 +154,10 @@ namespace MOS_Word_app.Views
             }
         }
 
-        private void GetFirstUnviewedTask(ProjectData projectData, out int firstProjectId, out int firstTaskId)
+        /// <summary>
+        /// 採点結果がなく未閲覧の先頭タスク（時間切れ表示用）。
+        /// </summary>
+        private void GetFirstUnviewedWithoutScoringTask(ProjectData projectData, out int firstProjectId, out int firstTaskId)
         {
             firstProjectId = 0;
             firstTaskId = 0;
@@ -165,20 +170,53 @@ namespace MOS_Word_app.Views
                 {
                     int arrayIndex = task.TaskId - 1;
                     bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
-                    if (isUnread)
-                    {
-                        firstProjectId = project.ProjectId;
-                        firstTaskId = task.TaskId;
-                        return;
-                    }
+                    if (!isUnread) continue;
+                    if (ScoreResultStore.IsScored(_groupId, project.ProjectId, task.TaskId)) continue;
+                    firstProjectId = project.ProjectId;
+                    firstTaskId = task.TaskId;
+                    return;
                 }
             }
+        }
+
+        /// <summary>
+        /// PowerPoint版と同様: あとで見直す → 採点結果 → 未採点の未閲覧（時間切れ）。
+        /// </summary>
+        private string ComputeResultMark(int projectId, int taskId, bool isFlagged, bool isUnread,
+            int firstUnviewedProjectId, int firstUnviewedTaskId, out bool countsAsWrong)
+        {
+            countsAsWrong = false;
+            if (isFlagged)
+            {
+                countsAsWrong = true;
+                return "✖";
+            }
+            if (ScoreResultStore.TryGetResult(_groupId, projectId, taskId, out bool isPassed))
+            {
+                if (!isPassed) countsAsWrong = true;
+                return isPassed ? "〇" : "✖";
+            }
+            if (isUnread)
+            {
+                if (projectId == firstUnviewedProjectId && taskId == firstUnviewedTaskId)
+                {
+                    countsAsWrong = true;
+                    return "時間切れ";
+                }
+                return "";
+            }
+            if (ScoreResultStore.IsIncorrect(_groupId, projectId, taskId))
+            {
+                countsAsWrong = true;
+                return "✖";
+            }
+            return "";
         }
 
         private List<ResultProjectInfo> ProcessProjectDataRaw(ProjectData projectData)
         {
             var resultProjects = new List<ResultProjectInfo>();
-            GetFirstUnviewedTask(projectData, out int firstProjectId, out int firstTaskId);
+            GetFirstUnviewedWithoutScoringTask(projectData, out int firstProjectId, out int firstTaskId);
 
             if (projectData?.Projects == null) return resultProjects;
             foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
@@ -194,12 +232,8 @@ namespace MOS_Word_app.Views
                         int arrayIndex = task.TaskId - 1;
                         bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
                         bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
-                        bool isScoringWrong = ScoreResultStore.IsIncorrect(_groupId, project.ProjectId, task.TaskId);
-                        string resultMark;
-                        if (isUnread)
-                            resultMark = (project.ProjectId == firstProjectId && task.TaskId == firstTaskId) ? "時間切れ" : "";
-                        else
-                            resultMark = (isFlagged || isScoringWrong) ? "✖" : "";
+                        string resultMark = ComputeResultMark(project.ProjectId, task.TaskId, isFlagged, isUnread,
+                            firstProjectId, firstTaskId, out _);
                         return new ResultTaskInfo
                         {
                             TaskTitle = $"タスク {task.TaskId}",
