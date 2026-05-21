@@ -32,6 +32,7 @@ namespace New_MOSWordVSTOAddIn
             (6, 1, "TableConvertTextToTable"),
             (6, 4, "TableColumnsDistribute"),
             (7, 1, "UpgradeDocument"),
+            (7, 2, "SetDocumentCompany"),
             (7, 3, "IntegralHeader"),
             (7, 4, "FileSaveAsTxt"),
             (7, 5, "FileSaveAsDocm"),

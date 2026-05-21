@@ -52,6 +52,14 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>7-1: 同一文書での前回 CompatibilityMode。未設定は -1。</summary>
         private int _p7LastCompatMode = -1;
 
+        /// <summary>7-2: 前ティックの Project7 文書 FullName。</summary>
+        private string _p7LastCompanyDocFullName;
+
+        /// <summary>7-2: 同一 Project7 文書で前ティック時点の Company が目標値だったか。</summary>
+        private bool _p7LastCompanyMatched;
+
+        private const string P7CompanyTarget = "ラビット出版";
+
         private string _p7IntegralTrackedFullName;
         private bool _p7IntegralLastDetected;
 
@@ -136,7 +144,7 @@ namespace New_MOSWordVSTOAddIn
 
         /// <summary>
         /// 7-4/7-5: 上書き保存時など、保存前から対象ファイル名のとき専用ログを付与する。
-        /// 初回の「名前を付けて保存」は ShowAllPoll で保存後の FullName を検知する。
+        /// 初回の「名前を付けて保存」は ShowAllPoll（毎ティック）で保存後の FullName を検知する。
         /// </summary>
         private void Application_DocumentBeforeSave(Word.Document Doc, ref bool SaveAsUI, ref bool Cancel)
         {
@@ -206,6 +214,22 @@ namespace New_MOSWordVSTOAddIn
                 {
                     _p7LastCompatDocFullName = null;
                     _p7LastCompatMode = -1;
+                }
+
+                // 7-2: Project7 上の Company ベースライン
+                try
+                {
+                    string fn = doc.FullName;
+                    if (IsProject7DocumentPath(fn))
+                    {
+                        _p7LastCompanyDocFullName = fn;
+                        _p7LastCompanyMatched = string.Equals(TryGetDocumentCompany(doc), P7CompanyTarget, StringComparison.Ordinal);
+                    }
+                }
+                catch
+                {
+                    _p7LastCompanyDocFullName = null;
+                    _p7LastCompanyMatched = false;
                 }
             }
             catch
@@ -303,6 +327,20 @@ namespace New_MOSWordVSTOAddIn
 
                 // 4-3: コメントペイン・リボン等でも未解決エコ件数だけは追跡（ShowAll 等の重い COM より前に実行）
                 UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+
+                // 7-4/7-5: FullName のみの軽量検知（毎ティック≈1.2秒）。重いポーリング（約6秒）だと次プロジェクト押下前に取りこぼす。
+                try
+                {
+                    UpdateFileSaveAsPolling(doc);
+                }
+                catch { }
+
+                // 7-2: 「ファイルの情報」で会社を設定する操作は編集ペイン外のため、フォーカス判定より前にポーリングする。
+                try
+                {
+                    UpdateP7CompanyPolling(doc);
+                }
+                catch { }
 
                 if (ShouldSkipDocumentComBecauseFocusNotInEditingPane())
                     return;
@@ -487,19 +525,54 @@ namespace New_MOSWordVSTOAddIn
                         }
                     }
                     catch { }
-
-                    // 7-4/7-5: 保存後に朗読会.txt / 朗読会.docm へ遷移したら専用ログ（事前作成ファイルがあっても、今回の操作のみ記録）
-                    try
-                    {
-                        UpdateFileSaveAsPolling(doc);
-                    }
-                    catch { }
                 }
             }
             catch
             {
                 // ドキュメント未表示などで COM エラーになることがあるため無視
             }
+        }
+
+        /// <summary>7-2: Project7.doc 上で Company が目標値へ遷移したとき SetDocumentCompany をログする。</summary>
+        private void UpdateP7CompanyPolling(Word.Document doc)
+        {
+            if (doc == null) return;
+            string fullName;
+            try { fullName = doc.FullName; }
+            catch { return; }
+            if (!IsProject7DocumentPath(fullName)) return;
+
+            string company = TryGetDocumentCompany(doc) ?? "";
+            bool nowMatched = string.Equals(company, P7CompanyTarget, StringComparison.Ordinal);
+
+            if (!string.Equals(fullName, _p7LastCompanyDocFullName, StringComparison.OrdinalIgnoreCase))
+            {
+                _p7LastCompanyDocFullName = fullName;
+                _p7LastCompanyMatched = nowMatched;
+            }
+            else
+            {
+                if (!_p7LastCompanyMatched && nowMatched)
+                    WordEvidenceHelper.LogCommandWithEvidence("SetDocumentCompany");
+                _p7LastCompanyMatched = nowMatched;
+            }
+        }
+
+        private static bool IsProject7DocumentPath(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return false;
+            string name = Path.GetFileNameWithoutExtension(fullName);
+            return System.Text.RegularExpressions.Regex.IsMatch(name, @"^project\s*7$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        private static string TryGetDocumentCompany(Word.Document doc)
+        {
+            try
+            {
+                dynamic companyProp = ((dynamic)doc.BuiltInDocumentProperties)["Company"];
+                return companyProp?.Value?.ToString() ?? "";
+            }
+            catch { return null; }
         }
 
         private static bool IsRdTxtSavePath(string fullName)
@@ -523,7 +596,7 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 7-4/7-5: ActiveDocument が朗読会.txt / 朗読会.docm へ遷移したときそれぞれ専用ログを付与する。
+        /// 7-4/7-5: ActiveDocument が朗読会.txt / 朗読会.docm へ遷移したときそれぞれ専用ログを付与する（毎ティックで呼ぶ）。
         /// </summary>
         private void UpdateFileSaveAsPolling(Word.Document doc)
         {

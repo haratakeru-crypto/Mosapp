@@ -53,37 +53,204 @@ namespace Libraries.Group1
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
+        private const string P7CompanyTarget = "ラビット出版";
+        private const string P7RdDocmFileName = "朗読会.docm";
+        private const string P7ReadPassword = "abc";
+
         private bool CheckTask_1_7_02(string filePath)
         {
-            Application wordApp = null; Document document = null;
+            try
+            {
+                if (string.IsNullOrEmpty(filePath)) return false;
+                if (!LogReader.HasTaskEvidence(7, 2, "SetDocumentCompany")) return false;
+
+                // 操作証跡 AND 状態（.Value で Company が完全一致）。別名保存後はディスクの Project7.doc より朗読会.docm を優先。
+                if (!TryGetCompanyForTask7_02(filePath, out string company)) return false;
+                return company == P7CompanyTarget;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>7-2: 採点用 Company 取得。朗読会.docm を最優先（別名保存後の Company の所在）。docm 未作成時のみ Project7。</summary>
+        private bool TryGetCompanyForTask7_02(string filePath, out string company)
+        {
+            company = "";
+            Application wordApp = null;
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
                 catch { return false; }
 
-                string fileName = System.IO.Path.GetFileName(filePath);
-                foreach (Document doc in wordApp.Documents)
-                {
-                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase)
-                        || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        document = doc; break;
-                    }
-                }
-                if (document == null) return false;
+                string dir = Path.GetDirectoryName(filePath);
+                string docmPath = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, P7RdDocmFileName);
 
-                // BuiltInDocumentProperties["Company"] は DocumentProperty COM オブジェクトを返すため、
-                // 実際の値は .Value プロパティ経由で取得する。
-                // （直接 .ToString() するとオブジェクトの型名 "System.__ComObject" 等が返り、常に false になる）
-                dynamic companyProp = ((dynamic)document.BuiltInDocumentProperties)["Company"];
-                string company = companyProp?.Value?.ToString() ?? "";
+                // 1) 朗読会.docm（開いている → ディスク。7-5 後は読み取りパスワード abc）
+                if (!string.IsNullOrEmpty(docmPath) && TryGetCompanyFromDocm(wordApp, docmPath, out company))
+                    return true;
 
-                // 厳密一致判定：前後・中央の空白、全角/半角の差もすべて区別する
-                // （部分一致や正規化を許容すると「ラビット出版社」「ﾗﾋﾞｯﾄ出版」などが合格してしまい誤学習を生むため）
-                return company == "ラビット出版";
+                // 2) Project7.doc（7-4 前など docm が無い／未保存のとき）
+                string project7Path = ResolveProject7PathForTask702(filePath, dir);
+                if (!string.IsNullOrEmpty(project7Path)
+                    && TryGetCompanyFromOpenDocuments(wordApp, project7Path, "Project7.doc", out company))
+                    return true;
+
+                return false;
             }
             catch { return false; }
-            finally { if (document != null) Marshal.ReleaseComObject(document); }
+            finally
+            {
+                if (wordApp != null) Marshal.ReleaseComObject(wordApp);
+            }
+        }
+
+        private static string ResolveProject7PathForTask702(string filePath, string dir)
+        {
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                string name = Path.GetFileName(filePath);
+                if (name != null && System.Text.RegularExpressions.Regex.IsMatch(
+                        Path.GetFileNameWithoutExtension(name), @"^project\s*7$",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    return filePath;
+            }
+            if (string.IsNullOrEmpty(dir)) return null;
+            string p7 = Path.Combine(dir, "Project7.doc");
+            return File.Exists(p7) ? p7 : filePath;
+        }
+
+        private static bool TryGetCompanyFromDocm(Application wordApp, string docmPath, out string company)
+        {
+            company = "";
+            if (TryGetCompanyFromOpenDocuments(wordApp, docmPath, P7RdDocmFileName, out company))
+                return true;
+            if (File.Exists(docmPath) && TryReadCompanyFromDocmOnDisk(wordApp, docmPath, out company))
+                return true;
+            return false;
+        }
+
+        private static bool TryGetCompanyFromOpenDocuments(Application wordApp, string fullPath, string fileName, out string company)
+        {
+            company = "";
+            Document matched = null;
+            try
+            {
+                foreach (Document doc in wordApp.Documents)
+                {
+                    try
+                    {
+                        if (doc.FullName.Equals(fullPath, StringComparison.OrdinalIgnoreCase)
+                            || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matched = doc;
+                            break;
+                        }
+                    }
+                    catch { }
+                }
+                if (matched == null) return false;
+                return TryGetCompanyFromDocument(matched, out company);
+            }
+            finally
+            {
+                if (matched != null) Marshal.ReleaseComObject(matched);
+            }
+        }
+
+        /// <summary>7-2: ディスク上の朗読会.docm をサイレントオープン。7-5 の読み取りパスワード付きは一時コピー＋ abc で開く（7-5 チェッカーと同型）。</summary>
+        private static bool TryReadCompanyFromDocmOnDisk(Application wordApp, string docmPath, out string company)
+        {
+            company = "";
+            bool encrypted = AppearsEncryptedByReadPassword(docmPath);
+            string pathToOpen = docmPath;
+            string tempPath = null;
+
+            if (encrypted)
+            {
+                tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".docm");
+                try
+                {
+                    using (var fsIn = new FileStream(docmPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var fsOut = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                    {
+                        fsIn.CopyTo(fsOut);
+                    }
+                    pathToOpen = tempPath;
+                }
+                catch { return false; }
+            }
+
+            Document opened = null;
+            WdAlertLevel originalAlerts = wordApp.DisplayAlerts;
+            try
+            {
+                wordApp.DisplayAlerts = WdAlertLevel.wdAlertsNone;
+                if (encrypted)
+                {
+                    opened = wordApp.Documents.Open(
+                        FileName: pathToOpen,
+                        ConfirmConversions: false,
+                        ReadOnly: true,
+                        AddToRecentFiles: false,
+                        PasswordDocument: P7ReadPassword,
+                        Visible: false);
+                }
+                else
+                {
+                    try
+                    {
+                        opened = wordApp.Documents.Open(
+                            FileName: pathToOpen,
+                            ConfirmConversions: false,
+                            ReadOnly: true,
+                            AddToRecentFiles: false,
+                            Visible: false);
+                    }
+                    catch (COMException)
+                    {
+                        opened = wordApp.Documents.Open(
+                            FileName: pathToOpen,
+                            ConfirmConversions: false,
+                            ReadOnly: true,
+                            AddToRecentFiles: false,
+                            PasswordDocument: P7ReadPassword,
+                            Visible: false);
+                    }
+                }
+
+                return TryGetCompanyFromDocument(opened, out company);
+            }
+            catch { return false; }
+            finally
+            {
+                wordApp.DisplayAlerts = originalAlerts;
+                if (opened != null)
+                {
+                    try { opened.Close(WdSaveOptions.wdDoNotSaveChanges); }
+                    catch { }
+                    Marshal.ReleaseComObject(opened);
+                }
+                if (tempPath != null)
+                {
+                    try
+                    {
+                        if (File.Exists(tempPath))
+                            File.Delete(tempPath);
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        private static bool TryGetCompanyFromDocument(Document document, out string company)
+        {
+            company = "";
+            try
+            {
+                dynamic companyProp = ((dynamic)document.BuiltInDocumentProperties)["Company"];
+                company = companyProp?.Value?.ToString() ?? "";
+                return true;
+            }
+            catch { return false; }
         }
 
         private bool CheckTask_1_7_03(string filePath)

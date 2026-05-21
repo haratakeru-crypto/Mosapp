@@ -85,6 +85,10 @@ namespace MOS_Word_app
                             destInfo.IsReadOnly = false;
                     }
                     catch { }
+
+                    if (groupId == 1 && projectId == 7)
+                        TryDeleteP7DerivativeOutputs(workingFolder);
+
                     return;
                 }
                 catch (IOException) when (retryCount < maxRetries - 1)
@@ -96,6 +100,24 @@ namespace MOS_Word_app
                 {
                     retryCount++;
                     Thread.Sleep(200);
+                }
+            }
+        }
+
+        /// <summary>7-4/7-5 の派生ファイルが残ると 7-2 の状態のみで誤判定し得るため、P7 個別リセット時に削除する。</summary>
+        private static void TryDeleteP7DerivativeOutputs(string workingFolder)
+        {
+            if (string.IsNullOrEmpty(workingFolder) || !Directory.Exists(workingFolder))
+                return;
+
+            foreach (string name in new[] { "朗読会.txt", "朗読会.docm" })
+            {
+                string path = Path.Combine(workingFolder, name);
+                if (!File.Exists(path)) continue;
+                try { File.Delete(path); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] 派生ファイル削除スキップ ({name}): {ex.Message}");
                 }
             }
         }
