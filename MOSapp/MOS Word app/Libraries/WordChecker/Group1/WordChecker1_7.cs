@@ -54,6 +54,7 @@ namespace Libraries.Group1
         }
 
         private const string P7CompanyTarget = "ラビット出版";
+        private const string P7RdTxtFileName = "朗読会.txt";
         private const string P7RdDocmFileName = "朗読会.docm";
         private const string P7ReadPassword = "abc";
 
@@ -71,7 +72,7 @@ namespace Libraries.Group1
             catch { return false; }
         }
 
-        /// <summary>7-2: 採点用 Company 取得。朗読会.docm を最優先（別名保存後の Company の所在）。docm 未作成時のみ Project7。</summary>
+        /// <summary>7-2: 採点用 Company 取得。docm 最優先 → 7-4 後の txt → Project7（開いているもの）。</summary>
         private bool TryGetCompanyForTask7_02(string filePath, out string company)
         {
             company = "";
@@ -83,12 +84,17 @@ namespace Libraries.Group1
 
                 string dir = Path.GetDirectoryName(filePath);
                 string docmPath = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, P7RdDocmFileName);
+                string txtPath = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, P7RdTxtFileName);
 
-                // 1) 朗読会.docm（開いている → ディスク。7-5 後は読み取りパスワード abc）
+                // 1) 朗読会.docm（7-5 後・一括採点。読み取りパスワード abc）
                 if (!string.IsNullOrEmpty(docmPath) && TryGetCompanyFromDocm(wordApp, docmPath, out company))
                     return true;
 
-                // 2) Project7.doc（7-4 前など docm が無い／未保存のとき）
+                // 2) 朗読会.txt（7-4 後〜7-5 前。その場採点で Active になりやすい）
+                if (!string.IsNullOrEmpty(txtPath) && TryGetCompanyFromTxt(wordApp, txtPath, filePath, out company))
+                    return true;
+
+                // 3) Project7.doc（7-4 前など）
                 string project7Path = ResolveProject7PathForTask702(filePath, dir);
                 if (!string.IsNullOrEmpty(project7Path)
                     && TryGetCompanyFromOpenDocuments(wordApp, project7Path, "Project7.doc", out company))
@@ -126,6 +132,51 @@ namespace Libraries.Group1
             if (File.Exists(docmPath) && TryReadCompanyFromDocmOnDisk(wordApp, docmPath, out company))
                 return true;
             return false;
+        }
+
+        private static bool TryGetCompanyFromTxt(Application wordApp, string txtPath, string activeFilePath, out string company)
+        {
+            company = "";
+            if (TryGetCompanyFromOpenDocuments(wordApp, txtPath, P7RdTxtFileName, out company))
+                return true;
+
+            if (!string.IsNullOrEmpty(activeFilePath)
+                && string.Equals(Path.GetFileName(activeFilePath), P7RdTxtFileName, StringComparison.OrdinalIgnoreCase)
+                && TryGetCompanyFromOpenDocuments(wordApp, activeFilePath, P7RdTxtFileName, out company))
+                return true;
+
+            if (File.Exists(txtPath) && TryReadCompanyFromTxtOnDisk(wordApp, txtPath, out company))
+                return true;
+            return false;
+        }
+
+        private static bool TryReadCompanyFromTxtOnDisk(Application wordApp, string txtPath, out string company)
+        {
+            company = "";
+            Document opened = null;
+            WdAlertLevel originalAlerts = wordApp.DisplayAlerts;
+            try
+            {
+                wordApp.DisplayAlerts = WdAlertLevel.wdAlertsNone;
+                opened = wordApp.Documents.Open(
+                    FileName: txtPath,
+                    ConfirmConversions: false,
+                    ReadOnly: true,
+                    AddToRecentFiles: false,
+                    Visible: false);
+                return TryGetCompanyFromDocument(opened, out company);
+            }
+            catch { return false; }
+            finally
+            {
+                wordApp.DisplayAlerts = originalAlerts;
+                if (opened != null)
+                {
+                    try { opened.Close(WdSaveOptions.wdDoNotSaveChanges); }
+                    catch { }
+                    Marshal.ReleaseComObject(opened);
+                }
+            }
         }
 
         private static bool TryGetCompanyFromOpenDocuments(Application wordApp, string fullPath, string fileName, out string company)

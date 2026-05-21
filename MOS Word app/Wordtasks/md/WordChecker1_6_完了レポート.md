@@ -108,6 +108,7 @@ return company == "ラビット出版";
 - 同じ作法は `Author`, `Title`, `Subject`, `Keywords`, `Manager` など `BuiltInDocumentProperties` 全般に適用される。
 - 既存のリファレンス実装：`PowerPointChecker1_10.cs` でも `.Value` 経由でアクセスしている（プロジェクト共通ルール）。
 - **混入経路**：他AIが書いた既存実装に `[...]?.ToString()` が紛れ込んでいた。レビュー時に「`BuiltInDocumentProperties[...]` の直後に `.Value` がない」パターンは要チェック。
+- **採点ロジック全体**（ログ証跡 `SetDocumentCompany`、別名保存後の docm／txt 優先読取、一括採点、P7 リセット時の派生ファイル削除）は **`WordChecker1_7_完了レポート.md` §「文書プロパティ（会社名）」** を参照。
 
 ### デバッグ手法
 - 判定が想定通りにならない場合は、**段階ごとの結果を出力**するデバッグ関数を一時的に仕込む。
