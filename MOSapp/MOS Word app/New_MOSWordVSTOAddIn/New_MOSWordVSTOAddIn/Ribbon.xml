@@ -8,6 +8,7 @@
     StyleSetGallery は Word で不明 ID のため未接続。StyleSetLineSimple は ThisAddIn の見出し1下罫線ポーリングで記録。
     ShowAll も Word の Ribbon で不明 ID のため未接続。編集記号は ThisAddIn の View.ShowAll / Options.ShowAll ポーリングで記録（1-1）。
     4-3: ReviewResolveComment は Word で無効 id となるため未接続。ReviewDeleteComment のみフック。解決操作の採点はチェッカー側で Comment.Done を参照。
+    4-7: 文書検査は FileInspectDocument / ReviewInspectDocument 等の idMso が環境により無効のため Ribbon 未接続。採点はヘッダー・フッター空の状態のみ。
   -->
   <commands>
     <command idMso="Cut" onAction="CommandOnAction" />
@@ -28,6 +29,7 @@
          この登録には依存していない。将来 Office 側で対応された場合に備えて登録は残している。 -->
     <command idMso="UpgradeDocument" onAction="CommandOnAction" />
     <command idMso="BulletDefineNew" onAction="CommandOnAction" />
+    <command idMso="ClearFormatting" onAction="CommandOnAction" />
 
   </commands>
 

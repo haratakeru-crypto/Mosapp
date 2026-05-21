@@ -485,11 +485,22 @@ namespace MOS_Word_app.Views
                     
                     resultWindow.OnNavigateToTask = (projectId, taskId) =>
                     {
-                        var appBarWindow = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
-                        if (appBarWindow != null)
+                        var uiTestAppBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
+                        if (uiTestAppBar != null)
                         {
-                            appBarWindow.Show();
-                            appBarWindow.Activate();
+                            uiTestAppBar.Show();
+                            uiTestAppBar.Activate();
+                            uiTestAppBar.SetReturnToResultMode(resultWindow);
+                        }
+                        else
+                        {
+                            var appBarWindow = System.Windows.Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault();
+                            if (appBarWindow != null)
+                            {
+                                appBarWindow.Show();
+                                appBarWindow.Activate();
+                                appBarWindow.SetReturnToResultMode(resultWindow);
+                            }
                         }
                         OnNavigateToTask(projectId, taskId);
                     };

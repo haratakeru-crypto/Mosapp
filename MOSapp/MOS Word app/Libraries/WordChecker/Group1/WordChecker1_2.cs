@@ -142,11 +142,9 @@ namespace Libraries.Group1
 
                 if (document == null) return false;
 
-                // 0. VSTOログで Cut / Paste が実行されたことを確認（ログが無い・どちらか一方だけなら不正解）
-                bool logFileExists = System.IO.File.Exists(LogReader.GetLogFilePath());
-                if (!logFileExists) return false;
-                bool cutExecuted = LogReader.HasCommandExecuted("Cut");
-                bool pasteExecuted = LogReader.HasCommandExecuted("Paste");
+                // 0. Cut / Paste が操作ログまたは証跡で記録されていること
+                bool cutExecuted = LogReader.HasTaskEvidence(2, 1, "Cut");
+                bool pasteExecuted = LogReader.HasTaskEvidence(2, 1, "Paste");
                 if (!cutExecuted || !pasteExecuted) return false;
 
                 // 1. 文書全体の「青空文庫のURLはコチラ↓」の数をカウント（1回なら切り取り成功）

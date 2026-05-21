@@ -19,6 +19,9 @@ namespace New_MOSWordVSTOAddIn
         private int _lastColumnBreakCount;
         private string _lastTask1_2_03ColorFingerprint;
 
+        /// <summary>3-1: 先頭セクションが「やや狭い」余白プリセット相当か。</summary>
+        private bool? _lastMarginsModerate;
+
         /// <summary>全セクションの向きを連結したフィンガープリント（先頭セクションのみでは 3-3 とチェッカーが不一致になるため）。</summary>
         private string _lastOrientationFingerprint;
         private string _lastPageBorderFingerprint;
@@ -181,6 +184,7 @@ namespace New_MOSWordVSTOAddIn
                 }
 
                 _lastColumnBreakCount = CountColumnBreaks(doc);
+                _lastMarginsModerate = IsMarginsModeratePreset(doc);
                 _lastOrientationFingerprint = GetAllSectionsOrientationFingerprint(doc);
                 _lastPageBorderFingerprint = GetPageBorderFingerprint(doc);
                 _lastHeading1LineSimple = IsHeading1LineSimplePattern(doc);
@@ -256,15 +260,15 @@ namespace New_MOSWordVSTOAddIn
             {
                 bool stillHasEcoBalloon = anyPhrase;
                 string commandId = stillHasEcoBalloon ? "ReviewResolveComment" : "ReviewDeleteComment";
-                Logger.LogCommand(commandId);
+                WordEvidenceHelper.LogCommandWithEvidence(commandId);
             }
             else if (phraseDisappeared)
             {
-                Logger.LogCommand("ReviewDeleteComment");
+                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
             }
             else if (commentCountDropped && doc != null && DocumentBodyContainsEcoPhraseForTask4_3(doc))
             {
-                Logger.LogCommand("ReviewDeleteComment");
+                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
             }
 
             _lastUnresolvedEcoCommentCount = newUnresolvedEcoCount;
@@ -309,9 +313,14 @@ namespace New_MOSWordVSTOAddIn
                 bool currentShowAll = viewShowAll || optionsShowAll;
                 if (_lastShowAllState.HasValue && _lastShowAllState.Value != currentShowAll)
                 {
-                    Logger.LogCommand("ShowAll");
+                    WordEvidenceHelper.LogCommandWithEvidence("ShowAll");
                 }
                 _lastShowAllState = currentShowAll;
+
+                bool marginsModerate = IsMarginsModeratePreset(doc);
+                if (_lastMarginsModerate.HasValue && marginsModerate && !_lastMarginsModerate.Value)
+                    WordEvidenceHelper.LogCommandWithEvidence("PageMarginsModerate");
+                _lastMarginsModerate = marginsModerate;
 
                 string orientFp = GetAllSectionsOrientationFingerprint(doc);
                 if (_lastOrientationFingerprint != null && orientFp != _lastOrientationFingerprint)
@@ -319,7 +328,7 @@ namespace New_MOSWordVSTOAddIn
                     if (_suppressOrientationPollLogs > 0)
                         _suppressOrientationPollLogs--;
                     else
-                        Logger.LogCommand("PageOrientationPortraitLandscape");
+                        WordEvidenceHelper.LogCommandWithEvidence("PageOrientationPortraitLandscape");
                 }
                 _lastOrientationFingerprint = orientFp;
 
@@ -339,7 +348,7 @@ namespace New_MOSWordVSTOAddIn
                     else
                     {
                         if (ext == ".doc" && _p7LastCompatMode >= 0 && _p7LastCompatMode != wdWord2013 && compat == wdWord2013)
-                            Logger.LogCommand("UpgradeDocument");
+                            WordEvidenceHelper.LogCommandWithEvidence("UpgradeDocument");
                         _p7LastCompatMode = compat;
                     }
                 }
@@ -357,7 +366,7 @@ namespace New_MOSWordVSTOAddIn
                         if (_suppressPageBorderPollLogs > 0)
                             _suppressPageBorderPollLogs--;
                         else
-                            Logger.LogCommand("PageBorders");
+                            WordEvidenceHelper.LogCommandWithEvidence("PageBorders");
                     }
                     _lastPageBorderFingerprint = borderFp;
 
@@ -367,7 +376,7 @@ namespace New_MOSWordVSTOAddIn
                         if (_suppressStyleSetPollLogs > 0)
                             _suppressStyleSetPollLogs--;
                         else
-                            Logger.LogCommand("StyleSetLineSimple");
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineSimple");
                     }
                     _lastHeading1LineSimple = lineSimple;
 
@@ -397,7 +406,7 @@ namespace New_MOSWordVSTOAddIn
                         bool hasWatermark = !string.IsNullOrEmpty(xml) && xml.Contains("下書き");
                         if (hasWatermark && (!_lastWatermarkFound.HasValue || !_lastWatermarkFound.Value))
                         {
-                            Logger.LogCommand("Watermark");
+                            WordEvidenceHelper.LogCommandWithEvidence("Watermark");
                         }
                         _lastWatermarkFound = hasWatermark;
                     }
@@ -444,8 +453,8 @@ namespace New_MOSWordVSTOAddIn
 
                             if (_lastLaptopWrapType != currentWrapType)
                             {
-                                if (currentWrapType == 0) Logger.LogCommand("WrapInline");
-                                else if (currentWrapType == 1) Logger.LogCommand("WrapSquare");
+                                if (currentWrapType == 0) WordEvidenceHelper.LogCommandWithEvidence("WrapInline");
+                                else if (currentWrapType == 1) WordEvidenceHelper.LogCommandWithEvidence("WrapSquare");
                             }
                             _lastLaptopWrapType = currentWrapType;
                             
@@ -472,7 +481,7 @@ namespace New_MOSWordVSTOAddIn
                             else
                             {
                                 if (!_p7IntegralLastDetected && nowIntegral)
-                                    Logger.LogCommand("IntegralHeader");
+                                    WordEvidenceHelper.LogCommandWithEvidence("IntegralHeader");
                                 _p7IntegralLastDetected = nowIntegral;
                             }
                         }
@@ -508,9 +517,9 @@ namespace New_MOSWordVSTOAddIn
         private static void LogFileSaveAsCommandForPath(string fullName)
         {
             if (IsRdTxtSavePath(fullName))
-                Logger.LogCommand("FileSaveAsTxt");
+                WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
             else if (IsRdDocmSavePath(fullName))
-                Logger.LogCommand("FileSaveAsDocm");
+                WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
         }
 
         /// <summary>
@@ -538,9 +547,9 @@ namespace New_MOSWordVSTOAddIn
                 }
 
                 if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasTxt && nowTxt)
-                    Logger.LogCommand("FileSaveAsTxt");
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
                 if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasDocm && nowDocm)
-                    Logger.LogCommand("FileSaveAsDocm");
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
 
                 _p7FileSaveAsTrackedFullName = fullName;
                 _p7FileSaveAsLastTxt = nowTxt;
@@ -549,9 +558,9 @@ namespace New_MOSWordVSTOAddIn
             else
             {
                 if (!_p7FileSaveAsLastTxt && nowTxt)
-                    Logger.LogCommand("FileSaveAsTxt");
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
                 if (!_p7FileSaveAsLastDocm && nowDocm)
-                    Logger.LogCommand("FileSaveAsDocm");
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
                 _p7FileSaveAsLastTxt = nowTxt;
                 _p7FileSaveAsLastDocm = nowDocm;
             }
@@ -842,6 +851,38 @@ namespace New_MOSWordVSTOAddIn
             bool isBlue = b >= r && b >= g && b > 0;
 
             return isAccent1 && isDarker25 && isBlue;
+        }
+
+        /// <summary>3-1: 先頭セクションの余白が「やや狭い」プリセット相当か（WordChecker1_3 と同じ許容誤差）。</summary>
+        private static bool IsMarginsModeratePreset(Word.Document doc)
+        {
+            Word.Section section = null;
+            Word.PageSetup ps = null;
+            try
+            {
+                section = doc.Sections[1];
+                ps = section.PageSetup;
+                float top = ps.TopMargin;
+                float bottom = ps.BottomMargin;
+                float left = ps.LeftMargin;
+                float right = ps.RightMargin;
+
+                bool IsApprox(float value, float target) => Math.Abs(value - target) <= 1.5f;
+
+                return IsApprox(top, 72.0f) &&
+                       IsApprox(bottom, 72.0f) &&
+                       IsApprox(left, 54.0f) &&
+                       IsApprox(right, 54.0f);
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (ps != null) Marshal.ReleaseComObject(ps);
+                if (section != null) Marshal.ReleaseComObject(section);
+            }
         }
 
         /// <summary>文書内の全セクションの印刷の向きを連結した文字列（いずれかのセクションの向き変更で変化する）。</summary>

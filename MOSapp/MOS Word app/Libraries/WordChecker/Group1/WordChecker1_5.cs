@@ -79,8 +79,8 @@ namespace Libraries.Group1
                 Marshal.ReleaseComObject(paraRange);
                 Marshal.ReleaseComObject(find);
                 Marshal.ReleaseComObject(searchRange);
-                // 5-1: 「現在行内」または「過去に行内にしたログがある」なら合格
-                bool logOk = LogReader.HasCommandExecuted("WrapInline");
+                // 5-1: 現在行内、または当該プロジェクトの証跡で行内操作あり
+                bool logOk = LogReader.HasTaskEvidence(5, 1, "WrapInline");
                 return result || logOk;
 
             }
@@ -112,8 +112,8 @@ namespace Libraries.Group1
                     catch { }
                 }
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
-                // 5-2: 「現在四角形」または「過去に四角形にしたログがある」なら合格
-                bool logOk = LogReader.HasCommandExecuted("WrapSquare");
+                // 5-2: 現在四角形、または当該プロジェクトの証跡で四角形操作あり
+                bool logOk = LogReader.HasTaskEvidence(5, 2, "WrapSquare");
                 return result || logOk;
 
             }

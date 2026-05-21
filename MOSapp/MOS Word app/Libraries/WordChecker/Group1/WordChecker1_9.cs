@@ -304,7 +304,7 @@ namespace Libraries.Group1
                 // 登録した正しいコマンドログが実行され、かつ未処理の変更履歴が残っていないことを厳格に判定
                 // (注: 後続タスクの「変更履歴のロック」を行うと、Wordの仕様により強制的にTrackRevisionsがtrueに戻ってしまい、
                 //  状態のみでの追跡が破綻するため、操作ログと履歴0件のANDで完全な厳格性と独立性を担保します)
-                return LogReader.HasCommandExecuted("AcceptAllChangesInDocAndStopTracking") && noRevisions;
+                return LogReader.HasTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking") && noRevisions;
             }
             catch { return false; }
             finally

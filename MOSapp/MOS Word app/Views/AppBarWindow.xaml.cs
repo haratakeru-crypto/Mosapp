@@ -78,6 +78,12 @@ namespace MOS_Word_app.Views
         // プロジェクト閲覧状況の追跡（50分制限対応）
         private DateTime _examStartTime; // 試験開始時刻
         private Dictionary<int, DateTime> _projectFirstViewTime = new Dictionary<int, DateTime>(); // プロジェクトの初回閲覧時刻
+
+        // 結果画面から戻ってきたときに「結果に戻る」ボタンとして振る舞うための状態
+        private bool _isReturnToResultMode = false;
+        private Views.ResultWindow _lastResultWindow;
+        private const string ReviewPageButtonLabel = "レビューページ";
+        private const string ReturnToResultButtonLabel = "結果に戻る";
         
         public AppBarWindow(int projectId = 1, int groupId = 1)
         {
@@ -366,9 +372,20 @@ namespace MOS_Word_app.Views
         {
             try
             {
-                // メインのバーウィンドウを非表示にする
+                // 「結果に戻る」モードの場合は、隠れている ResultWindow を再表示する
+                if (_isReturnToResultMode && _lastResultWindow != null && !_lastResultWindow.IsVisible)
+                {
+                    CloseWordDocumentsBeforeReturnToResult();
+                    this.Hide();
+                    _lastResultWindow.Show();
+                    _lastResultWindow.Activate();
+                    ClearReturnToResultMode();
+                    return;
+                }
+
+                // 通常モード: レビューページを開く
                 this.Hide();
-                
+
                 // 現在のタイマー残り時間と状態情報を渡す（AppBarWindowのインスタンスとgroupIdも渡す）
                 var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, null, this, _groupId);
                 reviewWindow.OnNavigateToTask = NavigateToTask;
@@ -388,6 +405,33 @@ namespace MOS_Word_app.Views
                 // エラーが発生した場合はメインウィンドウを再表示
                 this.Show();
             }
+        }
+
+        /// <summary>
+        /// 結果画面からタスクに戻ってきたときに、「結果に戻る」モードに切り替える。
+        /// </summary>
+        public void SetReturnToResultMode(Views.ResultWindow resultWindow)
+        {
+            _lastResultWindow = resultWindow;
+            _isReturnToResultMode = true;
+            UpdateReviewPageButtonLabel(ReturnToResultButtonLabel);
+        }
+
+        /// <summary>
+        /// 結果画面を閉じたときなどに、戻りモードを解除する。
+        /// </summary>
+        public void ClearReturnToResultMode()
+        {
+            _isReturnToResultMode = false;
+            _lastResultWindow = null;
+            UpdateReviewPageButtonLabel(ReviewPageButtonLabel);
+        }
+
+        private void UpdateReviewPageButtonLabel(string label)
+        {
+            var btn = this.FindName("ReviewPageButton") as System.Windows.Controls.Button;
+            if (btn != null)
+                btn.Content = label;
         }
         
         private void NavigateToTask(int projectId, int taskId)
@@ -1409,7 +1453,17 @@ namespace MOS_Word_app.Views
         {
             // 次のプロジェクトに移る前に現在のプロジェクト（Wordドキュメント）を保存する
             SaveAllWordDocuments();
-            
+            // 前プロジェクトの文書を閉じ、ActiveDocument の取り違えを防ぐ（プロセス kill は行わない）
+            if (!CloseAllWordDocuments())
+            {
+                TryQuitWord();
+                Thread.Sleep(500);
+            }
+            else
+            {
+                Thread.Sleep(200);
+            }
+
             // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
             
@@ -1742,7 +1796,6 @@ namespace MOS_Word_app.Views
                     if (!CloseAllWordDocuments())
                         TryQuitWord();
                     Thread.Sleep(500); // Word がファイルハンドルを解放するまで待つ
-                    LogReader.ClearLog();
                     ResetProject(_groupId, _currentProjectId);
                     
                     // リセット後、Wordドキュメントを再読み込み
@@ -1845,6 +1898,23 @@ namespace MOS_Word_app.Views
             }
         }
         
+        /// <summary>
+        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じる。
+        /// </summary>
+        private void CloseWordDocumentsBeforeReturnToResult()
+        {
+            SaveAllWordDocuments();
+            if (!CloseAllWordDocuments())
+            {
+                TryQuitWord();
+                Thread.Sleep(500);
+            }
+            else
+            {
+                Thread.Sleep(200);
+            }
+        }
+
         /// <summary>
         /// 開いているすべてのWord文書を閉じる（保存しない）。
         /// リセット実行前に呼び、上書き後に開き直すため。

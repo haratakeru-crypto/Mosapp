@@ -36,14 +36,13 @@ namespace MOS_Word_app.Views
             _groupId = groupId;
             _csvExported = false;
             this.Loaded += ResultWindow_Loaded;
-            // 結果画面を閉じたときは、アプリバー側の「結果画面に戻る」モードも解除する
+            // 結果画面を閉じたときは、アプリバー側の「結果に戻る」モードも解除する
             this.Closed += (s, args) =>
             {
-                var appBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
-                if (appBar != null)
-                {
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
                     appBar.ClearReturnToResultMode();
-                }
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
+                    appBar.ClearReturnToResultMode();
             };
         }
 
@@ -341,13 +340,22 @@ namespace MOS_Word_app.Views
             if (taskInfo == null || OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0) return;
             try
             {
-                var appBarWindow = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
-                if (appBarWindow != null)
+                var uiTestAppBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
+                if (uiTestAppBar != null)
                 {
-                    appBarWindow.Show();
-                    appBarWindow.Activate();
-                    // 結果画面からタスクに戻るので、「結果画面に戻る」モードに切り替える
-                    appBarWindow.SetReturnToResultMode(this);
+                    uiTestAppBar.Show();
+                    uiTestAppBar.Activate();
+                    uiTestAppBar.SetReturnToResultMode(this);
+                }
+                else
+                {
+                    var appBarWindow = System.Windows.Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault();
+                    if (appBarWindow != null)
+                    {
+                        appBarWindow.Show();
+                        appBarWindow.Activate();
+                        appBarWindow.SetReturnToResultMode(this);
+                    }
                 }
                 await System.Threading.Tasks.Task.Delay(50);
                 OnNavigateToTask(taskInfo.ProjectId, taskInfo.TaskId);

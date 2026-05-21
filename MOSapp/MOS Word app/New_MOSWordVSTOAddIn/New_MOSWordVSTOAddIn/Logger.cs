@@ -5,9 +5,8 @@ using System.Text;
 namespace New_MOSWordVSTOAddIn
 {
     /// <summary>
-    /// Word操作ログを記録するクラス。
-    /// リボンコマンド（編集記号の表示 ShowAll など）の実行のみをログに残す。
-    /// 文字の入力・削除等のログは行わない。
+    /// Word 操作ログ。採点用は <see cref="LogTaskEvidence"/> の Project/Task 付き行のみ。
+    /// <see cref="LogCommand"/> はデバッグ用（旧2括弧形式）。採点ロジックでは無視される。
     /// </summary>
     public static class Logger
     {
@@ -15,27 +14,22 @@ namespace New_MOSWordVSTOAddIn
         private static readonly string _logFileName = "mos_word_log.txt";
         private static string _logFilePath;
 
-        /// <summary>
-        /// ログファイルのパスを取得
-        /// </summary>
         private static string LogFilePath
         {
             get
             {
                 if (string.IsNullOrEmpty(_logFilePath))
-                {
                     _logFilePath = Path.Combine(Path.GetTempPath(), _logFileName);
-                }
                 return _logFilePath;
             }
         }
 
-        /// <summary>
-        /// コマンド実行をログに記録
-        /// </summary>
-        /// <param name="commandId">コマンドID</param>
+        /// <summary>デバッグ用。形式: [timestamp] [commandId] Executed（採点では使用しない）</summary>
         public static void LogCommand(string commandId)
         {
+            if (string.IsNullOrWhiteSpace(commandId))
+                return;
+
             try
             {
                 lock (_lockObject)
@@ -43,9 +37,6 @@ namespace New_MOSWordVSTOAddIn
                     string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     string logEntry = $"[{timestamp}] [{commandId}] Executed";
 
-                    // ログファイルに追記
-                    // 外部プロセス（MOS Word アプリ側）がログファイルを削除できるように
-                    // FileShare.ReadWrite | FileShare.Delete で開く
                     using (var fileStream = new FileStream(
                         LogFilePath,
                         FileMode.Append,
@@ -59,15 +50,10 @@ namespace New_MOSWordVSTOAddIn
             }
             catch (Exception ex)
             {
-                // ログ書き込み失敗時もWordの動作に影響を与えない
-                // デバッグビルド時のみデバッグ出力
                 System.Diagnostics.Debug.WriteLine($"[Logger] Error writing log: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// ログファイルをクリア
-        /// </summary>
         public static void ClearLog()
         {
             try
@@ -75,9 +61,7 @@ namespace New_MOSWordVSTOAddIn
                 lock (_lockObject)
                 {
                     if (File.Exists(LogFilePath))
-                    {
                         File.Delete(LogFilePath);
-                    }
                 }
             }
             catch (Exception ex)
@@ -86,16 +70,43 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
-        /// <summary>
-        /// ログファイルのパスを取得（外部からの読み込み用）
-        /// </summary>
         public static string GetLogFilePath()
         {
             return LogFilePath;
         }
+
+        /// <summary>
+        /// 採点用ログ行を <c>mos_word_log.txt</c> に追記する。
+        /// 形式: [timestamp] [ProjectN] [TaskN-M] [commandId] Executed（Task の N は Project と一致すること）
+        /// </summary>
+        public static void LogTaskEvidence(int projectId, int taskId, string commandId)
+        {
+            if (string.IsNullOrWhiteSpace(commandId))
+                return;
+
+            try
+            {
+                lock (_lockObject)
+                {
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string logEntry =
+                        $"[{timestamp}] [Project{projectId}] [Task{projectId}-{taskId}] [{commandId}] Executed";
+
+                    using (var fileStream = new FileStream(
+                        LogFilePath,
+                        FileMode.Append,
+                        FileAccess.Write,
+                        FileShare.ReadWrite | FileShare.Delete))
+                    using (var writer = new StreamWriter(fileStream, Encoding.UTF8))
+                    {
+                        writer.WriteLine(logEntry);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] Error writing scoring log: {ex.Message}");
+            }
+        }
     }
 }
-
-
-
-

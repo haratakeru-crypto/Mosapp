@@ -47,35 +47,36 @@ namespace New_MOSWordVSTOAddIn
             try
             {
                 string commandId = control.Id;
+                string loggedCommandId = commandId;
                 // 6-1: チェッカーが期待する ID に統一（ConvertTextToTable → TableConvertTextToTable）
                 if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.LogCommand("TableConvertTextToTable");
+                    loggedCommandId = "TableConvertTextToTable";
                 }
                 // 3-2: SectionBreakInsert を InsertSectionBreakNextPage としてログ（チェッカーが参照する ID）
                 else if (string.Equals(commandId, "SectionBreakInsert", StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.LogCommand("InsertSectionBreakNextPage");
+                    loggedCommandId = "InsertSectionBreakNextPage";
                 }
                 // 3-4: ColumnsLeft/Right は Word の idMso が無いため ColumnsDialog をフックし、チェッカー互換 ID で記録
                 else if (string.Equals(commandId, "ColumnsDialog", StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.LogCommand("ColumnsLeft");
+                    loggedCommandId = "ColumnsLeft";
                 }
                 else if (string.Equals(commandId, "PageBorders", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(commandId, "PageBorderOptionsDialog", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(commandId, "PageBorderAndShadingDialog", StringComparison.OrdinalIgnoreCase))
                 {
                     // 4-6: ページ罫線系。Word の Ribbon.xml では PageBorderAndShadingDialog のみ有効（PageBorders は不明 ID）
-                    Logger.LogCommand("PageBorders");
+                    loggedCommandId = "PageBorders";
                     Globals.ThisAddIn?.RegisterRibbonLoggedPageBorders();
                 }
-                else
+                else if (string.Equals(commandId, "PageOrientationPortraitLandscape", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(commandId, "PageOrientationPortraitLandscape", StringComparison.OrdinalIgnoreCase))
-                        Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
-                    Logger.LogCommand(commandId);
+                    Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
                 }
+
+                WordEvidenceHelper.LogCommandWithEvidence(loggedCommandId);
 
                 // 既定の動作（Cut / Paste / SaveAs など）をキャンセルせずに実行させる
                 cancelDefault = false;

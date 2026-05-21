@@ -14,8 +14,8 @@ namespace MOS_Word_app
 
         public static void ResetProject(int groupId, int projectId)
         {
-            // リセット時にVSTOログも初期化（採点で参照するログを空にする）
-            LogReader.ClearLog();
+            // 個別リセット時は対象プロジェクトの採点ログ行のみ削除（他プロジェクトのログを保持）
+            LogReader.ClearTaskEvidenceForProject(projectId);
 
             // 保存先（作業フォルダ）: Tab{groupId}\ 直下のみ。参照元: Tab{groupId}\Initial（Templates は使わない）
             string workingFolder = Path.Combine(BasePath, $"Tab{groupId}");

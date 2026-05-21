@@ -80,11 +80,8 @@ namespace Libraries.Group1
                 document = GetDocument(wordApp, filePath);
                 if (document == null) return false;
 
-                // 1-1: ログを優先。ログがなければ不正解。2回以上クリックかつ最終的に編集記号が表示で正解
-                bool logFileExists = System.IO.File.Exists(LogReader.GetLogFilePath());
-                if (!logFileExists) return false;
-
-                bool showAllExecutedTwice = LogReader.HasCommandExecutedAtLeast("ShowAll", 2);
+                // 1-1: 証跡で ShowAll 2回以上、かつ編集記号表示で正解（個別リセット後の旧全体ログ誤判定を防ぐ）
+                bool showAllExecutedTwice = LogReader.HasTaskEvidenceAtLeast(1, 1, "ShowAll", 2);
                 if (!showAllExecutedTwice) return false;
 
                 bool showAll = wordApp.ActiveWindow.View.ShowAll;
@@ -383,8 +380,8 @@ namespace Libraries.Group1
                 try { styleName = GetParagraphStyleSafe(target); } catch { }
                 bool isNormal = IsNormalStyleName(styleName);
 
-                // ログ優先: ClearFormatting / ClearCharacterAllFormatting が実行されていれば、書式がおおむねクリアされていれば正解
-                bool logOk = LogReader.HasCommandExecuted("ClearFormatting") || LogReader.HasCommandExecuted("ClearCharacterAllFormatting");
+                // ログ優先: リボンの「書式のクリア」(ClearFormatting) が採点ログにあれば、書式がおおむねクリアされていれば正解
+                bool logOk = LogReader.HasTaskEvidence(1, 5, "ClearFormatting");
                 bool strictlyCleared = isNormal && !isBold && !isItalic && !isUnderline && isColorAutomatic;
                 bool roughlyCleared = !isBold && !isItalic && !isUnderline && isColorAutomatic;
                 bool passedLogRough = logOk && roughlyCleared;

@@ -66,7 +66,7 @@ namespace Libraries.Group1
                 bool contentOk = combinedContentXml.Contains("実施月") && combinedContentXml.Contains("富士の水だより");
 
                 // 5. ログチェック
-                bool logOk = LogReader.HasCommandExecuted("TableConvertTextToTable");
+                bool logOk = LogReader.HasTaskEvidence(6, 1, "TableConvertTextToTable");
 
                 return logOk && rowCountOk && colCount == 2 && contentOk && isAutoFit;
 
@@ -290,7 +290,7 @@ namespace Libraries.Group1
                 // 5. 操作ログチェック: 「幅を揃える」ボタン（TableColumnsDistribute）が実行されたか
                 //    Ribbon.xml で idMso="TableColumnsDistribute" をフックすることで記録される
                 //    手動で列幅を同じ値に設定した場合はログが残らないので × となる
-                if (!LogReader.HasCommandExecuted("TableColumnsDistribute")) return false;
+                if (!LogReader.HasTaskEvidence(6, 4, "TableColumnsDistribute")) return false;
 
                 return true;
             }

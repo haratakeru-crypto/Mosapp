@@ -40,7 +40,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="🕐" FontSize="20" Foreground="White" Margin="0,0,10,0" VerticalAlignment="Center"/>
                         <TextBlock Name="TimerTextBlock" Text="50:00:00" FontFamily="Consolas" FontSize="20" Foreground="White" FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"/>
-                        <Button Content="レビューページ" 
+                        <Button Name="ReviewPageButton" Content="レビューページ" 
                                 Background="White" 
                                 Foreground="#1E40AF" 
                                 Padding="24,10" 

@@ -147,7 +147,7 @@ namespace Libraries.Group1
                 if (isState03) requiredCount++;
 
                 // 教材としての品質担保（手抜き防止）：状態が正しい場合、その回数分「新しい行頭文字の定義」のログが必要
-                if (requiredCount > 0 && !LogReader.HasCommandExecutedAtLeast("BulletDefineNew", requiredCount))
+                if (requiredCount > 0 && !LogReader.HasTaskEvidenceForProjectAtLeast(10, "BulletDefineNew", requiredCount))
                 {
                     return false;
                 }
@@ -191,7 +191,7 @@ namespace Libraries.Group1
                 if (isState03) requiredCount++;
 
                 // 教材としての品質担保（手抜き防止）：状態が正しい場合、その回数分「新しい行頭文字の定義」のログが必要
-                if (requiredCount > 0 && !LogReader.HasCommandExecutedAtLeast("BulletDefineNew", requiredCount))
+                if (requiredCount > 0 && !LogReader.HasTaskEvidenceForProjectAtLeast(10, "BulletDefineNew", requiredCount))
                 {
                     return false;
                 }

@@ -46,7 +46,7 @@ namespace Libraries.Group1
                 // 2. 後続タスク（別名保存で .txt 等）のあと ext が変わり stateOk が false になり得る。
                 //    5-1 と同様「現在が合格」または「過去に互換解除したログがある」なら合格。
                 //    UpgradeDocument は Ribbon の idMso では発火しないが、ThisAddIn ポーリングで .doc 上の非15→15 遷移時に記録する。
-                bool logOk = LogReader.HasCommandExecuted("UpgradeDocument");
+                bool logOk = LogReader.HasTaskEvidence(7, 1, "UpgradeDocument");
                 return stateOk || logOk;
             }
             catch { return false; }
@@ -112,7 +112,7 @@ namespace Libraries.Group1
                 // 7-1（互換15）かつ拡張子が .doc のとき（変換後～別名保存前）、tblGrid twip 等が変わり得るため補助指紋を OR する。
                 // 7-4 後などヘッダーが読めない／状態が変わったあとも、VSTO ポーリングで記録した IntegralHeader ログがあれば ○（7-1 と同型）。
                 return TryIntegralFromLiveHeaderWordOpenXml(document)
-                    || LogReader.HasCommandExecuted("IntegralHeader");
+                    || LogReader.HasTaskEvidence(7, 3, "IntegralHeader");
             }
             catch { return false; }
             finally
@@ -134,7 +134,7 @@ namespace Libraries.Group1
                 if (!File.Exists(targetTxt)) return false;
 
                 // 保存時の操作ログが存在するか
-                if (!LogReader.HasCommandExecuted("FileSaveAsTxt")) return false;
+                if (!LogReader.HasTaskEvidence(7, 4, "FileSaveAsTxt")) return false;
 
                 return true;
             }
@@ -168,7 +168,7 @@ namespace Libraries.Group1
                 string targetDocm = Path.Combine(dir, "朗読会.docm");
                 if (!File.Exists(targetDocm)) return false;
                 if (!AppearsEncryptedByReadPassword(targetDocm)) return false;
-                if (!LogReader.HasCommandExecuted("FileSaveAsDocm")) return false;
+                if (!LogReader.HasTaskEvidence(7, 5, "FileSaveAsDocm")) return false;
 
                 // パスワードが「abc」に正しく設定されているかを一時コピーファイルで安全にサイレント検証
                 WdAlertLevel originalAlertLevel = wordApp.DisplayAlerts;

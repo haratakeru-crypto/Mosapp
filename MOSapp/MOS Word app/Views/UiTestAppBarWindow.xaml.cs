@@ -75,8 +75,10 @@ namespace MOS_Word_app.Views
         private bool _isPaused = false; // 一時停止状態
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
-        // 結果画面から戻ってきたときに「結果画面に戻る」ボタンとして振る舞うための状態
+        // 結果画面から戻ってきたときに「結果に戻る」ボタンとして振る舞うための状態
         private Views.ResultWindow _lastResultWindow;
+        private const string ReviewPageButtonLabel = "レビューページ";
+        private const string ReturnToResultButtonLabel = "結果に戻る";
         private bool _isReturnToResultMode = false;
 
         public int CurrentProjectId => _currentProjectId;
@@ -475,19 +477,14 @@ namespace MOS_Word_app.Views
         {
             try
             {
-                var btn = sender as System.Windows.Controls.Button;
-
-                // 「結果画面に戻る」モードの場合は、隠れている ResultWindow を再表示する
+                // 「結果に戻る」モードの場合は、隠れている ResultWindow を再表示する
                 if (_isReturnToResultMode && _lastResultWindow != null && !_lastResultWindow.IsVisible)
                 {
+                    CloseWordDocumentsBeforeReturnToResult();
                     this.Hide();
                     _lastResultWindow.Show();
                     _lastResultWindow.Activate();
-
-                    // モードを解除してボタン表示を元に戻す
-                    _isReturnToResultMode = false;
-                    _lastResultWindow = null;
-                    if (btn != null) btn.Content = "レビューページ";
+                    ClearReturnToResultMode();
                     return;
                 }
 
@@ -516,18 +513,13 @@ namespace MOS_Word_app.Views
         }
 
         /// <summary>
-        /// 結果画面からタスクに戻ってきたときに、「結果画面に戻る」モードに切り替える。
+        /// 結果画面からタスクに戻ってきたときに、「結果に戻る」モードに切り替える。
         /// </summary>
         public void SetReturnToResultMode(Views.ResultWindow resultWindow)
         {
             _lastResultWindow = resultWindow;
             _isReturnToResultMode = true;
-
-            var btn = this.FindName("ReviewPageButton") as System.Windows.Controls.Button;
-            if (btn != null)
-            {
-                btn.Content = "結果画面に戻る";
-            }
+            UpdateReviewPageButtonLabel(ReturnToResultButtonLabel);
         }
 
         /// <summary>
@@ -537,12 +529,14 @@ namespace MOS_Word_app.Views
         {
             _isReturnToResultMode = false;
             _lastResultWindow = null;
+            UpdateReviewPageButtonLabel(ReviewPageButtonLabel);
+        }
 
+        private void UpdateReviewPageButtonLabel(string label)
+        {
             var btn = this.FindName("ReviewPageButton") as System.Windows.Controls.Button;
             if (btn != null)
-            {
-                btn.Content = "レビューページ";
-            }
+                btn.Content = label;
         }
         
         private void NavigateToTask(int projectId, int taskId)
@@ -1633,7 +1627,17 @@ namespace MOS_Word_app.Views
         {
             // 次のプロジェクトに移る前に現在のプロジェクト（Wordドキュメント）を保存する
             SaveAllWordDocuments();
-            
+            // 前プロジェクトの文書を閉じ、ActiveDocument の取り違えを防ぐ（プロセス kill は行わない）
+            if (!CloseAllWordDocuments())
+            {
+                TryQuitWord();
+                Thread.Sleep(500);
+            }
+            else
+            {
+                Thread.Sleep(200);
+            }
+
             // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
             
@@ -2063,6 +2067,23 @@ namespace MOS_Word_app.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[SaveAllWordDocumentsAndQuitWord] Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じる。
+        /// </summary>
+        private void CloseWordDocumentsBeforeReturnToResult()
+        {
+            SaveAllWordDocuments();
+            if (!CloseAllWordDocuments())
+            {
+                TryQuitWord();
+                Thread.Sleep(500);
+            }
+            else
+            {
+                Thread.Sleep(200);
             }
         }
 

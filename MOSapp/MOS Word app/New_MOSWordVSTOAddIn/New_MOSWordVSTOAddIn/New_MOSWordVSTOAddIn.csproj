@@ -235,6 +235,7 @@
     <Compile Include="Logger.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="WordEvidenceHelper.cs" />
     <Compile Include="Ribbon.cs">
       <SubType>Code</SubType>
     </Compile>

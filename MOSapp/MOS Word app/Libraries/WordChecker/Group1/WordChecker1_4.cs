@@ -172,10 +172,7 @@ namespace Libraries.Group1
                 }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] ロジック実行開始");
-                // VSTOログから手順をチェック
-                string logFilePath = LogReader.GetLogFilePath();
-                bool logFileExists = System.IO.File.Exists(logFilePath);
-                bool replyExecuted = LogReader.HasCommandExecuted("ReviewCommentReply");
+                // コメント返信は Word の有効な idMso が環境により異なり Ribbon フック不可のため、ログは使わず WordOpenXML のみで判定する。
 
                 // 【最重要】COMの Comments コレクションはモダンコメント環境で不安定なため使用しない。
                 // 文書全体の WordOpenXML を取得し、XML内のテキストノードから判定する。
@@ -273,8 +270,9 @@ namespace Libraries.Group1
                 // 吹き出しに「エコと節約」が一度も無い: 未着手 / 削除 / 解決（Word によって吹き出しが消える）の区別。削除は ReviewDeleteComment、解決は VSTO ポーリングの ReviewResolveComment ログで補足。
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_03] コメント状態チェック中...");
                 bool anyEcoBalloon = DocumentHasAnyEcoCommentBalloon(document);
-                bool logDelete = LogReader.HasCommandExecuted("ReviewDeleteComment");
-                bool logResolve = LogReader.HasCommandExecuted("ReviewResolveComment");
+                // 初期状態と完了後が見分けづらいため、個別リセット後の旧ログ誤判定を避け証跡のみ参照
+                bool logDelete = LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment");
+                bool logResolve = LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment");
                 bool resolvedStateOk = IsEcoCommentAbsentOrResolved(document);
 
                 bool result;
@@ -369,7 +367,7 @@ namespace Libraries.Group1
                     bool hasLine = bottomBorder != null &&
                                    lineStyle == (int)WdLineStyle.wdLineStyleSingle &&
                                    lineWidth == (int)WdLineWidth.wdLineWidth050pt;
-                    bool logOk = LogReader.HasCommandExecuted("StyleSetLineSimple");
+                    bool logOk = LogReader.HasTaskEvidence(4, 4, "StyleSetLineSimple");
 
                     bool result = hasLine && logOk;
                     System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_04] 終了。結果={result} (hasLine={hasLine}, logOk={logOk}, style={lineStyle}, width={lineWidth})");
@@ -451,10 +449,8 @@ namespace Libraries.Group1
                 }
                 catch { }
 
-                bool logWatermark = LogReader.HasCommandExecuted("Watermark") ||
-                                    LogReader.HasCommandExecuted("WatermarkMenu") || 
-                                    LogReader.HasCommandExecuted("GalleryWatermark") ||
-                                    LogReader.HasCommandExecuted("WatermarkCustomDialog");
+                bool logWatermark = LogReader.HasAnyTaskEvidence(4, 5,
+                    "Watermark", "WatermarkMenu", "GalleryWatermark", "WatermarkCustomDialog");
 
                 return found || logWatermark;
 
@@ -498,7 +494,7 @@ namespace Libraries.Group1
                 }
                 if (document == null) return false;
 
-                bool logOk = LogReader.HasCommandExecuted("PageBorders");
+                bool logOk = LogReader.HasTaskEvidence(4, 6, "PageBorders");
                 bool hasTop = false, hasBottom = false, hasLeft = false, hasRight = false;
                 int topColor = -999, bottomColor = -999, leftColor = -999, rightColor = -999, bordersShadow = -999;
 
@@ -573,20 +569,8 @@ namespace Libraries.Group1
                 string cleanF = footerText.Replace("\r", "").Replace("\f", "").Trim();
                 bool stateOk = string.IsNullOrEmpty(cleanH) && string.IsNullOrEmpty(cleanF);
 
-                // ドキュメント検査のコマンド候補を拡充（Ribbon.xml に追加した FileDocumentInspect を優先）
-                bool logOk = LogReader.HasCommandExecuted("FileDocumentInspect") || 
-                             LogReader.HasCommandExecuted("DocumentInspect") ||
-                             LogReader.HasCommandExecuted("DocumentInspector") ||
-                             LogReader.HasCommandExecuted("FileInspectDocument") ||
-                             LogReader.HasCommandExecuted("ReviewInspectDocument");
-
-                // ドキュメントの状態（空であること）が正しければ合格
+                // 文書検査はバージョンにより idMso が無効・非公開のため Ribbon フック不可。ヘッダー/フッターが空であることのみで判定する。
                 return stateOk;
-
-
-
-
-
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_07] 例外: {ex.Message}"); return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); if (docs != null) Marshal.ReleaseComObject(docs); if (wordApp != null) Marshal.ReleaseComObject(wordApp); }

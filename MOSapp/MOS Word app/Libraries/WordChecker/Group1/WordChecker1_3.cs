@@ -53,8 +53,8 @@ namespace Libraries.Group1
                 if (fileStateOk)
                     return true;
 
-                // 余白プリセットボタンを使っていれば、多少の差があっても正解とみなす
-                bool logOk = LogReader.HasCommandExecuted("PageMarginsModerate");
+                // 余白プリセットを使った操作は証跡で記録（個別リセット後の旧全体ログ誤判定を防ぐ）
+                bool logOk = LogReader.HasTaskEvidence(3, 1, "PageMarginsModerate");
                 return logOk;
             }
             catch { return false; }
@@ -243,7 +243,7 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(section);
                 }
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
-                bool logOk = LogReader.HasCommandExecuted("PageOrientationPortraitLandscape");
+                bool logOk = LogReader.HasTaskEvidence(3, 3, "PageOrientationPortraitLandscape");
                 return logOk && landscape;
             }
             catch { return false; }
