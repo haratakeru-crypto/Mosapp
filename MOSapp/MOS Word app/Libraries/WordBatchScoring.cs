@@ -108,6 +108,98 @@ namespace Libraries
             System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Done scoring group {groupId}");
         }
 
+        /// <summary>
+        /// 1 問だけ再採点する。成功時は結果を返し、失敗時は null。
+        /// </summary>
+        public static bool? ScoreSingleTask(int groupId, int projectId, int taskId)
+        {
+            WordApp wordApp = null;
+            try
+            {
+                try
+                {
+                    wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                }
+                catch
+                {
+                    wordApp = new WordApp();
+                    Thread.Sleep(500);
+                    try { wordApp.Visible = true; } catch { }
+                }
+
+                if (wordApp == null)
+                    return null;
+
+                try { wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone; } catch { }
+
+                SaveAllOpenDocuments(wordApp);
+
+                // 復習中の編集を捨てない: 既に開いている場合は保存してそのまま採点する
+                if (!TryActivateOpenProjectDocument(wordApp, projectId, groupId)
+                    && !OpenProjectDocument(wordApp, projectId, groupId))
+                {
+                    System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] ScoreSingleTask: could not open project {projectId}");
+                    return null;
+                }
+
+                Thread.Sleep(300);
+                bool? result = InvokeCheckTask(groupId, projectId, taskId);
+                if (result.HasValue)
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, result.Value);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] ScoreSingleTask error: {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                if (wordApp != null)
+                {
+                    try { Marshal.ReleaseComObject(wordApp); } catch { }
+                }
+            }
+        }
+
+        private static bool? InvokeCheckTask(int groupId, int projectId, int taskNum)
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string dllPath = Path.Combine(baseDir, "Dlls", $"WordChecker{groupId}_{projectId}.dll");
+            if (!File.Exists(dllPath))
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] DLL not found: {dllPath}");
+                return null;
+            }
+
+            try
+            {
+                Assembly assembly = Assembly.LoadFrom(dllPath);
+                string className = $"Libraries.Group{groupId}.WordChecker{groupId}_{projectId}";
+                Type checkerType = assembly.GetType(className);
+                if (checkerType == null)
+                    return null;
+
+                object checkerInstance = Activator.CreateInstance(checkerType);
+                string methodName = $"CheckTask_{groupId}_{projectId}_{taskNum:D2}";
+                MethodInfo method = checkerType.GetMethod(methodName);
+                if (method == null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: method not found ({methodName})");
+                    return null;
+                }
+
+                bool taskResult = (bool)method.Invoke(checkerInstance, null);
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] ScoreSingleTask P{projectId} T{taskNum}: {(taskResult ? "pass" : "fail")}");
+                return taskResult;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] InvokeCheckTask P{projectId} T{taskNum} error: {ex.Message}");
+                return null;
+            }
+        }
+
         private static BatchProjectData LoadProjectData()
         {
             try
@@ -190,6 +282,96 @@ namespace Libraries
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// 開いている全 Word 文書を保存する（再採点前にユーザーの編集を残す）。
+        /// </summary>
+        private static void SaveAllOpenDocuments(WordApp wordApp)
+        {
+            if (wordApp == null) return;
+            try
+            {
+                for (int i = wordApp.Documents.Count; i >= 1; i--)
+                {
+                    WordDoc doc = null;
+                    try
+                    {
+                        doc = wordApp.Documents[i];
+                        if (!doc.Saved)
+                            doc.Save();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] SaveAllOpenDocuments: {ex.Message}");
+                    }
+                    finally
+                    {
+                        if (doc != null)
+                        {
+                            try { Marshal.ReleaseComObject(doc); } catch { }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] SaveAllOpenDocuments error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 対象プロジェクトのファイルが既に開いていれば保存して前面化する（閉じ直ししない）。
+        /// </summary>
+        private static bool TryActivateOpenProjectDocument(WordApp wordApp, int projectId, int groupId)
+        {
+            if (wordApp == null)
+                return false;
+
+            string filePath = ResolveProjectFilePath(projectId, groupId);
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return false;
+
+            try
+            {
+                string pathLower = Path.GetFullPath(filePath).ToLowerInvariant();
+                for (int i = wordApp.Documents.Count; i >= 1; i--)
+                {
+                    WordDoc doc = null;
+                    try
+                    {
+                        doc = wordApp.Documents[i];
+                        string fullName = doc.FullName?.ToLowerInvariant() ?? "";
+                        string docFullPath = fullName;
+                        try { docFullPath = Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
+                        if (fullName != pathLower && docFullPath != pathLower)
+                            continue;
+
+                        if (!doc.Saved)
+                            doc.Save();
+                        doc.Activate();
+                        System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Reusing open document for P{projectId} (rescore)");
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] TryActivateOpenProjectDocument: {ex.Message}");
+                    }
+                    finally
+                    {
+                        if (doc != null)
+                        {
+                            try { Marshal.ReleaseComObject(doc); } catch { }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] TryActivateOpenProjectDocument error: {ex.Message}");
+            }
+
+            return false;
         }
 
         private static bool OpenProjectDocument(WordApp wordApp, int projectId, int groupId)

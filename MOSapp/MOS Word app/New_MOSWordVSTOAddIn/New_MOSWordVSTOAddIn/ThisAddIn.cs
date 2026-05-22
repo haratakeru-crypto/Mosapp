@@ -1096,8 +1096,7 @@ namespace New_MOSWordVSTOAddIn
             try
             {
                 string ext = Path.GetExtension(document.FullName).ToLowerInvariant();
-                usePostCompatFingerprint = ext == ".doc"
-                    && (int)document.CompatibilityMode == (int)Word.WdCompatibilityMode.wdWord2013;
+                usePostCompatFingerprint = ext == ".doc";
             }
             catch { /* ignore */ }
 
@@ -1151,9 +1150,18 @@ namespace New_MOSWordVSTOAddIn
             return false;
         }
 
+        private static bool HasIntegralAccent2ColorMarkerForPolling(string xml)
+        {
+            if (string.IsNullOrEmpty(xml)) return false;
+            return xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("fill=\"ED7D31\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("w:themeFill=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0
+                || xml.IndexOf("w:themeColor=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private static bool HasIntegralStructureFingerprintForPolling(string xml)
         {
-            if (xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) < 0) return false;
+            if (!HasIntegralAccent2ColorMarkerForPolling(xml)) return false;
             if (xml.IndexOf("w:w=\"1782\"", StringComparison.Ordinal) < 0) return false;
             if (xml.IndexOf("w:w=\"7286\"", StringComparison.Ordinal) < 0) return false;
             return true;
@@ -1162,11 +1170,7 @@ namespace New_MOSWordVSTOAddIn
         private static bool HasIntegralStructureFingerprintAfterCompatForPolling(string xml)
         {
             if (xml.IndexOf("<w:tbl", StringComparison.OrdinalIgnoreCase) < 0) return false;
-            bool accent2Marker =
-                xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) >= 0
-                || xml.IndexOf("w:themeFill=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0
-                || xml.IndexOf("w:themeColor=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0;
-            if (!accent2Marker) return false;
+            if (!HasIntegralAccent2ColorMarkerForPolling(xml)) return false;
             int gridColCount = 0;
             for (int i = 0; ;)
             {

@@ -71,7 +71,10 @@ namespace MOS_Word_app
             }
 
             if (_appBarWindow != null)
+            {
                 _appBarWindow.Show();
+                _appBarWindow.ApplyExamWindowLayout();
+            }
         }
 
         private void OnAppBarWindowClosed(object sender, EventArgs e)

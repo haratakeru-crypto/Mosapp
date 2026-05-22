@@ -52,6 +52,14 @@ namespace MOS_Word_app.Views
             await LoadResultsAsync();
         }
 
+        /// <summary>
+        /// 復習後の再採点結果を反映して結果画面を再描画する。
+        /// </summary>
+        public async Task RefreshResultsAsync()
+        {
+            await LoadResultsAsync();
+        }
+
         private async System.Threading.Tasks.Task LoadResultsAsync()
         {
             try
@@ -88,33 +96,7 @@ namespace MOS_Word_app.Views
                 }
 
                 System.Diagnostics.Debug.WriteLine($"[ResultWindow] 問題文JSONを読み込みました: {jsonPath}");
-                int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
-                GetFirstUnviewedWithoutScoringTask(projectData, out int summaryFirstProjectId, out int summaryFirstTaskId);
-                int totalWrongTasks = 0;
-                foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
-                {
-                    if (project.Tasks == null) continue;
-                    bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) ? _projectTaskFlaggedStates[project.ProjectId] : new bool[0];
-                    bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) ? _projectTaskViewedStates[project.ProjectId] : new bool[0];
-                    foreach (var task in project.Tasks)
-                    {
-                        int arrayIndex = task.TaskId - 1;
-                        bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
-                        bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
-                        ComputeResultMark(project.ProjectId, task.TaskId, isFlagged, isUnread, summaryFirstProjectId, summaryFirstTaskId, out bool countsAsWrong);
-                        if (countsAsWrong) totalWrongTasks++;
-                    }
-                }
-
-                int correctCount = totalTasks - totalWrongTasks;
-                int accuracyPercent = totalTasks > 0 ? (int)Math.Round((double)correctCount / totalTasks * 100.0) : 0;
-
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    WrongCountTextBlock.Text = totalWrongTasks.ToString();
-                    if (SummaryTextBlock != null)
-                        SummaryTextBlock.Text = $"「あとで見直す」と未閲覧（時間切れ）の合計: {totalWrongTasks}問 / 正答率: {accuracyPercent}%";
-                });
+                await UpdateSummaryAsync(projectData);
 
                 var resultProjects = await System.Threading.Tasks.Task.Run(() => ProcessProjectDataRaw(projectData));
 
@@ -138,7 +120,8 @@ namespace MOS_Word_app.Views
                 {
                     try
                     {
-                        await System.Threading.Tasks.Task.Run(() => ExportScoringCsvToDesktop(totalWrongTasks, _allProjects));
+                        int latestWrong = CountWrongTasks(projectData, useInitialSnapshot: false);
+                        await System.Threading.Tasks.Task.Run(() => ExportScoringCsvToDesktop(latestWrong, _allProjects));
                         _csvExported = true;
                     }
                     catch (Exception csvEx)
@@ -151,6 +134,58 @@ namespace MOS_Word_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error loading results: {ex.Message}");
             }
+        }
+
+        private async Task UpdateSummaryAsync(ProjectData projectData)
+        {
+            if (projectData?.Projects == null) return;
+
+            int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
+            int initialWrong = CountWrongTasks(projectData, useInitialSnapshot: true);
+            int latestWrong = CountWrongTasks(projectData, useInitialSnapshot: false);
+            double initialAccuracy = totalTasks > 0 ? (double)(totalTasks - initialWrong) / totalTasks * 100.0 : 0.0;
+            double latestAccuracy = totalTasks > 0 ? (double)(totalTasks - latestWrong) / totalTasks * 100.0 : 0.0;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                WrongCountTextBlock.Text = latestWrong.ToString();
+                if (AccuracyTextBlock != null)
+                    AccuracyTextBlock.Text = $"正答率: 初回 {initialAccuracy:F1}% / 修正後 {latestAccuracy:F1}%";
+                if (SummaryTextBlock != null)
+                    SummaryTextBlock.Text = $"「あとで見直す」と未閲覧（時間切れ）の合計: {latestWrong}問";
+            });
+        }
+
+        private int CountWrongTasks(ProjectData projectData, bool useInitialSnapshot)
+        {
+            int totalWrong = 0;
+            GetFirstUnviewedWithoutScoringTask(projectData, out int firstProjectId, out int firstTaskId);
+            foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
+            {
+                if (project.Tasks == null) continue;
+                bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId)
+                    ? _projectTaskFlaggedStates[project.ProjectId] : new bool[0];
+                bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId)
+                    ? _projectTaskViewedStates[project.ProjectId] : new bool[0];
+                foreach (var task in project.Tasks)
+                {
+                    int arrayIndex = task.TaskId - 1;
+                    bool isFlagged = arrayIndex >= 0 && arrayIndex < flaggedStates.Length && flaggedStates[arrayIndex];
+                    bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
+                    if (CountsAsWrong(project.ProjectId, task.TaskId, isFlagged, isUnread,
+                            firstProjectId, firstTaskId, useInitialSnapshot))
+                        totalWrong++;
+                }
+            }
+            return totalWrong;
+        }
+
+        private bool CountsAsWrong(int projectId, int taskId, bool isFlagged, bool isUnread,
+            int firstUnviewedProjectId, int firstUnviewedTaskId, bool useInitialSnapshot)
+        {
+            ComputeResultMark(projectId, taskId, isFlagged, isUnread,
+                firstUnviewedProjectId, firstUnviewedTaskId, out bool countsAsWrong, useInitialSnapshot);
+            return countsAsWrong;
         }
 
         /// <summary>
@@ -182,7 +217,7 @@ namespace MOS_Word_app.Views
         /// PowerPoint版と同様: あとで見直す → 採点結果 → 未採点の未閲覧（時間切れ）。
         /// </summary>
         private string ComputeResultMark(int projectId, int taskId, bool isFlagged, bool isUnread,
-            int firstUnviewedProjectId, int firstUnviewedTaskId, out bool countsAsWrong)
+            int firstUnviewedProjectId, int firstUnviewedTaskId, out bool countsAsWrong, bool useInitialSnapshot = false)
         {
             countsAsWrong = false;
             if (isFlagged)
@@ -190,7 +225,11 @@ namespace MOS_Word_app.Views
                 countsAsWrong = true;
                 return "✖";
             }
-            if (ScoreResultStore.TryGetResult(_groupId, projectId, taskId, out bool isPassed))
+            bool isPassed;
+            bool hasResult = useInitialSnapshot
+                ? ScoreResultStore.TryGetInitialResult(_groupId, projectId, taskId, out isPassed)
+                : ScoreResultStore.TryGetResult(_groupId, projectId, taskId, out isPassed);
+            if (hasResult)
             {
                 if (!isPassed) countsAsWrong = true;
                 return isPassed ? "〇" : "✖";
@@ -340,12 +379,16 @@ namespace MOS_Word_app.Views
             if (taskInfo == null || OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0) return;
             try
             {
+                var initialWrongKeys = ScoreResultStore.GetInitialWrongKeys(_groupId).ToList();
                 var uiTestAppBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
                 if (uiTestAppBar != null)
                 {
                     uiTestAppBar.Show();
                     uiTestAppBar.Activate();
                     uiTestAppBar.SetReturnToResultMode(this);
+                    uiTestAppBar.SetInitialWrongTaskKeys(initialWrongKeys);
+                    uiTestAppBar.TryEnqueueRetryTask(taskInfo.ProjectId, taskInfo.TaskId);
+                    uiTestAppBar.ApplyExamWindowLayout();
                 }
                 else
                 {
@@ -355,6 +398,9 @@ namespace MOS_Word_app.Views
                         appBarWindow.Show();
                         appBarWindow.Activate();
                         appBarWindow.SetReturnToResultMode(this);
+                        appBarWindow.SetInitialWrongTaskKeys(initialWrongKeys);
+                        appBarWindow.TryEnqueueRetryTask(taskInfo.ProjectId, taskInfo.TaskId);
+                        appBarWindow.ApplyExamWindowLayout();
                     }
                 }
                 await System.Threading.Tasks.Task.Delay(50);

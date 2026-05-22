@@ -463,6 +463,11 @@ namespace MOS_Word_app.Views
                 
                 // 全プロジェクト一括採点（結果画面の 〇/✖ 表示用）
                 await System.Threading.Tasks.Task.Run(() => WordBatchScoring.ScoreAllProjects(_groupId));
+                ScoreResultStore.SnapshotGroup(_groupId);
+
+                // 一括採点用の小窓レイアウトから試験用へ戻す（Word を閉じる前）
+                await System.Threading.Tasks.Task.Run(() =>
+                    WordWindowLayoutHelper.PositionWordForExamMode());
                 
                 overlayKeepOnTopTimer?.Stop();
                 overlayKeepOnTopTimer = null;
@@ -491,6 +496,7 @@ namespace MOS_Word_app.Views
                             uiTestAppBar.Show();
                             uiTestAppBar.Activate();
                             uiTestAppBar.SetReturnToResultMode(resultWindow);
+                            uiTestAppBar.ApplyExamWindowLayout();
                         }
                         else
                         {
@@ -500,6 +506,7 @@ namespace MOS_Word_app.Views
                                 appBarWindow.Show();
                                 appBarWindow.Activate();
                                 appBarWindow.SetReturnToResultMode(resultWindow);
+                                appBarWindow.ApplyExamWindowLayout();
                             }
                         }
                         OnNavigateToTask(projectId, taskId);

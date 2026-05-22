@@ -63,16 +63,43 @@ namespace Libraries.Group1
             try
             {
                 if (string.IsNullOrEmpty(filePath)) return false;
-                if (!LogReader.HasTaskEvidence(7, 2, "SetDocumentCompany")) return false;
+                if (!LogReader.HasTaskEvidence(7, 2, "SetDocumentCompany"))
+                    return false;
 
-                // 操作証跡 AND 状態（.Value で Company が完全一致）。別名保存後はディスクの Project7.doc より朗読会.docm を優先。
-                if (!TryGetCompanyForTask7_02(filePath, out string company)) return false;
-                return company == P7CompanyTarget;
+                // 主判定: VSTO が Project7 上で Company が目標値へ遷移したとき記録した SetDocumentCompany のみ（7-3/7-4/7-5 と同型の証跡中心）。
+                // 7-5 パスワード誤り等で docm/txt から Company が取れなくても 7-2 を巻き添えにしない。
+                LogCompanyStateDiagnosticsIfNeeded(filePath);
+                return true;
             }
             catch { return false; }
         }
 
-        /// <summary>7-2: 採点用 Company 取得。docm 最優先 → 7-4 後の txt → Project7（開いているもの）。</summary>
+        /// <summary>
+        /// 7-2 補助: 成果物から Company を読めるか監視用。採点結果には影響しない（非ブロッキング）。
+        /// </summary>
+        private void LogCompanyStateDiagnosticsIfNeeded(string filePath)
+        {
+            try
+            {
+                if (!TryGetCompanyForTask7_02(filePath, out string company))
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        "[WordChecker1_7] 7-2: SetDocumentCompany あり。状態読取不可（採点は○のまま）");
+                    return;
+                }
+
+                if (company != P7CompanyTarget)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WordChecker1_7] 7-2: SetDocumentCompany あり。状態 Company=\"{company}\"（目標と不一致・採点は○のまま）");
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 7-2: 採点用 Company 取得（補助・デバッグ用）。docm → txt → 開いている Project7。
+        /// </summary>
         private bool TryGetCompanyForTask7_02(string filePath, out string company)
         {
             company = "";
@@ -85,20 +112,46 @@ namespace Libraries.Group1
                 string dir = Path.GetDirectoryName(filePath);
                 string docmPath = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, P7RdDocmFileName);
                 string txtPath = string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, P7RdTxtFileName);
+                string project7Path = ResolveProject7PathForTask702(filePath, dir);
+
+                string derivedMismatch = null;
 
                 // 1) 朗読会.docm（7-5 後・一括採点。読み取りパスワード abc）
-                if (!string.IsNullOrEmpty(docmPath) && TryGetCompanyFromDocm(wordApp, docmPath, out company))
-                    return true;
+                if (!string.IsNullOrEmpty(docmPath) && TryGetCompanyFromDocm(wordApp, docmPath, out string fromDocm))
+                {
+                    if (fromDocm == P7CompanyTarget)
+                    {
+                        company = fromDocm;
+                        return true;
+                    }
+                    derivedMismatch = fromDocm;
+                }
 
-                // 2) 朗読会.txt（7-4 後〜7-5 前。その場採点で Active になりやすい）
-                if (!string.IsNullOrEmpty(txtPath) && TryGetCompanyFromTxt(wordApp, txtPath, filePath, out company))
-                    return true;
+                // 2) 朗読会.txt（7-4 後〜7-5 前）
+                if (!string.IsNullOrEmpty(txtPath) && TryGetCompanyFromTxt(wordApp, txtPath, filePath, out string fromTxt))
+                {
+                    if (fromTxt == P7CompanyTarget)
+                    {
+                        company = fromTxt;
+                        return true;
+                    }
+                    if (derivedMismatch == null)
+                        derivedMismatch = fromTxt;
+                }
 
-                // 3) Project7.doc（7-4 前など）
-                string project7Path = ResolveProject7PathForTask702(filePath, dir);
+                // 3) 開いている Project7.doc（7-2 復習で修正した値。朗読会.* が誤値のときのフォールバック）
                 if (!string.IsNullOrEmpty(project7Path)
-                    && TryGetCompanyFromOpenDocuments(wordApp, project7Path, "Project7.doc", out company))
+                    && TryGetCompanyFromOpenDocuments(wordApp, project7Path, "Project7.doc", out string fromProject7))
+                {
+                    company = fromProject7;
                     return true;
+                }
+
+                if (derivedMismatch != null)
+                {
+                    company = derivedMismatch;
+                    return true;
+                }
 
                 return false;
             }
@@ -327,7 +380,7 @@ namespace Libraries.Group1
 
                 // SaveCopyAs + System.IO.Packaging でのパッケージ読取は、一部環境で参照が解決せずビルド不能となるため採用しない。
                 // 全セクション×各ヘッダー種別の WordOpenXML のみで判定する（論点1: いずれかのヘッダーで一致すれば○）。
-                // 7-1（互換15）かつ拡張子が .doc のとき（変換後～別名保存前）、tblGrid twip 等が変わり得るため補助指紋を OR する。
+                // 拡張子 .doc のヘッダーは互換11/15で XML が異なる（Reference/XML: ED7D31 直書き vs themeFill accent2）。tbl+gridCol 補助指紋を OR する。
                 // 7-4 後などヘッダーが読めない／状態が変わったあとも、VSTO ポーリングで記録した IntegralHeader ログがあれば ○（7-1 と同型）。
                 return TryIntegralFromLiveHeaderWordOpenXml(document)
                     || LogReader.HasTaskEvidence(7, 3, "IntegralHeader");
@@ -484,8 +537,7 @@ namespace Libraries.Group1
             try
             {
                 string ext = Path.GetExtension(document.FullName).ToLowerInvariant();
-                usePostCompatFingerprint = ext == ".doc"
-                    && (int)document.CompatibilityMode == (int)WdCompatibilityMode.wdWord2013;
+                usePostCompatFingerprint = ext == ".doc";
             }
             catch { /* ignore */ }
 
@@ -539,9 +591,19 @@ namespace Libraries.Group1
             return false;
         }
 
+        /// <summary>インテグラル帯のオレンジ（accent2）。互換11 は fill="ED7D31" 直書き、互換15 は themeFill 等。</summary>
+        private static bool HasIntegralAccent2ColorMarker(string xml)
+        {
+            if (string.IsNullOrEmpty(xml)) return false;
+            return xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("fill=\"ED7D31\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("w:themeFill=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0
+                || xml.IndexOf("w:themeColor=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private static bool HasIntegralStructureFingerprint(string xml)
         {
-            if (xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) < 0) return false;
+            if (!HasIntegralAccent2ColorMarker(xml)) return false;
             if (xml.IndexOf("w:w=\"1782\"", StringComparison.Ordinal) < 0) return false;
             if (xml.IndexOf("w:w=\"7286\"", StringComparison.Ordinal) < 0) return false;
             return true;
@@ -550,11 +612,7 @@ namespace Libraries.Group1
         private static bool HasIntegralStructureFingerprintAfterCompat(string xml)
         {
             if (xml.IndexOf("<w:tbl", StringComparison.OrdinalIgnoreCase) < 0) return false;
-            bool accent2Marker =
-                xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) >= 0
-                || xml.IndexOf("w:themeFill=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0
-                || xml.IndexOf("w:themeColor=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0;
-            if (!accent2Marker) return false;
+            if (!HasIntegralAccent2ColorMarker(xml)) return false;
             int gridColCount = 0;
             for (int i = 0; ;)
             {

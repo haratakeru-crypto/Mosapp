@@ -438,6 +438,7 @@ namespace MOS_Word_app
                     CurrentProject = project;
                     HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                     ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
+                    ApplyExamWindowLayoutFromOpenProject();
                     BringWordWindowToForeground();
                     ResultMessage = $"Wordファイルを開きました: {Path.GetFileName(project.FilePath)}";
                 }
@@ -555,6 +556,22 @@ namespace MOS_Word_app
             {
                 System.Diagnostics.Debug.WriteLine($"[CloseAllWordDocuments] Error: {ex.Message}");
             }
+        }
+
+        /// <summary>プロジェクト再開時に試験用レイアウトを適用する（採点用サイズのまま残るのを防ぐ）。</summary>
+        private static void ApplyExamWindowLayoutFromOpenProject()
+        {
+            var uiTestBar = System.Windows.Application.Current.Windows
+                .OfType<Views.UiTestAppBarWindow>().FirstOrDefault();
+            if (uiTestBar != null)
+            {
+                uiTestBar.ApplyExamWindowLayout();
+                return;
+            }
+
+            var appBar = System.Windows.Application.Current.Windows
+                .OfType<Views.AppBarWindow>().FirstOrDefault();
+            appBar?.ApplyExamWindowLayout();
         }
 
         /// <summary>

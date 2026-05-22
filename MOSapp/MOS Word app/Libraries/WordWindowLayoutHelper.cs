@@ -22,6 +22,9 @@ namespace Libraries
         private const int TargetClientHeight = 650;
         private const int TopMargin = 40;
 
+        /// <summary>試験用アプリバー高さ（UiTestAppBarWindow と一致）。</summary>
+        public const double DefaultAppBarHeight = 258;
+
         [DllImport("user32.dll")]
         private static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
@@ -104,6 +107,59 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[WordWindowLayoutHelper] Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 試験用: 最大化を解除し、画面上部にアプリバー分を除いた領域へ Word を配置する。
+        /// </summary>
+        /// <param name="appBarHeight">下部アプリバー高さ（px）。</param>
+        /// <param name="screenWidth">0 のとき GetSystemMetrics を使用。</param>
+        /// <param name="screenHeight">0 のとき GetSystemMetrics を使用。</param>
+        public static void PositionWordForExamMode(
+            double appBarHeight = DefaultAppBarHeight,
+            int screenWidth = 0,
+            int screenHeight = 0)
+        {
+            try
+            {
+                TryNormalizeWordWindowState(null);
+
+                IntPtr wordHwnd = FindWordMainWindowHandle();
+                if (wordHwnd == IntPtr.Zero)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordWindowLayoutHelper] Word window handle not found (exam layout)");
+                    return;
+                }
+
+                ShowWindow(wordHwnd, SwRestore);
+
+                GetWindowRect(wordHwnd, out RECT windowRect);
+                GetClientRect(wordHwnd, out RECT clientRect);
+
+                int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
+                int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
+
+                if (screenWidth <= 0)
+                    screenWidth = GetSystemMetrics(SmCxScreen);
+                if (screenHeight <= 0)
+                    screenHeight = GetSystemMetrics(SmCyScreen);
+
+                int wordHeight = (int)Math.Max(400, screenHeight - appBarHeight);
+                int wordX = -borderWidth / 2;
+                int wordY = -borderHeight / 2;
+                int wordWidth = screenWidth + borderWidth;
+                int wordHeightWithBorder = wordHeight + borderHeight;
+
+                MoveWindow(wordHwnd, wordX, wordY, wordWidth, wordHeightWithBorder, true);
+                SetForegroundWindow(wordHwnd);
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"[WordWindowLayoutHelper] Positioned for exam: {wordWidth}x{wordHeightWithBorder} at ({wordX},{wordY})");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordWindowLayoutHelper] Exam layout error: {ex.Message}");
             }
         }
 

@@ -15,6 +15,7 @@ using System.Windows.Interop;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Reflection;
 using WordApp = Microsoft.Office.Interop.Word.Application;
 using WordDoc = Microsoft.Office.Interop.Word.Document;
@@ -82,6 +83,8 @@ namespace MOS_Word_app.Views
         // 結果画面から戻ってきたときに「結果に戻る」ボタンとして振る舞うための状態
         private bool _isReturnToResultMode = false;
         private Views.ResultWindow _lastResultWindow;
+        private readonly HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private const string ReviewPageButtonLabel = "レビューページ";
         private const string ReturnToResultButtonLabel = "結果に戻る";
         
@@ -117,120 +120,53 @@ namespace MOS_Word_app.Views
             }
         }
         
+        /// <summary>試験用レイアウト（Word ＋ アプリバー）を適用する。再表示・再開時に呼ぶ。</summary>
+        public void ApplyExamWindowLayout()
+        {
+            SetWindowPosition();
+        }
+
         private void SetWindowPosition()
         {
-            // Wordウィンドウを配置
-            PositionWordWindow();
-            
-            // ウィンドウハンドルを取得
+            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
+            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
+            const double barHeight = WordWindowLayoutHelper.DefaultAppBarHeight;
+            int wordTop = (int)(screenHeight - barHeight);
+
+            WordWindowLayoutHelper.PositionWordForExamMode(barHeight, screenWidth, screenHeight);
+
             IntPtr hWnd = new WindowInteropHelper(this).Handle;
             if (hWnd == IntPtr.Zero)
             {
-                // ハンドルが取得できない場合はWPFプロパティで設定
-                this.Width = 1920;
-                this.Height = 258;
+                this.Width = screenWidth;
+                this.Height = barHeight;
                 this.Left = 0;
-                this.Top = 774;
+                this.Top = wordTop;
                 this.Topmost = true;
                 return;
             }
 
-            // 現在のウィンドウサイズを取得して境界線のサイズを計算
             GetWindowRect(hWnd, out RECT windowRect);
             GetClientRect(hWnd, out RECT clientRect);
 
             int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
             int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
 
-            // アプリバーのウィンドウを1920x258サイズで、Wordの下に配置
-            // 高さ: 258
-            // 位置: Y=774 (Wordの下)
-            // 境界線を考慮して位置を調整
-            int x = -borderWidth / 2; // 左側の境界線を考慮
-            int y = 774 - borderHeight / 2; // 上側の境界線を考慮（Wordの下）
-            int width = 1920 + borderWidth; // 境界線を含めた幅
-            int height = 258 + borderHeight; // 境界線を含めた高さ
+            int x = -borderWidth / 2;
+            int y = wordTop - borderHeight / 2;
+            int width = screenWidth + borderWidth;
+            int height = (int)barHeight + borderHeight;
 
             MoveWindow(hWnd, x, y, width, height, true);
-            
-            // ウィンドウを最前面に表示
             this.Topmost = true;
         }
-        
+
         private void PositionWordWindow()
         {
-            try
-            {
-                // 実行中のWordプロセスを取得
-                var wordProcesses = Process.GetProcessesByName("WINWORD");
-                if (wordProcesses.Length == 0)
-                {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Word process not found");
-                    return;
-                }
-
-                Process wordProcess = wordProcesses[0];
-                
-                // Wordのメインウィンドウハンドルを取得（リトライロジック）
-                IntPtr wordHwnd = IntPtr.Zero;
-                uint processId = (uint)wordProcess.Id;
-                int retryCount = 0;
-                const int maxRetries = 20;
-                
-                while (wordHwnd == IntPtr.Zero && retryCount < maxRetries)
-                {
-                    EnumWindows((windowHandle, lParam) =>
-                    {
-                        GetWindowThreadProcessId(windowHandle, out uint windowProcessId);
-                        if (windowProcessId == processId)
-                        {
-                            // Wordのメインウィンドウを特定（クラス名で判定）
-                            StringBuilder className = new StringBuilder(256);
-                            GetClassName(windowHandle, className, className.Capacity);
-                            if (className.ToString().Contains("OpusApp"))
-                            {
-                                wordHwnd = windowHandle;
-                                return false;
-                            }
-                        }
-                        return true;
-                    }, IntPtr.Zero);
-                    
-                    if (wordHwnd == IntPtr.Zero)
-                    {
-                        Thread.Sleep(500);
-                        retryCount++;
-                    }
-                }
-                
-                if (wordHwnd != IntPtr.Zero)
-                {
-                    // Wordのウィンドウの境界線サイズを取得
-                    GetWindowRect(wordHwnd, out RECT wordWindowRect);
-                    GetClientRect(wordHwnd, out RECT wordClientRect);
-                    
-                    int wordBorderWidth = (wordWindowRect.right - wordWindowRect.left) - wordClientRect.right;
-                    int wordBorderHeight = (wordWindowRect.bottom - wordWindowRect.top) - wordClientRect.bottom;
-                    
-                    // Wordのウィンドウを左上 X=0, Y=0、右下 X=1920, Y=774 にリサイズ
-                    int wordX = -wordBorderWidth / 2;
-                    int wordY = -wordBorderHeight / 2;
-                    int wordWidth = 1920 + wordBorderWidth;
-                    int wordHeight = 774 + wordBorderHeight;
-                    
-                    MoveWindow(wordHwnd, wordX, wordY, wordWidth, wordHeight, true);
-                    SetForegroundWindow(wordHwnd);
-                    System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Word window positioned: {wordWidth}x{wordHeight} at ({wordX}, {wordY})");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Word window handle not found");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error positioning Word window: {ex.Message}");
-            }
+            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
+            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
+            WordWindowLayoutHelper.PositionWordForExamMode(
+                WordWindowLayoutHelper.DefaultAppBarHeight, screenWidth, screenHeight);
         }
 
         protected override void OnContentRendered(EventArgs e)
@@ -368,13 +304,14 @@ namespace MOS_Word_app.Views
             this.Close();
         }
         
-        private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
+        private async void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 // 「結果に戻る」モードの場合は、隠れている ResultWindow を再表示する
                 if (_isReturnToResultMode && _lastResultWindow != null && !_lastResultWindow.IsVisible)
                 {
+                    await TryRescorePendingRetryTasksAsync();
                     CloseWordDocumentsBeforeReturnToResult();
                     this.Hide();
                     _lastResultWindow.Show();
@@ -424,7 +361,92 @@ namespace MOS_Word_app.Views
         {
             _isReturnToResultMode = false;
             _lastResultWindow = null;
+            _retryTaskKeys.Clear();
             UpdateReviewPageButtonLabel(ReviewPageButtonLabel);
+        }
+
+        public void SetInitialWrongTaskKeys(IEnumerable<string> keys)
+        {
+            _initialWrongTaskKeys.Clear();
+            if (keys == null) return;
+            foreach (var key in keys)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                    _initialWrongTaskKeys.Add(key);
+            }
+        }
+
+        public bool TryEnqueueRetryTask(int projectId, int taskId)
+        {
+            string key = $"{projectId}-{taskId}";
+            if (!_initialWrongTaskKeys.Contains(key))
+                return false;
+            if (IsTaskFlaggedForRetry(projectId, taskId))
+                return false;
+            _retryTaskKeys.Add(key);
+            return true;
+        }
+
+        /// <summary>
+        /// 結果画面からの復習中に表示したタスクを再採点キューへ登録する（PP の WriteCurrentTaskFile 相当）。
+        /// </summary>
+        private void RegisterCurrentTaskForRetryIfFromResult()
+        {
+            if (!_isReturnToResultMode)
+                return;
+            if (TryEnqueueRetryTask(_currentProjectId, _currentTaskId))
+                System.Diagnostics.Debug.WriteLine($"[Retry] Enqueued P{_currentProjectId} T{_currentTaskId}");
+        }
+
+        private bool IsTaskFlaggedForRetry(int projectId, int taskId)
+        {
+            if (!_projectTaskFlaggedStates.ContainsKey(projectId))
+                return false;
+            var flags = _projectTaskFlaggedStates[projectId];
+            int idx = taskId - 1;
+            return idx >= 0 && idx < flags.Length && flags[idx];
+        }
+
+        private async Task TryRescorePendingRetryTasksAsync()
+        {
+            if (_retryTaskKeys.Count == 0 || _lastResultWindow == null)
+                return;
+
+            SaveAllWordDocuments();
+
+            var keysToScore = _retryTaskKeys.ToList();
+            await Task.Run(() =>
+            {
+                foreach (var key in keysToScore)
+                {
+                    if (!TryParseRetryTaskKey(key, out int projectId, out int taskId))
+                        continue;
+                    bool? passed = WordBatchScoring.ScoreSingleTask(_groupId, projectId, taskId);
+                    if (passed.HasValue)
+                        _retryTaskKeys.Remove(key);
+                }
+            });
+
+            try
+            {
+                await _lastResultWindow.RefreshResultsAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TryRescorePendingRetryTasks] Error: {ex.Message}");
+            }
+        }
+
+        private static bool TryParseRetryTaskKey(string key, out int projectId, out int taskId)
+        {
+            projectId = -1;
+            taskId = -1;
+            if (string.IsNullOrWhiteSpace(key))
+                return false;
+            var parts = key.Split('-');
+            if (parts.Length != 2)
+                return false;
+            return int.TryParse(parts[0], out projectId) && int.TryParse(parts[1], out taskId);
         }
 
         private void UpdateReviewPageButtonLabel(string label)
@@ -472,8 +494,7 @@ namespace MOS_Word_app.Views
                 this.WindowState = WindowState.Normal;
                 this.Activate();
                 this.Focus();
-                // 該当する Word を前面に表示する
-                PositionWordWindow();
+                ApplyExamWindowLayout();
                 
                 System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のタスク{taskId}に移動しました");
             }
@@ -921,6 +942,7 @@ namespace MOS_Word_app.Views
                 SetTextWithUnderline(taskDescriptionTextBlock, wordDescription);
                 UpdateTaskButtons();
                 UpdateButtonTexts();
+                RegisterCurrentTaskForRetryIfFromResult();
                 return;
             }
             
@@ -961,6 +983,7 @@ namespace MOS_Word_app.Views
             
             // ボタンのテキストを更新
             UpdateButtonTexts();
+            RegisterCurrentTaskForRetryIfFromResult();
         }
         
         /// <summary>
@@ -1620,7 +1643,7 @@ namespace MOS_Word_app.Views
                     System.Diagnostics.Debug.WriteLine($"Documents.Open エラー: {ex.Message}");
                 }
                 
-                PositionWordWindow();
+                ApplyExamWindowLayout();
                 System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
             }
             catch (Exception ex)
@@ -1813,6 +1836,8 @@ namespace MOS_Word_app.Views
                     {
                         this.Topmost = originalTopmost;
                     }
+
+                    ApplyExamWindowLayout();
 
                     // 該当プロジェクトの解答済み・フラグ状態をクリア（Initial\Initial の内容に合わせて初期表示）
                     int taskCount = _tasks != null ? _tasks.Count : 0;
