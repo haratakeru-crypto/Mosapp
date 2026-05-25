@@ -435,24 +435,29 @@ namespace Libraries.Group1
                     return false;
                 }
 
-                bool found = false;
+                string normalizedXml = "";
                 try
                 {
                     string xml = document.WordOpenXML;
-                    if (!string.IsNullOrEmpty(xml))
-                    {
-                        if (xml.Normalize(NormalizationForm.FormKC).Contains("下書き"))
-                        {
-                            found = true;
-                        }
-                    }
+                    normalizedXml = WordWatermarkInspection.NormalizeXml(xml);
                 }
                 catch { }
 
-                bool logWatermark = LogReader.HasAnyTaskEvidence(4, 5,
-                    "Watermark", "WatermarkMenu", "GalleryWatermark", "WatermarkCustomDialog");
+                // 1) 現在の文書: 下書き1（「下書き」＋斜め）のみ ○。下書き2（横）・社外秘・至急は ×
+                if (WordWatermarkInspection.HasForbiddenWatermark(normalizedXml))
+                    return false;
+                if (WordWatermarkInspection.IsDraft1Watermark(normalizedXml))
+                    return true;
+                if (WordWatermarkInspection.IsDraft2HorizontalWatermark(normalizedXml))
+                    return false;
+                if (TryIsDraft1WatermarkViaHeaderShapes(document))
+                    return true;
 
-                return found || logWatermark;
+                // 2) 4-7 後: 透かしなし + 4-5 で下書き1 証跡 + 4-7 相当（ヘッダー/フッター空）
+                bool cleared = WordWatermarkInspection.IsWatermarkClearedForTask47FollowUp(normalizedXml);
+                bool evidenceDraft1 = LogReader.HasTaskEvidence(4, 5, "Watermark");
+                bool task47State = IsPrimaryHeaderFooterEmpty(document);
+                return cleared && evidenceDraft1 && task47State;
 
 
 
@@ -554,41 +559,116 @@ namespace Libraries.Group1
                 }
                 if (document == null) return false;
 
-                string headerText = "";
-                string footerText = "";
-                try
-                {
-                    Section sec = document.Sections[1];
-                    headerText = sec.Headers[WdHeaderFooterIndex.wdHeaderFooterPrimary].Range.Text ?? "";
-                    footerText = sec.Footers[WdHeaderFooterIndex.wdHeaderFooterPrimary].Range.Text ?? "";
-                    Marshal.ReleaseComObject(sec);
-                }
-                catch { }
-
-                string cleanH = headerText.Replace("\r", "").Replace("\f", "").Trim();
-                string cleanF = footerText.Replace("\r", "").Replace("\f", "").Trim();
-                bool stateOk = string.IsNullOrEmpty(cleanH) && string.IsNullOrEmpty(cleanF);
-
                 // 文書検査はバージョンにより idMso が無効・非公開のため Ribbon フック不可。ヘッダー/フッターが空であることのみで判定する。
-                return stateOk;
+                return IsPrimaryHeaderFooterEmpty(document);
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_07] 例外: {ex.Message}"); return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); if (docs != null) Marshal.ReleaseComObject(docs); if (wordApp != null) Marshal.ReleaseComObject(wordApp); }
         }
 
-        private static readonly Regex DraftWatermarkLoose = new Regex(@"下書き[\s\u00A0\u200B\uFEFF]*[0-9１壱一ⅠⅠ①⑴⑺⑶]", RegexOptions.Compiled);
-
-        private static bool ContainsDraftKeyword(string s)
+        /// <summary>OpenXML で向きが取れない場合の補完: ヘッダー内「下書き」シェイプの Rotation で斜め/横を判定。</summary>
+        private static bool TryIsDraft1WatermarkViaHeaderShapes(Document document)
         {
-            if (string.IsNullOrEmpty(s)) return false;
+            if (document == null)
+                return false;
+
+            Section sec = null;
+            HeaderFooter header = null;
+            Shapes shapes = null;
             try
             {
-                return s.Normalize(NormalizationForm.FormKC).Contains("下書き");
+                if (document.Sections.Count < 1)
+                    return false;
+                sec = document.Sections[1];
+                header = sec.Headers[WdHeaderFooterIndex.wdHeaderFooterPrimary];
+                shapes = header.Shapes;
+                int count = shapes.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Shape shape = null;
+                    try
+                    {
+                        shape = shapes[i];
+                        string text = "";
+                        try
+                        {
+                            if (shape.TextFrame != null)
+                                text = shape.TextFrame.TextRange?.Text ?? "";
+                        }
+                        catch { }
+
+                        if (string.IsNullOrEmpty(text) || text.IndexOf("下書き", StringComparison.Ordinal) < 0)
+                            continue;
+
+                        double rotation = 0;
+                        try { rotation = shape.Rotation; } catch { }
+
+                        if (IsDiagonalShapeRotationDegrees(rotation))
+                            return true;
+                    }
+                    finally
+                    {
+                        if (shape != null)
+                            Marshal.ReleaseComObject(shape);
+                    }
+                }
+
+                return false;
             }
             catch
             {
                 return false;
             }
+            finally
+            {
+                if (shapes != null) Marshal.ReleaseComObject(shapes);
+                if (header != null) Marshal.ReleaseComObject(header);
+                if (sec != null) Marshal.ReleaseComObject(sec);
+            }
+        }
+
+        private static bool IsDiagonalShapeRotationDegrees(double rotation)
+        {
+            rotation = NormalizeShapeRotationDegrees(rotation);
+            if (rotation < 2)
+                return false;
+            double[] diagonalAngles = { 45, 135, 225, 315 };
+            foreach (double target in diagonalAngles)
+            {
+                double diff = Math.Abs(rotation - target);
+                if (diff <= 10 || Math.Abs(diff - 360) <= 10)
+                    return true;
+            }
+            return false;
+        }
+
+        private static double NormalizeShapeRotationDegrees(double rotation)
+        {
+            rotation %= 360;
+            if (rotation < 0)
+                rotation += 360;
+            return rotation;
+        }
+
+        /// <summary>4-7 および 4-5 の 2 段目: 先頭セクションの primary ヘッダー/フッターが空か。</summary>
+        private static bool IsPrimaryHeaderFooterEmpty(Document document)
+        {
+            if (document == null)
+                return false;
+            string headerText = "";
+            string footerText = "";
+            try
+            {
+                Section sec = document.Sections[1];
+                headerText = sec.Headers[WdHeaderFooterIndex.wdHeaderFooterPrimary].Range.Text ?? "";
+                footerText = sec.Footers[WdHeaderFooterIndex.wdHeaderFooterPrimary].Range.Text ?? "";
+                Marshal.ReleaseComObject(sec);
+            }
+            catch { }
+
+            string cleanH = headerText.Replace("\r", "").Replace("\f", "").Trim();
+            string cleanF = footerText.Replace("\r", "").Replace("\f", "").Trim();
+            return string.IsNullOrEmpty(cleanH) && string.IsNullOrEmpty(cleanF);
         }
 
         private static string JsonEscape(string s)

@@ -67,7 +67,9 @@ namespace Libraries
             }
         }
 
-        /// <summary>個別リセット: <c>[ProjectN]</c> の採点行のみ削除（他行は維持）。</summary>
+        /// <summary>
+        /// 個別リセット: 対象プロジェクトの証跡（Executed）・TaskStart・[Op] を削除し、他プロジェクトの行は維持する。
+        /// </summary>
         public static void ClearTaskEvidenceForProject(int projectId)
         {
             string path = GetLogFilePath();
@@ -77,14 +79,7 @@ namespace Libraries
             try
             {
                 var lines = File.ReadAllLines(path, Encoding.UTF8);
-                var kept = lines.Where(l =>
-                {
-                    if (string.IsNullOrWhiteSpace(l))
-                        return true;
-                    if (!TryParseScoringLine(l, out var e) || !e.IsValid)
-                        return true;
-                    return e.ProjectId != projectId;
-                }).ToArray();
+                var kept = lines.Where(l => !IsLogLineOwnedByProject(l, projectId)).ToArray();
 
                 if (kept.Length == lines.Length)
                     return;
@@ -101,6 +96,59 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] ClearTaskEvidenceForProject: {ex.Message}");
             }
+        }
+
+        /// <summary>個別リセット: 対象プロジェクトの破壊検知エラー行のみ削除する。</summary>
+        public static void ClearDestructiveLogForProject(int projectId)
+        {
+            string path = GetDestructiveErrorLogPath();
+            if (!File.Exists(path))
+                return;
+
+            string prefix = projectId.ToString() + ",";
+            try
+            {
+                var lines = File.ReadAllLines(path, Encoding.UTF8);
+                var kept = lines.Where(l =>
+                    string.IsNullOrWhiteSpace(l)
+                    || !l.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
+
+                if (kept.Length == lines.Length)
+                    return;
+
+                if (kept.Length == 0 || kept.All(string.IsNullOrWhiteSpace))
+                {
+                    File.Delete(path);
+                    return;
+                }
+
+                File.WriteAllLines(path, kept, new UTF8Encoding(false));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearDestructiveLogForProject: {ex.Message}");
+            }
+        }
+
+        private static bool IsLogLineOwnedByProject(string line, int projectId)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return false;
+
+            if (TryParseScoringLine(line, out var e) && e.IsValid && e.ProjectId == projectId)
+                return true;
+
+            if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                ParseTaskStart(line, out int p, out _, out _);
+                return p == projectId;
+            }
+
+            string taskMarker = "[Task " + projectId + "-";
+            if (line.IndexOf(taskMarker, StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            return false;
         }
 
         /// <summary>テスト・デバッグ用。採点と同一形式で追記。</summary>
@@ -307,6 +355,256 @@ namespace Libraries
                 if (IsScoringLine)
                     return $"[{Timestamp:yyyy-MM-dd HH:mm:ss}] [Project{ProjectId}] [Task{ProjectId}-{TaskId}] [{CommandId}] Executed";
                 return $"[{Timestamp:yyyy-MM-dd HH:mm:ss}] [{CommandId}] Executed";
+            }
+        }
+
+        // --- 破壊的操作検知（TaskStart / Op / destructive / snapshot）---
+
+        public static string GetCurrentTaskFilePath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_word_current_task.txt");
+        }
+
+        public static string GetDestructiveErrorLogPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_word_destructive_errors.log");
+        }
+
+        public static string GetSnapshotFilePath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_word_snapshot.txt");
+        }
+
+        public static void ClearCurrentTaskFile()
+        {
+            try
+            {
+                string path = GetCurrentTaskFilePath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearCurrentTaskFile: {ex.Message}");
+            }
+        }
+
+        public static void ClearDestructiveLog()
+        {
+            try
+            {
+                string path = GetDestructiveErrorLogPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearDestructiveLog: {ex.Message}");
+            }
+        }
+
+        public static void ClearSnapshot()
+        {
+            try
+            {
+                string path = GetSnapshotFilePath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearSnapshot: {ex.Message}");
+            }
+        }
+
+        /// <summary>アプリ側がタスク表示時に記録（記録主体は試験アプリ）。</summary>
+        public static void LogTaskStart(int projectId, int taskId, int attemptNo)
+        {
+            try
+            {
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                string line = $"[{timestamp}] [TaskStart] {projectId}-{taskId}-{attemptNo}";
+                File.AppendAllText(GetLogFilePath(), line + Environment.NewLine, new UTF8Encoding(false));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] LogTaskStart: {ex.Message}");
+            }
+        }
+
+        public static List<string> GetOperationsForTask(int projectId, int taskId, int attemptNo)
+        {
+            var result = new List<string>();
+            string path = GetLogFilePath();
+            if (!File.Exists(path))
+                return result;
+
+            string taskPrefix = $"[Task {projectId}-{taskId}-{attemptNo}]";
+            try
+            {
+                string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+                int curP = -1, curT = -1, curA = 0;
+                foreach (string line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+                    if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        ParseTaskStart(line, out curP, out curT, out curA);
+                        continue;
+                    }
+                    int opIdx = line.IndexOf("[Op]", StringComparison.OrdinalIgnoreCase);
+                    if (opIdx < 0)
+                        continue;
+                    bool inTask = line.IndexOf(taskPrefix, StringComparison.OrdinalIgnoreCase) >= 0
+                        || (curP == projectId && curT == taskId && curA == attemptNo);
+                    if (!inTask)
+                        continue;
+                    string afterOp = line.Substring(opIdx + 4).Trim();
+                    if (afterOp.Length > 0)
+                        result.Add(afterOp);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] GetOperationsForTask: {ex.Message}");
+            }
+
+            return result;
+        }
+
+        public static bool HasDisallowedOperations(int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes)
+        {
+            if (allowedOperationTypes == null)
+                return false;
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo);
+            if (ops.Count == 0)
+                return false;
+
+            foreach (string opLine in ops)
+            {
+                string type = GetOperationType(opLine);
+                if (string.IsNullOrEmpty(type))
+                    continue;
+                if (!allowedOperationTypes.Contains(type))
+                    return true;
+            }
+            return false;
+        }
+
+        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
+        {
+            try
+            {
+                string path = GetDestructiveErrorLogPath();
+                if (!File.Exists(path))
+                    return false;
+                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                foreach (string line in File.ReadAllLines(path, Encoding.UTF8))
+                {
+                    if (line != null && line.StartsWith(prefix, StringComparison.Ordinal))
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] HasLoggedDestructiveError: {ex.Message}");
+            }
+            return false;
+        }
+
+        public static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, IList<string> errors)
+        {
+            if (errors == null || errors.Count == 0)
+                return;
+            try
+            {
+                string key = $"{projectId},{taskId},{attemptNo}:";
+                string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
+                File.AppendAllText(GetDestructiveErrorLogPath(), key + body + Environment.NewLine, new UTF8Encoding(false));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] AppendDestructiveErrors: {ex.Message}");
+            }
+        }
+
+        private static void ParseTaskStart(string line, out int projectId, out int taskId, out int attemptNo)
+        {
+            projectId = -1;
+            taskId = -1;
+            attemptNo = 0;
+            int startIdx = line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase);
+            if (startIdx < 0)
+                return;
+            string part = line.Substring(startIdx + 11).Trim();
+            var tokens = part.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length >= 2
+                && int.TryParse(tokens[0].Trim(), out projectId)
+                && int.TryParse(tokens[1].Trim(), out taskId))
+            {
+                if (tokens.Length >= 3)
+                    int.TryParse(tokens[2].Trim(), out attemptNo);
+            }
+        }
+
+        private static string GetOperationType(string opLine)
+        {
+            if (string.IsNullOrWhiteSpace(opLine))
+                return "";
+            int space = opLine.IndexOf(' ');
+            return space > 0 ? opLine.Substring(0, space).Trim() : opLine.Trim();
+        }
+    }
+
+    /// <summary>タスク単位の attempt 番号（通常 0、結果画面からの再採点は 1 以上）。</summary>
+    public static class WordTaskAttemptRegistry
+    {
+        private static readonly object Sync = new object();
+        private static readonly Dictionary<string, int> Attempts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        private static string Key(int projectId, int taskId) => $"{projectId}-{taskId}";
+
+        public static int GetAttempt(int projectId, int taskId)
+        {
+            lock (Sync)
+            {
+                if (Attempts.TryGetValue(Key(projectId, taskId), out int v))
+                    return Math.Max(0, v);
+                return 0;
+            }
+        }
+
+        public static void SetAttempt(int projectId, int taskId, int attemptNo)
+        {
+            if (attemptNo < 0) attemptNo = 0;
+            lock (Sync)
+            {
+                Attempts[Key(projectId, taskId)] = attemptNo;
+            }
+        }
+
+        public static void ClearAll()
+        {
+            lock (Sync)
+            {
+                Attempts.Clear();
+            }
+        }
+
+        public static void ClearProject(int projectId)
+        {
+            string prefix = projectId + "-";
+            lock (Sync)
+            {
+                var keys = new List<string>();
+                foreach (var k in Attempts.Keys)
+                {
+                    if (k.StartsWith(prefix, StringComparison.Ordinal))
+                        keys.Add(k);
+                }
+                foreach (var k in keys)
+                    Attempts.Remove(k);
             }
         }
     }

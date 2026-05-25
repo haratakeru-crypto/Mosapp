@@ -85,6 +85,8 @@ namespace MOS_Word_app.Views
         private Views.ResultWindow _lastResultWindow;
         private readonly HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
+        private string _lastTaskStartKey;
         private const string ReviewPageButtonLabel = "レビューページ";
         private const string ReturnToResultButtonLabel = "結果に戻る";
         
@@ -384,6 +386,52 @@ namespace MOS_Word_app.Views
             if (IsTaskFlaggedForRetry(projectId, taskId))
                 return false;
             _retryTaskKeys.Add(key);
+            return true;
+        }
+
+        private void SyncTaskTracking()
+        {
+            if (_isReturnToResultMode)
+                EnsureRetryAttemptPrepared(_currentProjectId, _currentTaskId);
+            WriteCurrentTaskFile();
+            LogTaskStartIfNeeded();
+        }
+
+        private void WriteCurrentTaskFile()
+        {
+            try
+            {
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                var flags = WordTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
+                string content = $"{_currentProjectId},{_currentTaskId},{(int)flags},{attemptNo}";
+                File.WriteAllText(LogReader.GetCurrentTaskFilePath(), content, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[AppBarWindow] WriteCurrentTaskFile: " + ex.Message);
+            }
+        }
+
+        private void LogTaskStartIfNeeded()
+        {
+            int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+            string key = $"{_currentProjectId}-{_currentTaskId}-{attemptNo}";
+            if (string.Equals(_lastTaskStartKey, key, StringComparison.Ordinal))
+                return;
+            _lastTaskStartKey = key;
+            LogReader.LogTaskStart(_currentProjectId, _currentTaskId, attemptNo);
+        }
+
+        private bool EnsureRetryAttemptPrepared(int projectId, int taskId)
+        {
+            string key = $"{projectId}-{taskId}";
+            if (!_initialWrongTaskKeys.Contains(key))
+                return false;
+            if (_preparedRetryTaskKeys.Contains(key))
+                return true;
+            int cur = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
+            WordTaskAttemptRegistry.SetAttempt(projectId, taskId, Math.Max(1, cur + 1));
+            _preparedRetryTaskKeys.Add(key);
             return true;
         }
 
@@ -983,6 +1031,7 @@ namespace MOS_Word_app.Views
             
             // ボタンのテキストを更新
             UpdateButtonTexts();
+            SyncTaskTracking();
             RegisterCurrentTaskForRetryIfFromResult();
         }
         
@@ -1857,6 +1906,7 @@ namespace MOS_Word_app.Views
         private void ResetProject(int groupId, int projectId)
         {
             WordProjectResetHelper.ResetProject(groupId, projectId);
+            _lastTaskStartKey = null;
         }
         
         /// <summary>

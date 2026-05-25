@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using Libraries.Group1;
 using Word = Microsoft.Office.Interop.Word;
 
 namespace New_MOSWordVSTOAddIn
@@ -14,6 +16,7 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>Word の文書編集ペインのウィンドウクラス。リボン上の入力欄は通常これを祖先に持たない。</summary>
         private const string WordDocumentPaneClassName = "_WwG";
 
+        private WordDestructiveMonitor _destructiveMonitor;
         private Timer _showAllPollTimer;
         private bool? _lastShowAllState;
         private int _lastColumnBreakCount;
@@ -26,7 +29,8 @@ namespace New_MOSWordVSTOAddIn
         private string _lastOrientationFingerprint;
         private string _lastPageBorderFingerprint;
         private bool? _lastHeading1LineSimple;
-        private bool? _lastWatermarkFound;
+        /// <summary>4-5: 下書き1 透かしの有無（社外秘・至急は含めない）</summary>
+        private bool? _lastDraft1WatermarkFound;
         private int _lastLaptopWrapType = -1;
 
         /// <summary>リボンが既にログした直後のポーリング二重記録を抑止する（約2ティック）。</summary>
@@ -99,6 +103,8 @@ namespace New_MOSWordVSTOAddIn
             this.Application.DocumentBeforeSave += Application_DocumentBeforeSave;
             RefreshBaselineFromActiveDocumentNoLog();
             StartShowAllPolling();
+            _destructiveMonitor = new WordDestructiveMonitor(this);
+            _destructiveMonitor.Start();
         }
 
         /// <summary>
@@ -132,6 +138,8 @@ namespace New_MOSWordVSTOAddIn
                 // アンインストール時など Application が無い場合
             }
 
+            _destructiveMonitor?.Stop();
+            _destructiveMonitor = null;
             _showAllPollTimer?.Stop();
             _showAllPollTimer?.Dispose();
             _showAllPollTimer = null;
@@ -198,11 +206,13 @@ namespace New_MOSWordVSTOAddIn
                 _lastHeading1LineSimple = IsHeading1LineSimplePattern(doc);
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
 
-                // 4-5: ベースライン取得
-                try {
-                    string xml = doc.WordOpenXML;
-                    _lastWatermarkFound = !string.IsNullOrEmpty(xml) && xml.Contains("下書き");
-                } catch { _lastWatermarkFound = false; }
+                // 4-5: ベースライン取得（下書き1 のみ）
+                try
+                {
+                    string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                    _lastDraft1WatermarkFound = WordWatermarkInspection.IsDraft1Watermark(norm);
+                }
+                catch { _lastDraft1WatermarkFound = false; }
 
                 // 7-1: 互換モードのベースライン（ポーリングで 非15→15 の遷移を検知するため）
                 try
@@ -437,16 +447,14 @@ namespace New_MOSWordVSTOAddIn
                     }
                     _lastColumnBreakCount = columnBreakCount;
 
-                    // 4-5: 透かしの検知（WordOpenXML を使用）
+                    // 4-5: 下書き1 透かしのみ Executed 記録（社外秘・至急等は記録しない）
                     try
                     {
-                        string xml = doc.WordOpenXML;
-                        bool hasWatermark = !string.IsNullOrEmpty(xml) && xml.Contains("下書き");
-                        if (hasWatermark && (!_lastWatermarkFound.HasValue || !_lastWatermarkFound.Value))
-                        {
+                        string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                        bool hasDraft1 = WordWatermarkInspection.IsDraft1Watermark(norm);
+                        if (hasDraft1 && (!_lastDraft1WatermarkFound.HasValue || !_lastDraft1WatermarkFound.Value))
                             WordEvidenceHelper.LogCommandWithEvidence("Watermark");
-                        }
-                        _lastWatermarkFound = hasWatermark;
+                        _lastDraft1WatermarkFound = hasDraft1;
                     }
                     catch { }
 
@@ -1180,6 +1188,282 @@ namespace New_MOSWordVSTOAddIn
                 i = p + 10;
             }
             return gridColCount >= 2;
+        }
+
+        /// <summary>mos_word_current_task.txt を監視し、スナップショット取得・タスク切替時の差分記録を行う。</summary>
+        private sealed class WordDestructiveMonitor
+        {
+            private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_word_current_task.txt");
+            private static readonly string SnapshotFilePath = Path.Combine(Path.GetTempPath(), "mos_word_snapshot.txt");
+            private static readonly string DestructiveLogPath = Path.Combine(Path.GetTempPath(), "mos_word_destructive_errors.log");
+
+            private readonly ThisAddIn _addIn;
+            private Timer _pollTimer;
+            private int _projectId = -1;
+            private int _taskId = -1;
+            private int _attemptNo;
+            private int _exemptFlags;
+
+            public WordDestructiveMonitor(ThisAddIn addIn)
+            {
+                _addIn = addIn;
+            }
+
+            public void Start()
+            {
+                _pollTimer = new Timer { Interval = 500 };
+                _pollTimer.Tick += PollTimer_Tick;
+                _pollTimer.Start();
+            }
+
+            public void Stop()
+            {
+                _pollTimer?.Stop();
+                _pollTimer?.Dispose();
+                _pollTimer = null;
+            }
+
+            private void PollTimer_Tick(object sender, EventArgs e)
+            {
+                try
+                {
+                    if (!File.Exists(CurrentTaskFilePath))
+                    {
+                        _projectId = -1;
+                        _taskId = -1;
+                        return;
+                    }
+
+                    string line = File.ReadAllText(CurrentTaskFilePath).Trim();
+                    if (string.IsNullOrEmpty(line))
+                        return;
+
+                    var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 2)
+                        return;
+                    if (!int.TryParse(parts[0].Trim(), out int projectId) || !int.TryParse(parts[1].Trim(), out int taskId))
+                        return;
+
+                    int exemptFlags = 0;
+                    if (parts.Length >= 3)
+                        int.TryParse(parts[2].Trim(), out exemptFlags);
+                    int attemptNo = 0;
+                    if (parts.Length >= 4)
+                        int.TryParse(parts[3].Trim(), out attemptNo);
+
+                    bool forceSnapshot = !File.Exists(SnapshotFilePath);
+                    bool taskChanged = projectId != _projectId || taskId != _taskId || attemptNo != _attemptNo;
+
+                    if (!taskChanged && !forceSnapshot)
+                        return;
+
+                    if (_projectId >= 0 && _taskId >= 0 && !forceSnapshot && projectId == _projectId)
+                        CompareAndLogDestructive(_projectId, _taskId, _attemptNo, _exemptFlags);
+
+                    _projectId = projectId;
+                    _taskId = taskId;
+                    _attemptNo = attemptNo;
+                    _exemptFlags = exemptFlags;
+
+                    Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
+                    TakeSnapshot(projectId, taskId, attemptNo);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordDestructiveMonitor] " + ex.Message);
+                }
+            }
+
+            private void TakeSnapshot(int projectId, int taskId, int attemptNo)
+            {
+                Word.Document doc = TryGetProjectDocument(projectId);
+                if (doc == null)
+                    return;
+
+                try
+                {
+                    var snap = Capture(doc, projectId, taskId, attemptNo);
+                    SaveSnapshot(snap);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordDestructiveMonitor] TakeSnapshot: " + ex.Message);
+                }
+            }
+
+            private void CompareAndLogDestructive(int projectId, int taskId, int attemptNo, int exemptFlagsInt)
+            {
+                var baseline = LoadSnapshot();
+                if (baseline == null || baseline.ProjectId != projectId || baseline.TaskId != taskId || baseline.AttemptNo != attemptNo)
+                    return;
+
+                Word.Document doc = TryGetProjectDocument(projectId);
+                if (doc == null)
+                    return;
+
+                var current = Capture(doc, projectId, taskId, attemptNo);
+                var errors = Compare(baseline, current, exemptFlagsInt);
+                if (errors.Count == 0)
+                    return;
+
+                try
+                {
+                    string key = $"{projectId},{taskId},{attemptNo}:";
+                    string body = string.Join(" | ", errors);
+                    File.AppendAllText(DestructiveLogPath, key + body + Environment.NewLine, Encoding.UTF8);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordDestructiveMonitor] log: " + ex.Message);
+                }
+            }
+
+            private static List<string> Compare(SnapshotData baseline, SnapshotData current, int exemptFlagsInt)
+            {
+                var errors = new List<string>();
+                if (!HasFlag(exemptFlagsInt, 1) && current.Sections != baseline.Sections)
+                    errors.Add($"SectionsCount changed {baseline.Sections}->{current.Sections}");
+                if (!HasFlag(exemptFlagsInt, 2) && current.BodyTextLength != baseline.BodyTextLength)
+                    errors.Add($"BodyTextLength changed {baseline.BodyTextLength}->{current.BodyTextLength}");
+                if (!HasFlag(exemptFlagsInt, 4) && current.InlineShapes != baseline.InlineShapes)
+                    errors.Add($"InlineShapesCount changed {baseline.InlineShapes}->{current.InlineShapes}");
+                if (!HasFlag(exemptFlagsInt, 8) && current.FloatingShapes != baseline.FloatingShapes)
+                    errors.Add($"FloatingShapesCount changed {baseline.FloatingShapes}->{current.FloatingShapes}");
+                if (!HasFlag(exemptFlagsInt, 16) && current.Tables != baseline.Tables)
+                    errors.Add($"TablesCount changed {baseline.Tables}->{current.Tables}");
+                if (!HasFlag(exemptFlagsInt, 32) && current.Comments != baseline.Comments)
+                    errors.Add($"CommentsCount changed {baseline.Comments}->{current.Comments}");
+                if (!HasFlag(exemptFlagsInt, 64) && !string.Equals(baseline.HeaderPrimaryFp ?? "", current.HeaderPrimaryFp ?? "", StringComparison.Ordinal))
+                    errors.Add("HeaderFooterFingerprint changed");
+                if (!HasFlag(exemptFlagsInt, 1024) && baseline.CompatibilityMode >= 0 && current.CompatibilityMode >= 0
+                    && baseline.CompatibilityMode != current.CompatibilityMode)
+                    errors.Add($"CompatibilityMode changed {baseline.CompatibilityMode}->{current.CompatibilityMode}");
+                return errors;
+            }
+
+            private static bool HasFlag(int flags, int bit) => (flags & bit) != 0;
+
+            private Word.Document TryGetProjectDocument(int projectId)
+            {
+                try
+                {
+                    var app = _addIn.Application;
+                    if (app == null) return null;
+                    for (int i = app.Documents.Count; i >= 1; i--)
+                    {
+                        Word.Document doc = app.Documents[i];
+                        string name = Path.GetFileName(doc.FullName ?? "");
+                        if (name.StartsWith("Project" + projectId, StringComparison.OrdinalIgnoreCase)
+                            || name.StartsWith("project" + projectId, StringComparison.OrdinalIgnoreCase))
+                            return doc;
+                    }
+                    return app.ActiveDocument;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            private static SnapshotData Capture(Word.Document doc, int projectId, int taskId, int attemptNo)
+            {
+                var d = new SnapshotData
+                {
+                    ProjectId = projectId,
+                    TaskId = taskId,
+                    AttemptNo = attemptNo,
+                    FullName = doc.FullName ?? ""
+                };
+                try { d.Sections = doc.Sections.Count; } catch { }
+                try { d.BodyTextLength = doc.Content.Text.Length; } catch { }
+                try { d.InlineShapes = doc.InlineShapes.Count; } catch { }
+                try { d.FloatingShapes = doc.Shapes.Count; } catch { }
+                try { d.Comments = doc.Comments.Count; } catch { }
+                try { d.Tables = doc.Tables.Count; } catch { }
+                try { d.CompatibilityMode = (int)doc.CompatibilityMode; } catch { d.CompatibilityMode = -1; }
+                d.HeaderPrimaryFp = GetHeaderFp(doc);
+                return d;
+            }
+
+            private static string GetHeaderFp(Word.Document doc)
+            {
+                try
+                {
+                    var hdr = doc.Sections[1].Headers[Word.WdHeaderFooterIndex.wdHeaderFooterPrimary].Range;
+                    string xml = hdr.WordOpenXML ?? "";
+                    if (xml.IndexOf("ED7D31", StringComparison.OrdinalIgnoreCase) >= 0) return "ED7D31";
+                    if (xml.IndexOf("E97132", StringComparison.OrdinalIgnoreCase) >= 0) return "E97132";
+                    if (xml.IndexOf("accent2", StringComparison.OrdinalIgnoreCase) >= 0) return "accent2";
+                }
+                catch { }
+                return "";
+            }
+
+            private static void SaveSnapshot(SnapshotData d)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("# WordSnapshot v1");
+                sb.AppendLine($"ProjectId={d.ProjectId}");
+                sb.AppendLine($"TaskId={d.TaskId}");
+                sb.AppendLine($"AttemptNo={d.AttemptNo}");
+                sb.AppendLine($"FullName={d.FullName}");
+                sb.AppendLine($"Sections={d.Sections}");
+                sb.AppendLine($"BodyTextLength={d.BodyTextLength}");
+                sb.AppendLine($"InlineShapes={d.InlineShapes}");
+                sb.AppendLine($"FloatingShapes={d.FloatingShapes}");
+                sb.AppendLine($"Tables={d.Tables}");
+                sb.AppendLine($"Comments={d.Comments}");
+                sb.AppendLine($"HeaderPrimaryFp={d.HeaderPrimaryFp}");
+                sb.AppendLine($"CompatibilityMode={d.CompatibilityMode}");
+                File.WriteAllText(SnapshotFilePath, sb.ToString(), Encoding.UTF8);
+            }
+
+            private static SnapshotData LoadSnapshot()
+            {
+                if (!File.Exists(SnapshotFilePath))
+                    return null;
+                var d = new SnapshotData();
+                foreach (string line in File.ReadAllLines(SnapshotFilePath, Encoding.UTF8))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+                        continue;
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string key = line.Substring(0, eq).Trim();
+                    string val = line.Substring(eq + 1).Trim();
+                    switch (key)
+                    {
+                        case "ProjectId": int.TryParse(val, out int p); d.ProjectId = p; break;
+                        case "TaskId": int.TryParse(val, out int t); d.TaskId = t; break;
+                        case "AttemptNo": int.TryParse(val, out int a); d.AttemptNo = a; break;
+                        case "Sections": int.TryParse(val, out int s); d.Sections = s; break;
+                        case "BodyTextLength": int.TryParse(val, out int bl); d.BodyTextLength = bl; break;
+                        case "InlineShapes": int.TryParse(val, out int ins); d.InlineShapes = ins; break;
+                        case "FloatingShapes": int.TryParse(val, out int fs); d.FloatingShapes = fs; break;
+                        case "Tables": int.TryParse(val, out int tb); d.Tables = tb; break;
+                        case "Comments": int.TryParse(val, out int cm); d.Comments = cm; break;
+                        case "HeaderPrimaryFp": d.HeaderPrimaryFp = val; break;
+                        case "CompatibilityMode": int.TryParse(val, out int c); d.CompatibilityMode = c; break;
+                    }
+                }
+                return d;
+            }
+
+            private sealed class SnapshotData
+            {
+                public int ProjectId;
+                public int TaskId;
+                public int AttemptNo;
+                public string FullName;
+                public int Sections;
+                public int BodyTextLength;
+                public int InlineShapes;
+                public int FloatingShapes;
+                public int Tables;
+                public int Comments;
+                public string HeaderPrimaryFp;
+                public int CompatibilityMode = -1;
+            }
         }
 
         #region VSTO で生成されたコード

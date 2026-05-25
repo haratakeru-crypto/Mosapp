@@ -77,6 +77,7 @@ namespace New_MOSWordVSTOAddIn
                 }
 
                 WordEvidenceHelper.LogCommandWithEvidence(loggedCommandId);
+                LogRibbonOperation(commandId, loggedCommandId);
 
                 // 既定の動作（Cut / Paste / SaveAs など）をキャンセルせずに実行させる
                 cancelDefault = false;
@@ -87,6 +88,26 @@ namespace New_MOSWordVSTOAddIn
                 // エラー時も既定動作はブロックしない
                 cancelDefault = false;
             }
+        }
+
+        private static void LogRibbonOperation(string commandId, string loggedCommandId)
+        {
+            if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("Cut", "");
+            else if (string.Equals(commandId, "Paste", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("Paste", "");
+            else if (string.Equals(commandId, "FileSaveAs", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("FileSaveAs", "");
+            else if (string.Equals(commandId, "SectionBreakInsert", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(loggedCommandId, "InsertSectionBreakNextPage", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("InsertSectionBreak", loggedCommandId ?? "");
+            else if (string.Equals(commandId, "ReviewDeleteComment", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("ReviewNewComment", loggedCommandId ?? "");
+            else if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(loggedCommandId, "TableConvertTextToTable", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("InsertTable", loggedCommandId ?? "");
+            else
+                Logger.LogOperation("RibbonCommand", loggedCommandId ?? commandId ?? "");
         }
 
         /// <summary>

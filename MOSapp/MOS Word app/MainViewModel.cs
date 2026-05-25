@@ -474,6 +474,10 @@ namespace MOS_Word_app
             {
                 LogReader.ClearLog();
                 LogReader.ClearTaskEvidence(); // 旧 mos_word_task_evidence.txt が残っていれば削除のみ
+                LogReader.ClearDestructiveLog();
+                LogReader.ClearSnapshot();
+                LogReader.ClearCurrentTaskFile();
+                WordTaskAttemptRegistry.ClearAll();
                 for (int projectId = 1; projectId <= 10; projectId++)
                 {
                     try

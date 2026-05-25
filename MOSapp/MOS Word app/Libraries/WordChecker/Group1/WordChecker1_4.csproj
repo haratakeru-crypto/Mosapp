@@ -46,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="WordChecker1_4.cs" />
+    <Compile Include="WordWatermarkInspection.cs" />
     <Compile Include="..\..\LogReader.cs" Link="LogReader.cs" />
   </ItemGroup>
   <PropertyGroup>

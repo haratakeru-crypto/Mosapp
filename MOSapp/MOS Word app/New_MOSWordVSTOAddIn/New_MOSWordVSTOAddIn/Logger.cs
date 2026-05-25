@@ -13,6 +13,9 @@ namespace New_MOSWordVSTOAddIn
         private static readonly object _lockObject = new object();
         private static readonly string _logFileName = "mos_word_log.txt";
         private static string _logFilePath;
+        private static int _currentProjectId = -1;
+        private static int _currentTaskId = -1;
+        private static int _currentAttemptNo;
 
         private static string LogFilePath
         {
@@ -73,6 +76,54 @@ namespace New_MOSWordVSTOAddIn
         public static string GetLogFilePath()
         {
             return LogFilePath;
+        }
+
+        public static void SetCurrentTaskContext(int projectId, int taskId, int attemptNo)
+        {
+            lock (_lockObject)
+            {
+                _currentProjectId = projectId;
+                _currentTaskId = taskId;
+                _currentAttemptNo = attemptNo < 0 ? 0 : attemptNo;
+            }
+        }
+
+        /// <summary>
+        /// 汎用操作ログ。[Task P-T-A] [Op] Type Detail（TaskStart は試験アプリが記録）。
+        /// </summary>
+        public static void LogOperation(string operationType, string detail)
+        {
+            if (string.IsNullOrWhiteSpace(operationType))
+                return;
+            try
+            {
+                lock (_lockObject)
+                {
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    string taskPrefix = (_currentProjectId > 0 && _currentTaskId > 0)
+                        ? $"[Task {_currentProjectId}-{_currentTaskId}-{_currentAttemptNo}] "
+                        : "";
+                    string logEntry = $"[{timestamp}] {taskPrefix}[Op] {operationType} {detail}".TrimEnd();
+                    AppendLine(logEntry);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] LogOperation: {ex.Message}");
+            }
+        }
+
+        private static void AppendLine(string logEntry)
+        {
+            using (var fileStream = new FileStream(
+                LogFilePath,
+                FileMode.Append,
+                FileAccess.Write,
+                FileShare.ReadWrite | FileShare.Delete))
+            using (var writer = new StreamWriter(fileStream, Encoding.UTF8))
+            {
+                writer.WriteLine(logEntry);
+            }
         }
 
         /// <summary>

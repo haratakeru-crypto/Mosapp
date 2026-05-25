@@ -83,6 +83,8 @@ namespace MOS_Word_app.Views
         private bool _isReturnToResultMode = false;
         private readonly HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
+        private string _lastTaskStartKey;
 
         public int CurrentProjectId => _currentProjectId;
         public int CurrentGroupId => _groupId;
@@ -339,6 +341,13 @@ namespace MOS_Word_app.Views
                             totalTasks++;
                             try
                             {
+                                int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, taskNum);
+                                if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out string gateReason))
+                                {
+                                    taskResults.Add((taskNum, false, gateReason));
+                                    ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false);
+                                    continue;
+                                }
                                 bool taskResult = (bool)method.Invoke(checkerInstance, null);
                                 taskResults.Add((taskNum, taskResult, null));
                                 // 採点結果を共有ストアに記録
@@ -489,6 +498,53 @@ namespace MOS_Word_app.Views
             return true;
         }
 
+        private void SyncTaskTracking()
+        {
+            if (_isReturnToResultMode)
+                EnsureRetryAttemptPrepared(_currentProjectId, _currentTaskId);
+            WriteCurrentTaskFile();
+            LogTaskStartIfNeeded();
+        }
+
+        private void WriteCurrentTaskFile()
+        {
+            try
+            {
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                var flags = WordTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
+                string content = $"{_currentProjectId},{_currentTaskId},{(int)flags},{attemptNo}";
+                File.WriteAllText(LogReader.GetCurrentTaskFilePath(), content, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] WriteCurrentTaskFile: " + ex.Message);
+            }
+        }
+
+        private void LogTaskStartIfNeeded()
+        {
+            int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+            string key = $"{_currentProjectId}-{_currentTaskId}-{attemptNo}";
+            if (string.Equals(_lastTaskStartKey, key, StringComparison.Ordinal))
+                return;
+            _lastTaskStartKey = key;
+            LogReader.LogTaskStart(_currentProjectId, _currentTaskId, attemptNo);
+        }
+
+        private bool EnsureRetryAttemptPrepared(int projectId, int taskId)
+        {
+            string key = $"{projectId}-{taskId}";
+            if (!_initialWrongTaskKeys.Contains(key))
+                return false;
+            if (_preparedRetryTaskKeys.Contains(key))
+                return true;
+            int cur = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
+            WordTaskAttemptRegistry.SetAttempt(projectId, taskId, Math.Max(1, cur + 1));
+            _preparedRetryTaskKeys.Add(key);
+            System.Diagnostics.Debug.WriteLine($"[RetryAttempt] P{projectId} T{taskId} attempt={WordTaskAttemptRegistry.GetAttempt(projectId, taskId)}");
+            return true;
+        }
+
         /// <summary>
         /// 結果画面からの復習中に表示したタスクを再採点キューへ登録する（PP の WriteCurrentTaskFile 相当）。
         /// </summary>
@@ -585,6 +641,7 @@ namespace MOS_Word_app.Views
                 
                 // UIを更新
                 UpdateTaskDisplay();
+                SyncTaskTracking();
                 
                 // メインウィンドウを表示（レビューページから戻る時）
                 this.Show();
@@ -1159,6 +1216,7 @@ namespace MOS_Word_app.Views
             // ボタンのテキストを更新
             UpdateButtonTexts();
             MarkTaskAsViewed(_currentProjectId, _currentTaskId);
+            SyncTaskTracking();
             RegisterCurrentTaskForRetryIfFromResult();
         }
         
@@ -1964,6 +2022,7 @@ namespace MOS_Word_app.Views
                 TryQuitWord();
             Thread.Sleep(500); // Word がファイルハンドルを解放するまで待つ
             MOS_Word_app.WordProjectResetHelper.ResetProject(groupId, projectId);
+            _lastTaskStartKey = null;
             return true;
         }
         

@@ -4,13 +4,22 @@
 
 ## ログの形式
 
-ログ1行の例:
+ログファイルの既定パス: `%TEMP%\mos_word_log.txt`（`Logger.GetLogFilePath()` と一致）
+
+### 行種別（破壊的操作検知）
+
+| 種別 | 例 | 記録主体 |
+|------|-----|----------|
+| TaskStart | `[ts] [TaskStart] 7-3-0` | 試験アプリ（`LogReader.LogTaskStart`） |
+| Operation | `[ts] [Task 7-3-0] [Op] RibbonCommand Cut` | VSTO（`Logger.LogOperation`） |
+| 正解証跡 | `[ts] [Project7] [Task7-3] [IntegralHeader] Executed` | VSTO（`Logger.LogTaskEvidence`） |
+| デバッグ | `[ts] [コマンドID] Executed` | VSTO（`Logger.LogCommand`、採点・破壊判定では無視） |
+
+従来の証跡行の例:
 
 ```text
-[2025-03-27 12:34:56] [コマンドID] Executed
+[2025-03-27 12:34:56] [Project7] [Task7-3] [IntegralHeader] Executed
 ```
-
-ログファイルの既定パス: `%TEMP%\mos_word_log.txt`（`Logger.GetLogFilePath()` と一致）
 
 ---
 

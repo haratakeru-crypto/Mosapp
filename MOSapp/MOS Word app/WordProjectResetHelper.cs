@@ -16,6 +16,10 @@ namespace MOS_Word_app
         {
             // 個別リセット時は対象プロジェクトの採点ログ行のみ削除（他プロジェクトのログを保持）
             LogReader.ClearTaskEvidenceForProject(projectId);
+            LogReader.ClearDestructiveLogForProject(projectId);
+            LogReader.ClearSnapshot();
+            LogReader.ClearCurrentTaskFile();
+            WordTaskAttemptRegistry.ClearProject(projectId);
 
             // 保存先（作業フォルダ）: Tab{groupId}\ 直下のみ。参照元: Tab{groupId}\Initial（Templates は使わない）
             string workingFolder = Path.Combine(BasePath, $"Tab{groupId}");
