@@ -1,0 +1,65 @@
+<Window x:Class="MOSExcelMogiApp.Views.ImageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="解答例" 
+        WindowStartupLocation="CenterScreen"
+        SizeToContent="WidthAndHeight"
+        Topmost="True"
+        MinWidth="400"
+        MinHeight="300"
+        MaxWidth="1920"
+        MaxHeight="1080">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- ヘッダー -->
+        <Border Grid.Row="0" Background="#1E40AF" Padding="15,10">
+            <TextBlock Text="解答例" 
+                       Foreground="White" 
+                       FontSize="18" 
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
+        </Border>
+        
+        <!-- 画像表示エリア -->
+        <ScrollViewer Grid.Row="1" 
+                      VerticalScrollBarVisibility="Auto" 
+                      HorizontalScrollBarVisibility="Auto"
+                      Margin="10">
+            <Image x:Name="AnswerImage" 
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
+        </ScrollViewer>
+        
+        <!-- フッター -->
+        <Border Grid.Row="2" Background="#F5F5F5" Padding="15,10">
+            <Button Content="閉じる" 
+                    Width="100" 
+                    Height="35" 
+                    HorizontalAlignment="Center"
+                    Click="CloseButton_Click"
+                    Background="#1E40AF"
+                    Foreground="White"
+                    BorderThickness="0"
+                    FontWeight="Medium"
+                    Cursor="Hand">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1D4ED8"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Border>
+    </Grid>
+</Window>
+
+

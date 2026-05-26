@@ -1,0 +1,36 @@
+<project outputDir="C:\Users\kouza\source\repos\mos_xaml_app" baseDir="C:\Users\kouza\source\repos\mos_xaml_app\bin\Release" xmlns="http://confuser.codeplex.com">
+  <rule pattern="true" preset="maximum" inherit="false" />
+  <module path="MOSExcelMogiApp.exe">
+    <rule pattern="true" preset="maximum" inherit="false" />
+  </module>
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_1.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_2.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_3.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_4.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_5.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_6.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_7.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_8.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_9.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group1\ExcelChecker1_10.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_1.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_2.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_3.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_4.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_5.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_6.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_7.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_8.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_9.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group2\ExcelChecker2_10.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_1.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_2.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_3.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_4.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_5.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_6.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_7.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_8.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_9.dll" />
+  <module path="C:\Users\kouza\source\repos\mos_xaml_app\Libraries\Group3\ExcelChecker3_10.dll" />
+</project>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="Ribbon_Load">
+  <ribbon>
+    <tabs>
+      <tab id="MosLogTab" label="ログ" insertAfterMso="TabHelp">
+        <group id="MosLogGroup" label="ログ">
+          <button id="ShowLog" label="ログを表示" onAction="ShowLogOnAction" />
+          <button id="ClearLog" label="ログをクリア" onAction="ClearLogOnAction" />
+          <button id="CopyLogPath" label="ログパスをコピー" onAction="CopyLogPathOnAction" />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+  <!-- ファイルタブ（Backstage）の開閉。情報パネル由来の文書プロパティ変更をタスク文脈固定で記録する。 -->
+  <backstage onShow="OnBackstageShow" onHide="OnBackstageHide" />
+</customUI>

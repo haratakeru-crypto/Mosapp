@@ -1,0 +1,17 @@
+fixed,group,project,task,issue,checker_path
+〇,1,6,2,URLと表示文字列をContainsで判定,Libraries/Group1/ExcelChecker1_6.cs CheckTask_1_6_02_Impl
+〇,1,6,4,"タグ ""売上"" をContainsで判定",Libraries/Group1/ExcelChecker1_6.cs CheckTask_1_6_04_Impl
+〇,1,8,1,参照範囲をContains判定,Libraries/Group1/ExcelChecker1_8.cs CheckTask_1_8_01_Impl
+〇,1,8,2,セル値をContains判定,Libraries/Group1/ExcelChecker1_8.cs CheckTask_1_8_02_Impl
+〇,1,9,3,アイコンセット適用範囲を検証していない,Libraries/Group1/ExcelChecker1_9.cs CheckTask_1_9_03_Impl
+〇,1,9,4,条件付き書式値をContainsで判定,Libraries/Group1/ExcelChecker1_9.cs CheckTask_1_9_04_Impl
+〇,2,2,1,メモ内容をContainsで判定,Libraries/Group2/ExcelChecker2_2.cs CheckTask_2_2_01_Impl
+〇,1,1,7,メモ内容をContainsで判定,Libraries/Group1/ExcelChecker1_1.cs CheckTask_1_1_07_Impl
+〇,2,1,7,メモ内容をContainsで判定,Libraries/Group2/ExcelChecker2_1.cs CheckTask_2_1_07_Impl
+×,5,1,1,グラフタイトルをContainsで判定,Libraries/Group5/ExcelChecker5_1.cs CheckTask_5_1_01_Impl
+×,6,2,2,ハイパーリンクURLをContainsで判定,Libraries/Group6/ExcelChecker6_2.cs CheckTask_6_2_02_Impl
+×,6,4,4,タグをContainsで判定,Libraries/Group6/ExcelChecker6_4.cs CheckTask_6_4_04_Impl
+×,8,2,2,日付をContainsで判定,Libraries/Group8/ExcelChecker8_2.cs CheckTask_8_2_02_Impl
+×,9,6,6,フッター文字列をContainsで判定,Libraries/Group9/ExcelChecker9_6.cs CheckTask_9_6_06_Impl
+×,4,4,4,代替テキストをContainsで判定,Libraries/Group4/ExcelChecker4_4.cs CheckTask_4_4_04_Impl
+×,5,6,6,横軸ラベルをContainsで判定,Libraries/Group5/ExcelChecker5_6.cs CheckTask_5_6_06_Impl

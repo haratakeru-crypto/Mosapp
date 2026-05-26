@@ -90,14 +90,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="293288">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Mos PowerPoint Mogi App.exe" size="326568">
       <assemblyIdentity name="Mos PowerPoint Mogi App" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>cdQFMkm4h++3GCYt0ugrKKWzzeA5HNHsh4KJkeRSloE=</dsig:DigestValue>
+        <dsig:DigestValue>iR67eSLYDkeAKoP4MBPjEqRQU6jxpW8cJYGKRL4Ry0U=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -114,50 +114,50 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointAddIn1.dll" size="47616">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointAddIn1.dll" size="54272">
       <assemblyIdentity name="PowerPointAddIn1" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>NRvhyzKKB1VBxM4Tr4CWfvesJHBqS9/Tmo8BoZ5TTrQ=</dsig:DigestValue>
+        <dsig:DigestValue>EL9DzeWyisUZMU4D9Nf3mIx8kNJ69QtBClKtM2PGhNE=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_1.dll" size="12288">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_1.dll" size="12800">
       <assemblyIdentity name="PowerPointChecker1_1" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>MXhBMOL7Q3QPHpAnJ9kvdCEREfouxecozI+gxTLhg88=</dsig:DigestValue>
+        <dsig:DigestValue>mGgOPaHbkSECufLYnjhYEAMgLL8RpoxQrWK51kGecXg=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_10.dll" size="16384">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_10.dll" size="20992">
       <assemblyIdentity name="PowerPointChecker1_10" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>956pb2eTKWv1XGBi4bpXsO4Z94b6UPEQHzlkU1sNji0=</dsig:DigestValue>
+        <dsig:DigestValue>gr4BUM180p3QNqQ8XD9mK1yWhxtd13AEvQ7yCm9ZtVg=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_11.dll" size="18432">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_11.dll" size="20480">
       <assemblyIdentity name="PowerPointChecker1_11" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>utZlMURoJXVc5keLRBC3f+YkL4OoKEL6wT072oJcmRY=</dsig:DigestValue>
+        <dsig:DigestValue>oOo85Y9td+hXRJutiKwWolbg7OxVeSXjmBtayUDWEeo=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -169,19 +169,19 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>nUWFffo6em2XNvHf7vZ7r50/Raq/xMIUQr/vSCCfXHU=</dsig:DigestValue>
+        <dsig:DigestValue>knr/+3pMyenb4kM16uoocCfWN/Q5HWgp5M1Bjt4oheI=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_3.dll" size="20480">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_3.dll" size="23040">
       <assemblyIdentity name="PowerPointChecker1_3" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>VTOV+Osx9GLMNpTWScnCNkBHsx1xIHwulgP75/QJOGk=</dsig:DigestValue>
+        <dsig:DigestValue>y1lEzOtK0ZY21IVLHU4E5SoNPs20FEyxQQS0VjLIYt8=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -193,7 +193,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>hAE47T6ezzM89WCHV2SPqGvdbJ0mVXhEx7geiTcrFzU=</dsig:DigestValue>
+        <dsig:DigestValue>mfXWPyGVpv5pQ5a8Tkv5JtN1PyUzHAMSYSnUvZJRFRI=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -205,7 +205,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>YXA7LYPhC5/+YRL3IxFWejzcBrZHEbVQnNFcMiSdKm0=</dsig:DigestValue>
+        <dsig:DigestValue>XfDaq45BDWIOT53qthgwS15Wy5J79VMdUqKoi2mGmq4=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -217,7 +217,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>n7N/AJxoSc2BaknYElU9bOE5+aZs3bPQr2Xfif19Rdk=</dsig:DigestValue>
+        <dsig:DigestValue>in23GHq70NvvB6qYdW/mmlsehEnTv5g6a24a5VgELp8=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -229,19 +229,19 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>RLPPHeG4W3RBWN0oPAVJyrLr1dNCEnrj1M38rmL7tSg=</dsig:DigestValue>
+        <dsig:DigestValue>o38ha9cZhQFpwj6siQLMeg9NKMhOSrqtoXOooVrI9gc=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_8.dll" size="12800">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointChecker1_8.dll" size="14336">
       <assemblyIdentity name="PowerPointChecker1_8" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>6ieDBm+Q6CeST28jj1uh/gi3cMuYHQSQUtHA6VC03xg=</dsig:DigestValue>
+        <dsig:DigestValue>lr5E8STuSoC3fIQjemHuKqKIiKW7OPYvNFvGozOGlfU=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -253,19 +253,19 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>1fNx/wvdyEh7vGRIECqUFeAmdyiiJyextAqS2xcP1tI=</dsig:DigestValue>
+        <dsig:DigestValue>utc0aquxKyXG93oq97E4LSEAlwFg8jFnvcpesEWf7Lk=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointCheckerCommon.dll" size="17920">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PowerPointCheckerCommon.dll" size="30720">
       <assemblyIdentity name="PowerPointCheckerCommon" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>yF3MuXLD2BbvSY66MDsK8o1EWE9QbZVYwLaLs/Rz7D0=</dsig:DigestValue>
+        <dsig:DigestValue>B+BQPN24F18MIBmKyjFjRzjl7RaPk30Se0wcDqXTNOs=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -278,13 +278,13 @@
       <dsig:DigestValue>0kyZW4JsqtzZ7+xJAybps2T7Wgms7JmBrGUEn0Ahe3k=</dsig:DigestValue>
     </hash>
   </file>
-  <file name="Mos PowerPoint Mogi App.exe.config" size="300">
+  <file name="Mos PowerPoint Mogi App.exe.config" size="357">
     <hash>
       <dsig:Transforms>
         <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
       </dsig:Transforms>
       <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-      <dsig:DigestValue>Pn28xTIpJwPY71x92Vl1KzvSCLdlutXMyEyOXZXvgZk=</dsig:DigestValue>
+      <dsig:DigestValue>BUby9nlTTufXEXnsv08OuptDqdR7x+wJbVJjZmee2Mk=</dsig:DigestValue>
     </hash>
   </file>
   <file name="MOSPP教材用採点表.csv" size="841">
@@ -323,4 +323,4 @@
       <dsig:DigestValue>X6EQg0WMERcy1DoCrjv7uXEvOZSRtX73+GV6jhnRRBU=</dsig:DigestValue>
     </hash>
   </file>
-<publisherIdentity name="CN=PC425\kouza" issuerKeyHash="0c77e4068dcea99b3fa18f513f1ddd2afb57d2a7" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>bp+yqeZNPgkM6QZvyVzcr2QRIKLa6+kJ8nCBWR8X7lM=</DigestValue></Reference></SignedInfo><SignatureValue>boA+iCbc2xoQ0rML90wT+JyUSw3haRawTvJnmKJyXhvV6dCjP/eFM9jDj3s9bu+z1HgsNtUQ70jXp1gtpiirxJuhTuGeYWoiYXPl2b4M4MRtUB9df9y01laVOwZDKvvO2oxuLFNQATf5za8OCW/x3m5w1ou2yEzdk+uLb+rUMlc=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>x+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="53ee171f598170f209e9ebdaa2201164afdc5cc96f06e90c093e4de6a9b29f6e" Description="" Url=""><as:assemblyIdentity name="Mos PowerPoint Mogi App.exe" version="1.0.0.10" publicKeyToken="d2fcd6a4e2978f6c" language="neutral" processorArchitecture="msil" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=PC425\kouza</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>Hw7AkdciPc1lI9Y+OBe+ahoP9p8ScLhOg1905or87xw=</DigestValue></Reference></SignedInfo><SignatureValue>L+VLvAgvXgWWG3SbA2owE+YsCtMO65ejQo1zMfp1zrfqkLJ4o+YtRi9m7w7CQHSphfn1lXAT5TWuStKNV/G5ZLCyoQEk5T5bYxa052Tg4PEMyTT6OYfHRwDK2UXVbQoRx/x5tvE0JaFQfg9AG5K8bWI0MdpHfYl4Oc0uwbfcC3o=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>x+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBxTCCAS6gAwIBAgIQEzF8mOTnCIVK5niIZg3WuDANBgkqhkiG9w0BAQsFADAhMR8wHQYDVQQDHhYAUABDADQAMgA1AFwAawBvAHUAegBhMB4XDTI2MDEyODA0MDgwOFoXDTI3MDEyODEwMDgwOFowITEfMB0GA1UEAx4WAFAAQwA0ADIANQBcAGsAbwB1AHoAYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAx+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqUCAwEAATANBgkqhkiG9w0BAQsFAAOBgQAojeW4E8uX9EmITWZejtZh/ohP8Iz4xwytpw/ErF+DpLxRr6Vzv5LqkDhYHdc+cZNKeW6tMbSKeKVZcMTnZSliyEB6mim2qs5wN7vqlNBSWb3XiL2OiWSS4f7Fgr2sE5olLCjQrX1+funECSyjEWbz9LMLO4bZdAIuGZcgImUT1Q==</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>
+<publisherIdentity name="CN=PC425\kouza" issuerKeyHash="0c77e4068dcea99b3fa18f513f1ddd2afb57d2a7" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>2u+sYOKfydp9U0tWoL7oOAcgTJWEu1dPlBiMiBju6O8=</DigestValue></Reference></SignedInfo><SignatureValue>Veqk5daXzyabarTIHOa5iiX57JVtL6U5yHq8jczwIQcBx8R4c4A8TmPdEksBaWIMRzCmgTurjSVAhumTWwvYpdhqY9kzogqpIAeqZuKYEaG2lT1+PwqCci6rz/WjrvVmoRk5WMGlOTAqJP3ZDoBPGdtxKfzlmygPcKq/0TtX8zs=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>x+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="efe8ee18888c18944f57bb84954c200738e8bea0564b537ddac99fe260acefda" Description="" Url=""><as:assemblyIdentity name="Mos PowerPoint Mogi App.exe" version="1.0.0.10" publicKeyToken="d2fcd6a4e2978f6c" language="neutral" processorArchitecture="msil" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=PC425\kouza</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" /><DigestValue>gskBlLxwI2P9uac7l6wYsRAmDl2hFRsGcRwzcvsmEFc=</DigestValue></Reference></SignedInfo><SignatureValue>oFqMjj27cwxdXGD5pnboos5NkoC+RT0qFCMg5Sh5WoJlPp0iZRRbKqQMcKjAkb1bwBXYj3AsaAsR4rMTBGm0JelXsDSM+3ZEDYuEcHteySB6a83IxpHzqs7FdIFopFt2CpgClkze8FlNUy26Ma1Isy3LlbDd1cotFAGwtK++Fio=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>x+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqU=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBxTCCAS6gAwIBAgIQEzF8mOTnCIVK5niIZg3WuDANBgkqhkiG9w0BAQsFADAhMR8wHQYDVQQDHhYAUABDADQAMgA1AFwAawBvAHUAegBhMB4XDTI2MDEyODA0MDgwOFoXDTI3MDEyODEwMDgwOFowITEfMB0GA1UEAx4WAFAAQwA0ADIANQBcAGsAbwB1AHoAYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAx+PpVL0K3amFSYElFkbaav/I/47WHT0DgAGeIBjJfpg115TEqtxwL+lI6A+EbLJ4N7xO8AGEoIUTsW6uJFzoTpsEksNIonOlPav4aAb3yYSJ3EHdeDo9eZ/L4H2rIzZ3TUkC68X/pKhJnPKnRp0D3SezrO98dzG4JmsyKicPwqUCAwEAATANBgkqhkiG9w0BAQsFAAOBgQAojeW4E8uX9EmITWZejtZh/ohP8Iz4xwytpw/ErF+DpLxRr6Vzv5LqkDhYHdc+cZNKeW6tMbSKeKVZcMTnZSliyEB6mim2qs5wN7vqlNBSWb3XiL2OiWSS4f7Fgr2sE5olLCjQrX1+funECSyjEWbz9LMLO4bZdAIuGZcgImUT1Q==</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>

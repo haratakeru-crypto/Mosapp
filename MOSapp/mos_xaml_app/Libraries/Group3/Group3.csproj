@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Libraries.Group3</RootNamespace>
+    <AssemblyName>Group3</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+
+  <!-- 全部ビルド用のTarget -->
+  <Target Name="BuildAll">
+    <MSBuild Projects="ExcelChecker3_1.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_2.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_3.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_4.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_5.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_6.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_7.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_8.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_9.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    <MSBuild Projects="ExcelChecker3_10.csproj" Properties="Configuration=$(Configuration);Platform=$(Platform)" />
+    
+    <!-- コピー処理 -->
+    <MakeDir Directories="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_1.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_2.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_3.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_4.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_5.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_6.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_7.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_8.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_9.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+    <Copy SourceFiles="bin\Debug\ExcelChecker3_10.dll" DestinationFolder="..\..\bin\Debug\Libraries\Group3" />
+  </Target>
+
+  <PropertyGroup>
+    <DefaultTargets>BuildAll</DefaultTargets>
+  </PropertyGroup>
+
+  <!-- 標準のビルドターゲットを無効化 -->
+  <Target Name="Build" />
+  <Target Name="CoreCompile" />
+  <Target Name="CopyFilesToOutputDirectory" />
+</Project>

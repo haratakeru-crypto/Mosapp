@@ -1,0 +1,252 @@
+<Window x:Class="MOSExcelMogiApp.Views.ReviewPageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="レビューページ - 全問題一覧" 
+        WindowState="Maximized"
+        WindowStyle="None"
+        Background="#F5F5F5">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- ヘッダー -->
+        <Border Grid.Row="0" Background="#1E40AF" Padding="20,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- タイマー表示 -->
+                <Border Grid.Column="0" Background="White" CornerRadius="6" Padding="12,8" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🕐" FontSize="18" Foreground="#1E40AF" Margin="0,0,8,0"/>
+                        <TextBlock Name="TimerTextBlock" Text="50:00:00" FontFamily="Consolas" FontSize="18" 
+                                   Foreground="#1E40AF" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+                
+                <TextBlock Grid.Column="1" Text="レビューページ - 全問題一覧" 
+                           Foreground="White" FontSize="24" FontWeight="Bold"
+                           VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                
+                <Button Grid.Column="2" Name="CloseButton" Content="✕" 
+                        Background="Transparent" Foreground="White" 
+                        FontSize="20" FontWeight="Bold"
+                        Width="40" Height="40"
+                        BorderThickness="0"
+                        Click="CloseButton_Click"
+                        Visibility="Collapsed">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#DC2626"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </Border>
+        
+        <!-- メインコンテンツ -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20">
+                <!-- 説明テキスト -->
+                <TextBlock Text="任意の問題に戻るには、その問題をクリックします。" 
+                           FontSize="14" Foreground="#6B7280" 
+                           Margin="0,0,0,20" HorizontalAlignment="Center"/>
+                
+                <!-- プロジェクト一覧 -->
+                <ItemsControl Name="ProjectsItemsControl">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="White" CornerRadius="8" Margin="0,0,0,20" 
+                                    Padding="20" BorderBrush="#E5E7EB" BorderThickness="1">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" Direction="315" ShadowDepth="2" Opacity="0.1" BlurRadius="8"/>
+                                </Border.Effect>
+                                
+                                <StackPanel>
+                                    <!-- プロジェクトタイトル -->
+                                    <TextBlock Text="{Binding ProjectTitle}" 
+                                               FontSize="20" FontWeight="Bold" 
+                                               Foreground="#1E40AF" Margin="0,0,0,15"/>
+                                    
+                                    <!-- テーブル形式のタスク一覧 -->
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <!-- テーブルヘッダー -->
+                                        <Border Grid.Row="0" Background="#F8FAFC" 
+                                                BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+                                            <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="120"/>
+                                                <ColumnDefinition Width="120"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <TextBlock Grid.Column="0" Text="プロジェクト番号・タスク番号" 
+                                                       FontSize="19" FontWeight="Bold" 
+                                                       Foreground="#374151" Padding="15,10"/>
+                                            <TextBlock Grid.Column="1" Text="解答済み" 
+                                                       FontSize="19" FontWeight="Bold" 
+                                                       Foreground="#374151" Padding="15,10" 
+                                                       HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="あとで見直す" 
+                                                       FontSize="19" FontWeight="Bold" 
+                                                       Foreground="#374151" Padding="15,10" 
+                                                       HorizontalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        
+                                        <!-- タスク一覧 -->
+                                        <ItemsControl Grid.Row="1" ItemsSource="{Binding Tasks}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="120"/>
+                                                                <ColumnDefinition Width="120"/>
+                                                            </Grid.ColumnDefinitions>
+                                                        
+                                                        <!-- タスク情報 -->
+                                                        <Button Grid.Column="0" Background="Transparent" 
+                                                                Padding="15,10"
+                                                                Cursor="Hand"
+                                                                Click="TaskButton_Click"
+                                                                MouseEnter="TaskButton_MouseEnter"
+                                                                MouseLeave="TaskButton_MouseLeave"
+                                                                BorderThickness="0"
+                                                                HorizontalContentAlignment="Stretch"
+                                                                VerticalContentAlignment="Stretch">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button">
+                                                                    <Setter Property="Template">
+                                                                        <Setter.Value>
+                                                                            <ControlTemplate TargetType="Button">
+                                                                                <Border Background="{TemplateBinding Background}" 
+                                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                                        Padding="{TemplateBinding Padding}">
+                                                                                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                                                                </Border>
+                                                                                <ControlTemplate.Triggers>
+                                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                                        <Setter Property="Background" Value="#E0F2FE"/>
+                                                                                    </Trigger>
+                                                                                </ControlTemplate.Triggers>
+                                                                            </ControlTemplate>
+                                                                        </Setter.Value>
+                                                                    </Setter>
+                                                                </Style>
+                                                            </Button.Style>
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding TaskTitle}" 
+                                                                           FontSize="19" FontWeight="SemiBold" 
+                                                                           Foreground="#374151" Margin="0,0,0,4"/>
+                                                                <TextBlock Text="{Binding Description}" 
+                                                                           FontSize="17" Foreground="#6B7280" 
+                                                                           TextWrapping="Wrap" LineHeight="21"/>
+                                                            </StackPanel>
+                                                        </Button>
+                                                        
+                                                        <!-- 解答済み列 -->
+                                                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Name="CompletedMark" Text="✓" 
+                                                                       FontSize="20" Foreground="#10B981" 
+                                                                       FontWeight="Bold" 
+                                                                       HorizontalAlignment="Center"
+                                                                       Visibility="Collapsed"/>
+                                                        </Grid>
+                                                        
+                                                        <!-- あとで見直す列 -->
+                                                        <Grid Grid.Column="2" VerticalAlignment="Center">
+                                                            <TextBlock Name="FlaggedMark" Text="🚩" 
+                                                                       FontSize="20" 
+                                                                       HorizontalAlignment="Center"
+                                                                       Visibility="Collapsed"/>
+                                                        </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- フッター -->
+        <Border Grid.Row="2" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0">
+            <Grid Margin="20,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="全問題を確認できます" 
+                           Foreground="#6B7280" FontSize="14"
+                           VerticalAlignment="Center"/>
+                
+                <!-- 結果の表示ボタンのみ表示 -->
+                <Button Grid.Column="1" Name="EndExamButton" Content="結果の表示" 
+                        Background="#DC2626" Foreground="White" 
+                        Padding="25,10" FontWeight="Bold" FontSize="14"
+                        BorderThickness="0" Click="EndExamButton_Click"
+                        VerticalAlignment="Center"
+                        Margin="0,0,10,0">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#B91C1C"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                
+                <!-- スペーサー -->
+                <Grid Grid.Column="2"/>
+                
+                <!-- 閉じるボタンは非表示（結果の表示のみ表示） -->
+                <Button Grid.Column="3" Name="CloseButtonFooter" Content="終了" 
+                        Background="#1E40AF" Foreground="White" 
+                        Padding="20,10" FontWeight="Medium"
+                        BorderThickness="0" Click="CloseButton_Click"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#1D4ED8"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

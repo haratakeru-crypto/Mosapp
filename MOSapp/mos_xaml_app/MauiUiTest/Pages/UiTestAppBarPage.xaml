@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MOSExcelMogiApp.Maui.Pages.UiTestAppBarPage"
+             Title="UIテスト - App Bar"
+             BackgroundColor="#F5F5F5">
+    
+    <Grid RowDefinitions="Auto,*,Auto" Padding="0" x:Name="MainGrid">
+            <!-- ヘッダーバー -->
+            <Border Grid.Row="0" 
+                    BackgroundColor="#1E40AF" 
+                    StrokeThickness="0"
+                    Padding="20,10"
+                    MinimumHeightRequest="80">
+            <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
+                <!-- 左側: タイマーとボタン -->
+                <HorizontalStackLayout Grid.Column="0" 
+                                      Spacing="10" 
+                                      VerticalOptions="Center">
+                    <Label Text="🕐" 
+                           FontSize="20" 
+                           TextColor="White" 
+                           VerticalOptions="Center"/>
+                    <Label x:Name="TimerTextBlock" 
+                           Text="50:00:00" 
+                           FontFamily="Consolas" 
+                           FontSize="20" 
+                           TextColor="White" 
+                           FontAttributes="Bold" 
+                           VerticalOptions="Center"/>
+                    <Button Text="レビューページ" 
+                            BackgroundColor="White" 
+                            TextColor="#1E40AF" 
+                            Padding="24,10" 
+                            Margin="20,0,0,0"
+                            Clicked="ReviewPageButton_Clicked"
+                            FontAttributes="None"
+                            FontSize="16"/>
+                </HorizontalStackLayout>
+                
+                <!-- 中央: タイトル -->
+                <Label Grid.Column="1" 
+                       x:Name="ProjectInfoTextBlock"
+                       Text="プロジェクト 1/10" 
+                       TextColor="White" 
+                       FontSize="18" 
+                       FontAttributes="Bold"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center"/>
+                
+                <!-- 右側: ボタンとアイコン -->
+                <HorizontalStackLayout Grid.Column="2" 
+                                      Spacing="10" 
+                                      VerticalOptions="Center" 
+                                      HorizontalOptions="End" 
+                                      Margin="20,0,10,0">
+                    <Button x:Name="ScoreButton" 
+                            Text="採点" 
+                            BackgroundColor="White" 
+                            TextColor="#1E40AF" 
+                            Padding="24,10" 
+                            Clicked="ScoreButton_Clicked"
+                            FontAttributes="None"
+                            FontSize="16"/>
+                    <Button x:Name="PauseButton" 
+                            Text="一時停止" 
+                            BackgroundColor="White" 
+                            TextColor="#1E40AF" 
+                            Padding="24,10" 
+                            Clicked="PauseButton_Clicked"
+                            FontAttributes="None"
+                            FontSize="16"/>
+                    <Button x:Name="ResetButton" 
+                            Text="リセット" 
+                            BackgroundColor="White" 
+                            TextColor="#1E40AF" 
+                            Padding="24,10" 
+                            Clicked="ResetButton_Clicked"
+                            FontAttributes="None"
+                            FontSize="16"/>
+                    <Button Text="次のプロジェクト" 
+                            BackgroundColor="White" 
+                            TextColor="#1E40AF" 
+                            Padding="24,10" 
+                            Clicked="NextProject_Clicked"
+                            FontAttributes="None"
+                            FontSize="16"/>
+                    <Button Text="↓" 
+                            WidthRequest="32" 
+                            HeightRequest="32" 
+                            BackgroundColor="White" 
+                            TextColor="#1E40AF" 
+                            FontAttributes="Bold"
+                            FontSize="14"/>
+                    <Button Text="□" 
+                            WidthRequest="32" 
+                            HeightRequest="32" 
+                            BackgroundColor="White" 
+                            TextColor="#1E40AF" 
+                            FontAttributes="Bold"
+                            FontSize="14"/>
+                </HorizontalStackLayout>
+            </Grid>
+        </Border>
+        
+        <!-- メインコンテンツエリア -->
+        <ScrollView Grid.Row="1">
+            <Border BackgroundColor="White" 
+                    Margin="20,0,20,0"
+                    StrokeThickness="0"
+                    MinimumHeightRequest="600">
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="30">
+                    <!-- ナビゲーション -->
+                    <HorizontalStackLayout Grid.Row="0" 
+                                          Spacing="5" 
+                                          HorizontalOptions="Center" 
+                                          Margin="0,0,0,30">
+                    <Button Text="←" 
+                            WidthRequest="96" 
+                            HeightRequest="32" 
+                            BackgroundColor="#D1D5DB" 
+                            TextColor="White" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="PreviousTask_Clicked"/>
+                    
+                    <!-- タスク番号ボタン（1-7） -->
+                    <Frame x:Name="TaskButton1Frame"
+                            WidthRequest="120" 
+                            HeightRequest="32" 
+                            BackgroundColor="White" 
+                            BorderColor="#9CA3AF" 
+                            HasShadow="False"
+                            Padding="0">
+                        <Button Text="1" 
+                                BackgroundColor="Transparent" 
+                                TextColor="Black" 
+                                FontAttributes="Bold"
+                                FontSize="16"
+                                Clicked="TaskButton_Clicked"/>
+                    </Frame>
+                    <Button x:Name="TaskButton2" 
+                            Text="2" 
+                            WidthRequest="120" 
+                            HeightRequest="32" 
+                            BackgroundColor="#D1D5DB" 
+                            TextColor="Black" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="TaskButton_Clicked"/>
+                    <Button x:Name="TaskButton3" 
+                            Text="3" 
+                            WidthRequest="120" 
+                            HeightRequest="32" 
+                            BackgroundColor="#D1D5DB" 
+                            TextColor="Black" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="TaskButton_Clicked"/>
+                    <Button x:Name="TaskButton4" 
+                            Text="4" 
+                            WidthRequest="120" 
+                            HeightRequest="32" 
+                            BackgroundColor="#D1D5DB" 
+                            TextColor="Black" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="TaskButton_Clicked"/>
+                    <Button x:Name="TaskButton5" 
+                            Text="5" 
+                            WidthRequest="120" 
+                            HeightRequest="32" 
+                            BackgroundColor="#D1D5DB" 
+                            TextColor="Black" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="TaskButton_Clicked"/>
+                    <Button x:Name="TaskButton6" 
+                            Text="6" 
+                            WidthRequest="120" 
+                            HeightRequest="32" 
+                            BackgroundColor="#D1D5DB" 
+                            TextColor="Black" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="TaskButton_Clicked"/>
+                    <Button x:Name="TaskButton7" 
+                            Text="7" 
+                            WidthRequest="120" 
+                            HeightRequest="32" 
+                            BackgroundColor="#D1D5DB" 
+                            TextColor="Black" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="TaskButton_Clicked"/>
+                    
+                        <Button Text="→" 
+                                WidthRequest="96" 
+                                HeightRequest="32" 
+                                BackgroundColor="#D1D5DB" 
+                                TextColor="White" 
+                                FontAttributes="Bold"
+                                FontSize="16"
+                                Clicked="NextTask_Clicked"/>
+                    </HorizontalStackLayout>
+                    
+                    <!-- 指示テキスト - 大きく表示 -->
+                    <Frame Grid.Row="1" 
+                            BackgroundColor="White" 
+                            BorderColor="#E5E7EB" 
+                            HasShadow="False"
+                            Padding="30"
+                            VerticalOptions="FillAndExpand"
+                            Margin="0,0,0,30">
+                        <Grid RowDefinitions="*,Auto" RowSpacing="16">
+                            <!-- 上段: 指示テキスト - 大きく表示 -->
+                            <Label Grid.Row="0"
+                                   x:Name="TaskDescriptionTextBlock" 
+                                   Text="準備完了"
+                                   FontSize="20"
+                                   TextColor="#374151"
+                                   LineHeight="28"
+                                   VerticalOptions="Start"
+                                   Margin="0,0,0,16"/>
+                            
+                            <!-- 下段: アクションボタン（中央寄せ） -->
+                            <HorizontalStackLayout Grid.Row="1" 
+                                                  Spacing="24" 
+                                                  HorizontalOptions="Center" 
+                                                  Margin="0,16,0,0">
+                                <Button x:Name="CompleteButton" 
+                                        Text="解答済みにする" 
+                                        BackgroundColor="Transparent"
+                                        TextColor="#1E40AF" 
+                                        FontAttributes="None"
+                                        FontSize="16"
+                                        Padding="0,10,0,10"
+                                        Clicked="CompleteButton_Clicked"/>
+                                <Button x:Name="FlagButton" 
+                                        Text="あとで見直す" 
+                                        BackgroundColor="Transparent"
+                                        TextColor="#1E40AF" 
+                                        FontAttributes="None"
+                                        FontSize="16"
+                                        Padding="0,10,0,10"
+                                        Clicked="FlagButton_Clicked"/>
+                                <Button Text="試験後にコメントする" 
+                                        BackgroundColor="Transparent"
+                                        TextColor="#1E40AF" 
+                                        FontAttributes="None"
+                                        FontSize="16"
+                                        Padding="0,10,0,10"/>
+                                <Button Text="終了" 
+                                        BackgroundColor="#EF4444" 
+                                        TextColor="White" 
+                                        Padding="15,8" 
+                                        FontAttributes="None"
+                                        Clicked="CloseButton_Clicked"/>
+                            </HorizontalStackLayout>
+                        </Grid>
+                    </Frame>
+                </Grid>
+            </Border>
+        </ScrollView>
+        
+        <!-- 下部ボタンエリア（画像に合わせて追加） -->
+        <Border Grid.Row="2" 
+                BackgroundColor="White" 
+                Margin="20,0,20,20"
+                StrokeThickness="0"
+                Padding="20,15">
+            <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                <HorizontalStackLayout Spacing="15" 
+                                      HorizontalOptions="Center">
+                    <Button Text="採点" 
+                            BackgroundColor="#1E40AF" 
+                            TextColor="White" 
+                            Padding="24,10" 
+                            FontAttributes="None"
+                            FontSize="16"
+                            Clicked="ScoreButton_Clicked"/>
+                    <Button Text="一時停止" 
+                            BackgroundColor="#1E40AF" 
+                            TextColor="White" 
+                            Padding="24,10" 
+                            FontAttributes="None"
+                            FontSize="16"
+                            Clicked="PauseButton_Clicked"/>
+                    <Button Text="リセット" 
+                            BackgroundColor="#1E40AF" 
+                            TextColor="White" 
+                            Padding="24,10" 
+                            FontAttributes="None"
+                            FontSize="16"
+                            Clicked="ResetButton_Clicked"/>
+                    <Button Text="次のプロジェクト" 
+                            BackgroundColor="#1E40AF" 
+                            TextColor="White" 
+                            Padding="24,10" 
+                            FontAttributes="None"
+                            FontSize="16"
+                            Clicked="NextProject_Clicked"/>
+                    <Button Text="あとで見直す" 
+                            BackgroundColor="#1E40AF" 
+                            TextColor="White" 
+                            Padding="24,10" 
+                            FontAttributes="None"
+                            FontSize="16"
+                            Clicked="FlagButton_Clicked"/>
+                    <Button Text="試験終了" 
+                            BackgroundColor="#DC2626" 
+                            TextColor="White" 
+                            Padding="24,10" 
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Clicked="EndExamButton_Clicked"/>
+                </HorizontalStackLayout>
+            </ScrollView>
+        </Border>
+    </Grid>
+</ContentPage>
+
