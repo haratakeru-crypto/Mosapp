@@ -11,6 +11,8 @@ using Newtonsoft.Json;
 using WordApp = Microsoft.Office.Interop.Word.Application;
 using WordDoc = Microsoft.Office.Interop.Word.Document;
 
+using Libraries.Group1;
+
 namespace Libraries
 {
     /// <summary>
@@ -585,9 +587,12 @@ namespace Libraries
                 if (taskId >= 1 && taskId <= 3)
                     // 4-1〜4-3: ［校閲］コメント挿入・返信・解決・削除
                     flags |= WordValidationExemptFlags.CommentsCount;
-                if (taskId == 5 || taskId == 6)
-                    // 4-5: ［デザイン］透かし／4-6: ページ罫線
-                    flags |= WordValidationExemptFlags.Watermark | WordValidationExemptFlags.PageBorder;
+                if (taskId == 5)
+                    // 4-5: ［デザイン］透かし（下書き1）— タスク区間内の Watermark 変化のみ免除
+                    flags |= WordValidationExemptFlags.Watermark;
+                if (taskId == 6)
+                    // 4-6: ページ罫線 — タスク区間内の PageBorder 変化のみ免除
+                    flags |= WordValidationExemptFlags.PageBorder;
                 if (taskId == 7)
                     // 4-7: ドキュメント検査でヘッダー・フッター・透かし削除
                     flags |= WordValidationExemptFlags.HeaderFooterFingerprint | WordValidationExemptFlags.Watermark;
@@ -693,6 +698,14 @@ namespace Libraries
                 // 4-1/4-2: 問題文の指定文言クリックでコピー → コメント欄へ［貼り付け］（2-4 と同様）
                 allowed.Add("Paste");
             }
+            if (projectId == 4 && taskId == 5)
+            {
+                // 4-5: ［デザイン］透かし（下書き1）— [Op] Watermark（VSTO ポーリング。他タスクでは許可外）
+                allowed.Add("Watermark");
+            }
+            if (projectId == 4 && taskId == 6)
+                // 4-6: ［デザイン］ページ罫線 — [Op] PageBorders（Ribbon / ポーリング。他タスクでは許可外）
+                allowed.Add("PageBorders");
 
             // P5
             if (projectId == 5)
@@ -746,6 +759,8 @@ namespace Libraries
             public int Comments { get; set; }
             public string HeaderPrimaryFp { get; set; }
             public int CompatibilityMode { get; set; } = -1;
+            public string WatermarkFingerprint { get; set; } = "None";
+            public string PageBorderFingerprint { get; set; } = "";
         }
 
         public static List<string> CompareAndGetErrors(int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags)
@@ -781,6 +796,12 @@ namespace Libraries
                 && snapshot.CompatibilityMode >= 0 && current.CompatibilityMode >= 0
                 && current.CompatibilityMode != snapshot.CompatibilityMode)
                 errors.Add($"CompatibilityMode changed {snapshot.CompatibilityMode}->{current.CompatibilityMode}"); // 例: ［ファイル］情報の変換
+            if (!exemptFlags.HasFlag(WordValidationExemptFlags.Watermark)
+                && !string.Equals(snapshot.WatermarkFingerprint ?? "None", current.WatermarkFingerprint ?? "None", StringComparison.Ordinal))
+                errors.Add($"WatermarkFingerprint changed {snapshot.WatermarkFingerprint}->{current.WatermarkFingerprint}");
+            if (!exemptFlags.HasFlag(WordValidationExemptFlags.PageBorder)
+                && !string.Equals(snapshot.PageBorderFingerprint ?? "", current.PageBorderFingerprint ?? "", StringComparison.Ordinal))
+                errors.Add($"PageBorderFingerprint changed {snapshot.PageBorderFingerprint}->{current.PageBorderFingerprint}");
             return errors;
         }
 
@@ -827,6 +848,8 @@ namespace Libraries
             try { data.Tables = doc.Tables.Count; } catch { }
             try { data.CompatibilityMode = (int)doc.CompatibilityMode; } catch { data.CompatibilityMode = -1; }
             data.HeaderPrimaryFp = GetHeaderFingerprint(doc);
+            data.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprintFromDocument(doc);
+            data.PageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
             return data;
         }
 
@@ -915,8 +938,12 @@ namespace Libraries
                         case "Comments": int.TryParse(val, out int cm); data.Comments = cm; break;
                         case "HeaderPrimaryFp": data.HeaderPrimaryFp = val; break;
                         case "CompatibilityMode": int.TryParse(val, out int c); data.CompatibilityMode = c; break;
+                        case "WatermarkFingerprint": data.WatermarkFingerprint = val; break;
+                        case "PageBorderFingerprint": data.PageBorderFingerprint = val; break;
                     }
                 }
+                if (string.IsNullOrEmpty(data.WatermarkFingerprint))
+                    data.WatermarkFingerprint = "None";
                 return data;
             }
             catch { return null; }

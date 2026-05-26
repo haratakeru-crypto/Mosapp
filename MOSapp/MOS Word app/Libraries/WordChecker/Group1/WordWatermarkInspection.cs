@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Office.Interop.Word;
 
 namespace Libraries.Group1
 {
@@ -88,6 +90,74 @@ namespace Libraries.Group1
                     return true;
             }
             return false;
+        }
+
+        /// <summary>スナップショット比較用の透かし指紋（タスク開始時と採点時の差分のみ。絶対判定しない）。</summary>
+        public static string GetWatermarkFingerprint(string normalizedXml)
+        {
+            if (string.IsNullOrEmpty(normalizedXml))
+                return "None";
+            if (HasForbiddenWatermark(normalizedXml))
+                return "Forbidden";
+            if (IsDraft1Watermark(normalizedXml))
+                return "Draft1Diagonal";
+            if (IsDraft2HorizontalWatermark(normalizedXml))
+                return "Draft2Horizontal";
+            if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
+                return "DraftOther";
+            return "None";
+        }
+
+        public static string GetWatermarkFingerprintFromDocument(Document doc)
+        {
+            if (doc == null)
+                return "None";
+            try
+            {
+                return GetWatermarkFingerprint(NormalizeXml(doc.WordOpenXML));
+            }
+            catch
+            {
+                return "None";
+            }
+        }
+
+        /// <summary>先頭セクションのページ上辺・下辺罫線（4-6 採点と同一形式）。</summary>
+        public static string GetPageBorderFingerprint(Document doc)
+        {
+            if (doc == null)
+                return string.Empty;
+            Section sec = null;
+            Borders borders = null;
+            Border top = null;
+            Border bottom = null;
+            try
+            {
+                if (doc.Sections.Count < 1)
+                    return string.Empty;
+                sec = doc.Sections[1];
+                borders = sec.Borders;
+                top = borders[WdBorderType.wdBorderTop];
+                bottom = borders[WdBorderType.wdBorderBottom];
+                return string.Format(CultureInfo.InvariantCulture,
+                    "{0},{1},{2},{3}",
+                    (int)top.LineStyle, (int)top.LineWidth, (int)bottom.LineStyle, (int)bottom.LineWidth);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+            finally
+            {
+                if (bottom != null)
+                    Marshal.ReleaseComObject(bottom);
+                if (top != null)
+                    Marshal.ReleaseComObject(top);
+                if (borders != null)
+                    Marshal.ReleaseComObject(borders);
+                if (sec != null)
+                    Marshal.ReleaseComObject(sec);
+            }
         }
 
         /// <summary>4-7 後: 禁止透かし・下書き1/2 相当の透かしが残っていない。</summary>

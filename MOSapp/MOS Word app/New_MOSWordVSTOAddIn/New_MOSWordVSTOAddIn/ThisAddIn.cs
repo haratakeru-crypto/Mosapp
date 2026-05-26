@@ -31,6 +31,9 @@ namespace New_MOSWordVSTOAddIn
         private bool? _lastHeading1LineSimple;
         /// <summary>4-5: 下書き1 透かしの有無（社外秘・至急は含めない）</summary>
         private bool? _lastDraft1WatermarkFound;
+        /// <summary>透かし指紋（スナップショット比較・4-1 等の [Op] 補完用）</summary>
+        private string _lastWatermarkFingerprint;
+        private int _suppressWatermarkPollLogs;
         private int _lastLaptopWrapType = -1;
 
         /// <summary>リボンが既にログした直後のポーリング二重記録を抑止する（約2ティック）。</summary>
@@ -92,6 +95,116 @@ namespace New_MOSWordVSTOAddIn
         internal void RegisterRibbonLoggedStyleSetLineSimple()
         {
             _suppressStyleSetPollLogs = 2;
+        }
+
+        internal void RegisterRibbonLoggedWatermark()
+        {
+            _suppressWatermarkPollLogs = 2;
+        }
+
+        /// <summary>
+        /// タスク切替時: 透かしポーリングのベースラインを現文書に合わせる（[Op] / Executed は出さない）。
+        /// 4-5 の下書き1が 4-6 表示後に「変化」と誤検知されるのを防ぐ。
+        /// </summary>
+        internal void SyncWatermarkPollingBaselineOnTaskSwitch(int projectId)
+        {
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(projectId);
+                ApplyWatermarkPollingBaseline(doc);
+                _suppressWatermarkPollLogs = 2;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] SyncWatermarkPollingBaselineOnTaskSwitch: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 4-5 離脱時の保険: 文書に下書き1透かしが残っていれば 4-5 の証跡を補記する。
+        /// 重いポーリング前に 4-6/4-7 へ遷移した場合でも、4-5 の第2段採点（証跡必須）を満たせるようにする。
+        /// </summary>
+        internal void EnsureTask45WatermarkEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 4 || previousTaskId != 5)
+                return;
+            if (nextProjectId == 4 && nextTaskId == 5)
+                return;
+
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(4);
+                if (doc == null)
+                    return;
+                string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                if (WordWatermarkInspection.IsDraft1Watermark(norm))
+                    WordEvidenceHelper.LogCommandWithEvidence("Watermark");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask45WatermarkEvidenceBeforeLeave: " + ex.Message);
+            }
+        }
+
+        private void ApplyWatermarkPollingBaseline(Word.Document doc)
+        {
+            if (doc == null)
+            {
+                _lastWatermarkFingerprint = "None";
+                _lastDraft1WatermarkFound = false;
+                return;
+            }
+
+            try
+            {
+                string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                _lastWatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprint(norm);
+                _lastDraft1WatermarkFound = string.Equals(_lastWatermarkFingerprint, "Draft1Diagonal", StringComparison.Ordinal);
+            }
+            catch
+            {
+                _lastWatermarkFingerprint = "None";
+                _lastDraft1WatermarkFound = false;
+            }
+        }
+
+        internal Word.Document TryGetProjectDocument(int projectId)
+        {
+            try
+            {
+                var app = Application;
+                if (app == null)
+                    return null;
+                for (int i = app.Documents.Count; i >= 1; i--)
+                {
+                    Word.Document doc = app.Documents[i];
+                    string name = Path.GetFileName(doc.FullName ?? "");
+                    if (name.StartsWith("Project" + projectId, StringComparison.OrdinalIgnoreCase)
+                        || name.StartsWith("project" + projectId, StringComparison.OrdinalIgnoreCase))
+                        return doc;
+                }
+
+                return app.ActiveDocument;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>4-5 正答証跡と採点ゲート②用 [Op] Watermark（指紋変化・リボン透かし）。</summary>
+        private static void LogWatermarkForDestructiveGate(string fingerprint)
+        {
+            Logger.LogOperation("Watermark", fingerprint ?? "");
+            if (string.Equals(fingerprint, "Draft1Diagonal", StringComparison.Ordinal))
+                WordEvidenceHelper.LogCommandWithEvidence("Watermark");
+        }
+
+        /// <summary>4-6 正答証跡と採点ゲート②用 [Op] PageBorders。</summary>
+        private static void LogPageBordersForDestructiveGate()
+        {
+            WordEvidenceHelper.LogCommandWithEvidence("PageBorders");
+            Logger.LogOperation("PageBorders", "");
         }
 
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
@@ -202,17 +315,11 @@ namespace New_MOSWordVSTOAddIn
                 _lastColumnBreakCount = CountColumnBreaks(doc);
                 _lastMarginsModerate = IsMarginsModeratePreset(doc);
                 _lastOrientationFingerprint = GetAllSectionsOrientationFingerprint(doc);
-                _lastPageBorderFingerprint = GetPageBorderFingerprint(doc);
+                _lastPageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
                 _lastHeading1LineSimple = IsHeading1LineSimplePattern(doc);
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
 
-                // 4-5: ベースライン取得（下書き1 のみ）
-                try
-                {
-                    string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
-                    _lastDraft1WatermarkFound = WordWatermarkInspection.IsDraft1Watermark(norm);
-                }
-                catch { _lastDraft1WatermarkFound = false; }
+                ApplyWatermarkPollingBaseline(doc);
 
                 // 7-1: 互換モードのベースライン（ポーリングで 非15→15 の遷移を検知するため）
                 try
@@ -408,13 +515,13 @@ namespace New_MOSWordVSTOAddIn
                 bool runHeavyChecks = (_heavyCheckTickCounter % 5) == 0;
                 if (runHeavyChecks)
                 {
-                    string borderFp = GetPageBorderFingerprint(doc);
+                    string borderFp = WordWatermarkInspection.GetPageBorderFingerprint(doc);
                     if (_lastPageBorderFingerprint != null && borderFp != _lastPageBorderFingerprint)
                     {
                         if (_suppressPageBorderPollLogs > 0)
                             _suppressPageBorderPollLogs--;
                         else
-                            WordEvidenceHelper.LogCommandWithEvidence("PageBorders");
+                            LogPageBordersForDestructiveGate();
                     }
                     _lastPageBorderFingerprint = borderFp;
 
@@ -447,14 +554,21 @@ namespace New_MOSWordVSTOAddIn
                     }
                     _lastColumnBreakCount = columnBreakCount;
 
-                    // 4-5: 下書き1 透かしのみ Executed 記録（社外秘・至急等は記録しない）
+                    // 4-1 等: 透かし指紋の変化で [Op] Watermark（4-5 は Draft1Diagonal で Executed も）
                     try
                     {
                         string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
-                        bool hasDraft1 = WordWatermarkInspection.IsDraft1Watermark(norm);
-                        if (hasDraft1 && (!_lastDraft1WatermarkFound.HasValue || !_lastDraft1WatermarkFound.Value))
-                            WordEvidenceHelper.LogCommandWithEvidence("Watermark");
-                        _lastDraft1WatermarkFound = hasDraft1;
+                        string wmFp = WordWatermarkInspection.GetWatermarkFingerprint(norm);
+                        if (_lastWatermarkFingerprint != null
+                            && !string.Equals(wmFp, _lastWatermarkFingerprint, StringComparison.Ordinal))
+                        {
+                            if (_suppressWatermarkPollLogs > 0)
+                                _suppressWatermarkPollLogs--;
+                            else
+                                LogWatermarkForDestructiveGate(wmFp);
+                        }
+                        _lastWatermarkFingerprint = wmFp;
+                        _lastDraft1WatermarkFound = string.Equals(wmFp, "Draft1Diagonal", StringComparison.Ordinal);
                     }
                     catch { }
 
@@ -984,39 +1098,6 @@ namespace New_MOSWordVSTOAddIn
             return sb.ToString();
         }
 
-        private static string GetPageBorderFingerprint(Word.Document doc)
-        {
-            Word.Section sec = null;
-            Word.Borders borders = null;
-            Word.Border top = null;
-            Word.Border bottom = null;
-            try
-            {
-                sec = doc.Sections[1];
-                borders = sec.Borders;
-                top = borders[Word.WdBorderType.wdBorderTop];
-                bottom = borders[Word.WdBorderType.wdBorderBottom];
-                return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "{0},{1},{2},{3}",
-                    (int)top.LineStyle, (int)top.LineWidth, (int)bottom.LineStyle, (int)bottom.LineWidth);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-            finally
-            {
-                if (bottom != null)
-                    Marshal.ReleaseComObject(bottom);
-                if (top != null)
-                    Marshal.ReleaseComObject(top);
-                if (borders != null)
-                    Marshal.ReleaseComObject(borders);
-                if (sec != null)
-                    Marshal.ReleaseComObject(sec);
-            }
-        }
-
         /// <summary>
         /// WordChecker1_4 の 4-4（線・シンプル）と同条件。
         /// </summary>
@@ -1257,6 +1338,9 @@ namespace New_MOSWordVSTOAddIn
                     if (!taskChanged && !forceSnapshot)
                         return;
 
+                    if (taskChanged)
+                        _addIn.EnsureTask45WatermarkEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+
                     if (_projectId >= 0 && _taskId >= 0 && !forceSnapshot && projectId == _projectId)
                         CompareAndLogDestructive(_projectId, _taskId, _attemptNo, _exemptFlags);
 
@@ -1266,6 +1350,7 @@ namespace New_MOSWordVSTOAddIn
                     _exemptFlags = exemptFlags;
 
                     Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
+                    _addIn.SyncWatermarkPollingBaselineOnTaskSwitch(projectId);
                     TakeSnapshot(projectId, taskId, attemptNo);
                 }
                 catch (Exception ex)
@@ -1276,7 +1361,7 @@ namespace New_MOSWordVSTOAddIn
 
             private void TakeSnapshot(int projectId, int taskId, int attemptNo)
             {
-                Word.Document doc = TryGetProjectDocument(projectId);
+                Word.Document doc = _addIn.TryGetProjectDocument(projectId);
                 if (doc == null)
                     return;
 
@@ -1297,7 +1382,7 @@ namespace New_MOSWordVSTOAddIn
                 if (baseline == null || baseline.ProjectId != projectId || baseline.TaskId != taskId || baseline.AttemptNo != attemptNo)
                     return;
 
-                Word.Document doc = TryGetProjectDocument(projectId);
+                Word.Document doc = _addIn.TryGetProjectDocument(projectId);
                 if (doc == null)
                     return;
 
@@ -1338,32 +1423,14 @@ namespace New_MOSWordVSTOAddIn
                 if (!HasFlag(exemptFlagsInt, 1024) && baseline.CompatibilityMode >= 0 && current.CompatibilityMode >= 0
                     && baseline.CompatibilityMode != current.CompatibilityMode)
                     errors.Add($"CompatibilityMode changed {baseline.CompatibilityMode}->{current.CompatibilityMode}");
+                if (!HasFlag(exemptFlagsInt, 128) && !string.Equals(baseline.PageBorderFingerprint ?? "", current.PageBorderFingerprint ?? "", StringComparison.Ordinal))
+                    errors.Add($"PageBorderFingerprint changed {baseline.PageBorderFingerprint}->{current.PageBorderFingerprint}");
+                if (!HasFlag(exemptFlagsInt, 256) && !string.Equals(baseline.WatermarkFingerprint ?? "None", current.WatermarkFingerprint ?? "None", StringComparison.Ordinal))
+                    errors.Add($"WatermarkFingerprint changed {baseline.WatermarkFingerprint}->{current.WatermarkFingerprint}");
                 return errors;
             }
 
             private static bool HasFlag(int flags, int bit) => (flags & bit) != 0;
-
-            private Word.Document TryGetProjectDocument(int projectId)
-            {
-                try
-                {
-                    var app = _addIn.Application;
-                    if (app == null) return null;
-                    for (int i = app.Documents.Count; i >= 1; i--)
-                    {
-                        Word.Document doc = app.Documents[i];
-                        string name = Path.GetFileName(doc.FullName ?? "");
-                        if (name.StartsWith("Project" + projectId, StringComparison.OrdinalIgnoreCase)
-                            || name.StartsWith("project" + projectId, StringComparison.OrdinalIgnoreCase))
-                            return doc;
-                    }
-                    return app.ActiveDocument;
-                }
-                catch
-                {
-                    return null;
-                }
-            }
 
             private static SnapshotData Capture(Word.Document doc, int projectId, int taskId, int attemptNo)
             {
@@ -1382,6 +1449,16 @@ namespace New_MOSWordVSTOAddIn
                 try { d.Tables = doc.Tables.Count; } catch { }
                 try { d.CompatibilityMode = (int)doc.CompatibilityMode; } catch { d.CompatibilityMode = -1; }
                 d.HeaderPrimaryFp = GetHeaderFp(doc);
+                try
+                {
+                    string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                    d.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprint(norm);
+                }
+                catch
+                {
+                    d.WatermarkFingerprint = "None";
+                }
+                d.PageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
                 return d;
             }
 
@@ -1402,7 +1479,7 @@ namespace New_MOSWordVSTOAddIn
             private static void SaveSnapshot(SnapshotData d)
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("# WordSnapshot v1");
+                sb.AppendLine("# WordSnapshot v2");
                 sb.AppendLine($"ProjectId={d.ProjectId}");
                 sb.AppendLine($"TaskId={d.TaskId}");
                 sb.AppendLine($"AttemptNo={d.AttemptNo}");
@@ -1415,6 +1492,8 @@ namespace New_MOSWordVSTOAddIn
                 sb.AppendLine($"Comments={d.Comments}");
                 sb.AppendLine($"HeaderPrimaryFp={d.HeaderPrimaryFp}");
                 sb.AppendLine($"CompatibilityMode={d.CompatibilityMode}");
+                sb.AppendLine($"WatermarkFingerprint={d.WatermarkFingerprint ?? "None"}");
+                sb.AppendLine($"PageBorderFingerprint={d.PageBorderFingerprint ?? ""}");
                 File.WriteAllText(SnapshotFilePath, sb.ToString(), Encoding.UTF8);
             }
 
@@ -1444,8 +1523,12 @@ namespace New_MOSWordVSTOAddIn
                         case "Comments": int.TryParse(val, out int cm); d.Comments = cm; break;
                         case "HeaderPrimaryFp": d.HeaderPrimaryFp = val; break;
                         case "CompatibilityMode": int.TryParse(val, out int c); d.CompatibilityMode = c; break;
+                        case "WatermarkFingerprint": d.WatermarkFingerprint = val; break;
+                        case "PageBorderFingerprint": d.PageBorderFingerprint = val; break;
                     }
                 }
+                if (string.IsNullOrEmpty(d.WatermarkFingerprint))
+                    d.WatermarkFingerprint = "None";
                 return d;
             }
 
@@ -1463,6 +1546,8 @@ namespace New_MOSWordVSTOAddIn
                 public int Comments;
                 public string HeaderPrimaryFp;
                 public int CompatibilityMode = -1;
+                public string WatermarkFingerprint = "None";
+                public string PageBorderFingerprint = "";
             }
         }
 

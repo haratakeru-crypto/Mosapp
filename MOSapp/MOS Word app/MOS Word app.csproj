@@ -145,6 +145,7 @@
     <Compile Include="Libraries\LogReader.cs" />
     <Compile Include="Libraries\ScoreResultStore.cs" />
     <Compile Include="Libraries\WordBatchScoring.cs" />
+    <Compile Include="Libraries\WordChecker\Group1\WordWatermarkInspection.cs" />
     <Compile Include="Libraries\WordWindowLayoutHelper.cs" />
     <Compile Include="Libraries\VSTOCheckerHelper.cs" />
     <Compile Include="Libraries\VSTOInstallerHelper.cs" />

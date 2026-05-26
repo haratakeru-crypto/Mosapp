@@ -106,8 +106,27 @@ namespace New_MOSWordVSTOAddIn
             else if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(loggedCommandId, "TableConvertTextToTable", StringComparison.OrdinalIgnoreCase))
                 Logger.LogOperation("InsertTable", loggedCommandId ?? "");
+            else if (string.Equals(loggedCommandId, "PageBorders", StringComparison.OrdinalIgnoreCase))
+                // 4-6: ページ罫線 — 採点ゲート②で PageBorders 種別として判定（RibbonCommand 汎用にしない）
+                Logger.LogOperation("PageBorders", commandId ?? "");
             else
                 Logger.LogOperation("RibbonCommand", loggedCommandId ?? commandId ?? "");
+        }
+
+        /// <summary>
+        /// ［デザイン］透かしギャラリー。4-1 等で [Op] Watermark を記録（4-5 のみ許可、他タスクはゲート②で検知）。
+        /// </summary>
+        public void WatermarkGalleryOnAction(Microsoft.Office.Core.IRibbonControl control, string selectedId, int selectedIndex)
+        {
+            try
+            {
+                Globals.ThisAddIn?.RegisterRibbonLoggedWatermark();
+                Logger.LogOperation("Watermark", selectedId ?? "");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Ribbon] Error in WatermarkGalleryOnAction: {ex.Message}");
+            }
         }
 
         /// <summary>

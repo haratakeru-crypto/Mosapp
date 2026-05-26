@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="Ribbon_Load">
   <!--
-    <commands> はギャラリー型に onAction を付けられない（FontColorPicker 等は不可）。FontColorMoreColorsDialog のみ。
+    FontColorPicker・WatermarkGallery 等のギャラリーは Word の commands スキーマでフック不可（command のみ可）。透かしは ThisAddIn ポーリングで [Op] Watermark。
     ColumnsLeft/Right・ColumnBreak は Word で無効/未対応のため使わない。段組みは ColumnsDialog、段区切りは ThisAddIn ポーリング。
     InsertSectionBreakNextPage は環境で無効になり得るため SectionBreakInsert のみ。向きの縦横個別 id は省略（PageOrientationPortraitLandscape + ポーリング）。
     Word では PageBorders / PageBorderOptionsDialog は無効 id のため PageBorderAndShadingDialog のみ（Ribbon.cs で PageBorders ログに正規化）。
@@ -9,6 +9,7 @@
     ShowAll も Word の Ribbon で不明 ID のため未接続。編集記号は ThisAddIn の View.ShowAll / Options.ShowAll ポーリングで記録（1-1）。
     4-3: ReviewResolveComment は Word で無効 id となるため未接続。ReviewDeleteComment のみフック。解決操作の採点はチェッカー側で Comment.Done を参照。
     4-7: 文書検査は FileInspectDocument / ReviewInspectDocument 等の idMso が環境により無効のため Ribbon 未接続。採点はヘッダー・フッター空の状態のみ。
+    4-5 透かし: リボン XML 未接続。透かし指紋ポーリング + Snapshot 差分。
   -->
   <commands>
     <command idMso="Cut" onAction="CommandOnAction" />
@@ -30,7 +31,6 @@
     <command idMso="UpgradeDocument" onAction="CommandOnAction" />
     <command idMso="BulletDefineNew" onAction="CommandOnAction" />
     <command idMso="ClearFormatting" onAction="CommandOnAction" />
-
   </commands>
 
 

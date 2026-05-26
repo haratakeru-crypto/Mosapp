@@ -439,7 +439,6 @@ namespace Libraries
             if (!File.Exists(path))
                 return result;
 
-            string taskPrefix = $"[Task {projectId}-{taskId}-{attemptNo}]";
             try
             {
                 string[] lines = File.ReadAllLines(path, Encoding.UTF8);
@@ -456,10 +455,17 @@ namespace Libraries
                     int opIdx = line.IndexOf("[Op]", StringComparison.OrdinalIgnoreCase);
                     if (opIdx < 0)
                         continue;
-                    bool inTask = line.IndexOf(taskPrefix, StringComparison.OrdinalIgnoreCase) >= 0
-                        || (curP == projectId && curT == taskId && curA == attemptNo);
-                    if (!inTask)
+                    // 行に [Task P-T-A] があれば VSTO 記録時のタスクを優先（TaskStart より後に並んでも誤帰属しない）
+                    if (TryParseExplicitOpTask(line, opIdx, out int opP, out int opT, out int opA))
+                    {
+                        if (opP != projectId || opT != taskId || opA != attemptNo)
+                            continue;
+                    }
+                    else if (curP != projectId || curT != taskId || curA != attemptNo)
+                    {
                         continue;
+                    }
+
                     string afterOp = line.Substring(opIdx + 4).Trim();
                     if (afterOp.Length > 0)
                         result.Add(afterOp);
@@ -527,6 +533,29 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] AppendDestructiveErrors: {ex.Message}");
             }
+        }
+
+        /// <summary>VSTO の [Op] 行に付く [Task P-T-A] を解析（[Op] より前にある場合のみ）。</summary>
+        private static bool TryParseExplicitOpTask(string line, int opIdx, out int projectId, out int taskId, out int attemptNo)
+        {
+            projectId = -1;
+            taskId = -1;
+            attemptNo = 0;
+            int taskIdx = line.IndexOf("[Task ", StringComparison.OrdinalIgnoreCase);
+            if (taskIdx < 0 || taskIdx >= opIdx)
+                return false;
+            int closeIdx = line.IndexOf(']', taskIdx);
+            if (closeIdx < 0 || closeIdx > opIdx)
+                return false;
+            string inner = line.Substring(taskIdx + 6, closeIdx - taskIdx - 6).Trim();
+            var tokens = inner.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length < 2
+                || !int.TryParse(tokens[0].Trim(), out projectId)
+                || !int.TryParse(tokens[1].Trim(), out taskId))
+                return false;
+            if (tokens.Length >= 3)
+                int.TryParse(tokens[2].Trim(), out attemptNo);
+            return projectId > 0 && taskId > 0;
         }
 
         private static void ParseTaskStart(string line, out int projectId, out int taskId, out int attemptNo)
