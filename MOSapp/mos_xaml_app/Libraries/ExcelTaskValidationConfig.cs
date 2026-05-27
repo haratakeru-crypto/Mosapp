@@ -144,6 +144,19 @@ namespace Libraries
                 case 1:
                     switch (taskId)
                     {
+                        case 5: // イベント売上: テーブルサイズ変更時に Excel 内部更新で EditCellValue が発生し得る
+                            return ExcelValidationExemptFlags.SheetStructure | ExcelValidationExemptFlags.RangeEdit;
+                        case 1: // 試験結果テーブル: 縞模様(行/列)切替
+                        case 2: // 試験結果テーブル: 最後の列
+                        case 3: // 試験結果テーブル: スタイル変更
+                        case 4: // 担当者リスト: フィルター抽出
+                        default:
+                            // テーブル操作/フィルター操作が中心。RangeEdit 免除は不要なセル編集まで許容する。
+                            return ExcelValidationExemptFlags.SheetStructure;
+                    }
+                case 2:
+                    switch (taskId)
+                    {
                         case 1: // 下半期売上・A2スタイル
                         case 2: // 社員リスト・B5:B44インデント
                         case 3: // 社員リスト・A2:F2配置
@@ -157,7 +170,7 @@ namespace Libraries
                         default:
                             return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
                     }
-                case 2:
+                case 3:
                     switch (taskId)
                     {
                         case 1: // 売上一覧・印刷の向きを横向き
@@ -172,19 +185,6 @@ namespace Libraries
                             return ExcelValidationExemptFlags.None;
                         default:
                             return ExcelValidationExemptFlags.PrintAndPage;
-                    }
-                case 3:
-                    switch (taskId)
-                    {
-                        case 5: // イベント売上: テーブルサイズ変更時に Excel 内部更新で EditCellValue が発生し得る
-                            return ExcelValidationExemptFlags.SheetStructure | ExcelValidationExemptFlags.RangeEdit;
-                        case 1: // 試験結果テーブル: 縞模様(行/列)切替
-                        case 2: // 試験結果テーブル: 最後の列
-                        case 3: // 試験結果テーブル: スタイル変更
-                        case 4: // 担当者リスト: フィルター抽出
-                        default:
-                            // テーブル操作/フィルター操作が中心。RangeEdit 免除は不要なセル編集まで許容する。
-                            return ExcelValidationExemptFlags.SheetStructure;
                     }
                 case 4:
                     switch (taskId)
@@ -227,21 +227,6 @@ namespace Libraries
                 case 7:
                     switch (taskId)
                     {
-                        case 1: // 学生名簿・名前定義
-                            return ExcelValidationExemptFlags.WorkbookProperty;
-                        case 2: // 名前移動・日付変更
-                            return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.RangeEdit;
-                        case 3: // 売上報告・SUM
-                        case 4: // 学生名簿・CONCAT/オートフィル
-                        case 5: // 担当者リスト・CONCAT/オートフィル
-                        case 6: // 申込一覧・CONCAT/オートフィル
-                            return ExcelValidationExemptFlags.RangeEdit;
-                        default:
-                            return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.RangeEdit;
-                    }
-                case 8:
-                    switch (taskId)
-                    {
                         case 1: // 売上報告・数式表示
                             return ExcelValidationExemptFlags.WorkbookProperty;
                         case 2: // 受注明細・並べ替え
@@ -256,7 +241,7 @@ namespace Libraries
                         default:
                             return ExcelValidationExemptFlags.PrintAndPage | ExcelValidationExemptFlags.RangeEdit;
                     }
-                case 9:
+                case 8:
                     switch (taskId)
                     {
                         case 1: // イベント売上・オートフィル
@@ -269,6 +254,21 @@ namespace Libraries
                             return ExcelValidationExemptFlags.RangeEdit;
                         default:
                             return ExcelValidationExemptFlags.RangeEdit;
+                    }
+                case 9:
+                    switch (taskId)
+                    {
+                        case 1: // 学生名簿・名前定義
+                            return ExcelValidationExemptFlags.WorkbookProperty;
+                        case 2: // 名前移動・日付変更
+                            return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.RangeEdit;
+                        case 3: // 売上報告・SUM
+                        case 4: // 学生名簿・CONCAT/オートフィル
+                        case 5: // 担当者リスト・CONCAT/オートフィル
+                        case 6: // 申込一覧・CONCAT/オートフィル
+                            return ExcelValidationExemptFlags.RangeEdit;
+                        default:
+                            return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.RangeEdit;
                     }
                 case 10:
                     switch (taskId)
@@ -310,7 +310,7 @@ namespace Libraries
         {
             switch (projectId)
             {
-                case 1:
+                case 2:
                     switch (taskId)
                     {
                         case 1:
@@ -326,7 +326,7 @@ namespace Libraries
                         default:
                             return new List<string>();
                     }
-                case 2:
+                case 3:
                     switch (taskId)
                     {
                         case 6:
@@ -353,22 +353,6 @@ namespace Libraries
                 case 7:
                     switch (taskId)
                     {
-                        case 2:
-                            return new List<string> { "申込一覧!G3" };
-                        case 3:
-                            return new List<string> { "売上報告!J5" };
-                        case 4:
-                            return new List<string> { "学生名簿!G5:G24" };
-                        case 5:
-                            return new List<string> { "担当者リスト!H5:H19" };
-                        case 6:
-                            return new List<string> { "申込一覧!G5:G174" };
-                        default:
-                            return new List<string>();
-                    }
-                case 8:
-                    switch (taskId)
-                    {
                         case 3:
                         case 4:
                             return new List<string> { "下半期売上!D5:I12" };
@@ -377,7 +361,7 @@ namespace Libraries
                         default:
                             return new List<string>();
                     }
-                case 9:
+                case 8:
                     switch (taskId)
                     {
                         case 1:
@@ -394,6 +378,22 @@ namespace Libraries
                             return new List<string> { "試験結果!G7:G56" };
                         case 7:
                             return new List<string> { "申込一覧!I5" };
+                        default:
+                            return new List<string>();
+                    }
+                case 9:
+                    switch (taskId)
+                    {
+                        case 2:
+                            return new List<string> { "申込一覧!G3" };
+                        case 3:
+                            return new List<string> { "売上報告!J5" };
+                        case 4:
+                            return new List<string> { "学生名簿!G5:G24" };
+                        case 5:
+                            return new List<string> { "担当者リスト!H5:H19" };
+                        case 6:
+                            return new List<string> { "申込一覧!G5:G174" };
                         default:
                             return new List<string>();
                     }
