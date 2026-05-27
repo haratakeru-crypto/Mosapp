@@ -1069,7 +1069,11 @@ namespace Ui.ViewModels
             }
 
             int taskCount = projectConfig["taskCount"].Value<int>();
-            string libraryName = $"ExcelChecker{groupId}_{projectId}";
+            string libraryName = projectConfig["library"]?.ToString();
+            if (string.IsNullOrWhiteSpace(libraryName))
+            {
+                libraryName = $"ExcelChecker{groupId}_{projectId}";
+            }
 
             // 「採点中です」オーバーレイを表示
             Window scoringOverlay = null;

@@ -4,17 +4,17 @@
 winexe
 C#
 .cs
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\
 MOS_PowerPoint_app
 none
 false
 DEBUG;TRACE
-C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\App.xaml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\App.xaml
 7-752474433
 5-1811139474
 31395344813
-30-1452330931
+30-775534181
 MainWindow.xaml;Views\UiTestAppBarWindow.xaml;Views\ResultWindow.xaml;Views\PasswordWindow.xaml;Views\ReviewPageWindow.xaml;Views\SubjectSelectionWindow.xaml;Views\ScoreResultWindow.xaml;
 
-False
+True
 
