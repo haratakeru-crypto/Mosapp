@@ -192,6 +192,10 @@ namespace Libraries
                     return true;
                 }
 
+                // タスク切替などで別シートに付いたレイアウト系ログは、対象シート外なら違反にしない
+                if (ExcelTaskValidationConfig.ShouldIgnoreOffTargetSheetOperation(projectId, taskId, op.Detail))
+                    continue;
+
                 if (ExcelTaskValidationConfig.IsOperationExempt(opType, exemptFlags))
                     continue;
 

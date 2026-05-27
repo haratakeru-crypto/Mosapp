@@ -174,17 +174,20 @@ namespace Libraries
                     switch (taskId)
                     {
                         case 1: // 売上一覧・印刷の向きを横向き
+                            // 印刷向き変更に伴う内部名前定義更新（NamedRangeChanged）を許容
+                            return ExcelValidationExemptFlags.PrintAndPage | ExcelValidationExemptFlags.WorkbookProperty;
                         case 2: // 売上一覧・印刷範囲
                         case 3: // 売上一覧・印刷タイトル（行）
                         case 4: // 販売実績・余白
                         case 5: // 販売実績・改ページ
-                            return ExcelValidationExemptFlags.PrintAndPage;
+                            // 印刷関連操作では Print_Area / Print_Titles などの名前定義更新が発生しうる
+                            return ExcelValidationExemptFlags.PrintAndPage | ExcelValidationExemptFlags.WorkbookProperty;
                         case 6: // スキルアップ検定結果・セル内折り返し（書式のみ → CellFormatOnly）。許可範囲は A4:K4（TryGetFirstNonExemptViolation の範囲ゲート）
                             return ExcelValidationExemptFlags.CellFormatOnly;
                         case 7: // 売上一覧・G4 メモ（範囲制限あり。RangeEdit 免除は付けない）
                             return ExcelValidationExemptFlags.None;
                         default:
-                            return ExcelValidationExemptFlags.PrintAndPage;
+                            return ExcelValidationExemptFlags.PrintAndPage | ExcelValidationExemptFlags.WorkbookProperty;
                     }
                 case 4:
                     switch (taskId)
@@ -192,8 +195,8 @@ namespace Libraries
                         case 1: // 上半期売上・スパークライン
                         case 2: // ５年間売上・積み上げ縦棒
                         case 3: // 下半期売上・3-D円
-                        case 4: // 商品別売上・代替テキスト
-                            return ExcelValidationExemptFlags.ShapeOrImage;
+                        case 4: // 商品別売上・代替テキスト（ページレイアウト調整時の改ページ設定も許容）
+                            return ExcelValidationExemptFlags.ShapeOrImage | ExcelValidationExemptFlags.PrintAndPage;
                         default:
                             return ExcelValidationExemptFlags.ShapeOrImage;
                     }
@@ -227,14 +230,14 @@ namespace Libraries
                 case 7:
                     switch (taskId)
                     {
-                        case 1: // 売上報告・数式表示
-                            return ExcelValidationExemptFlags.WorkbookProperty;
+                        case 1: // 売上報告・数式表示（ページレイアウト上の改ページも許容）
+                            return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.PrintAndPage;
                         case 2: // 受注明細・並べ替え
                             return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
-                        case 3: // 下半期売上・アイコンセット
+                        case 3: // 下半期売上・アイコンセット（ConditionalFormatChanged はアドレス解釈不可のため RangeEdit 免除）
                         case 4: // 下半期売上・条件付き書式
                         case 7: // 下半期売上・書式変更（アクセシビリティ）
-                            return ExcelValidationExemptFlags.None;
+                            return ExcelValidationExemptFlags.RangeEdit;
                         case 5: // 受注明細・ヘッダー
                         case 6: // 受注明細・フッター
                             return ExcelValidationExemptFlags.PrintAndPage;
@@ -260,13 +263,13 @@ namespace Libraries
                     {
                         case 1: // 学生名簿・名前定義
                             return ExcelValidationExemptFlags.WorkbookProperty;
-                        case 2: // 名前移動・日付変更
-                            return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.RangeEdit;
+                        case 2: // 名前移動・日付変更（改ページ位置の調整も許容）
+                            return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.PrintAndPage;
                         case 3: // 売上報告・SUM
-                        case 4: // 学生名簿・CONCAT/オートフィル
-                        case 5: // 担当者リスト・CONCAT/オートフィル
+                        case 4: // 学生名簿・CONCAT/オートフィル（名前定義の自動更新を許容）
+                        case 5: // 担当者リスト・CONCAT/オートフィル（名前定義の自動更新を許容）
                         case 6: // 申込一覧・CONCAT/オートフィル
-                            return ExcelValidationExemptFlags.RangeEdit;
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.WorkbookProperty;
                         default:
                             return ExcelValidationExemptFlags.WorkbookProperty | ExcelValidationExemptFlags.RangeEdit;
                     }
@@ -278,7 +281,8 @@ namespace Libraries
                         case 3: // 売上一覧・IF
                         case 4: // 担当者リスト・SEQUENCE
                         case 5: // 業務予定・SEQUENCE
-                        case 6: // 売上集計・SORT
+                        case 6: // 売上集計・SORT（名前定義の自動更新を許容）
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.WorkbookProperty;
                         case 7: // 売上一覧・絶対参照
                             return ExcelValidationExemptFlags.RangeEdit;
                         case 8: // 在庫管理・インポート
@@ -296,6 +300,221 @@ namespace Libraries
                 default:
                     return ExcelValidationExemptFlags.None;
             }
+        }
+
+        #endregion
+
+        #region 対象シート（破壊的操作ログのシート帰属フィルタ）
+
+        /// <summary>
+        /// 指定タスクでユーザーが操作する想定のシート名一覧（Group1 演習・模擬）。
+        /// 空リストを返すタスクはシート帰属フィルタを適用しない（ブック全体操作など）。
+        /// </summary>
+        public static IReadOnlyList<string> GetTargetSheets(int projectId, int taskId)
+        {
+            switch (projectId)
+            {
+                case 1:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                        case 3:
+                            return new[] { "試験結果" };
+                        case 4:
+                            return new[] { "担当者リスト" };
+                        case 5:
+                            return new[] { "イベント売上" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 2:
+                    switch (taskId)
+                    {
+                        case 1:
+                            return new[] { "下半期売上" };
+                        case 2:
+                        case 3:
+                            return new[] { "社員リスト" };
+                        case 4:
+                            return new[] { "担当者別売上" };
+                        case 5:
+                            return new[] { "業務予定" };
+                        case 6:
+                        case 7:
+                            return new[] { "参加者一覧" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 3:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                        case 3:
+                        case 7:
+                            return new[] { "売上一覧" };
+                        case 4:
+                        case 5:
+                            return new[] { "販売実績" };
+                        case 6:
+                            return new[] { "スキルアップ検定結果" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 4:
+                    switch (taskId)
+                    {
+                        case 1:
+                            return new[] { "上半期売上" };
+                        case 2:
+                            return new[] { "５年間売上", "5年間売上" };
+                        case 3:
+                            return new[] { "下半期売上" };
+                        case 4:
+                            return new[] { "商品別売上" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 5:
+                    switch (taskId)
+                    {
+                        case 1:
+                            return new[] { "売上実績" };
+                        case 2:
+                        case 3:
+                        case 4:
+                            return new[] { "商品別売上" };
+                        case 5:
+                        case 6:
+                            return new[] { "月別売上" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 6:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                            return new[] { "売上一覧" };
+                        case 3:
+                            return new[] { "販売実績" };
+                        case 4:
+                            return Array.Empty<string>();
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 7:
+                    switch (taskId)
+                    {
+                        case 1:
+                            return new[] { "売上報告" };
+                        case 2:
+                        case 5:
+                        case 6:
+                            return new[] { "受注明細" };
+                        case 3:
+                        case 4:
+                        case 7:
+                            return new[] { "下半期売上" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 8:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                            return new[] { "イベント売上" };
+                        case 3:
+                        case 4:
+                        case 5:
+                        case 6:
+                            return new[] { "試験結果" };
+                        case 7:
+                            return new[] { "申込一覧" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 9:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 4:
+                            return new[] { "学生名簿" };
+                        case 2:
+                            return Array.Empty<string>();
+                        case 3:
+                            return new[] { "売上報告" };
+                        case 5:
+                            return new[] { "担当者リスト" };
+                        case 6:
+                            return new[] { "申込一覧" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 10:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 4:
+                            return new[] { "担当者リスト" };
+                        case 2:
+                            return new[] { "出張精算" };
+                        case 3:
+                        case 7:
+                            return new[] { "売上一覧" };
+                        case 5:
+                            return new[] { "業務予定" };
+                        case 6:
+                            return new[] { "売上集計" };
+                        case 8:
+                            return new[] { "在庫管理" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                default:
+                    return Array.Empty<string>();
+            }
+        }
+
+        /// <summary>
+        /// ログ detail（例: 売上一覧!A1, 受注明細!H=2;V=0）からシート名を抽出する。
+        /// </summary>
+        public static bool TryParseSheetNameFromOpDetail(string detail, out string sheetName)
+        {
+            sheetName = null;
+            if (string.IsNullOrWhiteSpace(detail))
+                return false;
+
+            int sep = detail.IndexOf('!');
+            if (sep <= 0)
+                return false;
+
+            sheetName = detail.Substring(0, sep).Trim();
+            return !string.IsNullOrEmpty(sheetName);
+        }
+
+        /// <summary>
+        /// 対象シート外の操作ログは破壊的操作違反から除外する（タスク切替時のノイズ抑止）。
+        /// シート名を解釈できない操作は従来どおり判定する。
+        /// </summary>
+        public static bool ShouldIgnoreOffTargetSheetOperation(int projectId, int taskId, string detail)
+        {
+            IReadOnlyList<string> targetSheets = GetTargetSheets(projectId, taskId);
+            if (targetSheets == null || targetSheets.Count == 0)
+                return false;
+
+            if (!TryParseSheetNameFromOpDetail(detail, out string sheetName))
+                return false;
+
+            foreach (string target in targetSheets)
+            {
+                if (string.Equals(sheetName, target, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            return true;
         }
 
         #endregion

@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Core.Ports.Primary;
+using Libraries;
 using MOSExcelMogiApp.Views;
 using Newtonsoft.Json.Linq;
 using System.Runtime.InteropServices;
@@ -1125,6 +1126,16 @@ namespace Ui.ViewModels
             try
             {
                 results = await Task.Run(() => ExecuteScoringDirect(libraryName, taskCount));
+                if (results != null && results.Count == taskCount)
+                {
+                    for (int taskIndex = 1; taskIndex <= taskCount; taskIndex++)
+                    {
+                        results[taskIndex - 1] = ApplyDestructiveValidationForTask(
+                            projectId,
+                            taskIndex,
+                            results[taskIndex - 1]);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -1616,6 +1627,43 @@ namespace Ui.ViewModels
             }
             
             return results;
+        }
+
+        /// <summary>
+        /// 破壊的操作検知（一括採点と同じロジック）。<paramref name="projectId"/> は画面上のスロット番号。
+        /// </summary>
+        private static bool ApplyDestructiveValidationForTask(int projectId, int taskId, bool checkerResult)
+        {
+            if (!checkerResult)
+                return false;
+            if (projectId <= 0 || taskId <= 0)
+                return checkerResult;
+
+            try
+            {
+                ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
+
+                if (ExcelLogReader.TryGetFirstNonExemptViolation(
+                        projectId,
+                        taskId,
+                        1,
+                        exemptFlags,
+                        out string violationMsg))
+                {
+                    string line = $"P{projectId}-T{taskId} {violationMsg}";
+                    System.Diagnostics.Debug.WriteLine($"[MainViewModel] Destructive validation failed: {line}");
+                    ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, line);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainViewModel] ApplyDestructiveValidationForTask error: {ex.Message}");
+                ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, $"P{projectId}-T{taskId} 例外: {ex.Message}");
+                return false;
+            }
+
+            return true;
         }
 
         private void ShowAppBar()

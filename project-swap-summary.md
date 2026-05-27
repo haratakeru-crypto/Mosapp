@@ -43,6 +43,17 @@
 5. **`MOSapp/mos_xaml_app/Ui/ViewModels/MainViewModel.cs`**  
    `ExecuteScoreAsync`：`projectConfig["library"]` を優先
 
+6. **`MOSapp/mos_xaml_app/Views/ReviewPageWindow.xaml.cs`**（一括採点）  
+   - 破壊的操作検証：`ApplyDestructiveValidation` に **スロット番号**（`project.projectId`）を渡す（従来は `ExcelChecker1_N` の N を渡していた）  
+   - チェッカー呼び出し：`private CheckTask_* (string filePath)` があれば `expectedFilePath` で採点（ActiveWorkbook 依存を低減）
+
+7. **`MOSapp/mos_xaml_app/Libraries/ExcelTaskValidationConfig.cs`** + **`ExcelLogReader.cs`**（提案A）  
+   - `GetTargetSheets(projectId, taskId)` でタスク想定シートを定義  
+   - 一括採点の破壊的操作判定で、**対象シート外**の `[Op]` は違反にしない（例: 10-1 文脈の `受注明細!SetPageBreak`）
+
+8. **`MOSapp/mos_xaml_app/Ui/ViewModels/MainViewModel.cs`**（その場採点）  
+   - `ExecuteScoreAsync` でチェッカー結果後に `ApplyDestructiveValidationForTask` を適用（一括採点と同じ破壊的操作ルール）
+
 ---
 
 ### ユーザー側対応（未実施）
