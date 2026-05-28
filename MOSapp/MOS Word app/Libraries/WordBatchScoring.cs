@@ -414,8 +414,27 @@ namespace Libraries
                         try { docFullPath = Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
                         if (fullName == pathLower || docFullPath == pathLower)
                         {
-                            doc.Close(SaveChanges: false);
-                            break;
+                            // 同一ファイルが既に開いている場合は、変更を捨てずに保存して再利用する。
+                            // Project7 は SaveAs 系タスクがあるため、ここでの Save() により
+                            // 「名前を付けて保存」UI が出るケースを避ける。
+                            if (projectId != 7)
+                            {
+                                try
+                                {
+                                    if (!doc.Saved)
+                                        doc.Save();
+                                }
+                                catch { }
+                            }
+                            try
+                            {
+                                doc.Activate();
+                            }
+                            catch { }
+                            Thread.Sleep(200);
+                            WordWindowLayoutHelper.PositionWordForBatchScoring(wordApp);
+                            Thread.Sleep(100);
+                            return true;
                         }
                     }
                     catch { }
