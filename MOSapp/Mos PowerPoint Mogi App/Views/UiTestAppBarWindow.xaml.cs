@@ -2115,6 +2115,17 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Destructive check error: {ex.Message}");
             }
 
+            // current_task を消す前に、印刷系タスク（5-1/11-7）は同期再評価して証跡を確定する。
+            // 最終タスク 11-7 での高速遷移時の取りこぼしを防ぐため、アプリ側でも境界補完する。
+            try
+            {
+                TryFinalizePrintEvidenceBeforeProjectTransition();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Print evidence finalize error: {ex.Message}");
+            }
+
             await Dispatcher.Yield(DispatcherPriority.Background);
 
             // プロジェクト切り替え前にタスク情報をクリアし、アドイン側の破壊的操作チェックをスキップさせる
@@ -2197,6 +2208,92 @@ namespace MOS_PowerPoint_app.Views
             ResetProjectTimer();
 
             System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
+        }
+
+        /// <summary>
+        /// プロジェクト遷移直前に 5-1 / 11-7 の印刷設定を同期評価し、条件一致なら証跡ログを明示追記する。
+        /// </summary>
+        private void TryFinalizePrintEvidenceBeforeProjectTransition()
+        {
+            bool isTask5_1 = _currentProjectId == 5 && _currentTaskId == 1;
+            bool isTask11_7 = _currentProjectId == 11 && _currentTaskId == 7;
+            if (!isTask5_1 && !isTask11_7)
+                return;
+
+            int attemptNo = GetCurrentTaskAttempt(_currentProjectId, _currentTaskId);
+            string marker = isTask5_1 ? "[Task5-1] Print" : "[Task11-7] Print";
+            if (Libraries.PPLogReader.HasMarkerWithinTask(_currentProjectId, _currentTaskId, attemptNo, marker))
+                return;
+
+            PowerPointApp pptApp = null;
+            PowerPointPresentation pres = null;
+            PrintOptions po = null;
+            try
+            {
+                try
+                {
+                    pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                }
+                catch
+                {
+                    return;
+                }
+                if (pptApp == null || pptApp.Presentations == null || pptApp.Presentations.Count < 1)
+                    return;
+
+                pres = pptApp.ActivePresentation;
+                if (pres == null)
+                    return;
+
+                po = pres.PrintOptions;
+                if (po == null)
+                    return;
+
+                bool matched = false;
+                const int maxRetries = 20; // up to ~2s (100ms * 20)
+                const int retryIntervalMs = 100;
+                for (int retry = 0; retry < maxRetries && !matched; retry++)
+                {
+                    int outputType = (int)po.OutputType;
+                    int copies = po.NumberOfCopies;
+                    bool collate = Convert.ToInt32(po.Collate) == (int)Microsoft.Office.Core.MsoTriState.msoTrue;
+
+                    if (isTask5_1)
+                    {
+                        matched = outputType == (int)PpPrintOutputType.ppPrintOutputThreeSlideHandouts
+                                  && copies == 4
+                                  && collate;
+                    }
+                    else if (isTask11_7)
+                    {
+                        matched = outputType == (int)PpPrintOutputType.ppPrintOutputNotesPages
+                                  && copies == 3
+                                  && collate;
+                    }
+
+                    if (!matched && retry + 1 < maxRetries)
+                    {
+                        Thread.Sleep(retryIntervalMs);
+                    }
+                }
+
+                if (!matched)
+                    return;
+
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                string line = $"[{timestamp}] [Task {_currentProjectId}-{_currentTaskId}-{attemptNo}] {marker}";
+                string evidencePath = Libraries.PPLogReader.GetTaskEvidenceLogPath();
+                string mainLogPath = Libraries.PPLogReader.GetLogFilePath();
+                File.AppendAllText(evidencePath, line + Environment.NewLine, new UTF8Encoding(false));
+                File.AppendAllText(mainLogPath, line + Environment.NewLine, new UTF8Encoding(false));
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Print evidence finalized: {line}");
+            }
+            finally
+            {
+                if (po != null) { try { Marshal.ReleaseComObject(po); } catch { } }
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
+                if (pptApp != null) { try { Marshal.ReleaseComObject(pptApp); } catch { } }
+            }
         }
         
         private void OpenProjectDocument(int projectId, int groupId)

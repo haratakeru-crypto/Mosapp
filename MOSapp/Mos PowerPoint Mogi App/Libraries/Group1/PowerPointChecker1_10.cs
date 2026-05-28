@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Packaging;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
@@ -250,10 +253,194 @@ namespace Libraries.Group1
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
-        /// <summary>10-4: グレースケールは表示状態のため COM では検証不可。VSTO ログで記録されていれば true。</summary>
+        /// <summary>
+        /// 10-4: 表示グレースケールの証跡ログに加え、スライド1の画像が「反転させたグレースケール」(Shape.BlackWhiteMode) であること。
+        /// </summary>
         public bool CheckTask_1_10_04()
         {
-            return PPLogReader.HasTask10_4GrayscaleExecuted();
+            if (!PPLogReader.HasTask10_4GrayscaleExecuted())
+                return false;
+            return Slide1HasInverseGrayscalePicture();
+        }
+
+        private static bool Slide1HasInverseGrayscalePicture()
+        {
+            if (TrySlide1InverseGrayscaleViaCom())
+                return true;
+            return TrySlide1InverseGrayscaleViaOpenXml();
+        }
+
+        /// <summary>スライド1の子供の画像候補（通常画像または画像プレースホルダー）か。</summary>
+        private static bool IsSlide1ChildImageShape(PptShape shape)
+        {
+            if (shape == null)
+                return false;
+
+            if (PowerPointCheckerCommon.IsPictureShape(shape))
+                return true;
+
+            try
+            {
+                if ((int)shape.Type != (int)MsoShapeType.msoPlaceholder)
+                    return false;
+
+                PlaceholderFormat placeholder = null;
+                try
+                {
+                    placeholder = shape.PlaceholderFormat;
+                    if (placeholder != null
+                        && placeholder.Type == PpPlaceholderType.ppPlaceholderPicture)
+                    {
+                        return true;
+                    }
+                }
+                finally
+                {
+                    if (placeholder != null)
+                    {
+                        try { Marshal.ReleaseComObject(placeholder); } catch { }
+                    }
+                }
+
+                string name = null;
+                try { name = shape.Name ?? ""; } catch { name = ""; }
+                return name.IndexOf("Picture", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>スライド1の画像（プレースホルダー含む）で BlackWhiteMode が反転グレースケールなら true。</summary>
+        private static bool TrySlide1InverseGrayscaleViaCom()
+        {
+            Presentation pres = null;
+            Slide slide = null;
+            const int expectedInverseMode = (int)MsoBlackWhiteMode.msoBlackWhiteInverseGrayScale;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres == null)
+                    return false;
+
+                slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 1);
+                if (slide == null)
+                    return false;
+
+                PptShapes shapes = null;
+                try
+                {
+                    shapes = slide.Shapes;
+                    if (shapes == null)
+                        return false;
+
+                    for (int i = 1; i <= shapes.Count; i++)
+                    {
+                        PptShape sh = null;
+                        try
+                        {
+                            sh = shapes[i];
+                            if (!IsSlide1ChildImageShape(sh))
+                                continue;
+
+                            if ((int)sh.BlackWhiteMode == expectedInverseMode)
+                                return true;
+                        }
+                        catch
+                        {
+                            // 個別図形の取得失敗はスキップ
+                        }
+                        finally
+                        {
+                            if (sh != null)
+                            {
+                                try { Marshal.ReleaseComObject(sh); } catch { }
+                            }
+                        }
+                    }
+
+                    return false;
+                }
+                finally
+                {
+                    if (shapes != null)
+                    {
+                        try { Marshal.ReleaseComObject(shapes); } catch { }
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (slide != null)
+                {
+                    try { Marshal.ReleaseComObject(slide); } catch { }
+                }
+                if (pres != null)
+                {
+                    try { Marshal.ReleaseComObject(pres); } catch { }
+                }
+            }
+        }
+
+        private static readonly Regex Slide1InverseBwModeRegex = new Regex(
+            @"\bbwMode\s*=\s*""(?:invGray|inverseGray)""",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>スライド1の OpenXML で bwMode が invGray / inverseGray なら true。</summary>
+        private static bool TrySlide1InverseGrayscaleViaOpenXml()
+        {
+            Presentation pres = null;
+            string tempPath = null;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres == null)
+                    return false;
+
+                tempPath = Path.Combine(Path.GetTempPath(), "mos_10_4_check_" + Guid.NewGuid().ToString("N") + ".pptx");
+                pres.SaveCopyAs(tempPath, PpSaveAsFileType.ppSaveAsOpenXMLPresentation, MsoTriState.msoFalse);
+                if (!File.Exists(tempPath))
+                    return false;
+
+                using (var package = Package.Open(tempPath, FileMode.Open, FileAccess.Read))
+                {
+                    var slide1Part = package.GetParts()
+                        .FirstOrDefault(p => p.Uri.OriginalString.EndsWith("/slides/slide1.xml", StringComparison.OrdinalIgnoreCase));
+                    if (slide1Part == null)
+                        return false;
+
+                    string slideXml;
+                    using (var reader = new StreamReader(slide1Part.GetStream()))
+                    {
+                        slideXml = reader.ReadToEnd();
+                    }
+
+                    if (string.IsNullOrEmpty(slideXml))
+                        return false;
+
+                    return Slide1InverseBwModeRegex.IsMatch(slideXml);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (pres != null)
+                {
+                    try { Marshal.ReleaseComObject(pres); } catch { }
+                }
+                if (tempPath != null && File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); } catch { }
+                }
+            }
         }
 
         /// <summary>10-5: スライドマスターのテーマを「イオン」に。</summary>
