@@ -27,28 +27,14 @@ namespace MOSExcelMogiApp.Views
     public partial class ReviewPageWindow : Window
     {
         // #region agent log
-        private static readonly string _agentDebugLogPath = @"C:\Users\kouza\source\repos\MOSapp\debug-f11e0d.log";
+        // NOTE:
+        // AgentLog 呼び出しは一括採点のホットパスに多数存在し、
+        // 引数生成・JSON化・ファイル書き込みが処理時間に大きく影響する。
+        // ここでは未定義シンボルに紐づく Conditional 属性で、
+        // 呼び出しサイトごと完全にコンパイル除去してオーバーヘッドをゼロ化する。
+        [System.Diagnostics.Conditional("ENABLE_AGENT_LOG")]
         private static void AgentLog(string location, string message, object data, string runId, string hypothesisId)
         {
-            try
-            {
-                var payload = new
-                {
-                    sessionId = "f11e0d",
-                    runId,
-                    hypothesisId,
-                    location,
-                    message,
-                    data,
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                };
-                var line = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
-                System.IO.File.AppendAllText(_agentDebugLogPath, line + "\n");
-            }
-            catch
-            {
-                // ignore logging errors
-            }
         }
         // #endregion
 
@@ -1363,8 +1349,8 @@ namespace MOSExcelMogiApp.Views
                         
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Successfully activated file for project {project.projectId}");
                         
-                        // 以前の固定待機(350ms)を短縮。
-                        System.Threading.Thread.Sleep(100);
+                        // 固定待機は最小化し、必要最小限の COM 反映待ちだけ残す。
+                        System.Threading.Thread.Sleep(20);
 
                         // 採点直前に再度アクティブ化して、直前に別ブックへ戻る現象を抑止する。
                         bool activatedBeforeScoring = ActivateExcelFile(project.filePath);
@@ -1476,7 +1462,7 @@ namespace MOSExcelMogiApp.Views
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 OpenExcelFilesInBackground(filesToOpen);
-                Thread.Sleep(200);
+                Thread.Sleep(80);
 
                 bool allReady = true;
                 foreach (var filePath in filesToOpen)
@@ -1528,7 +1514,7 @@ namespace MOSExcelMogiApp.Views
                 catch { }
 
                 OpenExcelFilesInBackground(new List<string> { filePath });
-                Thread.Sleep(isFirstProject ? 900 : 500);
+                Thread.Sleep(isFirstProject ? 400 : 250);
             }
 
             AgentLog(
@@ -2352,7 +2338,8 @@ namespace MOSExcelMogiApp.Views
                             AddToMru: false,
                             Local: false,
                             CorruptLoad: Microsoft.Office.Interop.Excel.XlCorruptLoad.xlNormalLoad);
-                        System.Threading.Thread.Sleep(500);
+                        // Open 直後の過剰待機を削減（次段の ready-check で不足時は再試行される）。
+                        System.Threading.Thread.Sleep(120);
                     }
                     catch (Exception ex)
                     {
@@ -2504,9 +2491,9 @@ namespace MOSExcelMogiApp.Views
 
                                 // 採点側（ExcelChecker）は ActiveWorkbook を参照して filePath を取得するものがあるため、
                                 // "ActiveWorkbookが期待したブックになった" ことを確認してから true を返す。
-                                // 以前は10秒待機していたが、不一致時は数秒待っても変わらないことが多いため大幅に短縮（1.5秒）。
-                                const int timeoutMs = 1500;
-                                const int pollIntervalMs = 100;
+                                // 待機は短めにし、失敗時は上位リトライ経路へ委譲する。
+                                const int timeoutMs = 900;
+                                const int pollIntervalMs = 50;
                                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
                                 while (sw.ElapsedMilliseconds < timeoutMs)
@@ -2539,8 +2526,8 @@ namespace MOSExcelMogiApp.Views
                                     }
                                     catch { }
 
-                                    // 500ms 経過しても切り替わらない場合は、ウィンドウ単位のアクティブ化を試みる
-                                    if (sw.ElapsedMilliseconds > 500)
+                                    // 300ms 経過しても切り替わらない場合は、ウィンドウ単位のアクティブ化を試みる
+                                    if (sw.ElapsedMilliseconds > 300)
                                     {
                                         TryActivateWorkbookForScoring(excelApp, wb);
                                     }

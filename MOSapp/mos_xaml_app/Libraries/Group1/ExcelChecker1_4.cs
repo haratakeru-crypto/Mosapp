@@ -176,51 +176,43 @@ namespace Libraries.Group1
         // ==========================================
         private bool CheckTask_1_4_04_OpenXml()
         {
-            // COM Interopを使用して、現在開いているExcelファイルのフルパスを取得
-            string originalPath = null;
+            Excel.Application excelApp = null;
+            Excel.Workbook targetWorkbook = null;
+            string validationPath = null;
+            bool shouldDeleteValidationPath = false;
             try
             {
-                Excel.Application excelApp = (Excel.Application)Marshal.GetActiveObject("Excel.Application");
-                string targetName = "project4.xlsx";
-                
-                foreach (Excel.Workbook wb in excelApp.Workbooks)
+                excelApp = (Excel.Application)Marshal.GetActiveObject("Excel.Application");
+                if (excelApp == null)
                 {
-                    if (wb.Name.Equals(targetName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        originalPath = wb.FullName;
-                        Console.WriteLine($"[DEBUG] Task 4-4: Found file path: {originalPath}");
-                        break;
-                    }
+                    Console.WriteLine("[DEBUG] Task 4-4: Excel application not found.");
+                    return false;
+                }
+
+                if (!TryGetTargetWorkbookForTask4_4(excelApp, out targetWorkbook))
+                {
+                    Console.WriteLine("[DEBUG] Task 4-4: Target workbook not found.");
+                    return false;
+                }
+
+                if (!TryPrepareValidationWorkbookPath(
+                    targetWorkbook,
+                    out validationPath,
+                    out shouldDeleteValidationPath))
+                {
+                    Console.WriteLine("[DEBUG] Task 4-4: Failed to prepare validation workbook.");
+                    return false;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DEBUG] Task 4-4: Failed to get Excel application. {ex.Message}");
-                return false;
-            }
-
-            if (string.IsNullOrEmpty(originalPath) || !File.Exists(originalPath))
-            {
-                Console.WriteLine($"[DEBUG] Task 4-4: File not found. Path: {originalPath}");
-                return false;
-            }
-
-            // 【重要】Excelが開いているとロックされるため、一時ファイルにコピーして検証する
-            string tempPath = Path.GetTempFileName();
-            try
-            {
-                File.Copy(originalPath, tempPath, true);
-                Console.WriteLine($"[DEBUG] Task 4-4: Copied to temp file: {tempPath}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DEBUG] Task 4-4: Copy failed. {ex.Message}");
+                Console.WriteLine($"[DEBUG] Task 4-4: Failed to acquire workbook. {ex.Message}");
                 return false;
             }
 
             try
             {
-                using (SpreadsheetDocument document = SpreadsheetDocument.Open(tempPath, false))
+                using (SpreadsheetDocument document = SpreadsheetDocument.Open(validationPath, false))
                 {
                     WorkbookPart wbPart = document.WorkbookPart;
                     // シート名と代替テキストの目標値
@@ -299,8 +291,18 @@ namespace Libraries.Group1
             }
             finally
             {
-                // 一時ファイルの削除
-                try { File.Delete(tempPath); } catch { }
+                if (shouldDeleteValidationPath && !string.IsNullOrEmpty(validationPath) && File.Exists(validationPath))
+                {
+                    try { File.Delete(validationPath); } catch { }
+                }
+                if (targetWorkbook != null)
+                {
+                    try { Marshal.ReleaseComObject(targetWorkbook); } catch { }
+                }
+                if (excelApp != null)
+                {
+                    try { Marshal.ReleaseComObject(excelApp); } catch { }
+                }
             }
 
             Console.WriteLine("[DEBUG] Task 4-4 Failed: Target AltText not found in any chart.");
@@ -334,6 +336,103 @@ namespace Libraries.Group1
             {
                 if (worksheet != null) Marshal.ReleaseComObject(worksheet);
             }
+        }
+
+        private bool TryGetTargetWorkbookForTask4_4(Excel.Application excelApp, out Excel.Workbook workbook)
+        {
+            workbook = null;
+            if (excelApp == null) return false;
+
+            // その場採点では現在の編集対象が最も信頼できるため ActiveWorkbook を優先する。
+            try
+            {
+                var activeWb = excelApp.ActiveWorkbook;
+                if (activeWb != null)
+                {
+                    workbook = activeWb;
+                    return true;
+                }
+            }
+            catch
+            {
+                // ActiveWorkbook が取れない場合は下の列挙へフォールバック
+            }
+
+            const string targetName = "project4.xlsx";
+            foreach (Excel.Workbook wb in excelApp.Workbooks)
+            {
+                try
+                {
+                    if (wb != null && wb.Name.Equals(targetName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        workbook = wb;
+                        return true;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryPrepareValidationWorkbookPath(
+            Excel.Workbook workbook,
+            out string validationPath,
+            out bool shouldDeleteValidationPath)
+        {
+            validationPath = null;
+            shouldDeleteValidationPath = false;
+            if (workbook == null) return false;
+
+            string tempXlsxPath = Path.Combine(
+                Path.GetTempPath(),
+                "mos_4_4_check_" + Guid.NewGuid().ToString("N") + ".xlsx");
+
+            // 優先1: 未保存変更も含めて評価できる SaveCopyAs
+            try
+            {
+                workbook.SaveCopyAs(tempXlsxPath);
+                if (File.Exists(tempXlsxPath))
+                {
+                    validationPath = tempXlsxPath;
+                    shouldDeleteValidationPath = true;
+                    return true;
+                }
+            }
+            catch
+            {
+                // フォールバックへ
+            }
+
+            // 優先2: 保存済みファイルのコピー（ロック回避）
+            string fullName = null;
+            try { fullName = workbook.FullName; } catch { fullName = null; }
+            if (!string.IsNullOrEmpty(fullName) && File.Exists(fullName))
+            {
+                try
+                {
+                    File.Copy(fullName, tempXlsxPath, true);
+                    if (File.Exists(tempXlsxPath))
+                    {
+                        validationPath = tempXlsxPath;
+                        shouldDeleteValidationPath = true;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // 最終フォールバックへ
+                }
+
+                // 優先3: 実ファイルを直接参照（最後の手段）
+                validationPath = fullName;
+                shouldDeleteValidationPath = false;
+                return true;
+            }
+
+            return false;
         }
 
         private Excel.Workbook GetWorkbook(Excel.Application excelApp, string filePath)
