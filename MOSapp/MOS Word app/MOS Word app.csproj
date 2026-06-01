@@ -25,7 +25,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>9</ApplicationRevision>
+    <ApplicationRevision>10</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -89,6 +89,11 @@
     </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_10.csproj">
       <Project>{55452BC6-0080-149C-0625-BED9EB0B2900}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn.csproj">
+      <Project>{07f6198f-2781-45a3-b41a-f75f992d27cf}</Project>
+      <Name>New_MOSWordVSTOAddIn</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -310,4 +315,15 @@
     <SignManifests>true</SignManifests>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- 発行時に VSTO アドインの出力を publish\WordAddIn にコピーする（Import の後に定義して確実に実行されるようにする） -->
+  <Target Name="AfterPublish">
+    <PropertyGroup>
+      <_AddInOutDir>$(ProjectDir)New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\bin\$(Configuration)\</_AddInOutDir>
+      <_AddInPublishDir>$(ProjectDir)$(PublishUrl)WordAddIn\</_AddInPublishDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(_AddInPublishDir)" />
+    <Exec Command="xcopy /Y /E &quot;$(_AddInOutDir)*.*&quot; &quot;$(_AddInPublishDir)&quot;" IgnoreExitCode="false" />
+    <WriteLinesToFile File="$(_AddInPublishDir)README.txt" Lines="Word 用 VSTO アドイン（採点連携用）;;1. 本フォルダ内の New_MOSWordVSTOAddIn.vsto をダブルクリックしてインストールしてください。;2. 初回はセキュリティの警告が出る場合があります。信頼してインストールしてください。;3. インストール後、Word を起動するとアドインが読み込まれ、模擬アプリの採点が正しく動作します。" Overwrite="true" Encoding="UTF-8" />
+    <Message Importance="high" Text="VSTO アドインを発行フォルダにコピーしました: $(_AddInPublishDir)" />
+  </Target>
 </Project>
