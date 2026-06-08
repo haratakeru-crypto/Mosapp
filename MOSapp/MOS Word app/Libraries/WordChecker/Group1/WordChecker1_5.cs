@@ -79,7 +79,10 @@ namespace Libraries.Group1
                 Marshal.ReleaseComObject(paraRange);
                 Marshal.ReleaseComObject(find);
                 Marshal.ReleaseComObject(searchRange);
-                return result;
+                // 5-1: 現在行内、または当該プロジェクトの証跡で行内操作あり
+                bool logOk = LogReader.HasTaskEvidence(5, 1, "WrapInline");
+                return result || logOk;
+
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -109,7 +112,10 @@ namespace Libraries.Group1
                     catch { }
                 }
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
-                return result;
+                // 5-2: 現在四角形、または当該プロジェクトの証跡で四角形操作あり
+                bool logOk = LogReader.HasTaskEvidence(5, 2, "WrapSquare");
+                return result || logOk;
+
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -120,75 +126,20 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // アート効果「水彩：スポンジ」: Word PIA から直接の効果名取得が困難なため、
-                // 対象画像（「5月21日より5日間の...」段落付近）で Brightness/Contrast/ColorType がデフォルトから変化していることを「効果あり」として判定
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "5月21日より5日間の"; find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                Range paraRange = searchRange.Paragraphs[1].Range;
-                int paraStart = paraRange.Start;
-                int paraEnd = paraRange.End;
 
-                bool effected = false;
+                // XML解析
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
 
-                InlineShapes ils = document.InlineShapes;
-                for (int i = 1; i <= ils.Count && !effected; i++)
-                {
-                    InlineShape il = null;
-                    try
-                    {
-                        il = ils[i];
-                        int s = il.Range.Start;
-                        if (s < paraStart || s > paraEnd) continue;
-                        Microsoft.Office.Interop.Word.PictureFormat pf = il.PictureFormat;
-                        try
-                        {
-                            effected =
-                                Math.Abs(pf.Brightness - 0.5f) > 0.01f ||
-                                Math.Abs(pf.Contrast - 0.5f) > 0.01f ||
-                                pf.ColorType != MsoPictureColorType.msoPictureAutomatic;
-                        }
-                        finally { if (pf != null) Marshal.ReleaseComObject(pf); }
-                    }
-                    catch { }
-                    finally { if (il != null) Marshal.ReleaseComObject(il); }
-                }
-                Marshal.ReleaseComObject(ils);
-
-                if (!effected)
-                {
-                    Microsoft.Office.Interop.Word.Shapes shapes = document.Shapes;
-                    for (int i = 1; i <= shapes.Count && !effected; i++)
-                    {
-                        Microsoft.Office.Interop.Word.Shape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
-                            if (anchor < paraStart || anchor > paraEnd) continue;
-                            Microsoft.Office.Interop.Word.PictureFormat pf = sh.PictureFormat;
-                            try
-                            {
-                                effected =
-                                    Math.Abs(pf.Brightness - 0.5f) > 0.01f ||
-                                    Math.Abs(pf.Contrast - 0.5f) > 0.01f ||
-                                    pf.ColorType != MsoPictureColorType.msoPictureAutomatic;
-                            }
-                            finally { if (pf != null) Marshal.ReleaseComObject(pf); }
-                        }
-                        catch { }
-                        finally { if (sh != null) Marshal.ReleaseComObject(sh); }
-                    }
-                    Marshal.ReleaseComObject(shapes);
-                }
-
-                Marshal.ReleaseComObject(paraRange);
-                Marshal.ReleaseComObject(find);
-                Marshal.ReleaseComObject(searchRange);
-                return effected;
+                // 5-3: 「5月21日より5日間の」段落付近の画像に限定
+                string imageXml = GetImageXmlNearText(xml, "5月21日より5日間の");
+                
+                // その画像に「水彩：スポンジ」が適用されているか
+                return imageXml.Contains("artisticWatercolorSponge");
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -199,43 +150,20 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 図の効果「ぼかし25ポイント」= SoftEdge(Radius=25) として判定（Shape 側に反映されることを期待）
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "5月21日より5日間の"; find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                Range paraRange = searchRange.Paragraphs[1].Range;
-                int paraStart = paraRange.Start;
-                int paraEnd = paraRange.End;
 
-                bool ok = false;
-                const float expected = 25f;
-                const float tolerance = 1.5f;
+                // XML解析
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
 
-                Microsoft.Office.Interop.Word.Shapes shapes = document.Shapes;
-                for (int i = 1; i <= shapes.Count && !ok; i++)
-                {
-                    Microsoft.Office.Interop.Word.Shape sh = null;
-                    try
-                    {
-                        sh = shapes[i];
-                        int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
-                        if (anchor < paraStart || anchor > paraEnd) continue;
-                        Microsoft.Office.Interop.Word.SoftEdgeFormat se = sh.SoftEdge;
-                        try { if (se != null && Math.Abs(se.Radius - expected) <= tolerance) ok = true; }
-                        finally { if (se != null) Marshal.ReleaseComObject(se); }
-                    }
-                    catch { }
-                    finally { if (sh != null) Marshal.ReleaseComObject(sh); }
-                }
-                Marshal.ReleaseComObject(shapes);
+                // 5-4: 「5月21日より5日間の」段落付近の画像に限定
+                string imageXml = GetImageXmlNearText(xml, "5月21日より5日間の");
 
-                Marshal.ReleaseComObject(paraRange);
-                Marshal.ReleaseComObject(find);
-                Marshal.ReleaseComObject(searchRange);
-                return ok;
+                // ぼかし25ポイント (317500 EMU)
+                return imageXml.Contains("softEdge") && imageXml.Contains("317500");
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -246,40 +174,20 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 図の効果「面取り ハードエッジ」= ThreeD.BevelTopType が HardEdge の場合に合格
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "TOEICテスト対策セミナー"; find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                Range paraRange = searchRange.Paragraphs[1].Range;
-                int paraStart = paraRange.Start;
-                int paraEnd = paraRange.End;
 
-                bool ok = false;
-                Microsoft.Office.Interop.Word.Shapes shapes = document.Shapes;
-                for (int i = 1; i <= shapes.Count && !ok; i++)
-                {
-                    Microsoft.Office.Interop.Word.Shape sh = null;
-                    try
-                    {
-                        sh = shapes[i];
-                        int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
-                        if (anchor < paraStart || anchor > paraEnd) continue;
-                        Microsoft.Office.Interop.Word.ThreeDFormat td = sh.ThreeD;
-                        try { if (td != null && td.BevelTopType == MsoBevelType.msoBevelHardEdge) ok = true; }
-                        finally { if (td != null) Marshal.ReleaseComObject(td); }
-                    }
-                    catch { }
-                    finally { if (sh != null) Marshal.ReleaseComObject(sh); }
-                }
-                Marshal.ReleaseComObject(shapes);
+                // XML解析
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
 
-                Marshal.ReleaseComObject(paraRange);
-                Marshal.ReleaseComObject(find);
-                Marshal.ReleaseComObject(searchRange);
-                return ok;
+                // 5-5: 「TOEICテスト対策セミナー」付近の画像（タイトル画像）に限定
+                string imageXml = GetImageXmlNearText(xml, "TOEICテスト対策セミナー");
+
+                // 面取り ハードエッジ
+                return imageXml.Contains("bevelT") && imageXml.Contains("hardEdge");
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -316,74 +224,19 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 「装飾用（Decorative）」が ON かを優先して判定（無ければ代替テキストが空であることを許容）
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "5月21日より5日間の"; find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                Range paraRange = searchRange.Paragraphs[1].Range;
-                int paraStart = paraRange.Start;
-                int paraEnd = paraRange.End;
 
-                bool ok = false;
+                // XML解析による判定
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
 
-                // まず Shape を確認
-                Microsoft.Office.Interop.Word.Shapes shapes = document.Shapes;
-                for (int i = 1; i <= shapes.Count && !ok; i++)
-                {
-                    Microsoft.Office.Interop.Word.Shape sh = null;
-                    try
-                    {
-                        sh = shapes[i];
-                        int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
-                        if (anchor < paraStart || anchor > paraEnd) continue;
+                // 装飾用のXML形式: <adec:decorative xmlns:adec=".../2017/decorative" val="1"/>
+                bool isDecorative = xml.Contains("2017/decorative") && xml.Contains("val=\"1\"");
 
-                        // Decorative プロパティは環境によっては Interop に露出しないため reflection で取得
-                        object decorative = sh.GetType().InvokeMember("Decorative", BindingFlags.GetProperty, null, sh, null);
-                        if (decorative is int di && di == -1) ok = true; // msoTrue = -1
-                        else if (decorative is bool db && db) ok = true;
-                        else if (string.IsNullOrWhiteSpace(sh.AlternativeText)) ok = true;
-                    }
-                    catch
-                    {
-                        try { if (sh != null && string.IsNullOrWhiteSpace(sh.AlternativeText)) ok = true; } catch { }
-                    }
-                    finally { if (sh != null) Marshal.ReleaseComObject(sh); }
-                }
-                Marshal.ReleaseComObject(shapes);
-
-                // InlineShape も確認（decorative が取れない場合は AltText 空で許容）
-                if (!ok)
-                {
-                    InlineShapes ils = document.InlineShapes;
-                    for (int i = 1; i <= ils.Count && !ok; i++)
-                    {
-                        InlineShape il = null;
-                        try
-                        {
-                            il = ils[i];
-                            int s = il.Range.Start;
-                            if (s < paraStart || s > paraEnd) continue;
-                            object decorative = il.GetType().InvokeMember("Decorative", BindingFlags.GetProperty, null, il, null);
-                            if (decorative is int di && di == -1) ok = true;
-                            else if (decorative is bool db && db) ok = true;
-                            else if (string.IsNullOrWhiteSpace(il.AlternativeText)) ok = true;
-                        }
-                        catch
-                        {
-                            try { if (il != null && string.IsNullOrWhiteSpace(il.AlternativeText)) ok = true; } catch { }
-                        }
-                        finally { if (il != null) Marshal.ReleaseComObject(il); }
-                    }
-                    Marshal.ReleaseComObject(ils);
-                }
-
-                Marshal.ReleaseComObject(paraRange);
-                Marshal.ReleaseComObject(find);
-                Marshal.ReleaseComObject(searchRange);
-                return ok;
+                return isDecorative;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -394,70 +247,77 @@ namespace Libraries.Group1
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = new Application(); wordApp.Visible = true; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 「背景の削除」は Word PIA から直接取得が難しいため、透明背景が設定されているかで近似判定
-                // 文末の画像を優先して確認（最後の InlineShape/Shape）
-                bool transparentLike = false;
-                InlineShape lastInline = null;
-                try
-                {
-                    InlineShapes ils = document.InlineShapes;
-                    if (ils.Count >= 1) lastInline = ils[ils.Count];
-                    Marshal.ReleaseComObject(ils);
-                }
-                catch { }
 
-                if (lastInline != null)
+                // XML解析
+                string xml = document.WordOpenXML;
+                if (string.IsNullOrEmpty(xml)) return false;
+
+                // 5-8: 文書の「最後」の画像を特定する
+                var matches = System.Text.RegularExpressions.Regex.Matches(xml, @"<w:drawing>.*?</w:drawing>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (matches.Count == 0) return false;
+                
+                // 最後の画像ブロックを取得
+                string lastImageXml = matches[matches.Count - 1].Value;
+
+                // 領域保持（foregroundMark）の座標 y1 を解析
+                var yMatches = System.Text.RegularExpressions.Regex.Matches(lastImageXml, @"y1=""(\d+)""");
+                bool hasTopMark = false;
+                bool hasBottomMark = false;
+                foreach (System.Text.RegularExpressions.Match m in yMatches)
                 {
-                    try
+                    if (int.TryParse(m.Groups[1].Value, out int y))
                     {
-                        Microsoft.Office.Interop.Word.PictureFormat pf = lastInline.PictureFormat;
-                        try
-                        {
-                            transparentLike = pf.TransparentBackground == MsoTriState.msoTrue || pf.TransparencyColor != 0;
-                        }
-                        finally { if (pf != null) Marshal.ReleaseComObject(pf); }
+                        if (y < 40000) hasTopMark = true;
+                        if (y > 60000) hasBottomMark = true;
                     }
-                    catch { }
-                    finally { Marshal.ReleaseComObject(lastInline); }
                 }
 
-                if (!transparentLike)
-                {
-                    try
-                    {
-                        Microsoft.Office.Interop.Word.Shapes shapes = document.Shapes;
-                        if (shapes.Count >= 1)
-                        {
-                            Microsoft.Office.Interop.Word.Shape sh = shapes[shapes.Count];
-                            try
-                            {
-                                Microsoft.Office.Interop.Word.PictureFormat pf = sh.PictureFormat;
-                                try
-                                {
-                                    transparentLike = pf.TransparentBackground == MsoTriState.msoTrue || pf.TransparencyColor != 0;
-                                }
-                                finally { if (pf != null) Marshal.ReleaseComObject(pf); }
-                            }
-                            finally { Marshal.ReleaseComObject(sh); Marshal.ReleaseComObject(shapes); }
-                        }
-                        else
-                        {
-                            Marshal.ReleaseComObject(shapes);
-                        }
-                    }
-                    catch { }
-                }
+                // 上下両方のエリアにマークがあり、背景削除が確定されていれば合格
+                return hasTopMark && hasBottomMark;
 
-                // 背景の削除コマンドが実行されたログがあり、かつ透明背景相当の状態になっている場合のみ正解とする
-                bool logOk = LogReader.HasCommandExecuted("PictureBackgroundRemoval");
-                return transparentLike && logOk;
+
+
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
+        }
+
+
+
+        /// <summary>
+        /// 指定したテキストを含む段落内、またはその直前にある画像のXMLブロックを抽出します。
+        /// </summary>
+        private string GetImageXmlNearText(string fullXml, string targetText)
+        {
+            var paragraphs = System.Text.RegularExpressions.Regex.Matches(fullXml, @"<w:p\b[^>]*>.*?</w:p>", System.Text.RegularExpressions.RegexOptions.Singleline);
+            
+            for (int i = 0; i < paragraphs.Count; i++)
+            {
+                string pXml = paragraphs[i].Value;
+                string pText = System.Text.RegularExpressions.Regex.Replace(pXml, @"<[^>]+>", "");
+                
+                if (pText.Contains(targetText))
+                {
+                    // 1. まず同じ段落内で画像を探す
+                    var drawingMatch = System.Text.RegularExpressions.Regex.Match(pXml, @"<(w:drawing|v:shape).*?>.*?</\1>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                    if (drawingMatch.Success) return drawingMatch.Value;
+
+                    // 2. なければ直前の段落を探す（タイトル画像などは直前の段落に置かれることが多いため）
+                    if (i > 0)
+                    {
+                        string prevPXml = paragraphs[i - 1].Value;
+                        var prevDrawingMatch = System.Text.RegularExpressions.Regex.Match(prevPXml, @"<(w:drawing|v:shape).*?>.*?</\1>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                        if (prevDrawingMatch.Success) return prevDrawingMatch.Value;
+                    }
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[GetImageXmlNearText] テキスト '{targetText}' 付近（直前含む）に画像が見つかりませんでした。");
+            return "";
         }
 
         private string GetCurrentWordFilePath()

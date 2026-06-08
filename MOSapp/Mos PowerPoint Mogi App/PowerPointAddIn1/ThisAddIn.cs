@@ -66,7 +66,7 @@ namespace PowerPointAddIn1
             _task5_1PrintLogged = false;
             _task11_7PrintLogged = false;
             _printOptionsPollTimer = new Timer();
-            _printOptionsPollTimer.Interval = 2000;
+            _printOptionsPollTimer.Interval = 1000;
             _printOptionsPollTimer.Tick += PrintOptionsPollTimer_Tick;
             _printOptionsPollTimer.Start();
 
@@ -110,6 +110,12 @@ namespace PowerPointAddIn1
             {
                 if (!File.Exists(CurrentTaskFilePath))
                 {
+                    // 最終タスク（11-7）でレビュー遷移時に current_task が消えるケースでも、
+                    // 離脱直前の印刷設定を1回だけ再評価して証跡を確定する。
+                    if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
+                    {
+                        TryLogTask11_7PrintOnTaskBoundary();
+                    }
                     _currentTaskProjectId = -1;
                     _currentTaskTaskId = -1;
                     _currentTaskAttemptNo = 1;
@@ -133,6 +139,17 @@ namespace PowerPointAddIn1
                     return;
 
                 // --- タスク切り替え時の処理 ---
+                // 5-1 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
+                if (_currentTaskProjectId == 5 && _currentTaskTaskId == 1)
+                {
+                    TryLogTask5_1PrintOnTaskBoundary();
+                }
+                // 11-7 も同様に、タスク離脱直前の即時再評価で証跡を確定する。
+                if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
+                {
+                    TryLogTask11_7PrintOnTaskBoundary();
+                }
+
                 // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
                 // ※ プロジェクトIDが変わる場合は、比較対象のプレゼンテーションが異なるためスキップする
                 if (_currentTaskProjectId != -1 && !forceSnapshot && projectId == _currentTaskProjectId)
@@ -703,6 +720,90 @@ namespace PowerPointAddIn1
                                 Logger.LogTask11_7Print();
                                 _task11_7PrintLogged = true;
                             }
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 5-1 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// ポーリング間隔中の取りこぼしを補完するための境界処理。
+        /// </summary>
+        private void TryLogTask5_1PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task5_1PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        int outputType = (int)po.OutputType;
+                        int copies = po.NumberOfCopies;
+                        bool collate = (Convert.ToInt32(po.Collate) == (int)Office.MsoTriState.msoTrue);
+
+                        if (outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputThreeSlideHandouts
+                            && copies == 4
+                            && collate)
+                        {
+                            Logger.LogTask5_1Print();
+                            _task5_1PrintLogged = true;
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 11-7 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// 最終タスクでレビュー遷移時に current_task が消える経路の取りこぼしも補完する。
+        /// </summary>
+        private void TryLogTask11_7PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task11_7PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        int outputType = (int)po.OutputType;
+                        int copies = po.NumberOfCopies;
+                        bool collate = (Convert.ToInt32(po.Collate) == (int)Office.MsoTriState.msoTrue);
+
+                        if (outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages
+                            && copies == 3
+                            && collate)
+                        {
+                            Logger.LogTask11_7Print();
+                            _task11_7PrintLogged = true;
                         }
                     }
                     finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }

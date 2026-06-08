@@ -307,30 +307,9 @@ namespace Libraries.Group1
         {
             try
             {
-                // 修正後: ファイル名だけで判定する
-                string targetFileName = "project2.xlsx"; 
-
                 Application excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                
-                // 1. アクティブなブックをチェック
-                if (excelApp.ActiveWorkbook != null)
-                {
-                    if (excelApp.ActiveWorkbook.Name.Equals(targetFileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return excelApp.ActiveWorkbook.FullName;
-                    }
-                }
-                
-                // 2. 開いている全ブックをチェック
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.Name.Equals(targetFileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return wb.FullName;
-                    }
-                }
-                
-                return null;
+                // 固定ファイル名に依存せず、現在アクティブなブックを採点対象にする。
+                return excelApp.ActiveWorkbook?.FullName;
             }
             catch (Exception ex)
             {

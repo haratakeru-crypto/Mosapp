@@ -16,12 +16,13 @@ namespace Libraries
         {
             "1-1",  // 編集記号の表示/非表示 (ShowAll)
             "2-1",  // 文字列の切り取り・貼り付け (Cut, Paste)
-            "4-2",  // コメントへの返信 (ReviewCommentReply)
+            "4-2",  // コメントへの返信（Ribbon idMso 非対応のためログは未使用・OpenXML 等で判定）
             "4-3",  // コメントの解決 (ReviewResolveComment)
             "6-1",  // 文字列を表に変換 (TableConvertTextToTable)
             "7-1",  // 互換モードの解除 (UpgradeDocument)
-            "7-4",  // テキスト保存 (FileSaveAs)
-            "7-5",  // マクロ有効保存 (FileSaveAs)
+            "7-3",  // インテグラルヘッダー（IntegralHeader ポーリング補助）
+            "7-4",  // テキスト保存 (FileSaveAsTxt)
+            "7-5",  // マクロ有効保存 (FileSaveAsDocm)
             "8-1"   // 目次の挿入 (TocAutomatic2)
         };
 

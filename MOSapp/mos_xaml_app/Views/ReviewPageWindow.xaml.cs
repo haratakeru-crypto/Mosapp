@@ -27,28 +27,14 @@ namespace MOSExcelMogiApp.Views
     public partial class ReviewPageWindow : Window
     {
         // #region agent log
-        private static readonly string _agentDebugLogPath = @"C:\Users\kouza\source\repos\MOSapp\debug-f11e0d.log";
+        // NOTE:
+        // AgentLog 呼び出しは一括採点のホットパスに多数存在し、
+        // 引数生成・JSON化・ファイル書き込みが処理時間に大きく影響する。
+        // ここでは未定義シンボルに紐づく Conditional 属性で、
+        // 呼び出しサイトごと完全にコンパイル除去してオーバーヘッドをゼロ化する。
+        [System.Diagnostics.Conditional("ENABLE_AGENT_LOG")]
         private static void AgentLog(string location, string message, object data, string runId, string hypothesisId)
         {
-            try
-            {
-                var payload = new
-                {
-                    sessionId = "f11e0d",
-                    runId,
-                    hypothesisId,
-                    location,
-                    message,
-                    data,
-                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-                };
-                var line = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
-                System.IO.File.AppendAllText(_agentDebugLogPath, line + "\n");
-            }
-            catch
-            {
-                // ignore logging errors
-            }
         }
         // #endregion
 
@@ -1363,8 +1349,8 @@ namespace MOSExcelMogiApp.Views
                         
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Successfully activated file for project {project.projectId}");
                         
-                        // 以前の固定待機(350ms)を短縮。
-                        System.Threading.Thread.Sleep(100);
+                        // 固定待機は最小化し、必要最小限の COM 反映待ちだけ残す。
+                        System.Threading.Thread.Sleep(20);
 
                         // 採点直前に再度アクティブ化して、直前に別ブックへ戻る現象を抑止する。
                         bool activatedBeforeScoring = ActivateExcelFile(project.filePath);
@@ -1393,7 +1379,11 @@ namespace MOSExcelMogiApp.Views
                         
                         // 採点を実行
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Starting scoring for project {project.projectId}");
-                        var results = ExecuteScoringForProject(project.libraryName, project.taskCount, project.filePath);
+                        var results = ExecuteScoringForProject(
+                            project.libraryName,
+                            project.taskCount,
+                            project.filePath,
+                            project.projectId);
                         
                         // 採点結果を保存
                         Models.ExamResultStorage.SaveProjectResult(project.projectId, results);
@@ -1472,7 +1462,7 @@ namespace MOSExcelMogiApp.Views
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 OpenExcelFilesInBackground(filesToOpen);
-                Thread.Sleep(200);
+                Thread.Sleep(80);
 
                 bool allReady = true;
                 foreach (var filePath in filesToOpen)
@@ -1524,7 +1514,7 @@ namespace MOSExcelMogiApp.Views
                 catch { }
 
                 OpenExcelFilesInBackground(new List<string> { filePath });
-                Thread.Sleep(isFirstProject ? 900 : 500);
+                Thread.Sleep(isFirstProject ? 400 : 250);
             }
 
             AgentLog(
@@ -1540,6 +1530,8 @@ namespace MOSExcelMogiApp.Views
         private sealed class CheckTaskMethodBinding
         {
             public MethodInfo ImplMethod;
+            /// <summary>private bool CheckTask_* (string filePath) など、パス引き版。</summary>
+            public MethodInfo FilePathMethod;
             public MethodInfo PublicMethod;
             public string ResolvedMethodName;
 
@@ -1574,13 +1566,20 @@ namespace MOSExcelMogiApp.Views
                     MethodInfo implMethod = checkerType.GetMethod(
                         methodName + "_Impl",
                         BindingFlags.Instance | BindingFlags.NonPublic);
+                    MethodInfo filePathMethod = checkerType.GetMethod(
+                        methodName,
+                        BindingFlags.Instance | BindingFlags.NonPublic,
+                        null,
+                        new[] { typeof(string) },
+                        null);
                     MethodInfo method = checkerType.GetMethod(methodName);
-                    if (implMethod == null && method == null)
+                    if (implMethod == null && filePathMethod == null && method == null)
                         continue;
 
                     return new CheckTaskMethodBinding
                     {
                         ImplMethod = implMethod,
+                        FilePathMethod = filePathMethod,
                         PublicMethod = method,
                         ResolvedMethodName = methodName
                     };
@@ -1589,13 +1588,19 @@ namespace MOSExcelMogiApp.Views
                 return null;
             }
 
-            /// <summary>既存ロジックと同じ分岐でチェッカーを呼び出す。</summary>
+            /// <summary>既存ロジックと同じ分岐でチェッカーを呼び出す。パスがあれば ActiveWorkbook ではなく指定ファイルを採点する。</summary>
             public bool TryInvoke(object checkerInstance, string expectedFilePath, out bool result)
             {
                 result = false;
                 if (ImplMethod != null && !string.IsNullOrEmpty(expectedFilePath))
                 {
                     result = (bool)ImplMethod.Invoke(checkerInstance, new object[] { expectedFilePath });
+                    return true;
+                }
+
+                if (FilePathMethod != null && !string.IsNullOrEmpty(expectedFilePath))
+                {
+                    result = (bool)FilePathMethod.Invoke(checkerInstance, new object[] { expectedFilePath });
                     return true;
                 }
 
@@ -1609,13 +1614,18 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
-        private List<bool> ExecuteScoringForProject(string libraryName, int taskCount, string expectedFilePath)
+        private List<bool> ExecuteScoringForProject(
+            string libraryName,
+            int taskCount,
+            string expectedFilePath,
+            int slotProjectId)
         {
             var results = new List<bool>();
             
             try
             {
-                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] ExecuteScoringForProject called with libraryName: {libraryName}, taskCount: {taskCount}");
+                System.Diagnostics.Debug.WriteLine(
+                    $"[ReviewPageWindow] ExecuteScoringForProject called with libraryName: {libraryName}, taskCount: {taskCount}, slotProjectId: {slotProjectId}");
                 // #region agent log
                 string activeWbName = null;
                 string activeWbFullName = null;
@@ -1640,7 +1650,7 @@ namespace MOSExcelMogiApp.Views
                 AgentLog(
                     location: "ReviewPageWindow.ExecuteScoringForProject",
                     message: "entry",
-                    data: new { libraryName, taskCount, excelHwnd, activeWbName, activeWbFullName },
+                    data: new { libraryName, taskCount, slotProjectId, excelHwnd, activeWbName, activeWbFullName },
                     runId: "pre-fix",
                     hypothesisId: "B");
                 // #endregion
@@ -1651,7 +1661,6 @@ namespace MOSExcelMogiApp.Views
                 {
                     string groupId = parts[0];
                     string projectId = parts[1];
-                    int parsedProjectId = int.TryParse(projectId, out int pid) ? pid : -1;
                     
                     // Create namespace and type name
                     string namespaceName = $"Libraries.Group{groupId}";
@@ -1832,9 +1841,12 @@ namespace MOSExcelMogiApp.Views
                             }
 
                             string resolvedName = binding.ResolvedMethodName;
-                            string invokeMode = (binding.ImplMethod != null && !string.IsNullOrEmpty(expectedFilePath))
-                                ? "impl_with_file_path"
-                                : "public_no_args";
+                            string invokeMode =
+                                binding.ImplMethod != null && !string.IsNullOrEmpty(expectedFilePath)
+                                    ? "impl_with_file_path"
+                                    : binding.FilePathMethod != null && !string.IsNullOrEmpty(expectedFilePath)
+                                        ? "private_filepath"
+                                        : "public_no_args";
                             AgentLog(
                                 location: "ReviewPageWindow.ExecuteScoringForProject",
                                 message: "method_found",
@@ -1862,7 +1874,8 @@ namespace MOSExcelMogiApp.Views
                                     continue;
                                 }
 
-                                invokeResult = ApplyDestructiveValidation(parsedProjectId, i, invokeResult);
+                                // ログ・免除設定は画面上のスロット番号（VSTO の [Task N-...]）に合わせる
+                                invokeResult = ApplyDestructiveValidation(slotProjectId, i, invokeResult);
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method {resolvedName} result: {invokeResult}");
                                 results.Add(invokeResult);
                                 AgentLog(
@@ -1973,6 +1986,7 @@ namespace MOSExcelMogiApp.Views
         /// <item><b>全プロジェクト（方式A）</b>: <see cref="ExcelLogReader.TryGetFirstNonExemptViolation"/> — 免除に含まれない操作は違反。範囲は <see cref="ExcelTaskValidationConfig.GetAllowedRanges"/>。</item>
         /// </list>
         /// ルールは <see cref="ExcelTaskValidationConfig"/>（免除 / 許可範囲）。
+        /// <paramref name="projectId"/> は Checker DLL 名ではなく、画面上のプロジェクトスロット番号（config の projects キー、VSTO ログの Task N）。
         /// </summary>
         private bool ApplyDestructiveValidation(int projectId, int taskId, bool checkerResult)
         {
@@ -2324,7 +2338,8 @@ namespace MOSExcelMogiApp.Views
                             AddToMru: false,
                             Local: false,
                             CorruptLoad: Microsoft.Office.Interop.Excel.XlCorruptLoad.xlNormalLoad);
-                        System.Threading.Thread.Sleep(500);
+                        // Open 直後の過剰待機を削減（次段の ready-check で不足時は再試行される）。
+                        System.Threading.Thread.Sleep(120);
                     }
                     catch (Exception ex)
                     {
@@ -2476,9 +2491,9 @@ namespace MOSExcelMogiApp.Views
 
                                 // 採点側（ExcelChecker）は ActiveWorkbook を参照して filePath を取得するものがあるため、
                                 // "ActiveWorkbookが期待したブックになった" ことを確認してから true を返す。
-                                // 以前は10秒待機していたが、不一致時は数秒待っても変わらないことが多いため大幅に短縮（1.5秒）。
-                                const int timeoutMs = 1500;
-                                const int pollIntervalMs = 100;
+                                // 待機は短めにし、失敗時は上位リトライ経路へ委譲する。
+                                const int timeoutMs = 900;
+                                const int pollIntervalMs = 50;
                                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
                                 while (sw.ElapsedMilliseconds < timeoutMs)
@@ -2511,8 +2526,8 @@ namespace MOSExcelMogiApp.Views
                                     }
                                     catch { }
 
-                                    // 500ms 経過しても切り替わらない場合は、ウィンドウ単位のアクティブ化を試みる
-                                    if (sw.ElapsedMilliseconds > 500)
+                                    // 300ms 経過しても切り替わらない場合は、ウィンドウ単位のアクティブ化を試みる
+                                    if (sw.ElapsedMilliseconds > 300)
                                     {
                                         TryActivateWorkbookForScoring(excelApp, wb);
                                     }

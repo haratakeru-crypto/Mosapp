@@ -14,8 +14,12 @@ namespace MOS_Word_app
 
         public static void ResetProject(int groupId, int projectId)
         {
-            // リセット時にVSTOログも初期化（採点で参照するログを空にする）
-            LogReader.ClearLog();
+            // 個別リセット時は対象プロジェクトの採点ログ行のみ削除（他プロジェクトのログを保持）
+            LogReader.ClearTaskEvidenceForProject(projectId);
+            LogReader.ClearDestructiveLogForProject(projectId);
+            LogReader.ClearSnapshot();
+            LogReader.ClearCurrentTaskFile();
+            WordTaskAttemptRegistry.ClearProject(projectId);
 
             // 保存先（作業フォルダ）: Tab{groupId}\ 直下のみ。参照元: Tab{groupId}\Initial（Templates は使わない）
             string workingFolder = Path.Combine(BasePath, $"Tab{groupId}");
@@ -85,6 +89,10 @@ namespace MOS_Word_app
                             destInfo.IsReadOnly = false;
                     }
                     catch { }
+
+                    if (groupId == 1 && projectId == 7)
+                        TryDeleteP7DerivativeOutputs(workingFolder);
+
                     return;
                 }
                 catch (IOException) when (retryCount < maxRetries - 1)
@@ -96,6 +104,24 @@ namespace MOS_Word_app
                 {
                     retryCount++;
                     Thread.Sleep(200);
+                }
+            }
+        }
+
+        /// <summary>7-4/7-5 の派生ファイルが残ると 7-2 の状態のみで誤判定し得るため、P7 個別リセット時に削除する。</summary>
+        private static void TryDeleteP7DerivativeOutputs(string workingFolder)
+        {
+            if (string.IsNullOrEmpty(workingFolder) || !Directory.Exists(workingFolder))
+                return;
+
+            foreach (string name in new[] { "朗読会.txt", "朗読会.docm" })
+            {
+                string path = Path.Combine(workingFolder, name);
+                if (!File.Exists(path)) continue;
+                try { File.Delete(path); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] 派生ファイル削除スキップ ({name}): {ex.Message}");
                 }
             }
         }

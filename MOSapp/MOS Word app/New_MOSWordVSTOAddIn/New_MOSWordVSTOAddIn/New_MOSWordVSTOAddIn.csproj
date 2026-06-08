@@ -235,6 +235,8 @@
     <Compile Include="Logger.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="WordEvidenceHelper.cs" />
+    <Compile Include="..\..\Libraries\WordChecker\Group1\WordWatermarkInspection.cs" Link="WordWatermarkInspection.cs" />
     <Compile Include="Ribbon.cs">
       <SubType>Code</SubType>
     </Compile>

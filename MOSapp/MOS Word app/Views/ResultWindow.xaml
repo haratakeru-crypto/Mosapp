@@ -74,6 +74,12 @@
                                        Foreground="#DC2626"/>
                         </Grid>
                         
+                        <TextBlock Name="AccuracyTextBlock"
+                                   Text="正答率: 初回 0% / 修正後 0%"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="#10B981"
+                                   Margin="0,8,0,0"/>
+                        
                         <TextBlock Name="SummaryTextBlock" 
                                    Text="「あとで見直す」状態の問題と、50分以内に目を通せていない問題の合計数です。" 
                                    FontSize="14" Foreground="#6B7280" 

@@ -438,6 +438,7 @@ namespace MOS_Word_app
                     CurrentProject = project;
                     HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                     ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
+                    ApplyExamWindowLayoutFromOpenProject();
                     BringWordWindowToForeground();
                     ResultMessage = $"Wordファイルを開きました: {Path.GetFileName(project.FilePath)}";
                 }
@@ -472,6 +473,11 @@ namespace MOS_Word_app
             try
             {
                 LogReader.ClearLog();
+                LogReader.ClearTaskEvidence(); // 旧 mos_word_task_evidence.txt が残っていれば削除のみ
+                LogReader.ClearDestructiveLog();
+                LogReader.ClearSnapshot();
+                LogReader.ClearCurrentTaskFile();
+                WordTaskAttemptRegistry.ClearAll();
                 for (int projectId = 1; projectId <= 10; projectId++)
                 {
                     try
@@ -554,6 +560,22 @@ namespace MOS_Word_app
             {
                 System.Diagnostics.Debug.WriteLine($"[CloseAllWordDocuments] Error: {ex.Message}");
             }
+        }
+
+        /// <summary>プロジェクト再開時に試験用レイアウトを適用する（採点用サイズのまま残るのを防ぐ）。</summary>
+        private static void ApplyExamWindowLayoutFromOpenProject()
+        {
+            var uiTestBar = System.Windows.Application.Current.Windows
+                .OfType<Views.UiTestAppBarWindow>().FirstOrDefault();
+            if (uiTestBar != null)
+            {
+                uiTestBar.ApplyExamWindowLayout();
+                return;
+            }
+
+            var appBar = System.Windows.Application.Current.Windows
+                .OfType<Views.AppBarWindow>().FirstOrDefault();
+            appBar?.ApplyExamWindowLayout();
         }
 
         /// <summary>

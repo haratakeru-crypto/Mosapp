@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using Libraries.Group1;
 using Word = Microsoft.Office.Interop.Word;
 
 namespace New_MOSWordVSTOAddIn
@@ -12,15 +16,25 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>Word の文書編集ペインのウィンドウクラス。リボン上の入力欄は通常これを祖先に持たない。</summary>
         private const string WordDocumentPaneClassName = "_WwG";
 
+        private WordDestructiveMonitor _destructiveMonitor;
         private Timer _showAllPollTimer;
         private bool? _lastShowAllState;
         private int _lastColumnBreakCount;
         private string _lastTask1_2_03ColorFingerprint;
 
+        /// <summary>3-1: 先頭セクションが「やや狭い」余白プリセット相当か。</summary>
+        private bool? _lastMarginsModerate;
+
         /// <summary>全セクションの向きを連結したフィンガープリント（先頭セクションのみでは 3-3 とチェッカーが不一致になるため）。</summary>
         private string _lastOrientationFingerprint;
         private string _lastPageBorderFingerprint;
         private bool? _lastHeading1LineSimple;
+        /// <summary>4-5: 下書き1 透かしの有無（社外秘・至急は含めない）</summary>
+        private bool? _lastDraft1WatermarkFound;
+        /// <summary>透かし指紋（スナップショット比較・4-1 等の [Op] 補完用）</summary>
+        private string _lastWatermarkFingerprint;
+        private int _suppressWatermarkPollLogs;
+        private int _lastLaptopWrapType = -1;
 
         /// <summary>リボンが既にログした直後のポーリング二重記録を抑止する（約2ティック）。</summary>
         private int _suppressOrientationPollLogs;
@@ -39,6 +53,35 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>4-3: 前ティックの Comments.Count。吹き出し本文が Range で読めない環境でも削除を検知する。</summary>
         private int _lastCommentsCountForEco = -1;
 
+        /// <summary>7-1: 前ティックの ActiveDocument.FullName（文書切替でベースライン再取得するため）</summary>
+        private string _p7LastCompatDocFullName;
+
+        /// <summary>7-1: 同一文書での前回 CompatibilityMode。未設定は -1。</summary>
+        private int _p7LastCompatMode = -1;
+
+        /// <summary>7-2: 前ティックの Project7 文書 FullName。</summary>
+        private string _p7LastCompanyDocFullName;
+
+        /// <summary>7-2: 同一 Project7 文書で前ティック時点の Company が目標値だったか。</summary>
+        private bool _p7LastCompanyMatched;
+
+        private const string P7CompanyTarget = "ラビット出版";
+
+        private string _p7IntegralTrackedFullName;
+        private bool _p7IntegralLastDetected;
+
+        private const string P7RdTxtFileName = "朗読会.txt";
+        private const string P7RdDocmFileName = "朗読会.docm";
+
+        /// <summary>7-4/7-5: 前ティックで追跡していた ActiveDocument.FullName</summary>
+        private string _p7FileSaveAsTrackedFullName;
+
+        /// <summary>7-4: 前ティックで ActiveDocument が朗読会.txt だったか</summary>
+        private bool _p7FileSaveAsLastTxt;
+
+        /// <summary>7-5: 前ティックで ActiveDocument が朗読会.docm だったか</summary>
+        private bool _p7FileSaveAsLastDocm;
+
         internal void RegisterRibbonLoggedPageOrientation()
         {
             _suppressOrientationPollLogs = 2;
@@ -54,14 +97,127 @@ namespace New_MOSWordVSTOAddIn
             _suppressStyleSetPollLogs = 2;
         }
 
+        internal void RegisterRibbonLoggedWatermark()
+        {
+            _suppressWatermarkPollLogs = 2;
+        }
+
+        /// <summary>
+        /// タスク切替時: 透かしポーリングのベースラインを現文書に合わせる（[Op] / Executed は出さない）。
+        /// 4-5 の下書き1が 4-6 表示後に「変化」と誤検知されるのを防ぐ。
+        /// </summary>
+        internal void SyncWatermarkPollingBaselineOnTaskSwitch(int projectId)
+        {
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(projectId);
+                ApplyWatermarkPollingBaseline(doc);
+                _suppressWatermarkPollLogs = 2;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] SyncWatermarkPollingBaselineOnTaskSwitch: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 4-5 離脱時の保険: 文書に下書き1透かしが残っていれば 4-5 の証跡を補記する。
+        /// 重いポーリング前に 4-6/4-7 へ遷移した場合でも、4-5 の第2段採点（証跡必須）を満たせるようにする。
+        /// </summary>
+        internal void EnsureTask45WatermarkEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 4 || previousTaskId != 5)
+                return;
+            if (nextProjectId == 4 && nextTaskId == 5)
+                return;
+
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(4);
+                if (doc == null)
+                    return;
+                string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                if (WordWatermarkInspection.IsDraft1Watermark(norm))
+                    WordEvidenceHelper.LogCommandWithEvidence("Watermark");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask45WatermarkEvidenceBeforeLeave: " + ex.Message);
+            }
+        }
+
+        private void ApplyWatermarkPollingBaseline(Word.Document doc)
+        {
+            if (doc == null)
+            {
+                _lastWatermarkFingerprint = "None";
+                _lastDraft1WatermarkFound = false;
+                return;
+            }
+
+            try
+            {
+                string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                _lastWatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprint(norm);
+                _lastDraft1WatermarkFound = string.Equals(_lastWatermarkFingerprint, "Draft1Diagonal", StringComparison.Ordinal);
+            }
+            catch
+            {
+                _lastWatermarkFingerprint = "None";
+                _lastDraft1WatermarkFound = false;
+            }
+        }
+
+        internal Word.Document TryGetProjectDocument(int projectId)
+        {
+            try
+            {
+                var app = Application;
+                if (app == null)
+                    return null;
+                for (int i = app.Documents.Count; i >= 1; i--)
+                {
+                    Word.Document doc = app.Documents[i];
+                    string name = Path.GetFileName(doc.FullName ?? "");
+                    if (name.StartsWith("Project" + projectId, StringComparison.OrdinalIgnoreCase)
+                        || name.StartsWith("project" + projectId, StringComparison.OrdinalIgnoreCase))
+                        return doc;
+                }
+
+                return app.ActiveDocument;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>4-5 正答証跡と採点ゲート②用 [Op] Watermark（指紋変化・リボン透かし）。</summary>
+        private static void LogWatermarkForDestructiveGate(string fingerprint)
+        {
+            Logger.LogOperation("Watermark", fingerprint ?? "");
+            if (string.Equals(fingerprint, "Draft1Diagonal", StringComparison.Ordinal))
+                WordEvidenceHelper.LogCommandWithEvidence("Watermark");
+        }
+
+        /// <summary>4-6 正答証跡と採点ゲート②用 [Op] PageBorders。</summary>
+        private static void LogPageBordersForDestructiveGate()
+        {
+            WordEvidenceHelper.LogCommandWithEvidence("PageBorders");
+            Logger.LogOperation("PageBorders", "");
+        }
+
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[New_MOSWordVSTOAddIn] Add-in started");
             System.Diagnostics.Debug.WriteLine($"[New_MOSWordVSTOAddIn] Log file: {Logger.GetLogFilePath()}");
 
             this.Application.DocumentChange += Application_DocumentChange;
+            this.Application.DocumentBeforeSave += Application_DocumentBeforeSave;
             RefreshBaselineFromActiveDocumentNoLog();
             StartShowAllPolling();
+            _destructiveMonitor = new WordDestructiveMonitor(this);
+            _destructiveMonitor.Start();
         }
 
         /// <summary>
@@ -88,12 +244,15 @@ namespace New_MOSWordVSTOAddIn
             try
             {
                 this.Application.DocumentChange -= Application_DocumentChange;
+                this.Application.DocumentBeforeSave -= Application_DocumentBeforeSave;
             }
             catch
             {
                 // アンインストール時など Application が無い場合
             }
 
+            _destructiveMonitor?.Stop();
+            _destructiveMonitor = null;
             _showAllPollTimer?.Stop();
             _showAllPollTimer?.Dispose();
             _showAllPollTimer = null;
@@ -102,6 +261,25 @@ namespace New_MOSWordVSTOAddIn
         private void Application_DocumentChange()
         {
             RefreshBaselineFromActiveDocumentNoLog();
+        }
+
+        /// <summary>
+        /// 7-4/7-5: 上書き保存時など、保存前から対象ファイル名のとき専用ログを付与する。
+        /// 初回の「名前を付けて保存」は ShowAllPoll（毎ティック）で保存後の FullName を検知する。
+        /// </summary>
+        private void Application_DocumentBeforeSave(Word.Document Doc, ref bool SaveAsUI, ref bool Cancel)
+        {
+            try
+            {
+                if (Doc == null) return;
+                string fullName;
+                try { fullName = Doc.FullName; }
+                catch { return; }
+                if (string.IsNullOrEmpty(fullName)) return;
+
+                LogFileSaveAsCommandForPath(fullName);
+            }
+            catch { /* ignore */ }
         }
 
         /// <summary>
@@ -135,10 +313,41 @@ namespace New_MOSWordVSTOAddIn
                 }
 
                 _lastColumnBreakCount = CountColumnBreaks(doc);
+                _lastMarginsModerate = IsMarginsModeratePreset(doc);
                 _lastOrientationFingerprint = GetAllSectionsOrientationFingerprint(doc);
-                _lastPageBorderFingerprint = GetPageBorderFingerprint(doc);
+                _lastPageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
                 _lastHeading1LineSimple = IsHeading1LineSimplePattern(doc);
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
+
+                ApplyWatermarkPollingBaseline(doc);
+
+                // 7-1: 互換モードのベースライン（ポーリングで 非15→15 の遷移を検知するため）
+                try
+                {
+                    _p7LastCompatDocFullName = doc.FullName;
+                    _p7LastCompatMode = (int)doc.CompatibilityMode;
+                }
+                catch
+                {
+                    _p7LastCompatDocFullName = null;
+                    _p7LastCompatMode = -1;
+                }
+
+                // 7-2: Project7 上の Company ベースライン
+                try
+                {
+                    string fn = doc.FullName;
+                    if (IsProject7DocumentPath(fn))
+                    {
+                        _p7LastCompanyDocFullName = fn;
+                        _p7LastCompanyMatched = string.Equals(TryGetDocumentCompany(doc), P7CompanyTarget, StringComparison.Ordinal);
+                    }
+                }
+                catch
+                {
+                    _p7LastCompanyDocFullName = null;
+                    _p7LastCompanyMatched = false;
+                }
             }
             catch
             {
@@ -192,15 +401,15 @@ namespace New_MOSWordVSTOAddIn
             {
                 bool stillHasEcoBalloon = anyPhrase;
                 string commandId = stillHasEcoBalloon ? "ReviewResolveComment" : "ReviewDeleteComment";
-                Logger.LogCommand(commandId);
+                WordEvidenceHelper.LogCommandWithEvidence(commandId);
             }
             else if (phraseDisappeared)
             {
-                Logger.LogCommand("ReviewDeleteComment");
+                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
             }
             else if (commentCountDropped && doc != null && DocumentBodyContainsEcoPhraseForTask4_3(doc))
             {
-                Logger.LogCommand("ReviewDeleteComment");
+                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
             }
 
             _lastUnresolvedEcoCommentCount = newUnresolvedEcoCount;
@@ -236,6 +445,20 @@ namespace New_MOSWordVSTOAddIn
                 // 4-3: コメントペイン・リボン等でも未解決エコ件数だけは追跡（ShowAll 等の重い COM より前に実行）
                 UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
 
+                // 7-4/7-5: FullName のみの軽量検知（毎ティック≈1.2秒）。重いポーリング（約6秒）だと次プロジェクト押下前に取りこぼす。
+                try
+                {
+                    UpdateFileSaveAsPolling(doc);
+                }
+                catch { }
+
+                // 7-2: 「ファイルの情報」で会社を設定する操作は編集ペイン外のため、フォーカス判定より前にポーリングする。
+                try
+                {
+                    UpdateP7CompanyPolling(doc);
+                }
+                catch { }
+
                 if (ShouldSkipDocumentComBecauseFocusNotInEditingPane())
                     return;
 
@@ -245,9 +468,14 @@ namespace New_MOSWordVSTOAddIn
                 bool currentShowAll = viewShowAll || optionsShowAll;
                 if (_lastShowAllState.HasValue && _lastShowAllState.Value != currentShowAll)
                 {
-                    Logger.LogCommand("ShowAll");
+                    WordEvidenceHelper.LogCommandWithEvidence("ShowAll");
                 }
                 _lastShowAllState = currentShowAll;
+
+                bool marginsModerate = IsMarginsModeratePreset(doc);
+                if (_lastMarginsModerate.HasValue && marginsModerate && !_lastMarginsModerate.Value)
+                    WordEvidenceHelper.LogCommandWithEvidence("PageMarginsModerate");
+                _lastMarginsModerate = marginsModerate;
 
                 string orientFp = GetAllSectionsOrientationFingerprint(doc);
                 if (_lastOrientationFingerprint != null && orientFp != _lastOrientationFingerprint)
@@ -255,9 +483,31 @@ namespace New_MOSWordVSTOAddIn
                     if (_suppressOrientationPollLogs > 0)
                         _suppressOrientationPollLogs--;
                     else
-                        Logger.LogCommand("PageOrientationPortraitLandscape");
+                        WordEvidenceHelper.LogCommandWithEvidence("PageOrientationPortraitLandscape");
                 }
                 _lastOrientationFingerprint = orientFp;
+
+                // 7-1: Ribbon の UpgradeDocument は発火しないため、.doc で CompatibilityMode が非2013→2013 へ遷移したときだけログ（5-1 の「状態 OR ログ」と同型）
+                try
+                {
+                    string fullName = doc.FullName;
+                    string ext = Path.GetExtension(fullName).ToLowerInvariant();
+                    int compat = (int)doc.CompatibilityMode;
+                    const int wdWord2013 = (int)Word.WdCompatibilityMode.wdWord2013;
+
+                    if (!string.Equals(fullName, _p7LastCompatDocFullName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _p7LastCompatDocFullName = fullName;
+                        _p7LastCompatMode = compat;
+                    }
+                    else
+                    {
+                        if (ext == ".doc" && _p7LastCompatMode >= 0 && _p7LastCompatMode != wdWord2013 && compat == wdWord2013)
+                            WordEvidenceHelper.LogCommandWithEvidence("UpgradeDocument");
+                        _p7LastCompatMode = compat;
+                    }
+                }
+                catch { }
 
                 // 重い判定（文書全体テキスト化・セクション走査・スタイル解析）は毎回実行しない。
                 // リボン入力欄（フォントサイズ等）でのフォーカス喪失を避けるため、約6秒ごとに間引く。
@@ -265,13 +515,13 @@ namespace New_MOSWordVSTOAddIn
                 bool runHeavyChecks = (_heavyCheckTickCounter % 5) == 0;
                 if (runHeavyChecks)
                 {
-                    string borderFp = GetPageBorderFingerprint(doc);
+                    string borderFp = WordWatermarkInspection.GetPageBorderFingerprint(doc);
                     if (_lastPageBorderFingerprint != null && borderFp != _lastPageBorderFingerprint)
                     {
                         if (_suppressPageBorderPollLogs > 0)
                             _suppressPageBorderPollLogs--;
                         else
-                            Logger.LogCommand("PageBorders");
+                            LogPageBordersForDestructiveGate();
                     }
                     _lastPageBorderFingerprint = borderFp;
 
@@ -281,7 +531,7 @@ namespace New_MOSWordVSTOAddIn
                         if (_suppressStyleSetPollLogs > 0)
                             _suppressStyleSetPollLogs--;
                         else
-                            Logger.LogCommand("StyleSetLineSimple");
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineSimple");
                     }
                     _lastHeading1LineSimple = lineSimple;
 
@@ -303,6 +553,100 @@ namespace New_MOSWordVSTOAddIn
                         Logger.LogCommand("ColumnBreak");
                     }
                     _lastColumnBreakCount = columnBreakCount;
+
+                    // 4-1 等: 透かし指紋の変化で [Op] Watermark（4-5 は Draft1Diagonal で Executed も）
+                    try
+                    {
+                        string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                        string wmFp = WordWatermarkInspection.GetWatermarkFingerprint(norm);
+                        if (_lastWatermarkFingerprint != null
+                            && !string.Equals(wmFp, _lastWatermarkFingerprint, StringComparison.Ordinal))
+                        {
+                            if (_suppressWatermarkPollLogs > 0)
+                                _suppressWatermarkPollLogs--;
+                            else
+                                LogWatermarkForDestructiveGate(wmFp);
+                        }
+                        _lastWatermarkFingerprint = wmFp;
+                        _lastDraft1WatermarkFound = string.Equals(wmFp, "Draft1Diagonal", StringComparison.Ordinal);
+                    }
+                    catch { }
+
+                    // 5-1, 5-2: 画像レイアウトの検知（5月21日...段落付近）
+                    try
+                    {
+                        Word.Range searchRange = doc.Content;
+                        Word.Find find = searchRange.Find;
+                        find.ClearFormatting();
+                        find.Text = "5月21日より5日間の";
+                        if (find.Execute())
+                        {
+                            Word.Range paraRange = searchRange.Paragraphs[1].Range;
+                            int paraStart = paraRange.Start;
+                            int paraEnd = paraRange.End;
+
+                            int currentWrapType = -1; // -1: なし, 0: 行内, 1: 四角形など
+
+                            // 行内画像チェック
+                            if (paraRange.InlineShapes.Count > 0)
+                            {
+                                currentWrapType = 0; // Inline
+                            }
+                            else
+                            {
+                                // 浮動画像（Shape）チェック
+                                foreach (Word.Shape sh in doc.Shapes)
+                                {
+                                    try
+                                    {
+                                        int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
+                                        if (anchor >= paraStart && anchor <= paraEnd)
+                                        {
+                                            if (sh.WrapFormat.Type == Word.WdWrapType.wdWrapSquare) currentWrapType = 1;
+                                            else currentWrapType = 2; // その他
+                                            break;
+                                        }
+                                    }
+                                    finally { Marshal.ReleaseComObject(sh); }
+                                }
+                            }
+
+                            if (_lastLaptopWrapType != currentWrapType)
+                            {
+                                if (currentWrapType == 0) WordEvidenceHelper.LogCommandWithEvidence("WrapInline");
+                                else if (currentWrapType == 1) WordEvidenceHelper.LogCommandWithEvidence("WrapSquare");
+                            }
+                            _lastLaptopWrapType = currentWrapType;
+                            
+                            Marshal.ReleaseComObject(paraRange);
+                        }
+                        Marshal.ReleaseComObject(find);
+                        Marshal.ReleaseComObject(searchRange);
+                    }
+                    catch { }
+
+                    // 7-3: インテグラル相当ヘッダーが false→true に遷移したとき IntegralHeader をログ（7-4 後の再採点用）。判定は WordChecker1_7 と同一。
+                    try
+                    {
+                        bool nowIntegral = EvaluateIntegralHeaderPresenceForPolling(doc);
+                        string iFull;
+                        try { iFull = doc.FullName; } catch { iFull = null; }
+                        if (!string.IsNullOrEmpty(iFull))
+                        {
+                            if (!string.Equals(iFull, _p7IntegralTrackedFullName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                _p7IntegralTrackedFullName = iFull;
+                                _p7IntegralLastDetected = nowIntegral;
+                            }
+                            else
+                            {
+                                if (!_p7IntegralLastDetected && nowIntegral)
+                                    WordEvidenceHelper.LogCommandWithEvidence("IntegralHeader");
+                                _p7IntegralLastDetected = nowIntegral;
+                            }
+                        }
+                    }
+                    catch { }
                 }
             }
             catch
@@ -310,6 +654,113 @@ namespace New_MOSWordVSTOAddIn
                 // ドキュメント未表示などで COM エラーになることがあるため無視
             }
         }
+
+        /// <summary>7-2: Project7.doc 上で Company が目標値へ遷移したとき SetDocumentCompany をログする。</summary>
+        private void UpdateP7CompanyPolling(Word.Document doc)
+        {
+            if (doc == null) return;
+            string fullName;
+            try { fullName = doc.FullName; }
+            catch { return; }
+            if (!IsProject7DocumentPath(fullName)) return;
+
+            string company = TryGetDocumentCompany(doc) ?? "";
+            bool nowMatched = string.Equals(company, P7CompanyTarget, StringComparison.Ordinal);
+
+            if (!string.Equals(fullName, _p7LastCompanyDocFullName, StringComparison.OrdinalIgnoreCase))
+            {
+                _p7LastCompanyDocFullName = fullName;
+                _p7LastCompanyMatched = nowMatched;
+            }
+            else
+            {
+                if (!_p7LastCompanyMatched && nowMatched)
+                    WordEvidenceHelper.LogCommandWithEvidence("SetDocumentCompany");
+                _p7LastCompanyMatched = nowMatched;
+            }
+        }
+
+        private static bool IsProject7DocumentPath(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return false;
+            string name = Path.GetFileNameWithoutExtension(fullName);
+            return System.Text.RegularExpressions.Regex.IsMatch(name, @"^project\s*7$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        private static string TryGetDocumentCompany(Word.Document doc)
+        {
+            try
+            {
+                dynamic companyProp = ((dynamic)doc.BuiltInDocumentProperties)["Company"];
+                return companyProp?.Value?.ToString() ?? "";
+            }
+            catch { return null; }
+        }
+
+        private static bool IsRdTxtSavePath(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return false;
+            return string.Equals(Path.GetFileName(fullName), P7RdTxtFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsRdDocmSavePath(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return false;
+            return string.Equals(Path.GetFileName(fullName), P7RdDocmFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void LogFileSaveAsCommandForPath(string fullName)
+        {
+            if (IsRdTxtSavePath(fullName))
+                WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+            else if (IsRdDocmSavePath(fullName))
+                WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+        }
+
+        /// <summary>
+        /// 7-4/7-5: ActiveDocument が朗読会.txt / 朗読会.docm へ遷移したときそれぞれ専用ログを付与する（毎ティックで呼ぶ）。
+        /// </summary>
+        private void UpdateFileSaveAsPolling(Word.Document doc)
+        {
+            if (doc == null) return;
+            string fullName;
+            try { fullName = doc.FullName; }
+            catch { return; }
+            if (string.IsNullOrEmpty(fullName)) return;
+
+            bool nowTxt = IsRdTxtSavePath(fullName);
+            bool nowDocm = IsRdDocmSavePath(fullName);
+
+            if (!string.Equals(fullName, _p7FileSaveAsTrackedFullName, StringComparison.OrdinalIgnoreCase))
+            {
+                bool wasTxt = false;
+                bool wasDocm = false;
+                if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName))
+                {
+                    wasTxt = IsRdTxtSavePath(_p7FileSaveAsTrackedFullName);
+                    wasDocm = IsRdDocmSavePath(_p7FileSaveAsTrackedFullName);
+                }
+
+                if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasTxt && nowTxt)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+                if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasDocm && nowDocm)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+
+                _p7FileSaveAsTrackedFullName = fullName;
+                _p7FileSaveAsLastTxt = nowTxt;
+                _p7FileSaveAsLastDocm = nowDocm;
+            }
+            else
+            {
+                if (!_p7FileSaveAsLastTxt && nowTxt)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+                if (!_p7FileSaveAsLastDocm && nowDocm)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+                _p7FileSaveAsLastTxt = nowTxt;
+                _p7FileSaveAsLastDocm = nowDocm;
+            }
+        }
+
 
         /// <summary>
         /// キーボードフォーカスが文書編集ペイン（_WwG）上にないとき true。
@@ -597,6 +1048,38 @@ namespace New_MOSWordVSTOAddIn
             return isAccent1 && isDarker25 && isBlue;
         }
 
+        /// <summary>3-1: 先頭セクションの余白が「やや狭い」プリセット相当か（WordChecker1_3 と同じ許容誤差）。</summary>
+        private static bool IsMarginsModeratePreset(Word.Document doc)
+        {
+            Word.Section section = null;
+            Word.PageSetup ps = null;
+            try
+            {
+                section = doc.Sections[1];
+                ps = section.PageSetup;
+                float top = ps.TopMargin;
+                float bottom = ps.BottomMargin;
+                float left = ps.LeftMargin;
+                float right = ps.RightMargin;
+
+                bool IsApprox(float value, float target) => Math.Abs(value - target) <= 1.5f;
+
+                return IsApprox(top, 72.0f) &&
+                       IsApprox(bottom, 72.0f) &&
+                       IsApprox(left, 54.0f) &&
+                       IsApprox(right, 54.0f);
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (ps != null) Marshal.ReleaseComObject(ps);
+                if (section != null) Marshal.ReleaseComObject(section);
+            }
+        }
+
         /// <summary>文書内の全セクションの印刷の向きを連結した文字列（いずれかのセクションの向き変更で変化する）。</summary>
         private static string GetAllSectionsOrientationFingerprint(Word.Document doc)
         {
@@ -613,39 +1096,6 @@ namespace New_MOSWordVSTOAddIn
                 }
             }
             return sb.ToString();
-        }
-
-        private static string GetPageBorderFingerprint(Word.Document doc)
-        {
-            Word.Section sec = null;
-            Word.Borders borders = null;
-            Word.Border top = null;
-            Word.Border bottom = null;
-            try
-            {
-                sec = doc.Sections[1];
-                borders = sec.Borders;
-                top = borders[Word.WdBorderType.wdBorderTop];
-                bottom = borders[Word.WdBorderType.wdBorderBottom];
-                return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "{0},{1},{2},{3}",
-                    (int)top.LineStyle, (int)top.LineWidth, (int)bottom.LineStyle, (int)bottom.LineWidth);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-            finally
-            {
-                if (bottom != null)
-                    Marshal.ReleaseComObject(bottom);
-                if (top != null)
-                    Marshal.ReleaseComObject(top);
-                if (borders != null)
-                    Marshal.ReleaseComObject(borders);
-                if (sec != null)
-                    Marshal.ReleaseComObject(sec);
-            }
         }
 
         /// <summary>
@@ -724,6 +1174,380 @@ namespace New_MOSWordVSTOAddIn
             catch
             {
                 return false;
+            }
+        }
+
+        /// <summary>7-3: インテグラル相当ヘッダー（WordChecker1_7 と同ロジック。VSTO ポーリング用）。</summary>
+        private static bool EvaluateIntegralHeaderPresenceForPolling(Word.Document document)
+        {
+            if (document == null) return false;
+            bool usePostCompatFingerprint = false;
+            try
+            {
+                string ext = Path.GetExtension(document.FullName).ToLowerInvariant();
+                usePostCompatFingerprint = ext == ".doc";
+            }
+            catch { /* ignore */ }
+
+            try
+            {
+                int sectionCount = document.Sections.Count;
+                for (int i = 1; i <= sectionCount; i++)
+                {
+                    foreach (Word.WdHeaderFooterIndex hfType in new[]
+                    {
+                        Word.WdHeaderFooterIndex.wdHeaderFooterPrimary,
+                        Word.WdHeaderFooterIndex.wdHeaderFooterFirstPage,
+                        Word.WdHeaderFooterIndex.wdHeaderFooterEvenPages
+                    })
+                    {
+                        Word.HeaderFooter header = null;
+                        try
+                        {
+                            header = document.Sections[i].Headers[hfType];
+                            if (!header.Exists) continue;
+                            string headerXml = header.Range.WordOpenXML ?? "";
+                            if (HeaderXmlLooksLikeIntegralForPolling(headerXml, usePostCompatFingerprint))
+                                return true;
+                        }
+                        finally
+                        {
+                            if (header != null) Marshal.ReleaseComObject(header);
+                        }
+                    }
+                }
+            }
+            catch { /* ignore */ }
+            return false;
+        }
+
+        private static bool HeaderXmlLooksLikeIntegralForPolling(string xml, bool usePostCompatFingerprint)
+        {
+            if (string.IsNullOrEmpty(xml)) return false;
+            if (ContainsIntegralBuildingBlockMetadataForPolling(xml)) return true;
+            if (HasIntegralStructureFingerprintForPolling(xml)) return true;
+            if (usePostCompatFingerprint && HasIntegralStructureFingerprintAfterCompatForPolling(xml)) return true;
+            return false;
+        }
+
+        private static bool ContainsIntegralBuildingBlockMetadataForPolling(string xml)
+        {
+            if (xml.IndexOf("Integral", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if (Regex.IsMatch(xml, @"w:val\s*=\s*""Integral""", RegexOptions.IgnoreCase)) return true;
+            if (xml.IndexOf("docPart", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (xml.IndexOf("w:sdt", StringComparison.Ordinal) >= 0) return true;
+            return false;
+        }
+
+        private static bool HasIntegralAccent2ColorMarkerForPolling(string xml)
+        {
+            if (string.IsNullOrEmpty(xml)) return false;
+            return xml.IndexOf("fill=\"E97132\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("fill=\"ED7D31\"", StringComparison.Ordinal) >= 0
+                || xml.IndexOf("w:themeFill=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0
+                || xml.IndexOf("w:themeColor=\"accent2\"", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool HasIntegralStructureFingerprintForPolling(string xml)
+        {
+            if (!HasIntegralAccent2ColorMarkerForPolling(xml)) return false;
+            if (xml.IndexOf("w:w=\"1782\"", StringComparison.Ordinal) < 0) return false;
+            if (xml.IndexOf("w:w=\"7286\"", StringComparison.Ordinal) < 0) return false;
+            return true;
+        }
+
+        private static bool HasIntegralStructureFingerprintAfterCompatForPolling(string xml)
+        {
+            if (xml.IndexOf("<w:tbl", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if (!HasIntegralAccent2ColorMarkerForPolling(xml)) return false;
+            int gridColCount = 0;
+            for (int i = 0; ;)
+            {
+                int p = xml.IndexOf("<w:gridCol", i, StringComparison.Ordinal);
+                if (p < 0) break;
+                gridColCount++;
+                i = p + 10;
+            }
+            return gridColCount >= 2;
+        }
+
+        /// <summary>mos_word_current_task.txt を監視し、スナップショット取得・タスク切替時の差分記録を行う。</summary>
+        private sealed class WordDestructiveMonitor
+        {
+            private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_word_current_task.txt");
+            private static readonly string SnapshotFilePath = Path.Combine(Path.GetTempPath(), "mos_word_snapshot.txt");
+            private static readonly string DestructiveLogPath = Path.Combine(Path.GetTempPath(), "mos_word_destructive_errors.log");
+
+            private readonly ThisAddIn _addIn;
+            private Timer _pollTimer;
+            private int _projectId = -1;
+            private int _taskId = -1;
+            private int _attemptNo;
+            private int _exemptFlags;
+
+            public WordDestructiveMonitor(ThisAddIn addIn)
+            {
+                _addIn = addIn;
+            }
+
+            public void Start()
+            {
+                _pollTimer = new Timer { Interval = 500 };
+                _pollTimer.Tick += PollTimer_Tick;
+                _pollTimer.Start();
+            }
+
+            public void Stop()
+            {
+                _pollTimer?.Stop();
+                _pollTimer?.Dispose();
+                _pollTimer = null;
+            }
+
+            private void PollTimer_Tick(object sender, EventArgs e)
+            {
+                try
+                {
+                    if (!File.Exists(CurrentTaskFilePath))
+                    {
+                        _projectId = -1;
+                        _taskId = -1;
+                        return;
+                    }
+
+                    string line = File.ReadAllText(CurrentTaskFilePath).Trim();
+                    if (string.IsNullOrEmpty(line))
+                        return;
+
+                    var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 2)
+                        return;
+                    if (!int.TryParse(parts[0].Trim(), out int projectId) || !int.TryParse(parts[1].Trim(), out int taskId))
+                        return;
+
+                    int exemptFlags = 0;
+                    if (parts.Length >= 3)
+                        int.TryParse(parts[2].Trim(), out exemptFlags);
+                    int attemptNo = 0;
+                    if (parts.Length >= 4)
+                        int.TryParse(parts[3].Trim(), out attemptNo);
+
+                    bool forceSnapshot = !File.Exists(SnapshotFilePath);
+                    bool taskChanged = projectId != _projectId || taskId != _taskId || attemptNo != _attemptNo;
+
+                    if (!taskChanged && !forceSnapshot)
+                        return;
+
+                    if (taskChanged)
+                        _addIn.EnsureTask45WatermarkEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+
+                    if (_projectId >= 0 && _taskId >= 0 && !forceSnapshot && projectId == _projectId)
+                        CompareAndLogDestructive(_projectId, _taskId, _attemptNo, _exemptFlags);
+
+                    _projectId = projectId;
+                    _taskId = taskId;
+                    _attemptNo = attemptNo;
+                    _exemptFlags = exemptFlags;
+
+                    Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
+                    _addIn.SyncWatermarkPollingBaselineOnTaskSwitch(projectId);
+                    TakeSnapshot(projectId, taskId, attemptNo);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordDestructiveMonitor] " + ex.Message);
+                }
+            }
+
+            private void TakeSnapshot(int projectId, int taskId, int attemptNo)
+            {
+                Word.Document doc = _addIn.TryGetProjectDocument(projectId);
+                if (doc == null)
+                    return;
+
+                try
+                {
+                    var snap = Capture(doc, projectId, taskId, attemptNo);
+                    SaveSnapshot(snap);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordDestructiveMonitor] TakeSnapshot: " + ex.Message);
+                }
+            }
+
+            private void CompareAndLogDestructive(int projectId, int taskId, int attemptNo, int exemptFlagsInt)
+            {
+                var baseline = LoadSnapshot();
+                if (baseline == null || baseline.ProjectId != projectId || baseline.TaskId != taskId || baseline.AttemptNo != attemptNo)
+                    return;
+
+                Word.Document doc = _addIn.TryGetProjectDocument(projectId);
+                if (doc == null)
+                    return;
+
+                var current = Capture(doc, projectId, taskId, attemptNo);
+                var errors = Compare(baseline, current, exemptFlagsInt);
+                if (errors.Count == 0)
+                    return;
+
+                try
+                {
+                    string key = $"{projectId},{taskId},{attemptNo}:";
+                    string body = string.Join(" | ", errors);
+                    File.AppendAllText(DestructiveLogPath, key + body + Environment.NewLine, Encoding.UTF8);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordDestructiveMonitor] log: " + ex.Message);
+                }
+            }
+
+            private static List<string> Compare(SnapshotData baseline, SnapshotData current, int exemptFlagsInt)
+            {
+                var errors = new List<string>();
+                if (!HasFlag(exemptFlagsInt, 1) && current.Sections != baseline.Sections)
+                    errors.Add($"SectionsCount changed {baseline.Sections}->{current.Sections}");
+                if (!HasFlag(exemptFlagsInt, 2) && current.BodyTextLength != baseline.BodyTextLength)
+                    errors.Add($"BodyTextLength changed {baseline.BodyTextLength}->{current.BodyTextLength}");
+                if (!HasFlag(exemptFlagsInt, 4) && current.InlineShapes != baseline.InlineShapes)
+                    errors.Add($"InlineShapesCount changed {baseline.InlineShapes}->{current.InlineShapes}");
+                if (!HasFlag(exemptFlagsInt, 8) && current.FloatingShapes != baseline.FloatingShapes)
+                    errors.Add($"FloatingShapesCount changed {baseline.FloatingShapes}->{current.FloatingShapes}");
+                if (!HasFlag(exemptFlagsInt, 16) && current.Tables != baseline.Tables)
+                    errors.Add($"TablesCount changed {baseline.Tables}->{current.Tables}");
+                if (!HasFlag(exemptFlagsInt, 32) && current.Comments != baseline.Comments)
+                    errors.Add($"CommentsCount changed {baseline.Comments}->{current.Comments}");
+                if (!HasFlag(exemptFlagsInt, 64) && !string.Equals(baseline.HeaderPrimaryFp ?? "", current.HeaderPrimaryFp ?? "", StringComparison.Ordinal))
+                    errors.Add("HeaderFooterFingerprint changed");
+                if (!HasFlag(exemptFlagsInt, 1024) && baseline.CompatibilityMode >= 0 && current.CompatibilityMode >= 0
+                    && baseline.CompatibilityMode != current.CompatibilityMode)
+                    errors.Add($"CompatibilityMode changed {baseline.CompatibilityMode}->{current.CompatibilityMode}");
+                if (!HasFlag(exemptFlagsInt, 128) && !string.Equals(baseline.PageBorderFingerprint ?? "", current.PageBorderFingerprint ?? "", StringComparison.Ordinal))
+                    errors.Add($"PageBorderFingerprint changed {baseline.PageBorderFingerprint}->{current.PageBorderFingerprint}");
+                if (!HasFlag(exemptFlagsInt, 256) && !string.Equals(baseline.WatermarkFingerprint ?? "None", current.WatermarkFingerprint ?? "None", StringComparison.Ordinal))
+                    errors.Add($"WatermarkFingerprint changed {baseline.WatermarkFingerprint}->{current.WatermarkFingerprint}");
+                return errors;
+            }
+
+            private static bool HasFlag(int flags, int bit) => (flags & bit) != 0;
+
+            private static SnapshotData Capture(Word.Document doc, int projectId, int taskId, int attemptNo)
+            {
+                var d = new SnapshotData
+                {
+                    ProjectId = projectId,
+                    TaskId = taskId,
+                    AttemptNo = attemptNo,
+                    FullName = doc.FullName ?? ""
+                };
+                try { d.Sections = doc.Sections.Count; } catch { }
+                try { d.BodyTextLength = doc.Content.Text.Length; } catch { }
+                try { d.InlineShapes = doc.InlineShapes.Count; } catch { }
+                try { d.FloatingShapes = doc.Shapes.Count; } catch { }
+                try { d.Comments = doc.Comments.Count; } catch { }
+                try { d.Tables = doc.Tables.Count; } catch { }
+                try { d.CompatibilityMode = (int)doc.CompatibilityMode; } catch { d.CompatibilityMode = -1; }
+                d.HeaderPrimaryFp = GetHeaderFp(doc);
+                try
+                {
+                    string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
+                    d.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprint(norm);
+                }
+                catch
+                {
+                    d.WatermarkFingerprint = "None";
+                }
+                d.PageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
+                return d;
+            }
+
+            private static string GetHeaderFp(Word.Document doc)
+            {
+                try
+                {
+                    var hdr = doc.Sections[1].Headers[Word.WdHeaderFooterIndex.wdHeaderFooterPrimary].Range;
+                    string xml = hdr.WordOpenXML ?? "";
+                    if (xml.IndexOf("ED7D31", StringComparison.OrdinalIgnoreCase) >= 0) return "ED7D31";
+                    if (xml.IndexOf("E97132", StringComparison.OrdinalIgnoreCase) >= 0) return "E97132";
+                    if (xml.IndexOf("accent2", StringComparison.OrdinalIgnoreCase) >= 0) return "accent2";
+                }
+                catch { }
+                return "";
+            }
+
+            private static void SaveSnapshot(SnapshotData d)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("# WordSnapshot v2");
+                sb.AppendLine($"ProjectId={d.ProjectId}");
+                sb.AppendLine($"TaskId={d.TaskId}");
+                sb.AppendLine($"AttemptNo={d.AttemptNo}");
+                sb.AppendLine($"FullName={d.FullName}");
+                sb.AppendLine($"Sections={d.Sections}");
+                sb.AppendLine($"BodyTextLength={d.BodyTextLength}");
+                sb.AppendLine($"InlineShapes={d.InlineShapes}");
+                sb.AppendLine($"FloatingShapes={d.FloatingShapes}");
+                sb.AppendLine($"Tables={d.Tables}");
+                sb.AppendLine($"Comments={d.Comments}");
+                sb.AppendLine($"HeaderPrimaryFp={d.HeaderPrimaryFp}");
+                sb.AppendLine($"CompatibilityMode={d.CompatibilityMode}");
+                sb.AppendLine($"WatermarkFingerprint={d.WatermarkFingerprint ?? "None"}");
+                sb.AppendLine($"PageBorderFingerprint={d.PageBorderFingerprint ?? ""}");
+                File.WriteAllText(SnapshotFilePath, sb.ToString(), Encoding.UTF8);
+            }
+
+            private static SnapshotData LoadSnapshot()
+            {
+                if (!File.Exists(SnapshotFilePath))
+                    return null;
+                var d = new SnapshotData();
+                foreach (string line in File.ReadAllLines(SnapshotFilePath, Encoding.UTF8))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+                        continue;
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0) continue;
+                    string key = line.Substring(0, eq).Trim();
+                    string val = line.Substring(eq + 1).Trim();
+                    switch (key)
+                    {
+                        case "ProjectId": int.TryParse(val, out int p); d.ProjectId = p; break;
+                        case "TaskId": int.TryParse(val, out int t); d.TaskId = t; break;
+                        case "AttemptNo": int.TryParse(val, out int a); d.AttemptNo = a; break;
+                        case "Sections": int.TryParse(val, out int s); d.Sections = s; break;
+                        case "BodyTextLength": int.TryParse(val, out int bl); d.BodyTextLength = bl; break;
+                        case "InlineShapes": int.TryParse(val, out int ins); d.InlineShapes = ins; break;
+                        case "FloatingShapes": int.TryParse(val, out int fs); d.FloatingShapes = fs; break;
+                        case "Tables": int.TryParse(val, out int tb); d.Tables = tb; break;
+                        case "Comments": int.TryParse(val, out int cm); d.Comments = cm; break;
+                        case "HeaderPrimaryFp": d.HeaderPrimaryFp = val; break;
+                        case "CompatibilityMode": int.TryParse(val, out int c); d.CompatibilityMode = c; break;
+                        case "WatermarkFingerprint": d.WatermarkFingerprint = val; break;
+                        case "PageBorderFingerprint": d.PageBorderFingerprint = val; break;
+                    }
+                }
+                if (string.IsNullOrEmpty(d.WatermarkFingerprint))
+                    d.WatermarkFingerprint = "None";
+                return d;
+            }
+
+            private sealed class SnapshotData
+            {
+                public int ProjectId;
+                public int TaskId;
+                public int AttemptNo;
+                public string FullName;
+                public int Sections;
+                public int BodyTextLength;
+                public int InlineShapes;
+                public int FloatingShapes;
+                public int Tables;
+                public int Comments;
+                public string HeaderPrimaryFp;
+                public int CompatibilityMode = -1;
+                public string WatermarkFingerprint = "None";
+                public string PageBorderFingerprint = "";
             }
         }
 

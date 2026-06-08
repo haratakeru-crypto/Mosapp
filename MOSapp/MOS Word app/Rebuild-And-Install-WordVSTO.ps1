@@ -1,12 +1,14 @@
 # Rebuild-And-Install-WordVSTO.ps1
-# VSTOアドインをアンインストール → ビルド → インストール
+# VSTOアドインをアンインストール → Release ビルド → インストール
+# （wordvstosetup.vdproj の参照先は bin\Release と一致させる）
 
 $ErrorActionPreference = "Stop"
 $AddInName = "New_MOSWordVSTOAddIn"
+$Configuration = "Release"
 $ScriptDir = $PSScriptRoot
 if (-not $ScriptDir) { $ScriptDir = Get-Location }
 
-Write-Host "=== VSTO 再ビルド・インストール ===" -ForegroundColor Cyan
+Write-Host "=== VSTO 再ビルド・インストール ($Configuration) ===" -ForegroundColor Cyan
 
 # 1) Word を終了
 Write-Host "Word を終了しています..."
@@ -30,30 +32,49 @@ if ($uninstallKey -and $uninstallKey.UninstallString) {
     Write-Host "既存のアドインのアンインストール情報が見つかりません（スキップ）"
 }
 
-# 3) VSTO をビルド
-$vstoProj = Join-Path $ScriptDir "New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn.csproj"
-$msbuild = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
-if (-not (Test-Path $msbuild)) { $msbuild = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" }
-if (-not (Test-Path $msbuild)) { $msbuild = "msbuild.exe" }
+# 3) MSBuild を解決（VS 2022 / 18 など）
+$msbuild = $null
+foreach ($candidate in @(
+    "${env:ProgramFiles}\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe",
+    "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe",
+    "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
+)) {
+    if ($candidate -and (Test-Path $candidate)) { $msbuild = $candidate; break }
+}
+if (-not $msbuild) { $msbuild = "msbuild.exe" }
+Write-Host "MSBuild: $msbuild" -ForegroundColor Gray
 
+# 4) VSTO を Release でビルド
+$vstoProj = Join-Path $ScriptDir "New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn.csproj"
 if (Test-Path $vstoProj) {
-    Write-Host "ビルド中: $vstoProj"
-    & $msbuild $vstoProj /t:Rebuild /p:Configuration=Debug /v:minimal
+    Write-Host "ビルド中: $vstoProj ($Configuration)"
+    & $msbuild $vstoProj /t:Rebuild /p:Configuration=$Configuration /v:minimal
     if ($LASTEXITCODE -ne 0) { throw "ビルドに失敗しました" }
 } else {
     $vstoProj = Join-Path $ScriptDir "MOSWordVSTOAddIn\MOSWordVSTOAddIn.csproj"
     if (Test-Path $vstoProj) {
-        Write-Host "ビルド中: $vstoProj"
-        & $msbuild $vstoProj /t:Rebuild /p:Configuration=Debug /v:minimal
+        Write-Host "ビルド中: $vstoProj ($Configuration)"
+        & $msbuild $vstoProj /t:Rebuild /p:Configuration=$Configuration /v:minimal
         if ($LASTEXITCODE -ne 0) { throw "ビルドに失敗しました" }
     } else { throw "VSTO プロジェクトが見つかりません" }
 }
 
-# 4) .vsto を探してインストール
+# 5) .vsto を探してインストール（Release 優先、Debug は後方互換）
 $vstoPath = $null
-foreach ($base in @($ScriptDir, (Join-Path $ScriptDir "bin\Debug"))) {
-    $p = Join-Path $base "New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\bin\Debug\$AddInName.vsto"
+$relativeUnderScript = "New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\bin"
+foreach ($base in @($ScriptDir, (Join-Path $ScriptDir "bin\$Configuration"))) {
+    $p = Join-Path $base "$relativeUnderScript\$Configuration\$AddInName.vsto"
     if (Test-Path $p) { $vstoPath = $p; break }
+}
+if (-not $vstoPath) {
+    foreach ($cfg in @("Release", "Debug")) {
+        $p = Join-Path $ScriptDir "$relativeUnderScript\$cfg\$AddInName.vsto"
+        if (Test-Path $p) { $vstoPath = $p; break }
+    }
+}
+if (-not $vstoPath) {
+    $p = Join-Path $ScriptDir "MOSWordVSTOAddIn\bin\$Configuration\MOSWordVSTOAddIn.vsto"
+    if (Test-Path $p) { $vstoPath = $p }
 }
 if (-not $vstoPath) {
     $p = Join-Path $ScriptDir "MOSWordVSTOAddIn\bin\Debug\MOSWordVSTOAddIn.vsto"

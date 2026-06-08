@@ -1,3 +1,7 @@
 .env.local
 .vs/
 *.zip
+bin/
+obj/
+*.user
+*.suo

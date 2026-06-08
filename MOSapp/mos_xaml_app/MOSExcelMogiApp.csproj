@@ -254,10 +254,6 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="ExcelAddIn1\ExcelAddIn1.csproj">
-      <Project>{6A7617F7-8A21-464D-9EE8-7964AFA06EF3}</Project>
-      <Name>ExcelAddIn1</Name>
-    </ProjectReference>
     <BootstrapperPackage Include=".NETFramework,Version=v4.8">
       <Visible>False</Visible>
       <ProductName>Microsoft .NET Framework 4.8 %28x86 および x64%29</ProductName>
@@ -268,6 +264,10 @@
       <ProductName>.NET Framework 3.5 SP1</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
+    <ProjectReference Include="ExcelAddIn1\ExcelAddIn1.csproj">
+      <Project>{6A7617F7-8A21-464D-9EE8-7964AFA06EF3}</Project>
+      <Name>ExcelAddIn1</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="AfterPublish">

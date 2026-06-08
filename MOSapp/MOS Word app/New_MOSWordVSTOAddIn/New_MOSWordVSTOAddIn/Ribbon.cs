@@ -47,35 +47,37 @@ namespace New_MOSWordVSTOAddIn
             try
             {
                 string commandId = control.Id;
+                string loggedCommandId = commandId;
                 // 6-1: チェッカーが期待する ID に統一（ConvertTextToTable → TableConvertTextToTable）
                 if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.LogCommand("TableConvertTextToTable");
+                    loggedCommandId = "TableConvertTextToTable";
                 }
                 // 3-2: SectionBreakInsert を InsertSectionBreakNextPage としてログ（チェッカーが参照する ID）
                 else if (string.Equals(commandId, "SectionBreakInsert", StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.LogCommand("InsertSectionBreakNextPage");
+                    loggedCommandId = "InsertSectionBreakNextPage";
                 }
                 // 3-4: ColumnsLeft/Right は Word の idMso が無いため ColumnsDialog をフックし、チェッカー互換 ID で記録
                 else if (string.Equals(commandId, "ColumnsDialog", StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.LogCommand("ColumnsLeft");
+                    loggedCommandId = "ColumnsLeft";
                 }
                 else if (string.Equals(commandId, "PageBorders", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(commandId, "PageBorderOptionsDialog", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(commandId, "PageBorderAndShadingDialog", StringComparison.OrdinalIgnoreCase))
                 {
                     // 4-6: ページ罫線系。Word の Ribbon.xml では PageBorderAndShadingDialog のみ有効（PageBorders は不明 ID）
-                    Logger.LogCommand("PageBorders");
+                    loggedCommandId = "PageBorders";
                     Globals.ThisAddIn?.RegisterRibbonLoggedPageBorders();
                 }
-                else
+                else if (string.Equals(commandId, "PageOrientationPortraitLandscape", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(commandId, "PageOrientationPortraitLandscape", StringComparison.OrdinalIgnoreCase))
-                        Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
-                    Logger.LogCommand(commandId);
+                    Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
                 }
+
+                WordEvidenceHelper.LogCommandWithEvidence(loggedCommandId);
+                LogRibbonOperation(commandId, loggedCommandId);
 
                 // 既定の動作（Cut / Paste / SaveAs など）をキャンセルせずに実行させる
                 cancelDefault = false;
@@ -85,6 +87,45 @@ namespace New_MOSWordVSTOAddIn
                 System.Diagnostics.Debug.WriteLine($"[Ribbon] Error in CommandOnAction: {ex.Message}");
                 // エラー時も既定動作はブロックしない
                 cancelDefault = false;
+            }
+        }
+
+        private static void LogRibbonOperation(string commandId, string loggedCommandId)
+        {
+            if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("Cut", "");
+            else if (string.Equals(commandId, "Paste", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("Paste", "");
+            else if (string.Equals(commandId, "FileSaveAs", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("FileSaveAs", "");
+            else if (string.Equals(commandId, "SectionBreakInsert", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(loggedCommandId, "InsertSectionBreakNextPage", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("InsertSectionBreak", loggedCommandId ?? "");
+            else if (string.Equals(commandId, "ReviewDeleteComment", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("ReviewNewComment", loggedCommandId ?? "");
+            else if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(loggedCommandId, "TableConvertTextToTable", StringComparison.OrdinalIgnoreCase))
+                Logger.LogOperation("InsertTable", loggedCommandId ?? "");
+            else if (string.Equals(loggedCommandId, "PageBorders", StringComparison.OrdinalIgnoreCase))
+                // 4-6: ページ罫線 — 採点ゲート②で PageBorders 種別として判定（RibbonCommand 汎用にしない）
+                Logger.LogOperation("PageBorders", commandId ?? "");
+            else
+                Logger.LogOperation("RibbonCommand", loggedCommandId ?? commandId ?? "");
+        }
+
+        /// <summary>
+        /// ［デザイン］透かしギャラリー。4-1 等で [Op] Watermark を記録（4-5 のみ許可、他タスクはゲート②で検知）。
+        /// </summary>
+        public void WatermarkGalleryOnAction(Microsoft.Office.Core.IRibbonControl control, string selectedId, int selectedIndex)
+        {
+            try
+            {
+                Globals.ThisAddIn?.RegisterRibbonLoggedWatermark();
+                Logger.LogOperation("Watermark", selectedId ?? "");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Ribbon] Error in WatermarkGalleryOnAction: {ex.Message}");
             }
         }
 
@@ -254,6 +295,10 @@ namespace New_MOSWordVSTOAddIn
     <command idMso=""SectionBreakInsert"" onAction=""CommandOnAction"" />
     <command idMso=""PageBorderAndShadingDialog"" onAction=""CommandOnAction"" />
     <command idMso=""ConvertTextToTable"" onAction=""CommandOnAction"" />
+    <command idMso=""TableSplitTable"" onAction=""CommandOnAction"" />
+    <command idMso=""TableSplitCells"" onAction=""CommandOnAction"" />
+    <command idMso=""TableColumnsDistribute"" onAction=""CommandOnAction"" />
+    <command idMso=""TableRepeatHeaderRows"" onAction=""CommandOnAction"" />
   </commands>
   <ribbon>
     <tabs>
