@@ -303,7 +303,7 @@
     <PreBuildEvent>taskkill /IM "MOS Word app.exe" /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestCertificateThumbprint>51697A577CB7A09B44708FAD375E49927D37773A</ManifestCertificateThumbprint>
+    <ManifestCertificateThumbprint>0CF57E9C01FFB2BA2E5EF549F4B8D6E8FC1D000C</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestKeyFile>MOS Word app_TemporaryKey.pfx</ManifestKeyFile>
@@ -312,7 +312,7 @@
     <GenerateManifests>true</GenerateManifests>
   </PropertyGroup>
   <PropertyGroup>
-    <SignManifests>true</SignManifests>
+    <SignManifests>false</SignManifests>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- 発行時に VSTO アドインの出力を publish\WordAddIn にコピーする（Import の後に定義して確実に実行されるようにする） -->
