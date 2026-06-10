@@ -46,4 +46,3 @@ C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.exe.manifest
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.application
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.exe
 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.pdb
-C:\Users\kouza\source\repos\MOSapp\MOSapp\MOSapp\obj\Debug\MOSapp.exe.config

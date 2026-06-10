@@ -1162,6 +1162,7 @@ namespace Ui.ViewModels
                 {
                     MOSExcelMogiApp.Models.ExamResultStorage.SaveProjectResult(projectId, results);
                     var dialog = new ScoringResultDialog(taskCount, results, groupId, projectId);
+                    dialog.Topmost = true;
                     dialog.ShowDialog();
                     ResultMessage = $"採点完了: {taskCount}問のタスクを採点しました";
                 }
@@ -1916,27 +1917,47 @@ namespace Ui.ViewModels
 
             System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Saving current project (Group{groupId}, Project{currentProjectNumber})");
             
-            // COM Interopを使用して現在のExcelファイルを上書き保存
             ExcelApp excelApp = null;
             ExcelWorkbook workbook = null;
+            bool ownedProxy = false; // Marshal.GetActiveObject で取得した場合は true（使用後に Release が必要）
             
             try
             {
-                // Excelアプリケーションを取得
-                try
+                // 共有インスタンスが生きていればそちらを優先して使う（二重プロキシによる COM 不安定を防ぐ）
+                if (_sharedExcelApp != null)
                 {
-                    excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                    System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Got existing Excel application");
+                    try
+                    {
+                        _ = _sharedExcelApp.Visible; // 生存確認
+                        excelApp = _sharedExcelApp;
+                        ownedProxy = false;
+                        System.Diagnostics.Debug.WriteLine("[SaveCurrentExcelProject] Using shared Excel application");
+                    }
+                    catch
+                    {
+                        _sharedExcelApp = null;
+                        excelApp = null;
+                    }
                 }
-                catch
+
+                // 共有インスタンスが使えない場合は GetActiveObject にフォールバック
+                if (excelApp == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Excel application not found, skipping save");
-                    excelApp = null;
+                    try
+                    {
+                        excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                        ownedProxy = true;
+                        System.Diagnostics.Debug.WriteLine("[SaveCurrentExcelProject] Got Excel application via GetActiveObject");
+                    }
+                    catch
+                    {
+                        System.Diagnostics.Debug.WriteLine("[SaveCurrentExcelProject] Excel application not found, skipping save");
+                        return;
+                    }
                 }
                 
                 if (excelApp != null)
                 {
-                    // 現在開いているワークブックを検索
                     workbook = null;
                     string currentFileName = System.IO.Path.GetFileName(CurrentProject.FilePath);
                     
@@ -1951,67 +1972,55 @@ namespace Ui.ViewModels
                         }
                     }
                     
-                    // ワークブックが見つかった場合は保存
                     if (workbook != null)
                     {
-                        // 現在開いているファイルのパスを取得
                         string currentFilePath = workbook.FullName;
                         if (string.IsNullOrEmpty(currentFilePath))
-                        {
                             currentFilePath = CurrentProject.FilePath;
-                        }
                         
                         System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Current file path: {currentFilePath}");
                         
-                        // 既存ファイルの読み取り専用属性を解除
                         if (File.Exists(currentFilePath))
                         {
                             FileInfo fileInfo = new FileInfo(currentFilePath);
                             if (fileInfo.IsReadOnly)
                             {
                                 fileInfo.IsReadOnly = false;
-                                System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Removed read-only attribute from existing file");
+                                System.Diagnostics.Debug.WriteLine("[SaveCurrentExcelProject] Removed read-only attribute from existing file");
                             }
                         }
                         
-                        // ワークブックを上書き保存
-                        // 既存ファイルの上書き確認ダイアログを自動で「はい」にするため、DisplayAlertsを無効化
                         bool originalDisplayAlerts = excelApp.DisplayAlerts;
                         try
                         {
                             excelApp.DisplayAlerts = false;
-                            System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Disabled Excel display alerts for automatic overwrite");
-                            
-                            // 現在開いているファイルを上書き保存
                             workbook.Save();
-                            
                             System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Saved current project to: {currentFilePath}");
                         }
                         finally
                         {
-                            // DisplayAlertsを元の状態に戻す
                             excelApp.DisplayAlerts = originalDisplayAlerts;
-                            System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Restored Excel display alerts to original state");
                         }
                         
-                        // 保存したファイルの読み取り専用属性を解除
                         FileInfo savedFileInfo = new FileInfo(currentFilePath);
                         if (savedFileInfo.IsReadOnly)
                         {
                             savedFileInfo.IsReadOnly = false;
-                            System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Removed read-only attribute from saved file");
                         }
                         
-                        // ワークブックを閉じる（closeWorkbookがtrueの場合のみ）
                         if (closeWorkbook)
                         {
                             workbook.Close(SaveChanges: false);
+                            Marshal.ReleaseComObject(workbook);
                             workbook = null;
+                            // ワークブックを閉じた直後は Excel が内部状態を更新するまでわずかな時間が
+                            // 必要。低スペック PC では次の Workbooks.Open が COM エラーになるため待機する。
+                            Thread.Sleep(400);
                         }
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine($"[SaveCurrentExcelProject] Current workbook not found, skipping save");
+                        System.Diagnostics.Debug.WriteLine("[SaveCurrentExcelProject] Current workbook not found, skipping save");
                     }
                 }
             }
@@ -2021,14 +2030,14 @@ namespace Ui.ViewModels
             }
             finally
             {
-                // COMオブジェクトの解放
-                if (workbook != null && closeWorkbook)
+                // GetActiveObject で取得した場合のみ解放（共有インスタンスは Release しない）
+                if (ownedProxy && excelApp != null)
                 {
-                    try
-                    {
-                        Marshal.ReleaseComObject(workbook);
-                    }
-                    catch { }
+                    try { Marshal.ReleaseComObject(excelApp); } catch { }
+                }
+                if (workbook != null)
+                {
+                    try { Marshal.ReleaseComObject(workbook); } catch { }
                 }
             }
         }

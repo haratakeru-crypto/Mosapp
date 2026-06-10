@@ -41,16 +41,19 @@ namespace Libraries.Group1
         // 実装メソッド
         // ==========================================
 
-        // タスク3-1: セルスタイルの適用
+        // タスク3-1: セルスタイルの適用 (A2 に「集計」スタイル)
         private bool CheckTask_1_3_01_Impl(string filePath)
         {
             return CheckTaskBasic(filePath, "下半期売上", (worksheet) =>
             {
                 Range targetCell = worksheet.Range["A2"];
-                dynamic style = targetCell.Style;
-                string styleName = style.NameLocal; // "タイトル"
-                string styleNameEng = style.Name;   // "Title"
-                return styleName == "タイトル" || styleName == "Title";
+                try
+                {
+                    dynamic style = targetCell.Style;
+                    string styleName = (string)(style.NameLocal ?? "(null)");
+                    return styleName == "集計" || styleName == "Total";
+                }
+                catch { return false; }
             });
         }
 
