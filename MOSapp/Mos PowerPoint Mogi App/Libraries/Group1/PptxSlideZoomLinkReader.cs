@@ -347,7 +347,7 @@ namespace Libraries.Group1
         private static string NormalizeTitle(string s)
         {
             if (string.IsNullOrEmpty(s)) return "";
-            return s.Trim().Replace("\r", "").Replace("\n", "");
+            return NormalizeTitleForFuzzyMatch(s);
         }
 
         private static bool TitlesMatchPair(string a, string b, string req1, string req2)
@@ -359,6 +359,206 @@ namespace Libraries.Group1
             bool has1b = string.Equals(b, req1, StringComparison.Ordinal);
             bool has2b = string.Equals(b, req2, StringComparison.Ordinal);
             return (has1a && has2b) || (has2a && has1b);
+        }
+
+        /// <summary>
+        /// サマリーズームスライド上のズームリンク先を Open XML で検証する。
+        /// 指定2タイトルへのリンクがちょうど2件あり、禁止スライド番号へのリンクがないことを確認する。
+        /// </summary>
+        public static bool TryValidateSummaryZoomTargetTitles(
+            string pptxFilePath,
+            int summaryZoomSlideNumber1Based,
+            string requiredTitle1,
+            string requiredTitle2,
+            IReadOnlyList<int> forbiddenTargetSlideIndices1Based,
+            out string errorMessage)
+        {
+            errorMessage = null;
+            if (string.IsNullOrEmpty(pptxFilePath) || !File.Exists(pptxFilePath))
+            {
+                errorMessage = "pptx ファイルが見つかりません";
+                return false;
+            }
+
+            if (summaryZoomSlideNumber1Based < 1)
+            {
+                errorMessage = "サマリーズームのスライド番号が不正です";
+                return false;
+            }
+
+            try
+            {
+                using (var fs = new FileStream(pptxFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var zip = new ZipArchive(fs, ZipArchiveMode.Read))
+                {
+                    if (zip.GetEntry("ppt/presentation.xml") == null)
+                    {
+                        errorMessage = "ppt/presentation.xml が存在しません";
+                        return false;
+                    }
+
+                    var orderedSlidePartPaths = BuildOrderedSlidePartPaths(zip);
+                    if (orderedSlidePartPaths == null || orderedSlidePartPaths.Count < summaryZoomSlideNumber1Based)
+                    {
+                        errorMessage = "プレゼンテーションのスライド一覧を解釈できません";
+                        return false;
+                    }
+
+                    string summarySlidePart = orderedSlidePartPaths[summaryZoomSlideNumber1Based - 1];
+                    string relsPath = "ppt/slides/_rels/" + Path.GetFileName(summarySlidePart) + ".rels";
+                    var relsEntry = zip.GetEntry(relsPath);
+                    if (relsEntry == null)
+                    {
+                        errorMessage = "サマリーズームスライドの .rels が見つかりません: " + relsPath;
+                        return false;
+                    }
+
+                    XmlDocument relsDoc = new XmlDocument();
+                    using (var s = relsEntry.Open())
+                        relsDoc.Load(s);
+
+                    var ridToTarget = BuildRidToTargetMap(relsDoc);
+                    var slideToSlideTargets = CollectSlidePartTargetsFromRelsLoose(relsDoc, summarySlidePart);
+
+                    if (slideToSlideTargets.Count != 2)
+                    {
+                        string slideXmlPath = summarySlidePart.Replace('\\', '/');
+                        var entrySlide = zip.GetEntry(slideXmlPath);
+                        if (entrySlide != null)
+                        {
+                            XmlDocument slideXmlDoc = new XmlDocument();
+                            using (var st = entrySlide.Open())
+                                slideXmlDoc.Load(st);
+                            var fromIds = CollectSlidePartsFromSlideXmlGraphicData(slideXmlDoc, ridToTarget, summarySlidePart);
+                            if (fromIds.Count == 2)
+                                slideToSlideTargets = fromIds;
+                        }
+                    }
+
+                    if (slideToSlideTargets.Count != 2)
+                    {
+                        errorMessage = "サマリーズームのリンク先スライドを2件特定できませんでした（実際: " + slideToSlideTargets.Count + "）";
+                        return false;
+                    }
+
+                    var forbidden = new HashSet<int>();
+                    if (forbiddenTargetSlideIndices1Based != null)
+                    {
+                        foreach (int idx in forbiddenTargetSlideIndices1Based)
+                        {
+                            if (idx >= 1) forbidden.Add(idx);
+                        }
+                    }
+
+                    var linkedTitles = new List<string>();
+                    foreach (string slidePart in slideToSlideTargets)
+                    {
+                        int slideIndex = GetSlidePartIndex1Based(orderedSlidePartPaths, slidePart);
+                        if (slideIndex < 1)
+                        {
+                            errorMessage = "リンク先スライドの位置を特定できません: " + slidePart;
+                            return false;
+                        }
+
+                        if (forbidden.Contains(slideIndex))
+                        {
+                            errorMessage = "禁止されたスライド（スライド " + slideIndex + "）へのリンクが含まれています";
+                            return false;
+                        }
+
+                        var entry = zip.GetEntry(slidePart.Replace('\\', '/'));
+                        if (entry == null)
+                        {
+                            errorMessage = "リンク先スライド部分が見つかりません: " + slidePart;
+                            return false;
+                        }
+
+                        XmlDocument slideDoc = new XmlDocument();
+                        using (var st = entry.Open())
+                            slideDoc.Load(st);
+                        linkedTitles.Add(ExtractSlideTitleFromSlidePart(slideDoc));
+                    }
+
+                    if (!TitlesMatchRequiredPairFuzzy(linkedTitles, requiredTitle1, requiredTitle2))
+                    {
+                        errorMessage = "リンク先2スライドのタイトルが問題文と一致しません";
+                        return false;
+                    }
+
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = "pptx 解析エラー: " + ex.Message;
+                return false;
+            }
+        }
+
+        private static int GetSlidePartIndex1Based(List<string> orderedSlidePartPaths, string slidePart)
+        {
+            if (orderedSlidePartPaths == null || string.IsNullOrEmpty(slidePart))
+                return -1;
+            string norm = slidePart.Replace('\\', '/');
+            for (int i = 0; i < orderedSlidePartPaths.Count; i++)
+            {
+                if (string.Equals(orderedSlidePartPaths[i].Replace('\\', '/'), norm, StringComparison.OrdinalIgnoreCase))
+                    return i + 1;
+            }
+            return -1;
+        }
+
+        private static string NormalizeTitleForFuzzyMatch(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder();
+            foreach (char c in s.Trim().Replace("\r", "").Replace("\n", ""))
+            {
+                if (c == ' ' || c == '\u3000' || c == '\t') continue;
+                sb.Append(NormalizeWidthInsensitiveChar(c));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>全角数字・句読点などを半角に揃える（教材スライドの「１.教育理念」等）。</summary>
+        private static char NormalizeWidthInsensitiveChar(char c)
+        {
+            if (c >= '\uFF10' && c <= '\uFF19')
+                return (char)('0' + (c - '\uFF10'));
+            if (c == '\uFF0E')
+                return '.';
+            if (c == '\uFF01')
+                return '!';
+            if (c == '\uFF1F')
+                return '?';
+            return c;
+        }
+
+        private static bool TitlesMatchRequiredPairFuzzy(List<string> actualTitles, string req1, string req2)
+        {
+            if (actualTitles == null || actualTitles.Count != 2)
+                return false;
+
+            string n1 = NormalizeTitleForFuzzyMatch(req1);
+            string n2 = NormalizeTitleForFuzzyMatch(req2);
+            string a = NormalizeTitleForFuzzyMatch(actualTitles[0]);
+            string b = NormalizeTitleForFuzzyMatch(actualTitles[1]);
+
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b) || string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return (TitleFuzzyEquals(a, n1) && TitleFuzzyEquals(b, n2))
+                || (TitleFuzzyEquals(a, n2) && TitleFuzzyEquals(b, n1));
+        }
+
+        private static bool TitleFuzzyEquals(string actualNorm, string requiredNorm)
+        {
+            if (string.IsNullOrEmpty(actualNorm) || string.IsNullOrEmpty(requiredNorm))
+                return false;
+            if (string.Equals(actualNorm, requiredNorm, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return actualNorm.IndexOf(requiredNorm, StringComparison.OrdinalIgnoreCase) >= 0
+                || requiredNorm.IndexOf(actualNorm, StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

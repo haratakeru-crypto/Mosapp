@@ -9,7 +9,7 @@ namespace Libraries
 {
     /// <summary>
     /// PowerPoint VSTO アドインで生成されたログファイルを読み込むユーティリティ。
-    /// メインログ（mos_ppt_log.txt）に加え、5-1/10-4/11-7 用の採点証跡（mos_ppt_task_evidence.txt）を扱う。
+    /// メインログ（mos_ppt_log.txt）に加え、1-2/1-3/1-4/1-8/5-1/10-4/11-7 用の採点証跡（mos_ppt_task_evidence.txt）を扱う。
     /// </summary>
     public static class PPLogReader
     {
@@ -41,7 +41,7 @@ namespace Libraries
 
         /// <summary>
         /// 採点用証跡ログのパス（%TEMP%\mos_ppt_task_evidence.txt）。
-        /// 5-1・10-4・11-7 など、単体プロジェクトリセット後も採点に必要な行だけを VSTO が追記する。
+        /// 1-2/1-3/1-4/1-8/5-1/10-4/11-7 など、単体プロジェクトリセット後も採点に必要な行だけを VSTO が追記する。
         /// <see cref="ClearLog"/> では消えない。全プロジェクトリセット時に <see cref="ClearTaskEvidence"/> で消す。
         /// </summary>
         public static string GetTaskEvidenceLogPath()
@@ -122,7 +122,7 @@ namespace Libraries
 
         /// <summary>
         /// 単体プロジェクトリセット時、そのプロジェクトのログ依存採点タスクに対応する証跡行だけを削除する。
-        /// 5→5-1 印刷、10→10-4 グレースケール、11→11-7 印刷。他プロジェクトでは何もしない。
+        /// 1→1-2/1-3/1-4/1-8、5→5-1、10→10-4、11→11-7。他プロジェクトでは何もしない。
         /// </summary>
         public static void ClearTaskEvidenceForProject(int projectId)
         {
@@ -176,7 +176,8 @@ namespace Libraries
                     {
                         "[Task1-2] Duplicate",
                         "[Task1-3] HideSlide3",
-                        "[Task1-4] DeleteThirdSlide"
+                        "[Task1-4] DeleteThirdSlide",
+                        "[Task1-8] SummaryZoom"
                     };
                 case 5:
                     return new[] { "[Task5-1] Print" };
@@ -233,28 +234,20 @@ namespace Libraries
             return HasGradingEvidenceMarker("[Task5-1] Print");
         }
 
-        /// <summary>証跡またはメインログに 11-7 の印刷記録（[Task11-7] Print）が含まれるか。</summary>
-        public static bool HasTask11_7PrintExecuted()
+        /// <summary>証跡またはメインログに 1-8 サマリーズーム挿入記録（[Task1-8] SummaryZoom）が含まれるか。</summary>
+        public static bool HasTask1_8SummaryZoomExecuted()
         {
-            return HasGradingEvidenceMarker("[Task11-7] Print");
+            return HasGradingEvidenceMarker("[Task1-8] SummaryZoom");
         }
 
-        /// <summary>証跡またはメインログに 1-2 複製記録（[Task1-2] Duplicate）が含まれるか。</summary>
-        public static bool HasTask1_2DuplicateExecuted()
+        /// <summary>
+        /// セッション内で 1-8 サマリーズームが実行済みか（採点コンテキストに依存しない）。
+        /// タスク1-6のスライド番号補正に使用する。
+        /// </summary>
+        public static bool HasTask1_8SummaryZoomExecutedGlobally()
         {
-            return HasGradingEvidenceMarker("[Task1-2] Duplicate");
-        }
-
-        /// <summary>証跡またはメインログに 1-3 非表示記録（[Task1-3] HideSlide3）が含まれるか。</summary>
-        public static bool HasTask1_3HideSlide3Executed()
-        {
-            return HasGradingEvidenceMarker("[Task1-3] HideSlide3");
-        }
-
-        /// <summary>証跡またはメインログに 1-4 削除記録（[Task1-4] DeleteThirdSlide）が含まれるか。</summary>
-        public static bool HasTask1_4DeleteThirdSlideExecuted()
-        {
-            return HasGradingEvidenceMarker("[Task1-4] DeleteThirdSlide");
+            return FileContainsMarker(GetTaskEvidenceLogPath(), "[Task1-8] SummaryZoom")
+                || FileContainsMarker(GetLogFilePath(), "[Task1-8] SummaryZoom");
         }
 
         /// <summary>採点用証跡を優先し、無ければ従来の mos_ppt_log.txt を検索する。</summary>
@@ -523,6 +516,74 @@ namespace Libraries
             if (string.IsNullOrWhiteSpace(opLine)) return "";
             int space = opLine.IndexOf(' ');
             return space > 0 ? opLine.Substring(0, space).Trim() : opLine.Trim();
+        }
+
+        /// <summary>タスク開始時スナップショットの読み取り結果（スライド構成検証用）。</summary>
+        public sealed class PPTaskSnapshotData
+        {
+            public int ProjectId { get; set; }
+            public int TaskId { get; set; }
+            public int SlidesCount { get; set; }
+            public List<string> SlideNames { get; set; } = new List<string>();
+        }
+
+        /// <summary>
+        /// %TEMP%\mos_ppt_snapshot.txt から、指定タスクの開始時スナップショットを読み込む。
+        /// ProjectId / TaskId が一致しない場合は false を返す。
+        /// </summary>
+        public static bool TryLoadTaskSnapshot(int projectId, int taskId, out PPTaskSnapshotData snapshot)
+        {
+            snapshot = null;
+            string path = GetSnapshotPath();
+            if (!File.Exists(path))
+                return false;
+
+            try
+            {
+                var data = new PPTaskSnapshotData();
+                foreach (string line in File.ReadAllLines(path))
+                {
+                    if (string.IsNullOrEmpty(line)) continue;
+                    int colonIndex = line.IndexOf(':');
+                    if (colonIndex < 0) continue;
+
+                    string key = line.Substring(0, colonIndex);
+                    string value = line.Substring(colonIndex + 1);
+
+                    switch (key)
+                    {
+                        case "TaskId":
+                            var ids = value.Split(',');
+                            if (ids.Length == 2)
+                            {
+                                int.TryParse(ids[0], out int pid);
+                                int.TryParse(ids[1], out int tid);
+                                data.ProjectId = pid;
+                                data.TaskId = tid;
+                            }
+                            break;
+                        case "SlidesCount":
+                            int.TryParse(value, out int slidesCount);
+                            data.SlidesCount = slidesCount;
+                            break;
+                        case "SlideNames":
+                            data.SlideNames = value.Split(new[] { '|' }, StringSplitOptions.None).ToList();
+                            break;
+                    }
+                }
+
+                if (data.ProjectId != projectId || data.TaskId != taskId)
+                    return false;
+                if (data.SlidesCount < 1 || data.SlideNames == null || data.SlideNames.Count != data.SlidesCount)
+                    return false;
+
+                snapshot = data;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

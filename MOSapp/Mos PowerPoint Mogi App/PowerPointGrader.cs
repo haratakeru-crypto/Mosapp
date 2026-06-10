@@ -151,7 +151,7 @@ namespace MOS_PowerPoint_app
         /// 指定したプロジェクト・タスクの採点を行う。
         /// ログに余計な操作や許可されない座標変化があれば不合格。続けて COM による結果判定を行う。
         /// </summary>
-        /// <param name="projectId">プロジェクト ID（1～11）。</param>
+        /// <param name="projectId">プロジェクト ID（1～10）。</param>
         /// <param name="taskId">タスク ID。</param>
         /// <returns>合格なら true、不合格または未実装・範囲外なら false。</returns>
         public bool GradeTask(int projectId, int taskId)
@@ -170,6 +170,8 @@ namespace MOS_PowerPoint_app
             if (HasLoggedDestructiveError(projectId, taskId, attemptNo))
             {
                 System.Diagnostics.Debug.WriteLine($"[Grader] Task {projectId}-{taskId} FAILED due to logged destructive operation.");
+                if (projectId == 1 && taskId == 1)
+                    Debug.WriteLine("[Task1-1] GradeTask: FAIL early exit (logged destructive operation)");
                 PPGradingPerf.Log("GradeTask.HasLoggedDestructiveError", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
                 PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit");
                 return false;
@@ -179,6 +181,8 @@ namespace MOS_PowerPoint_app
             sw.Restart();
             if (FailsLogChecks(projectId, taskId, attemptNo))
             {
+                if (projectId == 1 && taskId == 1)
+                    Debug.WriteLine("[Task1-1] GradeTask: FAIL early exit (disallowed log operations)");
                 PPGradingPerf.Log("GradeTask.FailsLogChecks", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} failed");
                 PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit");
                 return false;
@@ -193,14 +197,27 @@ namespace MOS_PowerPoint_app
             {
                 var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, exemptFlags);
                 PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+                if (projectId == 1 && taskId == 1)
+                {
+                    LogTask1_1SnapshotContext(destructiveErrors);
+                }
                 if (destructiveErrors.Count > 0)
                 {
                     foreach (var err in destructiveErrors)
                     {
                         System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
                     }
+                    if (projectId == 1 && taskId == 1)
+                    {
+                        Debug.WriteLine($"[Task1-1] GradeTask: FAIL early exit (snapshot errors={destructiveErrors.Count}, COM not run)");
+                    }
                     PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit snapshot errors");
                     return false;
+                }
+
+                if (projectId == 1 && taskId == 1)
+                {
+                    Debug.WriteLine("[Task1-1] GradeTask: snapshot OK, reaching COM checker");
                 }
 
                 sw.Restart();
@@ -218,9 +235,23 @@ namespace MOS_PowerPoint_app
                     PPLogReader.ClearGradingContext();
                 }
                 PPGradingPerf.Log("GradeTask.ComChecker", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
+                if (projectId == 1 && taskId == 1)
+                    Debug.WriteLine($"[Task1-1] GradeTask: COM result={(comResult ? "PASS" : "FAIL")}");
             }
             PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} pass={comResult}");
             return comResult;
+        }
+
+        private static void LogTask1_1SnapshotContext(List<string> destructiveErrors)
+        {
+            PPLogReader.PPTaskSnapshotData snap;
+            bool hasSnap = PPLogReader.TryLoadTaskSnapshot(1, 1, out snap);
+            string snapInfo = hasSnap
+                ? $"SlidesCount={snap.SlidesCount} SlideNames={snap.SlideNames?.Count ?? 0}"
+                : "not loaded or ID mismatch";
+            Debug.WriteLine($"[Task1-1] GradeTask: snapshot context ({snapInfo}, errors={destructiveErrors.Count})");
+            foreach (string err in destructiveErrors)
+                Debug.WriteLine($"[Task1-1] GradeTask: snapshot error: {err}");
         }
 
         /// <summary>プロジェクト別の COM 採点のみ（計測用に分離）。</summary>
@@ -239,6 +270,7 @@ namespace MOS_PowerPoint_app
                         case 5: return c1.CheckTask_1_1_05();
                         case 6: return c1.CheckTask_1_1_06();
                         case 7: return c1.CheckTask_1_1_07();
+                        case 8: return c1.CheckTask_1_1_08();
                         default: return false;
                     }
                 case 2:
@@ -342,19 +374,6 @@ namespace MOS_PowerPoint_app
                         case 5: return c10.CheckTask_1_10_05();
                         case 6: return c10.CheckTask_1_10_06();
                         case 7: return c10.CheckTask_1_10_07();
-                        default: return false;
-                    }
-                case 11:
-                    var c11 = new PowerPointChecker1_11();
-                    switch (taskId)
-                    {
-                        case 1: return c11.CheckTask_1_11_01();
-                        case 2: return c11.CheckTask_1_11_02();
-                        case 3: return c11.CheckTask_1_11_03();
-                        case 4: return c11.CheckTask_1_11_04();
-                        case 5: return c11.CheckTask_1_11_05();
-                        case 6: return c11.CheckTask_1_11_06();
-                        case 7: return c11.CheckTask_1_11_07();
                         default: return false;
                     }
                 default:

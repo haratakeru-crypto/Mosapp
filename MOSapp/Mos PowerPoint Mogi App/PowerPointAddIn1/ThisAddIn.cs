@@ -36,6 +36,7 @@ namespace PowerPointAddIn1
         private bool _task1_2Logged;
         private bool _task1_3Logged;
         private bool _task1_4Logged;
+        private bool _task1_8Logged;
         private List<int> _task1_4PrevSlideIds = new List<int>();
         private string _task1_4PrevPresentationKey;
 
@@ -88,6 +89,7 @@ namespace PowerPointAddIn1
             _kiosk7_4PollTimer.Tick += Kiosk7_4PollTimer_Tick;
             _kiosk7_4PollTimer.Start();
 
+            _task1_8Logged = false;
             _task1_2Logged = false;
             _task1_3Logged = false;
             _task1_4Logged = false;
@@ -175,6 +177,7 @@ namespace PowerPointAddIn1
                     _task1_4PrevSlideIds.Clear();
                     _task1_4PrevPresentationKey = null;
                 }
+                if (!(projectId == 1 && taskId == 8)) _task1_8Logged = false;
 
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
@@ -942,7 +945,7 @@ namespace PowerPointAddIn1
             try
             {
                 if (Application == null || Application.Presentations == null) return;
-                if (!IsCurrentTask(1, 2) && !IsCurrentTask(1, 3) && !IsCurrentTask(1, 4)) return;
+                if (!IsCurrentTask(1, 2) && !IsCurrentTask(1, 3) && !IsCurrentTask(1, 4) && !IsCurrentTask(1, 8)) return;
 
                 PowerPoint.Presentation pres = null;
                 try
@@ -1052,6 +1055,75 @@ namespace PowerPointAddIn1
                             _task1_4PrevSlideIds = new List<int>(currentIds);
                         }
                         finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
+                    }
+
+                    if (IsCurrentTask(1, 8) && !_task1_8Logged)
+                    {
+                        PowerPoint.Slides slides = null;
+                        PowerPoint.Slide slide2 = null;
+                        try
+                        {
+                            slides = pres.Slides;
+                            if (slides != null && slides.Count >= 2)
+                            {
+                                slide2 = slides[2];
+                                if (slide2 != null)
+                                {
+                                    PowerPoint.Shapes shapes = slide2.Shapes;
+                                    if (shapes != null)
+                                    {
+                                        for (int i = 1; i <= shapes.Count; i++)
+                                        {
+                                            PowerPoint.Shape sh = null;
+                                            try
+                                            {
+                                                sh = shapes[i];
+                                                if (sh.HasTextFrame == Office.MsoTriState.msoTrue)
+                                                {
+                                                    var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                                                    string text = tf?.TextRange?.Text ?? "";
+                                                    if (text.IndexOf("ご提案のポイント", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                    {
+                                                        // ズームオブジェクト (Shape.Type == msoZoom (21)) が存在することを確認
+                                                        bool hasZoom = false;
+                                                        for (int j = 1; j <= shapes.Count; j++)
+                                                        {
+                                                            PowerPoint.Shape shZoom = null;
+                                                            try
+                                                            {
+                                                                shZoom = shapes[j];
+                                                                if ((int)shZoom.Type == 21 || shZoom.Name.Contains("Zoom") || shZoom.Name.Contains("ズーム"))
+                                                                {
+                                                                    hasZoom = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                            catch { }
+                                                            finally { if (shZoom != null) try { Marshal.ReleaseComObject(shZoom); } catch { } }
+                                                        }
+
+                                                        if (hasZoom)
+                                                        {
+                                                            Logger.LogTask1_8SummaryZoom();
+                                                            _task1_8Logged = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            catch { }
+                                            finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
+                                        }
+                                        try { Marshal.ReleaseComObject(shapes); } catch { }
+                                    }
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            if (slide2 != null) try { Marshal.ReleaseComObject(slide2); } catch { }
+                            if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+                        }
                     }
                 }
                 finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }

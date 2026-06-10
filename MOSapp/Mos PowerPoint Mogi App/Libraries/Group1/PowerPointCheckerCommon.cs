@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.PowerPoint;
@@ -81,6 +82,37 @@ namespace Libraries.Group1
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// 作業中 pptx（TabN\ProjectM.pptx）から、対応する初期ファイル（TabN\Initial\projectM.pptx）のパスを解決する。
+        /// </summary>
+        public static bool TryResolveInitialPptxPath(string activePptxPath, out string initialPptxPath)
+        {
+            initialPptxPath = null;
+            if (string.IsNullOrWhiteSpace(activePptxPath) || !File.Exists(activePptxPath))
+                return false;
+
+            string fileName = Path.GetFileNameWithoutExtension(activePptxPath);
+            if (string.IsNullOrEmpty(fileName))
+                return false;
+
+            int projectId = 0;
+            if (fileName.StartsWith("Project", StringComparison.OrdinalIgnoreCase))
+                int.TryParse(fileName.Substring("Project".Length), out projectId);
+            if (projectId < 1)
+                return false;
+
+            string tabFolder = Path.GetDirectoryName(activePptxPath);
+            if (string.IsNullOrEmpty(tabFolder))
+                return false;
+
+            string ext = Path.GetExtension(activePptxPath);
+            if (string.IsNullOrEmpty(ext))
+                ext = ".pptx";
+
+            initialPptxPath = Path.Combine(tabFolder, "Initial", $"project{projectId}{ext}");
+            return File.Exists(initialPptxPath);
         }
 
         /// <summary>

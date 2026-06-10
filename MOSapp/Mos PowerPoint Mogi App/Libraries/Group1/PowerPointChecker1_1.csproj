@@ -40,6 +40,8 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Linq" />
     <Reference Include="System.Runtime.InteropServices" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.Office.Interop.PowerPoint">
       <HintPath>C:\Windows\assembly\GAC_MSIL\Microsoft.Office.Interop.PowerPoint\15.0.0.0__71e9bce111e9429c\Microsoft.Office.Interop.PowerPoint.dll</HintPath>
@@ -52,6 +54,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="PowerPointChecker1_1.cs" />
+    <Compile Include="PptxSlideBaselineReader.cs" />
+    <Compile Include="PptxSlideZoomLinkReader.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

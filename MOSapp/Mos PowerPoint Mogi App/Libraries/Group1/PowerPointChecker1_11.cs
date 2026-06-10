@@ -350,8 +350,8 @@ namespace Libraries.Group1
         /// <summary>11-7: ノートで全スライド3部・部単位で印刷。COM の PrintOptions または VSTO ログの印刷記録で判定。</summary>
         public bool CheckTask_1_11_07()
         {
-            if (PPLogReader.HasTask11_7PrintExecuted())
-                return true;
+            // if (PPLogReader.HasTask11_7PrintExecuted())
+            //     return true;
             Presentation pres = null;
             try
             {

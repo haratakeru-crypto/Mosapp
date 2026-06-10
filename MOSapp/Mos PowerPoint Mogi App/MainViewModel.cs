@@ -190,8 +190,8 @@ namespace MOS_PowerPoint_app
                     
                     if (Directory.Exists(tabFolder))
                     {
-                        // Project1.pptxからProject11.pptxを検索
-                        for (int projectId = 1; projectId <= 11; projectId++)
+                        // Project1.pptxからProject10.pptxを検索
+                        for (int projectId = 1; projectId <= 10; projectId++)
                         {
                             // Project1.pptx, Project2.pptx, ... を検索
                             string[] possibleNames = { $"Project{projectId}.pptx", $"Project{projectId}.ppt" };
@@ -219,7 +219,7 @@ namespace MOS_PowerPoint_app
                     else
                     {
                         // フォルダが存在しない場合でも、空のプロジェクトリストを作成
-                        for (int projectId = 1; projectId <= 11; projectId++)
+                        for (int projectId = 1; projectId <= 10; projectId++)
                         {
                             group.Projects.Add(new ProjectViewModel
                             {
@@ -242,7 +242,7 @@ namespace MOS_PowerPoint_app
                 foreach (int groupId in new[] { 1, 3 })
                 {
                     var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = groupId == 3 ? "応用編" : $"Group {groupId}" };
-                    for (int projectId = 1; projectId <= 11; projectId++)
+                    for (int projectId = 1; projectId <= 10; projectId++)
                     {
                         group.Projects.Add(new ProjectViewModel
                         {
@@ -287,6 +287,7 @@ namespace MOS_PowerPoint_app
                     try
                     {
                         pptApp.Presentations.Open(project.FilePath, WithWindow: MsoTriState.msoTrue);
+                        Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
                     }
                     catch (Exception ex)
                     {
@@ -420,7 +421,7 @@ namespace MOS_PowerPoint_app
             int done = 0;
             foreach (int groupId in new[] { 1 }) // Tab1のみリセットし、Tab3（応用編）は除外
             {
-                for (int projectId = 1; projectId <= 11; projectId++)
+                for (int projectId = 1; projectId <= 10; projectId++)
                 {
                     try
                     {

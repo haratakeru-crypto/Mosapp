@@ -30,28 +30,32 @@ namespace Libraries
                 switch (taskId)
                 {
                     case 1: // 1-1 スライド追加（4枚目に挿入）
-                        // SlidesCount / 図形・位置に加え、TextLength も免除する。
-                        // 挿入により 4 枚目以降のスライド番号がずれ、スナップショットの「スライド i の文字数」と一致しなくなるため。
+                        // SlidesCount は COM 採点（枚数+1・4枚目挿入）で検証するため免除。図形・位置・TextLength も挿入に伴い不一致になる。
                         flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
-                    case 2: // 1-2 スライド複製
-                    case 4: // 1-4 スライド削除
-                        // スライドの構成が大きく変わるため、SlidesCount, ShapesCount, TextLength, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
+                    case 2: // 1-2 スライド非表示
+                        // 非表示設定のみのため免除不要
                         break;
-                    case 3: // 1-3 スライド非表示
-                        // 非表示設定のみで物理的な変化はないため免除不要
+                    case 3: // 1-3 スライド5のレイアウト変更＋テキスト入力
+                        // プレースホルダーの再配置およびテキスト入力が発生するため、ShapesCount, ShapePosition, TextLength免除が必要
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
-                    case 5: // 1-5 レイアウト変更
-                        // プレースホルダーの再配置が発生するため、ShapesCount, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                    case 4: // 1-4 スライド6の箇条書き2段組み
+                        // 2段組みによりテキストフレーム等のサイズ・位置が変化するため、ShapePositionを免除
+                        flags |= PPValidationExemptFlags.ShapePosition;
                         break;
-                    case 6: // 1-6 箇条書きを2段組みに設定
+                    case 5: // 1-5 文字間隔を広げる
                         // 書式変更のみでオブジェクト数は不変のため免除不要
                         break;
-                    case 7: // 1-7 吹き出しへのテキスト入力
-                        // 図形内に文字を書き込むため、TextLength免除が必要
-                        flags |= PPValidationExemptFlags.TextLength;
+                    case 6: // 1-6 スライド8にセクション追加
+                        // セクション追加のみのため免除不要
+                        break;
+                    case 7: // 1-7 スライド1のセクション名変更
+                        // セクション名変更のみのため免除不要
+                        break;
+                    case 8: // 1-8 サマリーズーム挿入
+                        // スライドの追加や、挿入による以降のスライド番号ズレ（すべての座標と文字数の不一致）を回避するため、すべて免除
+                        flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
                         break;
                 }
             }
@@ -255,8 +259,6 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
-            // 1-7: 吹き出しへのテキスト入力 (スライド1に「教育者必見」の5文字が追加される)
-            if (projectId == 1 && taskId == 7) return slideIndex == 1 ? 5 : 0;
             // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
             if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
 
@@ -268,8 +270,6 @@ namespace Libraries
         /// TextLength 免除時のスライド別デルタ判定。既定は allowedDelta と actualDelta の厳密一致。
         /// 9-6（ハイパーリンク）スライド1は、スナップショット時点で既に置換済みの場合 actualDelta が 0 となるため、
         /// 0 または -57（想定の URL→お問い合わせ）のみ許容する。
-        /// 1-7（吹き出し「教育者必見」）スライド1は、結果表示時にスナップショットが入力後状態で取られると actualDelta が 0 になるため、
-        /// 0 または +5 を許容する。
         /// </summary>
         public static bool IsAllowedTextLengthDelta(int projectId, int taskId, int slideIndex, int allowedDelta, long actualDelta)
         {
@@ -278,11 +278,6 @@ namespace Libraries
             if (projectId == 9 && taskId == 6 && slideIndex == 1)
             {
                 return actualDelta == 0 || actualDelta == -57;
-            }
-
-            if (projectId == 1 && taskId == 7 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == 5;
             }
 
             return actualDelta == allowedDelta;
@@ -306,16 +301,12 @@ namespace Libraries
             return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
         }
 
-        /// <summary>破壊的操作ログ用。9-6 スライド1は「0 または -57」、1-7 スライド1は「0 または +5」、それ以外は従来表記。</summary>
+        /// <summary>破壊的操作ログ用。9-6 スライド1は「0 または -57」、それ以外は従来表記。</summary>
         public static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
         {
             if (projectId == 9 && taskId == 6 && slideIndex == 1)
             {
                 return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または -57、実際の変化: {actualDelta}）";
-            }
-            if (projectId == 1 && taskId == 7 && slideIndex == 1)
-            {
-                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または +5、実際の変化: {actualDelta}）";
             }
             return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
         }

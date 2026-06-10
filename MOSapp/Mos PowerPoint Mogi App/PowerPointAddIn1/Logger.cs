@@ -101,6 +101,12 @@ namespace PowerPointAddIn1
             LogTaskTag("Task1-4", "DeleteThirdSlide");
         }
 
+        /// <summary>1-8: サマリーズームスライドが挿入されたことを記録。</summary>
+        public static void LogTask1_8SummaryZoom()
+        {
+            LogTaskTag("Task1-8", "SummaryZoom");
+        }
+
         /// <summary>8-4: オーディオ再生設定（フェードイン4秒等）を記録。</summary>
         public static void LogTask8_4Audio()
         {
@@ -205,6 +211,7 @@ namespace PowerPointAddIn1
                     if (string.Equals(taskTag, "Task1-2", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task1-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task1-4", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task1-8", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal))

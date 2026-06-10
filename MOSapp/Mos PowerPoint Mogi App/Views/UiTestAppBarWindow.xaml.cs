@@ -2216,12 +2216,12 @@ namespace MOS_PowerPoint_app.Views
         private void TryFinalizePrintEvidenceBeforeProjectTransition()
         {
             bool isTask5_1 = _currentProjectId == 5 && _currentTaskId == 1;
-            bool isTask11_7 = _currentProjectId == 11 && _currentTaskId == 7;
-            if (!isTask5_1 && !isTask11_7)
+            bool isTask11_7 = false;
+            if (!isTask5_1)
                 return;
 
             int attemptNo = GetCurrentTaskAttempt(_currentProjectId, _currentTaskId);
-            string marker = isTask5_1 ? "[Task5-1] Print" : "[Task11-7] Print";
+            string marker = "[Task5-1] Print";
             if (Libraries.PPLogReader.HasMarkerWithinTask(_currentProjectId, _currentTaskId, attemptNo, marker))
                 return;
 
@@ -2264,12 +2264,7 @@ namespace MOS_PowerPoint_app.Views
                                   && copies == 4
                                   && collate;
                     }
-                    else if (isTask11_7)
-                    {
-                        matched = outputType == (int)PpPrintOutputType.ppPrintOutputNotesPages
-                                  && copies == 3
-                                  && collate;
-                    }
+                    // isTask11_7の評価は削除されました
 
                     if (!matched && retry + 1 < maxRetries)
                     {
@@ -2355,6 +2350,7 @@ namespace MOS_PowerPoint_app.Views
                         try
                         {
                             presentation = pptApp.Presentations.Open(filePath, WithWindow: Microsoft.Office.Core.MsoTriState.msoTrue);
+                            Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
                             System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開きました: {filePath}");
                             break;
                         }
