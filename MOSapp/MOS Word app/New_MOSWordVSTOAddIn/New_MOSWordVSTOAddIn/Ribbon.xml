@@ -31,6 +31,7 @@
     <command idMso="UpgradeDocument" onAction="CommandOnAction" />
     <command idMso="BulletDefineNew" onAction="CommandOnAction" />
     <command idMso="ClearFormatting" onAction="CommandOnAction" />
+    <!-- NavigationPane は Word の idMso として Ribbon フック不可。開閉は ThisAddIn が CommandBars["Navigation"] で管理。 -->
   </commands>
 
 

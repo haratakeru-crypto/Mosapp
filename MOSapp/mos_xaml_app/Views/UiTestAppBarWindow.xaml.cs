@@ -171,9 +171,7 @@ namespace MOSExcelMogiApp.Views
                 
                 // 採点結果ダイアログを表示（groupIdとprojectIdを渡す）
                 int groupId = int.Parse(tabNumber); // tabNumberがgroupIdに対応
-                var dialog = new MOSExcelMogiApp.Views.ScoringResultDialog(taskCount, results, groupId, _currentProjectId);
-                dialog.Topmost = true;
-                dialog.ShowDialog();
+                MOSExcelMogiApp.Views.ScoringResultDialog.ShowResults(this, taskCount, results, groupId, _currentProjectId);
             }
             catch (Exception ex)
             {

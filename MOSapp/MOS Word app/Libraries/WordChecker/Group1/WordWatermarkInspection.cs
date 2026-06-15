@@ -9,7 +9,8 @@ using Microsoft.Office.Interop.Word;
 namespace Libraries.Group1
 {
     /// <summary>
-    /// 4-5 透かし判定。ギャラリー「下書き1」は表示文字「下書き」＋斜め、「下書き2」は「下書き」＋横書き。
+    /// 4-5 透かし判定。ギャラリー「サンプル２」は表示文字「サンプル」（ヘッダー内）。
+    /// 「下書き1」は「下書き」＋斜め、「下書き2」は「下書き」＋横書き。
     /// WordChecker と VSTO ポーリングで同条件を共有する。
     /// </summary>
     public static class WordWatermarkInspection
@@ -32,6 +33,10 @@ namespace Libraries.Group1
             @"rotation:\s*(-?\d+(?:\.\d+)?)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+        private static readonly Regex HeaderBlockRegex = new Regex(
+            @"<w:hdr\b[^>]*>.*?</w:hdr>",
+            RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
         public static string NormalizeXml(string xml)
         {
             if (string.IsNullOrEmpty(xml))
@@ -44,6 +49,18 @@ namespace Libraries.Group1
             {
                 return xml;
             }
+        }
+
+        /// <summary>透かし「サンプル２」: ヘッダー内に「サンプル」または SAMPLE（下書き・禁止キーワードは除外）。</summary>
+        public static bool IsSample2Watermark(string normalizedXml)
+        {
+            if (string.IsNullOrEmpty(normalizedXml))
+                return false;
+            if (HasForbiddenWatermark(normalizedXml))
+                return false;
+            if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
+                return false;
+            return ContainsSample2TextInWatermarkHeader(normalizedXml);
         }
 
         /// <summary>［デザイン］透かし「下書き1」: 文字「下書き」かつ斜め。社外秘・至急・下書き2（横）は false。</summary>
@@ -103,6 +120,8 @@ namespace Libraries.Group1
                 return "Draft1Diagonal";
             if (IsDraft2HorizontalWatermark(normalizedXml))
                 return "Draft2Horizontal";
+            if (IsSample2Watermark(normalizedXml))
+                return "Sample2";
             if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
                 return "DraftOther";
             return "None";
@@ -171,7 +190,24 @@ namespace Libraries.Group1
                 return false;
             if (IsDraft2HorizontalWatermark(normalizedXml))
                 return false;
-            return normalizedXml.IndexOf("下書き", StringComparison.Ordinal) < 0;
+            if (IsSample2Watermark(normalizedXml))
+                return false;
+            return normalizedXml.IndexOf("下書き", StringComparison.Ordinal) < 0
+                && normalizedXml.IndexOf("サンプル", StringComparison.Ordinal) < 0;
+        }
+
+        private static bool ContainsSample2TextInWatermarkHeader(string normalizedXml)
+        {
+            foreach (Match match in HeaderBlockRegex.Matches(normalizedXml))
+            {
+                string hdr = match.Value;
+                if (hdr.IndexOf("サンプル", StringComparison.Ordinal) >= 0)
+                    return true;
+                if (hdr.IndexOf("SAMPLE", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool ContainsDraft1DiagonalNearDraftText(string normalizedXml)

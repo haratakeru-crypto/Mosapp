@@ -27,65 +27,58 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "5月21日より5日間の"; find.Execute();
+                Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "5月21日より5日間の"); find.Execute();
                 if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
                 Range paraRange = searchRange.Paragraphs[1].Range;
                 int paraStart = paraRange.Start;
                 int paraEnd = paraRange.End;
 
-                // 「5月21日より5日間の...」段落の先頭付近に行内画像があるか
-                bool result = false;
-
-                InlineShapes ils = document.InlineShapes;
-                for (int i = 1; i <= ils.Count && !result; i++)
-                {
-                    InlineShape il = null;
-                    try
-                    {
-                        il = ils[i];
-                        int s = il.Range.Start;
-                        if (s >= paraStart && s <= Math.Min(paraStart + 5, paraEnd)) result = true;
-                    }
-                    catch { }
-                    finally { if (il != null) Marshal.ReleaseComObject(il); }
-                }
-                Marshal.ReleaseComObject(ils);
-
-                // 画像が Shape（フロート）として存在し、折り返しが「行内」相当になっているケースも許容
-                if (!result)
-                {
-                    Microsoft.Office.Interop.Word.Shapes shapes = document.Shapes;
-                    for (int i = 1; i <= shapes.Count && !result; i++)
-                    {
-                        Microsoft.Office.Interop.Word.Shape sh = null;
-                        try
-                        {
-                            sh = shapes[i];
-                            int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
-                            if (anchor >= paraStart && anchor <= paraEnd)
-                            {
-                                // 行内に見える設定（厳密には InlineShapes が望ましいが、誤判定回避のため許容）
-                                WrapFormat wf = sh.WrapFormat;
-                                try { if (wf != null && wf.Type == WdWrapType.wdWrapInline) result = true; }
-                                finally { if (wf != null) Marshal.ReleaseComObject(wf); }
-                            }
-                        }
-                        catch { }
-                        finally { if (sh != null) Marshal.ReleaseComObject(sh); }
-                    }
-                    Marshal.ReleaseComObject(shapes);
-                }
+                // 「5月21日より5日間の...」段落の画像の折り返しが「上下」(wdWrapTopBottom) か
+                bool result = IsWrapTopBottomInParagraph(document, paraStart, paraEnd);
 
                 Marshal.ReleaseComObject(paraRange);
                 Marshal.ReleaseComObject(find);
                 Marshal.ReleaseComObject(searchRange);
-                // 5-1: 現在行内、または当該プロジェクトの証跡で行内操作あり
-                bool logOk = LogReader.HasTaskEvidence(5, 1, "WrapInline");
+                // 5-1: 現在「上下」、または当該タスクの証跡で WrapTopBottom 操作あり（5-2 後はログで判定）
+                bool logOk = LogReader.HasTaskEvidence(5, 1, "WrapTopBottom");
                 return result || logOk;
 
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
+        }
+
+        /// <summary>指定段落内にアンカーされた画像の折り返しが「上下」(wdWrapTopBottom) か。</summary>
+        private static bool IsWrapTopBottomInParagraph(Document document, int paraStart, int paraEnd)
+        {
+            if (document == null) return false;
+            Microsoft.Office.Interop.Word.Shapes shapes = null;
+            try
+            {
+                shapes = document.Shapes;
+                for (int i = 1; i <= shapes.Count; i++)
+                {
+                    Microsoft.Office.Interop.Word.Shape sh = null;
+                    try
+                    {
+                        sh = shapes[i];
+                        int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
+                        if (anchor < paraStart || anchor > paraEnd) continue;
+                        WrapFormat wf = sh.WrapFormat;
+                        try
+                        {
+                            if (wf != null && wf.Type == WdWrapType.wdWrapTopBottom)
+                                return true;
+                        }
+                        finally { if (wf != null) Marshal.ReleaseComObject(wf); }
+                    }
+                    catch { }
+                    finally { if (sh != null) Marshal.ReleaseComObject(sh); }
+                }
+            }
+            catch { }
+            finally { if (shapes != null) Marshal.ReleaseComObject(shapes); }
+            return false;
         }
 
         private bool CheckTask_1_5_02(string filePath)
@@ -97,8 +90,8 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 「5月21日より5日間の」の先頭の画像の文字列の折り返しが「四角形」= wdWrapSquare
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "5月21日より5日間の"; find.Execute();
+                // 「5月21日より5日間の」の先頭の画像の文字列の折り返しが「狭く」= wdWrapTight
+                Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "5月21日より5日間の"); find.Execute();
                 if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
                 bool result = false;
                 foreach (Microsoft.Office.Interop.Word.Shape sh in document.Shapes)
@@ -106,14 +99,14 @@ namespace Libraries.Group1
                     try
                     {
                         WrapFormat wf = sh.WrapFormat;
-                        if (wf.Type == WdWrapType.wdWrapSquare) { result = true; Marshal.ReleaseComObject(wf); break; }
+                        if (wf.Type == WdWrapType.wdWrapTight) { result = true; Marshal.ReleaseComObject(wf); break; }
                         Marshal.ReleaseComObject(wf);
                     }
                     catch { }
                 }
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
-                // 5-2: 現在四角形、または当該プロジェクトの証跡で四角形操作あり
-                bool logOk = LogReader.HasTaskEvidence(5, 2, "WrapSquare");
+                // 5-2: 現在「狭く」、または当該タスクの証跡で WrapTight 操作あり
+                bool logOk = LogReader.HasTaskEvidence(5, 2, "WrapTight");
                 return result || logOk;
 
             }

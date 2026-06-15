@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="WordChecker1_3.cs" />
     <Compile Include="..\..\LogReader.cs" Link="LogReader.cs" />
+    <Compile Include="..\WordFindHelper.cs" Link="WordFindHelper.cs" />
   </ItemGroup>
   <PropertyGroup>
     <PostBuildEvent>if not exist "$(ProjectDir)..\..\bin\$(Configuration)\products" mkdir "$(ProjectDir)..\..\bin\$(Configuration)\products" &amp; if exist "$(TargetPath)" copy /Y "$(TargetPath)" "$(ProjectDir)..\..\bin\$(Configuration)\products\$(TargetFileName)"</PostBuildEvent>

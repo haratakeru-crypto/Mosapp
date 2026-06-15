@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Microsoft.Office.Interop.Word;
 
@@ -10,6 +11,8 @@ namespace New_MOSWordVSTOAddIn
     /// </summary>
     internal static class WordEvidenceHelper
     {
+        private const string Task2_1CutTargetText = "青空文庫のURLはコチラ↓";
+
         private static readonly (int ProjectId, int TaskId, string CommandId)[] EvidenceTargets =
         {
             (1, 1, "ShowAll"),
@@ -27,8 +30,8 @@ namespace New_MOSWordVSTOAddIn
             (4, 5, "GalleryWatermark"),
             (4, 5, "WatermarkCustomDialog"),
             (4, 6, "PageBorders"),
-            (5, 1, "WrapInline"),
-            (5, 2, "WrapSquare"),
+            (5, 1, "WrapTopBottom"),
+            (5, 2, "WrapTight"),
             (6, 1, "TableConvertTextToTable"),
             (6, 4, "TableColumnsDistribute"),
             (7, 1, "UpgradeDocument"),
@@ -56,12 +59,168 @@ namespace New_MOSWordVSTOAddIn
                         continue;
                 }
                 else if (!UsesFixedProjectWhenActiveUnknown(commandId))
-                {
                     continue;
-                }
 
                 Logger.LogTaskEvidence(entry.ProjectId, entry.TaskId, commandId);
             }
+        }
+
+        /// <summary>2-1: 切り取り選択を記録し、段落単位なら CutParagraphSelection 証跡を付ける。記録した場合 true（通常 Cut は付けない）。</summary>
+        public static bool TryLogInvalidParagraphCut()
+        {
+            try
+            {
+                int activeProjectId = TryGetActiveProjectId();
+                if (activeProjectId > 0 && activeProjectId != 2)
+                    return false;
+
+                var app = Globals.ThisAddIn?.Application;
+                if (app?.Selection == null)
+                    return false;
+
+                CutSelectionAnalysis analysis = AnalyzeCutSelection(app.Selection);
+                string detail = "paraCount=" + analysis.ParaCount
+                    + "|wholePara=" + (analysis.WholeParagraph ? "1" : "0")
+                    + "|selEnd=" + analysis.SelEnd
+                    + "|paraEnd=" + analysis.ParaEnd
+                    + "|targetEnd=" + analysis.TargetEnd
+                    + "|sel=" + (analysis.SelText ?? "").Replace("|", "/");
+                Logger.LogOperation("CutSelection", detail);
+
+                if (!analysis.IsParagraphCut)
+                    return false;
+
+                Logger.LogTaskEvidence(2, 1, "CutParagraphSelection");
+                return true;
+            }
+            catch { }
+
+            return false;
+        }
+
+        private struct CutSelectionAnalysis
+        {
+            public bool IsParagraphCut;
+            public int ParaCount;
+            public bool WholeParagraph;
+            public string SelText;
+            public int SelStart;
+            public int SelEnd;
+            public int ParaStart;
+            public int ParaEnd;
+            public int TargetStart;
+            public int TargetEnd;
+        }
+
+        private static CutSelectionAnalysis AnalyzeCutSelection(Selection sel)
+        {
+            var a = new CutSelectionAnalysis
+            {
+                SelText = NormalizeCutSelectionText(sel.Text),
+                ParaCount = sel.Paragraphs.Count
+            };
+
+            if (a.ParaCount >= 2)
+            {
+                a.IsParagraphCut = true;
+                return a;
+            }
+
+            if (a.ParaCount != 1)
+                return a;
+
+            Paragraph para = sel.Paragraphs[1];
+            Range paraRange = null;
+            try
+            {
+                paraRange = para.Range;
+                Range selRange = sel.Range;
+                a.ParaStart = paraRange.Start;
+                a.ParaEnd = paraRange.End;
+                a.SelStart = selRange.Start;
+                a.SelEnd = selRange.End;
+                a.WholeParagraph = a.SelStart == a.ParaStart && a.SelEnd == a.ParaEnd;
+
+                if (TryGetTargetTextRangeInParagraph(paraRange, out int tStart, out int tEnd))
+                {
+                    a.TargetStart = tStart;
+                    a.TargetEnd = tEnd;
+                }
+
+                if (a.WholeParagraph)
+                {
+                    a.IsParagraphCut = true;
+                    return a;
+                }
+
+                if (a.TargetEnd > 0 && a.SelStart == a.TargetStart && a.SelEnd == a.TargetEnd)
+                {
+                    a.IsParagraphCut = false;
+                    return a;
+                }
+
+                if (string.Equals(a.SelText, Task2_1CutTargetText, StringComparison.Ordinal) && a.SelEnd < a.ParaEnd)
+                {
+                    a.IsParagraphCut = false;
+                    return a;
+                }
+
+                if (a.TargetEnd > 0 && a.SelEnd > a.TargetEnd)
+                {
+                    a.IsParagraphCut = true;
+                    return a;
+                }
+
+                if ((a.SelText ?? "").Length > Task2_1CutTargetText.Length)
+                {
+                    a.IsParagraphCut = true;
+                    return a;
+                }
+            }
+            finally
+            {
+                if (paraRange != null) Marshal.ReleaseComObject(paraRange);
+                Marshal.ReleaseComObject(para);
+            }
+
+            return a;
+        }
+
+        private static bool TryGetTargetTextRangeInParagraph(Range paraRange, out int targetStart, out int targetEnd)
+        {
+            targetStart = 0;
+            targetEnd = 0;
+            Range search = null;
+            try
+            {
+                search = paraRange.Duplicate;
+                Find find = search.Find;
+                find.ClearFormatting();
+                find.Text = Task2_1CutTargetText;
+                find.Forward = true;
+                find.Wrap = WdFindWrap.wdFindStop;
+                find.Format = false;
+                find.MatchCase = false;
+                find.MatchWholeWord = false;
+                if (!find.Execute())
+                    return false;
+                targetStart = search.Start;
+                targetEnd = search.End;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (search != null) Marshal.ReleaseComObject(search);
+            }
+        }
+
+        private static string NormalizeCutSelectionText(string text)
+        {
+            return (text ?? "").TrimEnd('\r', '\n', '\a', '\v');
         }
 
         /// <summary>
@@ -70,7 +229,8 @@ namespace New_MOSWordVSTOAddIn
         /// </summary>
         private static bool UsesFixedProjectWhenActiveUnknown(string commandId)
         {
-            return string.Equals(commandId, "FileSaveAsTxt", StringComparison.OrdinalIgnoreCase)
+            return string.Equals(commandId, "ShowAll", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandId, "FileSaveAsTxt", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "FileSaveAsDocm", StringComparison.OrdinalIgnoreCase);
         }
 

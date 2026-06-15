@@ -170,6 +170,7 @@ namespace Libraries
 
         private static bool? InvokeCheckTask(int groupId, int projectId, int taskNum)
         {
+            LogReader.RequestVstoEvidenceFlush();
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string dllPath = Path.Combine(baseDir, "Dlls", $"WordChecker{groupId}_{projectId}.dll");
             if (!File.Exists(dllPath))
@@ -276,6 +277,7 @@ namespace Libraries
                             System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: fail (grading gate)");
                             continue;
                         }
+                        LogReader.RequestVstoEvidenceFlush();
                         bool taskResult = (bool)method.Invoke(checkerInstance, null);
                         results.Add(taskResult);
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: {(taskResult ? "pass" : "fail")}");
@@ -698,6 +700,8 @@ namespace Libraries
                 // 2-1: ［ホーム］切り取り・貼り付け — [Op] 明示記録
                 allowed.Add("Cut");
                 allowed.Add("Paste");
+                // VSTO が切り取り選択を診断用に記録（ユーザー操作ではない）
+                allowed.Add("CutSelection");
             }
             if (projectId == 2 && taskId == 4)
                 // 2-4: 問題文の指定文言クリックでコピー → 図形へ［貼り付け］（直接入力より Paste 想定）
@@ -780,6 +784,7 @@ namespace Libraries
             public int CompatibilityMode { get; set; } = -1;
             public string WatermarkFingerprint { get; set; } = "None";
             public string PageBorderFingerprint { get; set; } = "";
+            public int FootnoteReferenceCount { get; set; }
         }
 
         public static List<string> CompareAndGetErrors(int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags)
@@ -821,6 +826,9 @@ namespace Libraries
             if (!exemptFlags.HasFlag(WordValidationExemptFlags.PageBorder)
                 && !string.Equals(snapshot.PageBorderFingerprint ?? "", current.PageBorderFingerprint ?? "", StringComparison.Ordinal))
                 errors.Add($"PageBorderFingerprint changed {snapshot.PageBorderFingerprint}->{current.PageBorderFingerprint}");
+            if (projectId == 8 && taskId == 3
+                && current.FootnoteReferenceCount != snapshot.FootnoteReferenceCount)
+                errors.Add($"FootnoteReferenceCount changed {snapshot.FootnoteReferenceCount}->{current.FootnoteReferenceCount}");
             return errors;
         }
 
@@ -869,6 +877,14 @@ namespace Libraries
             data.HeaderPrimaryFp = GetHeaderFingerprint(doc);
             data.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprintFromDocument(doc);
             data.PageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
+            try
+            {
+                data.FootnoteReferenceCount = WordFindHelper.CountFootnoteReferencesInXml(doc.WordOpenXML);
+            }
+            catch
+            {
+                data.FootnoteReferenceCount = 0;
+            }
             return data;
         }
 
@@ -959,6 +975,7 @@ namespace Libraries
                         case "CompatibilityMode": int.TryParse(val, out int c); data.CompatibilityMode = c; break;
                         case "WatermarkFingerprint": data.WatermarkFingerprint = val; break;
                         case "PageBorderFingerprint": data.PageBorderFingerprint = val; break;
+                        case "FootnoteReferenceCount": int.TryParse(val, out int fn); data.FootnoteReferenceCount = fn; break;
                     }
                 }
                 if (string.IsNullOrEmpty(data.WatermarkFingerprint))
@@ -982,6 +999,12 @@ namespace Libraries
         public static bool TryPass(int groupId, int projectId, int taskId, int attemptNo, out string failReason)
         {
             failReason = null;
+            if (projectId == 2 && taskId == 1
+                && LogReader.HasTaskEvidence(2, 1, "CutParagraphSelection"))
+            {
+                failReason = "CutParagraphSelection detected";
+                return false;
+            }
             if (LogReader.HasLoggedDestructiveError(projectId, taskId, attemptNo))
             {
                 failReason = "logged destructive error";

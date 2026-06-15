@@ -292,6 +292,8 @@ namespace MOS_Word_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId}");
 
+                LogReader.RequestVstoEvidenceFlush();
+
                 // 現在のプロジェクトのタスク数を取得
                 int taskCount = _tasks != null ? _tasks.Count : 0;
                 if (taskCount == 0)
@@ -381,9 +383,7 @@ namespace MOS_Word_app.Views
                 });
 
                 // 採点結果ウィンドウを表示（Task / Result 〇✖）
-                var scoreWindow = new ScoreResultWindow(result.scoreList);
-                scoreWindow.Owner = this;
-                scoreWindow.ShowDialog();
+                ScoreResultWindow.ShowResults(this, result.scoreList);
 
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点完了: {result.passedCount}/{result.totalTasks}");
             }
@@ -1692,8 +1692,16 @@ namespace MOS_Word_app.Views
                 catch { }
                 if (!hasObject) return false;
 
-                var w = new ObjectSelectedWarningWindow();
+                var w = new ObjectSelectedWarningWindow
+                {
+                    Owner = this,
+                    Topmost = true,
+                    ShowInTaskbar = true
+                };
+                this.Topmost = true;
+                this.Activate();
                 w.ShowDialog();
+                this.Topmost = true;
                 return true;
             }
             catch
@@ -1704,6 +1712,7 @@ namespace MOS_Word_app.Views
         
         private void MoveToNextProject()
         {
+            LogReader.RequestCloseNavigationPaneIfOpen();
             // 次のプロジェクトに移る前に現在のプロジェクト（Wordドキュメント）を保存する
             SaveAllWordDocuments();
             // 前プロジェクトの文書を閉じ、ActiveDocument の取り違えを防ぐ（プロセス kill は行わない）
@@ -1809,22 +1818,8 @@ namespace MOS_Word_app.Views
                     return;
                 }
                 
-                WordApp wordApp = null;
+                WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
                 bool wordWasNotRunning = false;
-                try
-                {
-                    wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
-                }
-                catch
-                {
-                    wordApp = new WordApp();
-                    wordApp.Visible = true;
-                    wordWasNotRunning = true;
-                    // Word を起動した直後は COM が準備できるまで少し待つ
-                    System.Threading.Thread.Sleep(500);
-                }
-                
-                if (wordApp == null) return;
                 
                 // 同じパスで既に開いているドキュメントがあれば保存せずに閉じる（初期化状態でも常にフォルダから開く）
                 string pathLower = System.IO.Path.GetFullPath(filePath).ToLowerInvariant();
@@ -1877,11 +1872,12 @@ namespace MOS_Word_app.Views
         
         private void MoveToNextProjectWithMessage()
         {
-            // メッセージを表示
-            MessageBox.Show("5分経ったので次のプロジェクトに移動します", "時間切れ", 
+            MessageBox.Show(this, "5分経ったので次のプロジェクトに移動します", "時間切れ",
                           MessageBoxButton.OK, MessageBoxImage.Information);
-            
-            // 次のプロジェクトに移動
+
+            if (TryShowObjectSelectedWarningIfWordObjectSelected())
+                return;
+
             MoveToNextProject();
         }
         
@@ -1967,7 +1963,7 @@ namespace MOS_Word_app.Views
         }
         
         
-        private void ResetButton_Click(object sender, RoutedEventArgs e)
+        private async void ResetButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -1976,37 +1972,82 @@ namespace MOS_Word_app.Views
                     "リセット確認",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
-                
-                if (result == MessageBoxResult.Yes)
-                {
-                    if (!ResetProject(_groupId, _currentProjectId))
-                        return;
-                    
-                    // リセット後、Wordドキュメントを再読み込み
-                    OpenProjectDocument(_currentProjectId, _groupId);
 
-                    // Word が立ち上がった後に、アプリバー最前面で完了メッセージを表示する
-                    bool originalTopmost = this.Topmost;
+                if (result != MessageBoxResult.Yes)
+                    return;
+
+                var waitWindow = new Window
+                {
+                    Title = "リセット中",
+                    Width = 300,
+                    Height = 120,
+                    WindowStyle = WindowStyle.None,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                    ShowInTaskbar = false,
+                    ResizeMode = ResizeMode.NoResize,
+                    Topmost = true,
+                    Background = System.Windows.Media.Brushes.White,
+                    BorderBrush = System.Windows.Media.Brushes.SteelBlue,
+                    BorderThickness = new Thickness(2)
+                };
+                var stack = new StackPanel
+                {
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(16)
+                };
+                stack.Children.Add(new TextBlock
+                {
+                    Text = $"リセット中です...\nプロジェクト {_currentProjectId}",
+                    FontSize = 14,
+                    TextAlignment = TextAlignment.Center,
+                    Foreground = System.Windows.Media.Brushes.SteelBlue
+                });
+                waitWindow.Content = stack;
+                waitWindow.Show();
+
+                Exception resetError = null;
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
                     try
                     {
-                        this.Topmost = true;
-                        this.Activate();
-                        MessageBox.Show(this, "プロジェクトをリセットしました。", "リセット完了", MessageBoxButton.OK, MessageBoxImage.Information);
+                        if (!ResetProject(_groupId, _currentProjectId))
+                            resetError = new InvalidOperationException("リセットを完了できませんでした。");
                     }
-                    finally
-                    {
-                        this.Topmost = originalTopmost;
-                    }
+                    catch (Exception ex) { resetError = ex; }
+                }, DispatcherPriority.Background);
 
-                    ApplyExamWindowLayout();
+                waitWindow.Close();
 
-                    // 該当プロジェクトの解答済み・フラグ状態をクリア（Initial\Initial の内容に合わせて初期表示）
-                    int taskCount = _tasks != null ? _tasks.Count : 0;
-                    int arraySize = Math.Max(taskCount, 100);
-                    _projectTaskCompletedStates[_currentProjectId] = new bool[arraySize];
-                    _projectTaskFlaggedStates[_currentProjectId] = new bool[arraySize];
-                    UpdateTaskDisplay();
+                if (resetError != null)
+                {
+                    MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
+                        "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
                 }
+
+                OpenProjectDocument(_currentProjectId, _groupId);
+
+                bool originalTopmost = this.Topmost;
+                try
+                {
+                    this.Topmost = true;
+                    this.Activate();
+                    MessageBox.Show(this, "プロジェクトをリセットしました。", "リセット完了",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                finally
+                {
+                    this.Topmost = originalTopmost;
+                }
+
+                ApplyExamWindowLayout();
+
+                int taskCount = _tasks != null ? _tasks.Count : 0;
+                int arraySize = Math.Max(taskCount, 100);
+                _projectTaskCompletedStates[_currentProjectId] = new bool[arraySize];
+                _projectTaskFlaggedStates[_currentProjectId] = new bool[arraySize];
+                UpdateTaskDisplay();
             }
             catch (Exception ex)
             {

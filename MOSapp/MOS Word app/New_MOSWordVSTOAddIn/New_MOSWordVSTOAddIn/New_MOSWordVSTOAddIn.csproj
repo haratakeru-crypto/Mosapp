@@ -94,6 +94,8 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
     <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
     <WarningLevel>4</WarningLevel>
+    <!-- Debug ビルドで .vsto 登録すると Release インストールを上書きするため無効化 -->
+    <Install>false</Install>
   </PropertyGroup>
   <!--
     This section defines properties that are set when the "Release" configuration is selected.
@@ -237,6 +239,7 @@
     </Compile>
     <Compile Include="WordEvidenceHelper.cs" />
     <Compile Include="..\..\Libraries\WordChecker\Group1\WordWatermarkInspection.cs" Link="WordWatermarkInspection.cs" />
+    <Compile Include="..\..\Libraries\WordChecker\WordFindHelper.cs" Link="WordFindHelper.cs" />
     <Compile Include="Ribbon.cs">
       <SubType>Code</SubType>
     </Compile>

@@ -5,6 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using Libraries;
 
 namespace MOS_Word_app
@@ -28,32 +29,14 @@ namespace MOS_Word_app
         {
             base.OnStartup(e);
 
-            // #region agent log
-            try
-            {
-                var args = e?.Args ?? new string[0];
-                var argsStr = args.Length > 0 ? string.Join("|", args) : "";
-                var line1 = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"App.xaml.cs:OnStartup\",\"message\":\"StartupEventArgs.Args\",\"data\":{\"argsLength\":" + args.Length + ",\"argsJoined\":\"" + argsStr.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"},\"sessionId\":\"debug-session\",\"hypothesisId\":\"B\"}\n";
-                var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
-                try { System.IO.File.AppendAllText(logPath, line1); } catch { System.IO.File.AppendAllText(System.AppDomain.CurrentDomain.BaseDirectory + "debug.log", line1); }
-            }
-            catch { }
-            // #endregion
-
             ParseStartupArgs(e?.Args);
 
-            // #region agent log
-            try
+            // MainWindow 表示後に VSTO チェック・準備（UI スレッドをブロックしない）
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                var line2 = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"App.xaml.cs:AfterParse\",\"message\":\"AutoOpen after parse\",\"data\":{\"autoOpenGroupId\":" + (AutoOpenGroupId.HasValue ? AutoOpenGroupId.Value.ToString() : "null") + ",\"autoOpenProjectId\":" + (AutoOpenProjectId.HasValue ? AutoOpenProjectId.Value.ToString() : "null") + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"B\"}\n";
-                var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
-                try { System.IO.File.AppendAllText(logPath, line2); } catch { System.IO.File.AppendAllText(System.AppDomain.CurrentDomain.BaseDirectory + "debug.log", line2); }
-            }
-            catch { }
-            // #endregion
-
-            // VSTOアドインのインストール状態をチェック
-            CheckVSTOAddInStatus();
+                CheckVSTOAddInStatus();
+                VSTOInstallerHelper.StartBackgroundPrepForExam();
+            }), DispatcherPriority.ApplicationIdle);
         }
 
         private static void ParseStartupArgs(string[] args)
@@ -91,12 +74,11 @@ namespace MOS_Word_app
                 string message = status.GetInstallationMessage();
                 string title = "VSTOアドイン未インストール";
 
-                MessageBoxResult result = MessageBox.Show(
-                    message + "\n\nこのまま続行しますか？\n（VSTOが必要なタスクの採点が正しく行われない可能性があります）",
-                    title,
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning
-                );
+                var owner = Current?.MainWindow;
+                string body = message + "\n\nこのまま続行しますか？\n（VSTOが必要なタスクの採点が正しく行われない可能性があります）";
+                MessageBoxResult result = owner != null
+                    ? MessageBox.Show(owner, body, title, MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                    : MessageBox.Show(body, title, MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
                 if (result == MessageBoxResult.No)
                 {

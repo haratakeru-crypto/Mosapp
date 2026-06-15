@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="採点結果" Height="250" Width="600"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="True">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

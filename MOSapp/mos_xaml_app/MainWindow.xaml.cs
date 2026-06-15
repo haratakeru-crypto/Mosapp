@@ -443,6 +443,9 @@ namespace MOSExcelMogiApp
                 
                 System.Diagnostics.Debug.WriteLine($"Template file found: {templatePath}");
                 
+                // テンプレートファイル自体の Zone.Identifier を削除（存在する場合）
+                RemoveZoneIdentifier(templatePath);
+
                 // テンプレートファイルを読み取り専用で保護（テンプレートを変更されないようにする）
                 FileInfo templateFileInfo = new FileInfo(templatePath);
                 if (!templateFileInfo.IsReadOnly)
@@ -493,6 +496,8 @@ namespace MOSExcelMogiApp
                     // テンプレートファイルをプロジェクトファイルにコピー
                     // 読み取り専用ファイルからでもコピー可能
                     File.Copy(templatePath, projectFilePath, overwrite: true);
+                    // File.Copy は Zone.Identifier ADS も引き継ぐため、コピー直後に削除して保護ビューを防ぐ
+                    RemoveZoneIdentifier(projectFilePath);
 
                     System.Diagnostics.Debug.WriteLine($"[ResetProject] Project file reset successfully: {projectFilePath}");
                     
@@ -538,6 +543,8 @@ namespace MOSExcelMogiApp
                     try
                     {
                         File.Copy(projectFilePath, initialFilePath, overwrite: true);
+                        // ADS の引き継ぎを防ぐため、Initialフォルダのファイルも Zone.Identifier を削除
+                        RemoveZoneIdentifier(initialFilePath);
 
                         System.Diagnostics.Debug.WriteLine($"[ResetProject] Copied project file to Initial folder: {initialFilePath}");
                         
@@ -630,6 +637,39 @@ namespace MOSExcelMogiApp
             }
         }
         
+        // Zone.Identifier ADS を削除して保護ビューを防ぐ
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        private static extern bool DeleteFileW(string lpFileName);
+
+        /// <summary>
+        /// ファイルの Zone.Identifier ADS（NTFS 代替データストリーム）を削除する。
+        /// File.Copy は ADS も引き継ぐため、コピー直後にこのメソッドを呼ぶことで保護ビューを防ぐ。
+        /// 読み取り専用ファイルの場合は一時的に属性を外してから削除を試みる。
+        /// </summary>
+        private static void RemoveZoneIdentifier(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+            try
+            {
+                // 読み取り専用だと ADS 削除が失敗する場合があるため、一時的に属性を外す
+                FileInfo fi = new FileInfo(filePath);
+                bool wasReadOnly = fi.IsReadOnly;
+                if (wasReadOnly)
+                {
+                    try { fi.IsReadOnly = false; } catch { }
+                }
+
+                DeleteFileW(filePath + ":Zone.Identifier");
+
+                // 読み取り専用だったファイルは元に戻す
+                if (wasReadOnly)
+                {
+                    try { new FileInfo(filePath).IsReadOnly = true; } catch { }
+                }
+            }
+            catch { }
+        }
+
         // ファイルがロックされているか確認するメソッド
         private bool IsFileLocked(string filePath)
         {

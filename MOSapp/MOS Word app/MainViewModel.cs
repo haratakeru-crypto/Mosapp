@@ -174,14 +174,6 @@ namespace MOS_Word_app
         private void LoadProjects()
         {
             string basePath = @"C:\MOSTest\Word365";
-            // #region agent log
-            try
-            {
-                var line = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:LoadProjects\",\"message\":\"LoadProjects entry\",\"data\":{\"basePath\":\"" + (basePath ?? "").Replace("\\", "\\\\") + "\"},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H1\"}\n";
-                File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", line);
-            }
-            catch { }
-            // #endregion
 
             // 保存先は Tab{groupId}\ 直下。一覧は Initial にファイルがあれば表示し、FilePath は作業フォルダ（Tab\）のパスにする
             for (int groupId = 1; groupId <= 3; groupId++)
@@ -189,15 +181,6 @@ namespace MOS_Word_app
                 string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
                 string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
                 var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
-                // #region agent log
-                try
-                {
-                    bool dirExists = Directory.Exists(initialFolder);
-                    var line = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:LoadProjects\",\"message\":\"tabFolder check\",\"data\":{\"groupId\":" + groupId + ",\"tabFolder\":\"" + (initialFolder ?? "").Replace("\\", "\\\\") + "\",\"dirExists\":" + dirExists.ToString().ToLowerInvariant() + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H1\"}\n";
-                    File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", line);
-                }
-                catch { }
-                // #endregion
 
                 for (int projectId = 1; projectId <= 10; projectId++)
                 {
@@ -223,18 +206,6 @@ namespace MOS_Word_app
                     }
                     string filePath = (existsInWorking || existsInInitial) ? workingFilePath : null;
 
-                    if (groupId == 1 && projectId == 1)
-                    {
-                        // #region agent log
-                        try
-                        {
-                            var pathEsc = (filePath ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
-                            var line = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:LoadProjects\",\"message\":\"project 1-1 filePath\",\"data\":{\"filePath\":\"" + pathEsc + "\",\"hasPath\":" + (!string.IsNullOrEmpty(filePath)).ToString().ToLowerInvariant() + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H1\"}\n";
-                            File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", line);
-                        }
-                        catch { }
-                        // #endregion
-                    }
                     group.Projects.Add(new ProjectViewModel
                     {
                         GroupId = groupId,
@@ -250,54 +221,14 @@ namespace MOS_Word_app
 
         private void ExecuteOpenProject(object parameter)
         {
-            // #region agent log
-            try
-            {
-                string paramType = parameter?.GetType()?.FullName ?? "null";
-                bool isPvm = parameter is ProjectViewModel;
-                var line = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"ExecuteOpenProject called\",\"data\":{\"parameterNull\":" + (parameter == null).ToString().ToLowerInvariant() + ",\"parameterType\":\"" + (paramType ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\",\"isProjectViewModel\":" + isPvm.ToString().ToLowerInvariant() + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"param\"}\n";
-                var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
-                try { File.AppendAllText(logPath, line); } catch { File.AppendAllText(AppDomain.CurrentDomain.BaseDirectory + "debug.log", line); }
-            }
-            catch { }
-            // #endregion
-
             if (!(parameter is ProjectViewModel))
             {
-                // #region agent log
-                try
-                {
-                    string paramType = parameter?.GetType()?.FullName ?? "null";
-                    var line = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"early return parameter not ProjectViewModel\",\"data\":{\"parameterType\":\"" + (paramType ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"},\"sessionId\":\"debug-session\",\"hypothesisId\":\"param\"}\n";
-                    File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", line);
-                }
-                catch { }
-                // #endregion
                 return;
             }
             var project = (ProjectViewModel)parameter;
             {
-                // #region agent log
-                try
-                {
-                    var pathEsc = (project?.FilePath ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
-                    var line = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"ExecuteOpenProject entry\",\"data\":{\"filePath\":\"" + pathEsc + "\",\"groupId\":" + (project?.GroupId ?? 0) + ",\"projectId\":" + (project?.ProjectId ?? 0) + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"E\"}\n";
-                    var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
-                    try { File.AppendAllText(logPath, line); } catch { File.AppendAllText(AppDomain.CurrentDomain.BaseDirectory + "debug.log", line); }
-                }
-                catch { }
-                // #endregion
                 if (string.IsNullOrEmpty(project.FilePath))
                 {
-                    // #region agent log
-                    try
-                    {
-                        var pathEsc = (project?.FilePath ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
-                        var line = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"early return file not found\",\"data\":{\"filePath\":\"" + pathEsc + "\",\"pathEmpty\":" + string.IsNullOrEmpty(project?.FilePath).ToString().ToLowerInvariant() + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H3\"}\n";
-                        File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", line);
-                    }
-                    catch { }
-                    // #endregion
                     ResultMessage = $"エラー: ファイルが見つかりません: {project.FilePath ?? "パスが設定されていません"}";
                     return;
                 }
@@ -350,18 +281,14 @@ namespace MOS_Word_app
                 if (!vstoStatus.IsInstalled)
                 {
                     string message = vstoStatus.GetInstallationMessage();
-                    MessageBoxResult result = MessageBox.Show(
-                        message + "\n\nこのままWordを起動しますか？\n（VSTOが必要なタスクの採点が正しく行われない可能性があります）",
-                        "VSTOアドイン未インストール",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning
-                    );
+                    var owner = System.Windows.Application.Current?.MainWindow;
+                    string vstoBody = message + "\n\nこのままWordを起動しますか？\n（VSTOが必要なタスクの採点が正しく行われない可能性があります）";
+                    MessageBoxResult result = owner != null
+                        ? MessageBox.Show(owner, vstoBody, "VSTOアドイン未インストール", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+                        : MessageBox.Show(vstoBody, "VSTOアドイン未インストール", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
                     if (result == MessageBoxResult.No)
                     {
-                        // #region agent log
-                        try { File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"early return VSTO No\",\"data\":{},\"sessionId\":\"debug-session\",\"hypothesisId\":\"vsto\"}\n"); } catch { }
-                        // #endregion
                         ResultMessage = "Wordの起動をキャンセルしました。";
                         return;
                     }
@@ -369,24 +296,7 @@ namespace MOS_Word_app
 
                 try
                 {
-                    // Wordアプリケーションを取得または作成
-                    WordApp wordApp = null;
-                    try
-                    {
-                        wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
-                        wordApp.Visible = true;
-                        // #region agent log
-                        try { File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"Word app GetActiveObject ok\",\"data\":{},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H4\"}\n"); } catch { }
-                        // #endregion
-                    }
-                    catch (Exception exWord)
-                    {
-                        // #region agent log
-                        try { File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"Word app create\",\"data\":{\"error\":\"" + (exWord?.Message ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H4\"}\n"); } catch { }
-                        // #endregion
-                        wordApp = new WordApp();
-                        wordApp.Visible = true;
-                    }
+                    WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
 
                     // 同じパスで既に開いているドキュメントがあれば保存せずに閉じる（メモリではなくフォルダから開き直す）
                     string pathLower = System.IO.Path.GetFullPath(project.FilePath).ToLowerInvariant();
@@ -422,15 +332,9 @@ namespace MOS_Word_app
                     try
                     {
                         doc = wordApp.Documents.Open(project.FilePath, ReadOnly: false, Visible: true);
-                        // #region agent log
-                        try { File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"Documents.Open ok\",\"data\":{},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H5\"}\n"); } catch { }
-                        // #endregion
                     }
                     catch (Exception ex)
                     {
-                        // #region agent log
-                        try { File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"Documents.Open error\",\"data\":{\"error\":\"" + (ex?.Message ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H5\"}\n"); } catch { }
-                        // #endregion
                         // ファイルが既に開いている場合は無視
                         System.Diagnostics.Debug.WriteLine($"ドキュメントを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
                     }
@@ -444,9 +348,6 @@ namespace MOS_Word_app
                 }
                 catch (Exception ex)
                 {
-                    // #region agent log
-                    try { File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainViewModel.cs:ExecuteOpenProject\",\"message\":\"ExecuteOpenProject catch\",\"data\":{\"error\":\"" + (ex?.Message ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H4\"}\n"); } catch { }
-                    // #endregion
                     ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
                     System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
                 }
@@ -766,6 +667,8 @@ namespace MOS_Word_app
                 object checkerInstance = Activator.CreateInstance(checkerType);
                 int passedCount = 0;
                 int totalTasks = 0;
+
+                LogReader.RequestVstoEvidenceFlush();
 
                 // 各タスクをチェック（プロジェクトごとにタスク数が異なる）
                 int[] taskCounts = { 5, 5, 6, 7, 8, 7, 5, 7, 6, 5 }; // プロジェクト1-10のタスク数

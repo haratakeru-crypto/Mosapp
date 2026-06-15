@@ -71,7 +71,7 @@ namespace Libraries.Group1
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "参考文献一覧"; find.Execute();
+                Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
                 if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
                 Range foundRange = searchRange;
                 // 教材どおり「参考文献一覧」はセクション2の本文にあること（区切りだけ挿入して別セクションに見出しが無い誤正解を防ぐ）
@@ -206,7 +206,7 @@ namespace Libraries.Group1
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "参考文献一覧"; find.Execute();
+                Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
                 if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
                 Range foundRange = searchRange;
                 Paragraph headingPara = foundRange.Paragraphs[1];
@@ -260,7 +260,7 @@ namespace Libraries.Group1
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "参考文献一覧"; find.Execute();
+                Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
                 if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
                 // セクション2のみ「2段組」（等幅）を判定。他セクションの段組や「狭くした2段組」（不等幅）は不正解
@@ -311,10 +311,9 @@ namespace Libraries.Group1
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "茨城県天心記念五浦美術館";
+                WordFindHelper.ConfigureSafeFind(find, "茨城県天心記念五浦美術館");
                 find.Execute();
                 if (!find.Found)
                 {
@@ -423,7 +422,7 @@ namespace Libraries.Group1
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                Range searchRange = document.Content; Find find = searchRange.Find; find.ClearFormatting(); find.Text = "参考文献一覧"; find.Execute();
+                Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
                 if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
                 Range foundRange = searchRange;
                 Section section = GetSectionContainingPosition(document, foundRange.Start);
@@ -435,10 +434,9 @@ namespace Libraries.Group1
                 Marshal.ReleaseComObject(searchRange);
 
                 // task5 と同じ検索で「段区切り」の直後の段落先頭＝1段目の終わり（その手前の段落までが 3-6 の対象）
-                searchRange = document.Content;
+                searchRange = WordFindHelper.DuplicateContent(document);
                 find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "茨城県天心記念五浦美術館";
+                WordFindHelper.ConfigureSafeFind(find, "茨城県天心記念五浦美術館");
                 find.Execute();
                 if (!find.Found)
                 {

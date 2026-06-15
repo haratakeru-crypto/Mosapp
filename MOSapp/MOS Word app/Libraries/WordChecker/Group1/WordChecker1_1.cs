@@ -82,9 +82,9 @@ namespace Libraries.Group1
 
                 // 1-1: 証跡で ShowAll 2回以上、かつ編集記号表示で正解（個別リセット後の旧全体ログ誤判定を防ぐ）
                 bool showAllExecutedTwice = LogReader.HasTaskEvidenceAtLeast(1, 1, "ShowAll", 2);
+                bool showAll = wordApp.ActiveWindow.View.ShowAll;
                 if (!showAllExecutedTwice) return false;
 
-                bool showAll = wordApp.ActiveWindow.View.ShowAll;
                 return showAll;
             }
             catch { return false; }
@@ -106,19 +106,57 @@ namespace Libraries.Group1
                 Paragraph p1 = FindTargetParagraph(document, "社員のコンプライアンス意識の確立");
                 if (p1 == null) return false;
 
+                Paragraph heading = FindTargetParagraph(document, "CSR活動のメリット");
+                if (heading == null)
+                {
+                    Marshal.ReleaseComObject(p1);
+                    return false;
+                }
+
+                if (p1.Range.Start <= heading.Range.Start)
+                {
+                    Marshal.ReleaseComObject(heading);
+                    Marshal.ReleaseComObject(p1);
+                    return false;
+                }
+
                 object countOne = 1;
                 Paragraph p2 = (Paragraph)p1.Next(ref countOne);
                 Paragraph p3 = p2 != null ? (Paragraph)p2.Next(ref countOne) : null;
+                Paragraph p4 = p3 != null ? (Paragraph)p3.Next(ref countOne) : null;
 
                 bool b1 = p1.Range.ListFormat.ListType == WdListType.wdListBullet;
                 bool b2 = p2 != null && p2.Range.ListFormat.ListType == WdListType.wdListBullet;
                 bool b3 = p3 != null && p3.Range.ListFormat.ListType == WdListType.wdListBullet;
+                bool headingNotBullet = heading.Range.ListFormat.ListType != WdListType.wdListBullet;
+                bool nextNotBullet = p4 == null || p4.Range.ListFormat.ListType != WdListType.wdListBullet;
 
+                int bulletCountInRange = 0;
+                Paragraph cur = heading;
+                Paragraph stopAfter = p4 ?? p3;
+                while (cur != null)
+                {
+                    if (cur.Range.ListFormat.ListType == WdListType.wdListBullet)
+                        bulletCountInRange++;
+                    if (stopAfter != null && cur.Range.Start == stopAfter.Range.Start)
+                        break;
+                    object one = 1;
+                    Paragraph next = (Paragraph)cur.Next(ref one);
+                    if (cur != heading) Marshal.ReleaseComObject(cur);
+                    cur = next;
+                }
+                if (cur != null && cur != heading) Marshal.ReleaseComObject(cur);
+
+                bool exactThree = bulletCountInRange == 3;
+                bool result = b1 && b2 && b3 && headingNotBullet && nextNotBullet && exactThree;
+
+                if (p4 != null) Marshal.ReleaseComObject(p4);
                 if (p3 != null) Marshal.ReleaseComObject(p3);
                 if (p2 != null) Marshal.ReleaseComObject(p2);
+                Marshal.ReleaseComObject(heading);
                 Marshal.ReleaseComObject(p1);
 
-                return b1 && b2 && b3;
+                return result;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -183,7 +221,7 @@ namespace Libraries.Group1
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        /// <summary>1-4: 「はじめに」以降で「日本におけるCSR活動」を含む段落を探し、スタイル「見出し2」を判定する</summary>
+        /// <summary>1-4: 小見出し「CSR活動の光と影」のスタイルが「見出し３」であることを判定する</summary>
         private bool CheckTask_1_1_04(string filePath)
         {
             Application wordApp = null;
@@ -196,34 +234,7 @@ namespace Libraries.Group1
                 document = GetDocument(wordApp, filePath);
                 if (document == null) return false;
 
-                Paragraph target = null;
-                bool foundHajimeni = false;
-
-                try
-                {
-                    foreach (Paragraph p in document.Paragraphs)
-                    {
-                        try
-                        {
-                            string text = p.Range.Text ?? "";
-                            string normalizedText = text.Replace(" ", "").Replace("　", "")
-                                                        .Replace("\r", "").Replace("\n", "").Replace("\a", "");
-
-                            if (normalizedText.Contains("はじめに"))
-                            {
-                                foundHajimeni = true;
-                            }
-                            else if (foundHajimeni && normalizedText.Contains("日本におけるCSR活動"))
-                            {
-                                target = p;
-                                break;
-                            }
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
+                Paragraph target = FindTargetParagraph(document, "CSR活動の光と影");
                 if (target == null) return false;
 
                 try
@@ -231,8 +242,8 @@ namespace Libraries.Group1
                     string pName = GetParagraphStyleSafe(target);
                     string rName = GetRangeStyleSafe(target.Range);
 
-                    return pName.Contains("見出し2") || pName.Contains("heading2") ||
-                           rName.Contains("見出し2") || rName.Contains("heading2");
+                    return pName.Contains("見出し3") || pName.Contains("heading3") ||
+                           rName.Contains("見出し3") || rName.Contains("heading3");
                 }
                 finally
                 {
@@ -247,16 +258,6 @@ namespace Libraries.Group1
         {
             Application wordApp = null;
             Document document = null;
-            // #region agent log
-            try
-            {
-                string logPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory ?? "", "..", "..", "..", "..", "debug-340a5e.log"));
-                long ts = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                string line = "{\"sessionId\":\"340a5e\",\"hypothesisId\":\"H0\",\"location\":\"WordChecker1_1.CheckTask_1_1_05\",\"message\":\"entry\",\"data\":{\"filePath\":\"" + (filePath ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"},\"timestamp\":" + ts + "}\n";
-                File.AppendAllText(logPath, line, Encoding.UTF8);
-            }
-            catch { }
-            // #endregion
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
@@ -320,44 +321,6 @@ namespace Libraries.Group1
                     catch { }
                 }
 
-                // #region agent log
-                try
-                {
-                    long ts = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                    string line = "{\"sessionId\":\"340a5e\",\"hypothesisId\":\"H1\",\"location\":\"WordChecker1_1.CheckTask_1_1_05\",\"message\":\"target\",\"data\":{\"targetNull\":" + (target == null ? "true" : "false") + "},\"timestamp\":" + ts + "}\n";
-                    string logPath1 = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory ?? "", "..", "..", "..", "..", "debug-340a5e.log"));
-                    try { File.AppendAllText(logPath1, line, Encoding.UTF8); } catch { }
-                    string logPath2 = null;
-                    try { string logDir = Path.GetDirectoryName(filePath); if (!string.IsNullOrEmpty(logDir)) logPath2 = Path.Combine(logDir, "debug-340a5e.log"); } catch { }
-                    if (!string.IsNullOrEmpty(logPath2)) try { File.AppendAllText(logPath2, line, Encoding.UTF8); } catch { }
-                    if (target == null)
-                    {
-                        var samples = new System.Collections.Generic.List<string>();
-                        try
-                        {
-                            int n = 0;
-                            foreach (Paragraph p in document.Paragraphs)
-                            {
-                                if (n >= 40) break;
-                                try
-                                {
-                                    string text = p.Range.Text ?? "";
-                                    string normalizedText = text.Replace(" ", "").Replace("　", "").Replace("\r", "").Replace("\n", "").Replace("\a", "").Replace("\t", "").Trim();
-                                    if (normalizedText.Length > 0) { samples.Add(normalizedText.Length <= 80 ? normalizedText : normalizedText.Substring(0, 80) + "..."); n++; }
-                                }
-                                catch { }
-                            }
-                        }
-                        catch { }
-                        string escaped = string.Join("|", samples).Replace("\\", "\\\\").Replace("\"", "\\\"");
-                        string line2 = "{\"sessionId\":\"340a5e\",\"hypothesisId\":\"H1b\",\"message\":\"paragraphSamples\",\"data\":{\"samples\":\"" + escaped + "\"},\"timestamp\":" + ts + "}\n";
-                        try { File.AppendAllText(logPath1, line2, Encoding.UTF8); } catch { }
-                        if (!string.IsNullOrEmpty(logPath2)) try { File.AppendAllText(logPath2, line2, Encoding.UTF8); } catch { }
-                    }
-                }
-                catch { }
-                // #endregion
-
                 if (target == null) return false;
 
                 Font font = null;
@@ -384,37 +347,12 @@ namespace Libraries.Group1
                 bool logOk = LogReader.HasTaskEvidence(1, 5, "ClearFormatting");
                 bool strictlyCleared = isNormal && !isBold && !isItalic && !isUnderline && isColorAutomatic;
                 bool roughlyCleared = !isBold && !isItalic && !isUnderline && isColorAutomatic;
-                bool passedLogRough = logOk && roughlyCleared;
-
-                // #region agent log
-                try
-                {
-                    string logPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory ?? "", "..", "..", "..", "..", "debug-340a5e.log"));
-                    long ts = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                    string styleEsc = (styleName ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
-                    string line = "{\"sessionId\":\"340a5e\",\"hypothesisId\":\"H2-H4\",\"location\":\"WordChecker1_1.CheckTask_1_1_05\",\"message\":\"conditions\",\"data\":{\"logOk\":" + (logOk ? "true" : "false") + ",\"roughlyCleared\":" + (roughlyCleared ? "true" : "false") + ",\"strictlyCleared\":" + (strictlyCleared ? "true" : "false") + ",\"passedLogRough\":" + (passedLogRough ? "true" : "false") + ",\"isBold\":" + (isBold ? "true" : "false") + ",\"isItalic\":" + (isItalic ? "true" : "false") + ",\"isUnderline\":" + (isUnderline ? "true" : "false") + ",\"isColorAutomatic\":" + (isColorAutomatic ? "true" : "false") + ",\"isNormal\":" + (isNormal ? "true" : "false") + ",\"styleName\":\"" + styleEsc + "\",\"underline\":" + underline + "},\"timestamp\":" + ts + "}\n";
-                    File.AppendAllText(logPath, line, Encoding.UTF8);
-                }
-                catch { }
-                // #endregion
-
                 if (logOk && roughlyCleared)
                     return true;
                 // ログなし時は従来の厳密なファイル判定
                 try
                 {
-                    bool result = strictlyCleared;
-                    // #region agent log
-                    try
-                    {
-                        string logPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory ?? "", "..", "..", "..", "..", "debug-340a5e.log"));
-                        long ts = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                        string line = "{\"sessionId\":\"340a5e\",\"hypothesisId\":\"H5\",\"location\":\"WordChecker1_1.CheckTask_1_1_05\",\"message\":\"return\",\"data\":{\"result\":" + (result ? "true" : "false") + "},\"timestamp\":" + ts + "}\n";
-                        File.AppendAllText(logPath, line, Encoding.UTF8);
-                    }
-                    catch { }
-                    // #endregion
-                    return result;
+                    return strictlyCleared;
                 }
                 finally
                 {
@@ -422,19 +360,8 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(target);
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                // #region agent log
-                try
-                {
-                    string logPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory ?? "", "..", "..", "..", "..", "debug-340a5e.log"));
-                    long ts = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                    string exEsc = (ex?.Message ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
-                    string line = "{\"sessionId\":\"340a5e\",\"hypothesisId\":\"H5\",\"location\":\"WordChecker1_1.CheckTask_1_1_05\",\"message\":\"catch\",\"data\":{\"ex\":\"" + exEsc + "\"},\"timestamp\":" + ts + "}\n";
-                    File.AppendAllText(logPath, line, Encoding.UTF8);
-                }
-                catch { }
-                // #endregion
                 return false;
             }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
@@ -590,29 +517,26 @@ namespace Libraries.Group1
         /// </summary>
         private Paragraph FindTargetParagraph(Document doc, string searchText)
         {
+            Application wordApp = null;
+            try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { wordApp = null; }
+
+            return WordFindHelper.PreserveSelection(wordApp, () => FindTargetParagraphCore(doc, searchText));
+        }
+
+        private Paragraph FindTargetParagraphCore(Document doc, string searchText)
+        {
             Paragraph firstNonTOC = null;
             Paragraph lastAny = null;
-            Range searchRange = doc.Content;
-            searchRange.Find.ClearFormatting();
-            object findText = searchText;
-            object matchCase = false;
-            object matchWholeWord = false;
-            object matchWildcards = false;
-            object matchSoundsLike = false;
-            object matchAllWordForms = false;
-            object forward = true;
-            object wrap = WdFindWrap.wdFindStop;
-            object format = false;
-            object replaceWith = Type.Missing;
-            object replace = Type.Missing;
-            object matchKashida = Type.Missing;
-            object matchDiacritics = Type.Missing;
-            object matchAlefHamza = Type.Missing;
-            object matchControl = Type.Missing;
+            Range searchRange = WordFindHelper.DuplicateContent(doc);
+            if (searchRange == null)
+                return null;
+
+            Find find = searchRange.Find;
+            WordFindHelper.ConfigureSafeFind(find, searchText);
 
             try
             {
-                while (searchRange.Find.Execute(ref findText, ref matchCase, ref matchWholeWord, ref matchWildcards, ref matchSoundsLike, ref matchAllWordForms, ref forward, ref wrap, ref format, ref replaceWith, ref replace, ref matchKashida, ref matchDiacritics, ref matchAlefHamza, ref matchControl))
+                while (find.Execute())
                 {
                     Paragraph p = searchRange.Paragraphs[1];
                     if (IsRangeInTOCField(doc, p.Range))

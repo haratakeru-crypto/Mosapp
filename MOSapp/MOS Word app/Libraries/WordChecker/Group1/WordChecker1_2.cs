@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -72,7 +71,7 @@ namespace Libraries.Group1
         }
 
         /// <summary>
-        /// タスク2-4: 文書の一番下の図形に、「いつでもご参加ください」と入力します。
+        /// タスク2-4: 文書の一番下の図形に、「ご参加お待ちしております」と入力します。
         /// </summary>
         public bool CheckTask_1_2_04()
         {
@@ -143,27 +142,17 @@ namespace Libraries.Group1
                 if (document == null) return false;
 
                 // 0. Cut / Paste が操作ログまたは証跡で記録されていること
+                bool cutParagraph = LogReader.HasTaskEvidence(2, 1, "CutParagraphSelection");
                 bool cutExecuted = LogReader.HasTaskEvidence(2, 1, "Cut");
                 bool pasteExecuted = LogReader.HasTaskEvidence(2, 1, "Paste");
+                if (cutParagraph) return false;
                 if (!cutExecuted || !pasteExecuted) return false;
 
-                // 1. 文書全体の「青空文庫のURLはコチラ↓」の数をカウント（1回なら切り取り成功）
-                int count = 0;
-                Range search = document.Content;
-                search.Find.ClearFormatting();
-                search.Find.Text = "青空文庫のURLはコチラ↓";
-                while (search.Find.Execute())
-                {
-                    count++;
-                    search.Collapse(WdCollapseDirection.wdCollapseEnd);
-                }
-                Marshal.ReleaseComObject(search);
+                int count = WordFindHelper.CountTextOccurrences(document, wordApp, "青空文庫のURLはコチラ↓");
 
-                // 2. 移動先の位置関係をチェック
-                Range urlRange = FindExactText(document, "青空文庫のURLはコチラ↓");
-                Range headingRange = FindExactText(document, "朗読を楽しみましょう");
-                // 青空文庫のリンク「https://www.aozora.gr.jp/index.html」を含む段落の1つ上に貼り付けられているかで判定
-                Range linkRange = FindExactText(document, "https://www.aozora.gr.jp/index.html");
+                Range urlRange = WordFindHelper.FindFirstRange(document, wordApp, "青空文庫のURLはコチラ↓");
+                Range headingRange = WordFindHelper.FindFirstRange(document, wordApp, "朗読を楽しみましょう");
+                Range linkRange = WordFindHelper.FindFirstRange(document, wordApp, "https://www.aozora.gr.jp/index.html");
                 if (urlRange == null || headingRange == null || linkRange == null)
                 {
                     if (urlRange != null) Marshal.ReleaseComObject(urlRange);
@@ -173,7 +162,8 @@ namespace Libraries.Group1
                 }
 
                 // 「青空文庫のURLはコチラ↓」が見出しより後ろにあるか
-                bool isAfterHeading = urlRange.Start > headingRange.Start;
+                int headingStart = headingRange.Start;
+                bool isAfterHeading = urlRange.Start > headingStart;
 
                 // リンク段落の1つ上の段落に「青空文庫のURLはコチラ↓」が含まれるか（Paragraph.Range は段落記号を含むため「含まれる」で判定）
                 Paragraph linkPara = linkRange.Paragraphs[1];
@@ -329,7 +319,6 @@ namespace Libraries.Group1
                     {
                         bool isAccent1 = false;
                         float shade = 0f;
-                        int rgb = 0;
                         try
                         {
                             isAccent1 = font.TextColor.ObjectThemeColor == WdThemeColorIndex.wdThemeColorAccent1;
@@ -346,48 +335,11 @@ namespace Libraries.Group1
                             }
                         }
                         catch { }
-                        try { rgb = (int)font.TextColor.RGB; } catch { }
-                        int themeRaw = -999;
-                        try { themeRaw = (int)font.TextColor.ObjectThemeColor; } catch { }
-                        // 「黒+基本色25%」: TintAndShade が効く環境は従来レンジ。Word によっては 0 のまま解決 RGB のみになるため、
-                        // 文書テーマのアクセント1（最上段）より十分暗い解決色かどうかで補完する。
-                        bool isDarker25ByTint = shade >= -0.31f && shade <= -0.19f;
-                        bool isDarker25ByOpenXml = false;
-                        string openXmlSnippet = "";
-                        try
-                        {
-                            isDarker25ByOpenXml = TryIsAccent1DarkerFromWordOpenXml(targetRange, out openXmlSnippet);
-                        }
-                        catch { }
-                        bool isDarker25ByLum = false;
-                        float baseLum = -1f;
-                        float textLum = -1f;
-                        bool themeAccentReadOk = false;
-                        try
-                        {
-                            themeAccentReadOk = TryGetDocumentThemeAccent1Rgb(document, out int br, out int bg, out int bb);
-                            // COM の RGB はテーマ色で不正確なことがある（ログで textLum が異常に高い）。OpenXML 失敗時のみ輝度比較。
-                            if (!isDarker25ByOpenXml && themeAccentReadOk && TryGetFontResolvedLuminanceNoAutoColor(font, out textLum))
-                            {
-                                baseLum = FontRgbLuminance(br, bg, bb);
-                                // COM の RGB が壊れていると textLum が 0.85 超になる。明らかな誤値は輝度比較に使わない。
-                                if (textLum < 0.7f)
-                                    isDarker25ByLum = textLum < baseLum * 0.88f && textLum < baseLum - 0.02f;
-                            }
-                            else if (!isDarker25ByOpenXml && !themeAccentReadOk && TryGetFontResolvedLuminanceNoAutoColor(font, out textLum))
-                            {
-                                if (textLum < 0.7f)
-                                    isDarker25ByLum = textLum < 0.52f;
-                            }
-                        }
-                        catch { }
-                        bool isDarker25 = isDarker25ByTint || (Math.Abs(shade) < 0.001f && (isDarker25ByOpenXml || isDarker25ByLum));
+                        bool isDarker25 = IsAccent1BlackBasic25Percent(font, targetRange, document, shade);
                         bool isBlue = false;
                         try { isBlue = IsResolvedColorBlue(font.TextColor); } catch { }
                         bool colorStateOk = isAccent1 && isDarker25 && isBlue;
-                        // 色の一致を主判定とする（VSTO ログは補助。ログ未取得でも正しいテーマ色なら正解）
-                        bool result = colorStateOk;
-                        return result;
+                        return colorStateOk;
                     }
                     finally
                     {
@@ -452,8 +404,60 @@ namespace Libraries.Group1
             return sb.ToString();
         }
 
-        /// <summary>WordOpenXML の w:color に accent1 と themeShade（または lumMod による暗化）があるか。COM の TintAndShade が 0 でもここで判別できる。</summary>
-        private static bool TryIsAccent1DarkerFromWordOpenXml(Range range, out string snippet)
+        /// <summary>「黒+基本色25%」（アクセント1を約25%暗く）のみ true。50%暗色は拒否。</summary>
+        private static bool IsAccent1BlackBasic25Percent(Font font, Range range, Document document, float tintAndShade)
+        {
+            if (IsTintAndShade25Percent(tintAndShade))
+                return true;
+
+            if (Math.Abs(tintAndShade) >= 0.001f)
+                return false;
+
+            if (TryIsAccent1BlackBasic25PercentFromOpenXml(range, out _))
+                return true;
+
+            try
+            {
+                if (TryGetDocumentThemeAccent1Rgb(document, out int br, out int bg, out int bb)
+                    && TryGetFontResolvedLuminanceNoAutoColor(font, out float textLum))
+                {
+                    float baseLum = FontRgbLuminance(br, bg, bb);
+                    if (textLum >= 0.7f)
+                        return false;
+                    float ratio = baseLum > 0.001f ? textLum / baseLum : 0f;
+                    if (ratio < 0.60f)
+                        return false;
+                    return ratio >= 0.70f && ratio <= 0.80f;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        private static bool IsTintAndShade25Percent(float shade)
+        {
+            if (shade <= -0.35f)
+                return false;
+            return shade >= -0.31f && shade <= -0.19f;
+        }
+
+        private static bool IsThemeShade25Percent(int themeShade)
+        {
+            if (themeShade >= 0x70 && themeShade <= 0x90)
+                return false;
+            return themeShade >= 0xB0 && themeShade <= 0xC8;
+        }
+
+        private static bool IsLumMod25Percent(int lumModVal)
+        {
+            if (lumModVal >= 45000 && lumModVal <= 55000)
+                return false;
+            return lumModVal >= 70000 && lumModVal <= 85000;
+        }
+
+        /// <summary>WordOpenXML の w:color に accent1 + 25%暗色があるか。</summary>
+        private static bool TryIsAccent1BlackBasic25PercentFromOpenXml(Range range, out string snippet)
         {
             snippet = "";
             try
@@ -463,7 +467,6 @@ namespace Libraries.Group1
                     return false;
                 string blob = WebUtility.HtmlDecode(ExpandWordOpenXmlForColorSearch(xml));
                 snippet = blob.Length > 480 ? blob.Substring(0, 480) : blob;
-                // 同一 w:color 開始タグ内に accent1 と、シェード／明度変更のいずれかがあるか
                 foreach (Match m in Regex.Matches(blob, @"<w:color\b[^>]*(?:/>|>)", RegexOptions.IgnoreCase))
                 {
                     string tag = m.Value;
@@ -473,15 +476,19 @@ namespace Libraries.Group1
                     if (mShade.Success)
                     {
                         int v = Convert.ToInt32(mShade.Groups[1].Value, 16);
-                        if (v > 0)
+                        if (IsThemeShade25Percent(v))
                             return true;
+                        if (v >= 0x70 && v <= 0x90)
+                            return false;
                     }
                     Match mMod = Regex.Match(tag, @"lumMod\s*=\s*""([0-9]+)""", RegexOptions.IgnoreCase);
-                    if (mMod.Success && int.TryParse(mMod.Groups[1].Value, out int lumModVal) && lumModVal > 0 && lumModVal < 100000)
-                        return true;
-                    Match mOff = Regex.Match(tag, @"lumOff\s*=\s*""([0-9]+)""", RegexOptions.IgnoreCase);
-                    if (mOff.Success && int.TryParse(mOff.Groups[1].Value, out int lumOffVal) && lumOffVal != 0)
-                        return true;
+                    if (mMod.Success && int.TryParse(mMod.Groups[1].Value, out int lumModVal))
+                    {
+                        if (IsLumMod25Percent(lumModVal))
+                            return true;
+                        if (lumModVal >= 45000 && lumModVal <= 55000)
+                            return false;
+                    }
                 }
                 return false;
             }
@@ -489,6 +496,12 @@ namespace Libraries.Group1
             {
                 return false;
             }
+        }
+
+        /// <summary>WordOpenXML の w:color に accent1 と themeShade（または lumMod による暗化）があるか。COM の TintAndShade が 0 でもここで判別できる。</summary>
+        private static bool TryIsAccent1DarkerFromWordOpenXml(Range range, out string snippet)
+        {
+            return TryIsAccent1BlackBasic25PercentFromOpenXml(range, out snippet);
         }
 
         /// <summary>文書テーマのアクセント1（ギャラリー最上段）の RGB。Office の型を直接参照しないため dynamic で取得する。</summary>
@@ -590,7 +603,7 @@ namespace Libraries.Group1
                     if (shape.TextFrame != null && shape.TextFrame.TextRange != null)
                     {
                         string text = shape.TextFrame.TextRange.Text ?? "";
-                        if (text.Contains("いつでもご参加ください"))
+                        if (text.Contains("ご参加お待ちしております"))
                         {
                             Marshal.ReleaseComObject(shape);
                             return true;
@@ -634,7 +647,7 @@ namespace Libraries.Group1
                 {
                     if (shape.TextFrame != null && shape.TextFrame.TextRange != null)
                     {
-                        if ((shape.TextFrame.TextRange.Text ?? "").Contains("いつでもご参加ください"))
+                        if ((shape.TextFrame.TextRange.Text ?? "").Contains("ご参加お待ちしております"))
                         { targetShape = shape; break; }
                     }
                     Marshal.ReleaseComObject(shape);
@@ -676,35 +689,26 @@ namespace Libraries.Group1
             }
         }
 
-        /// <summary>
-        /// 検索時のCOMエラーや改行コードの巻き込みを防ぐためのヘルパー。見つかった場合はそのRangeを返す（呼び出し元で解放すること）。見つからない場合はnull。
-        /// </summary>
         private Range FindExactText(Document doc, string searchText)
         {
-            Range range = doc.Content;
-            range.Find.ClearFormatting();
-            object findText = searchText;
-            object matchCase = false;
-            object matchWholeWord = false;
-            object matchWildcards = false;
-            object matchSoundsLike = false;
-            object matchAllWordForms = false;
-            object forward = true;
-            object wrap = WdFindWrap.wdFindStop;
-            object format = false;
-            object replaceWith = Type.Missing;
-            object replace = Type.Missing;
-            object matchKashida = Type.Missing;
-            object matchDiacritics = Type.Missing;
-            object matchAlefHamza = Type.Missing;
-            object matchControl = Type.Missing;
-            bool found = range.Find.Execute(ref findText, ref matchCase, ref matchWholeWord, ref matchWildcards, ref matchSoundsLike, ref matchAllWordForms, ref forward, ref wrap, ref format, ref replaceWith, ref replace, ref matchKashida, ref matchDiacritics, ref matchAlefHamza, ref matchControl);
-            if (!found)
+            Application wordApp = null;
+            try
             {
-                Marshal.ReleaseComObject(range);
+                wordApp = (Application)Marshal.GetActiveObject("Word.Application");
+            }
+            catch
+            {
                 return null;
             }
-            return range;
+            try
+            {
+                return WordFindHelper.FindFirstRange(doc, wordApp, searchText);
+            }
+            finally
+            {
+                if (wordApp != null)
+                    Marshal.ReleaseComObject(wordApp);
+            }
         }
 
         private string GetCurrentWordFilePath()

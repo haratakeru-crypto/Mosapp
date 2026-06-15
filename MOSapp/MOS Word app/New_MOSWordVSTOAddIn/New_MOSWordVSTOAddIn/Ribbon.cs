@@ -76,7 +76,12 @@ namespace New_MOSWordVSTOAddIn
                     Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
                 }
 
-                WordEvidenceHelper.LogCommandWithEvidence(loggedCommandId);
+                bool cutSkipped = false;
+                if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))
+                    cutSkipped = WordEvidenceHelper.TryLogInvalidParagraphCut();
+
+                if (!cutSkipped)
+                    WordEvidenceHelper.LogCommandWithEvidence(loggedCommandId);
                 LogRibbonOperation(commandId, loggedCommandId);
 
                 // 既定の動作（Cut / Paste / SaveAs など）をキャンセルせずに実行させる

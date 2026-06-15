@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="操作が必要です" Height="320" Width="480"
         WindowStartupLocation="CenterScreen"
+        Topmost="True"
         ResizeMode="NoResize"
         BorderBrush="#1E3A5F"
         BorderThickness="2">

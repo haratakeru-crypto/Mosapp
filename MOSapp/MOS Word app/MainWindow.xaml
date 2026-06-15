@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="MOS Word App" Height="700" Width="1000"
         WindowStartupLocation="CenterScreen"
-        ShowInTaskbar="False"
+        ShowInTaskbar="True"
         Background="#F5F5F5">
     <Grid>
         <Grid.RowDefinitions>

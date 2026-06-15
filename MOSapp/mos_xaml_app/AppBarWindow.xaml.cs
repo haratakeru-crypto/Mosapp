@@ -41,6 +41,8 @@ namespace MOSExcelMogiApp
         private bool _fromResultWindow = false; // 結果画面から来たかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
         private DispatcherTimer _ratioRestoreTimer; // Office サイズ変更を検知して初期比率に戻す用
+        private DispatcherTimer _excelPositionRetryTimer;
+        private DateTime _excelPositionRetryDeadline;
         private bool _isNavigatingToTask = false; // 連続クリックで多重起動しないためのガード
 
         // Win32 API
@@ -213,7 +215,8 @@ namespace MOSExcelMogiApp
         }
 
         /// <param name="bringToForeground">true のときのみ Excel を前面に出す。タイマーから呼ぶ場合は false にし、ダイアログ入力中のフォーカスを奪わない。</param>
-        private void PositionExcelWindow(bool bringToForeground = true)
+        /// <returns>XLMAIN ウィンドウを検出して MoveWindow できた場合 true。</returns>
+        private bool PositionExcelWindow(bool bringToForeground = true)
         {
             try
             {
@@ -246,7 +249,7 @@ namespace MOSExcelMogiApp
                 }
                 catch { }
                 // #endregion
-                if (excelHwnd == IntPtr.Zero && excelProcesses.Length == 0) return;
+                if (excelHwnd == IntPtr.Zero && excelProcesses.Length == 0) return false;
 
                 Process excelProcess = null;
                 if (excelHwnd == IntPtr.Zero)
@@ -254,7 +257,7 @@ namespace MOSExcelMogiApp
                     excelProcess = excelProcesses
                         .OrderByDescending(p => { try { return p.StartTime; } catch { return DateTime.MinValue; } })
                         .FirstOrDefault();
-                    if (excelProcess == null) return;
+                    if (excelProcess == null) return false;
                     processId = (uint)excelProcess.Id;
                 }
                 // #region agent log
@@ -345,11 +348,52 @@ namespace MOSExcelMogiApp
                     // 最大化/最小化状態だと MoveWindow が効かず比率が崩れることがあるため、必ず復元してから移動/リサイズする
                     try { ShowWindow(excelHwnd, SW_RESTORE); } catch { }
                     MoveWindow(excelHwnd, excelX, excelY, excelWidth, excelHeight, true);
+                    return true;
                 }
+
+                return false;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error positioning Excel window: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void StartExcelPositionRetryTimer()
+        {
+            _excelPositionRetryTimer?.Stop();
+            _excelPositionRetryDeadline = DateTime.UtcNow.AddSeconds(15);
+            _excelPositionRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            _excelPositionRetryTimer.Tick += OnExcelPositionRetryTick;
+            _excelPositionRetryTimer.Start();
+            OnExcelPositionRetryTick(null, EventArgs.Empty);
+        }
+
+        private void OnExcelPositionRetryTick(object sender, EventArgs e)
+        {
+            if (DateTime.UtcNow >= _excelPositionRetryDeadline)
+            {
+                StopExcelPositionRetryTimer();
+                return;
+            }
+
+            SetWindowPosition();
+
+            if (_viewModel?.TryGetSharedExcelApplication() != null &&
+                PositionExcelWindow(bringToForeground: false))
+            {
+                StopExcelPositionRetryTimer();
+            }
+        }
+
+        private void StopExcelPositionRetryTimer()
+        {
+            if (_excelPositionRetryTimer != null)
+            {
+                _excelPositionRetryTimer.Tick -= OnExcelPositionRetryTick;
+                _excelPositionRetryTimer.Stop();
+                _excelPositionRetryTimer = null;
             }
         }
 
@@ -372,8 +416,11 @@ namespace MOSExcelMogiApp
             // ウィンドウハンドルが利用可能になるまで少し待機してから配置
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                LoadTasks();
+                UpdateTaskDisplay();
                 SetWindowPosition();
                 StartRatioRestoreTimer();
+                StartExcelPositionRetryTimer();
             }), DispatcherPriority.Loaded);
         }
 
@@ -726,7 +773,7 @@ namespace MOSExcelMogiApp
 
             // タスク説明の表示を更新
             var taskDescriptionTextBlock = FindName("TaskDescriptionTextBlock") as TextBlock;
-            if (taskDescriptionTextBlock != null && _tasks != null && _currentTaskId <= _tasks.Count)
+            if (taskDescriptionTextBlock != null && _tasks != null && _tasks.Any(t => t.TaskId == _currentTaskId))
             {
                 var currentTask = _tasks.Find(t => t.TaskId == _currentTaskId);
                 if (currentTask != null)
@@ -1671,31 +1718,7 @@ namespace MOSExcelMogiApp
                     }
                     UpdateTaskDisplay();
 
-                    // 次のプロジェクトに移動した際も Excel とアプリバーを画面解像度に合わせた位置に再配置
-                    // 新しい Excel ウィンドウが完全に表示されるまで遅延してから実行（シートタブが見えるように）
-                    // #region agent log
-                    try
-                    {
-                        var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                        File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.OnCurrentProjectChanged", message = "delay 1200ms started", data = new { newProjectId }, sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-                    }
-                    catch { }
-                    // #endregion
-                    var delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
-                    delayTimer.Tick += (s, args) =>
-                    {
-                        delayTimer.Stop();
-                        // #region agent log
-                        try
-                        {
-                            var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                            File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.OnCurrentProjectChanged", message = "SetWindowPosition from delay", sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-                        }
-                        catch { }
-                        // #endregion
-                        SetWindowPosition();
-                    };
-                    delayTimer.Start();
+                    StartExcelPositionRetryTimer();
                 }
                 else
                 {
@@ -1730,7 +1753,7 @@ namespace MOSExcelMogiApp
             {
                 try
                 {
-                    SetWindowPosition();
+                    StartExcelPositionRetryTimer();
                 }
                 catch (Exception ex)
                 {
@@ -1742,6 +1765,7 @@ namespace MOSExcelMogiApp
         protected override void OnClosed(EventArgs e)
         {
             ClearCurrentTaskFile();
+            StopExcelPositionRetryTimer();
             _ratioRestoreTimer?.Stop();
             _ratioRestoreTimer = null;
             _timer?.Stop();

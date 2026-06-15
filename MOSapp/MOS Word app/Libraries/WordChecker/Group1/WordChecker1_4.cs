@@ -59,19 +59,18 @@ namespace Libraries.Group1
                 if (document == null) return false;
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] ロジック実行開始");
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "1.生活の中でできるエコ活動";
+                WordFindHelper.ConfigureSafeFind(find, "1.生活の中でできるエコ活動");
                 find.Execute();
                 if (!find.Found)
                 {
-                    find.Text = "１.生活の中でできるエコ活動";
+                    WordFindHelper.ConfigureSafeFind(find, "１.生活の中でできるエコ活動");
                     find.Execute();
                 }
                 if (!find.Found)
                 {
-                    find.Text = "生活の中でできるエコ活動";
+                    WordFindHelper.ConfigureSafeFind(find, "生活の中でできるエコ活動");
                     find.Execute();
                 }
                 if (!find.Found)
@@ -177,16 +176,18 @@ namespace Libraries.Group1
                 // 【最重要】COMの Comments コレクションはモダンコメント環境で不安定なため使用しない。
                 // 文書全体の WordOpenXML を取得し、XML内のテキストノードから判定する。
                 bool fileStateCheck = false;
+                bool xmlContainsPhrase = false;
+                bool replyOnSonoTa = false;
                 try
                 {
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
                     string xml = document.WordOpenXML;
                     if (!string.IsNullOrEmpty(xml))
                     {
-                        if (xml.Contains("前田先生に最終確認"))
-                        {
+                        xmlContainsPhrase = xml.Contains("前田先生に最終確認");
+                        if (xmlContainsPhrase)
                             fileStateCheck = true;
-                        }
+                        replyOnSonoTa = DocumentHasMaedaReplyOnSonoTaComment(document);
                     }
                 }
                 catch (Exception ex)
@@ -252,10 +253,9 @@ namespace Libraries.Group1
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_03] ロジック実行開始");
                 // 本文に「エコと節約」があること（教材の前提）
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "エコと節約";
+                WordFindHelper.ConfigureSafeFind(find, "エコと節約");
                 find.Execute();
                 if (!find.Found)
                 {
@@ -443,23 +443,21 @@ namespace Libraries.Group1
                 }
                 catch { }
 
-                // 1) 現在の文書: 下書き1（「下書き」＋斜め）のみ ○。下書き2（横）・社外秘・至急は ×
+                // 1) 現在の文書: 透かし「サンプル２」（ヘッダー内「サンプル」）のみ ○
                 if (WordWatermarkInspection.HasForbiddenWatermark(normalizedXml))
                     return false;
-                if (WordWatermarkInspection.IsDraft1Watermark(normalizedXml))
+                if (WordWatermarkInspection.IsSample2Watermark(normalizedXml))
                     return true;
+                if (WordWatermarkInspection.IsDraft1Watermark(normalizedXml))
+                    return false;
                 if (WordWatermarkInspection.IsDraft2HorizontalWatermark(normalizedXml))
                     return false;
-                if (TryIsDraft1WatermarkViaHeaderShapes(document))
-                    return true;
 
-                // 2) 4-7 後: 透かしなし + 4-5 で下書き1 証跡 + 4-7 相当（ヘッダー/フッター空）
+                // 2) 4-7 後: 透かしなし + 4-5 で透かし挿入証跡 + 4-7 相当（ヘッダー/フッター空）
                 bool cleared = WordWatermarkInspection.IsWatermarkClearedForTask47FollowUp(normalizedXml);
-                bool evidenceDraft1 = LogReader.HasTaskEvidence(4, 5, "Watermark");
+                bool evidenceWatermark = LogReader.HasTaskEvidence(4, 5, "Watermark");
                 bool task47State = IsPrimaryHeaderFooterEmpty(document);
-                return cleared && evidenceDraft1 && task47State;
-
-
+                return cleared && evidenceWatermark && task47State;
 
 
 
@@ -526,9 +524,8 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(right); Marshal.ReleaseComObject(left); Marshal.ReleaseComObject(bottom); Marshal.ReleaseComObject(top); Marshal.ReleaseComObject(borders1); Marshal.ReleaseComObject(section1);
                 }
 
-                int[] expectedAccent1Colors = new int[] { -738131969, -721354753 };
-                bool colorOk = false;
-                foreach (int c in expectedAccent1Colors) { if (topColor == c && bottomColor == c && leftColor == c && rightColor == c) { colorOk = true; break; } }
+                bool colorOk = ArePageBordersAccent3(document)
+                    || TryBorderColorsMatchDocumentThemeAccent3(document, topColor, bottomColor, leftColor, rightColor);
 
                 bool result = logOk && hasTop && hasBottom && hasLeft && hasRight && colorOk && bordersShadow == 0;
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_06] 終了。結果={result}");
@@ -671,51 +668,6 @@ namespace Libraries.Group1
             return string.IsNullOrEmpty(cleanH) && string.IsNullOrEmpty(cleanF);
         }
 
-        private static string JsonEscape(string s)
-        {
-            if (s == null) return string.Empty;
-            return s
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n")
-                .Replace("\t", "\\t");
-        }
-
-        private static string GetDebug6b16c7LogPath()
-        {
-            try
-            {
-                var d = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory ?? "");
-                for (int i = 0; i < 10 && d != null; i++)
-                {
-                    if (File.Exists(Path.Combine(d.FullName, "MOS Word app.sln")) && d.Parent != null)
-                        return Path.Combine(d.Parent.FullName, "debug-6b16c7.log");
-                    d = d.Parent;
-                }
-            }
-            catch { }
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory ?? "", "debug-6b16c7.log");
-        }
-
-        private static void WriteDebug6b16c7Ndjson(string runId, string hypothesisId, string location, string message, string dataJson)
-        {
-            try
-            {
-                long ts = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                string path = GetDebug6b16c7LogPath();
-                string line = "{\"sessionId\":\"6b16c7\",\"runId\":\"" + (runId ?? "").Replace("\\", "").Replace("\"", "") +
-                              "\",\"timestamp\":" + ts +
-                              ",\"location\":\"" + location.Replace("\"", "") +
-                              "\",\"message\":\"" + message.Replace("\"", "") +
-                              "\",\"hypothesisId\":\"" + hypothesisId.Replace("\"", "") +
-                              "\",\"data\":" + dataJson + "}\n";
-                File.AppendAllText(path, line, Encoding.UTF8);
-            }
-            catch { }
-        }
-
-
         /// <summary>コメントまたはその返信に指定したテキストが含まれるか判定する</summary>
         private static bool CommentBalloonContainsText(Comment comment, string searchText)
         {
@@ -747,6 +699,76 @@ namespace Libraries.Group1
             }
             catch { }
             finally { if (replies != null) Marshal.ReleaseComObject(replies); }
+            return false;
+        }
+
+        private static bool CommentScopeLooksLikeEcoHeading(string scopeText)
+        {
+            string n = NormalizeCommentBody(scopeText);
+            if (string.IsNullOrEmpty(n))
+                return false;
+            return n.Contains("1.生活の中でできるエコ活動")
+                || n.Contains("１.生活の中でできるエコ活動")
+                || n.Contains("生活の中でできるエコ活動");
+        }
+
+        private static bool CommentScopeLooksLikeSonoTaHeading(string scopeText)
+        {
+            string n = NormalizeCommentBody(scopeText);
+            return !string.IsNullOrEmpty(n) && n.Contains("その他");
+        }
+
+        private static bool DocumentHasMaedaReplyOnSonoTaComment(Document document)
+        {
+            Comments comments = null;
+            try
+            {
+                comments = document.Comments;
+                int count = comments.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Comment comment = null;
+                    try
+                    {
+                        comment = comments[i];
+                        Range scope = null;
+                        string scopeText = "";
+                        try
+                        {
+                            scope = comment.Scope;
+                            scopeText = scope?.Text ?? "";
+                        }
+                        finally { if (scope != null) Marshal.ReleaseComObject(scope); }
+                        if (!CommentScopeLooksLikeSonoTaHeading(scopeText))
+                            continue;
+                        Comments replies = null;
+                        try
+                        {
+                            replies = comment.Replies;
+                            if (replies == null)
+                                continue;
+                            int rc = replies.Count;
+                            for (int r = 1; r <= rc; r++)
+                            {
+                                Comment reply = null;
+                                try
+                                {
+                                    reply = replies[r];
+                                    string rt = "";
+                                    try { rt = reply.Range?.Text ?? ""; } catch { }
+                                    if (NormalizeCommentBody(rt).Contains("前田先生に最終確認"))
+                                        return true;
+                                }
+                                finally { if (reply != null) Marshal.ReleaseComObject(reply); }
+                            }
+                        }
+                        finally { if (replies != null) Marshal.ReleaseComObject(replies); }
+                    }
+                    finally { if (comment != null) Marshal.ReleaseComObject(comment); }
+                }
+            }
+            catch { }
+            finally { if (comments != null) Marshal.ReleaseComObject(comments); }
             return false;
         }
 
@@ -943,6 +965,115 @@ namespace Libraries.Group1
             {
                 if (comments != null) Marshal.ReleaseComObject(comments);
             }
+        }
+
+        /// <summary>4-6: ページ罫線4辺が「オリーブ、アクセント3」（themeColor=accent3）か。</summary>
+        private static bool ArePageBordersAccent3(Document document)
+        {
+            if (document == null)
+                return false;
+            try
+            {
+                string contentXml = null;
+                try { contentXml = WordFindHelper.DuplicateContent(document)?.WordOpenXML; } catch { }
+                if (!string.IsNullOrEmpty(contentXml) && TryArePgBordersAccent3(contentXml))
+                    return true;
+
+                string docXml = null;
+                try { docXml = document.WordOpenXML; } catch { }
+                return !string.IsNullOrEmpty(docXml) && TryArePgBordersAccent3(docXml);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryArePgBordersAccent3(string xml)
+        {
+            if (string.IsNullOrEmpty(xml))
+                return false;
+            int start = xml.IndexOf("<w:pgBorders", StringComparison.OrdinalIgnoreCase);
+            if (start < 0)
+                return false;
+            int end = xml.IndexOf("</w:pgBorders>", start, StringComparison.OrdinalIgnoreCase);
+            if (end < 0)
+                return false;
+            end += "</w:pgBorders>".Length;
+            string pgBordersXml = xml.Substring(start, end - start);
+            return IsPgBorderSideAccent3(pgBordersXml, "top")
+                && IsPgBorderSideAccent3(pgBordersXml, "left")
+                && IsPgBorderSideAccent3(pgBordersXml, "bottom")
+                && IsPgBorderSideAccent3(pgBordersXml, "right");
+        }
+
+        private static bool IsPgBorderSideAccent3(string pgBordersXml, string sideName)
+        {
+            var match = Regex.Match(pgBordersXml, $@"<w:{sideName}\s+([^/>]*)/>", RegexOptions.IgnoreCase);
+            if (!match.Success)
+                return false;
+            string attrs = match.Groups[1].Value;
+            return Regex.IsMatch(attrs, @"w:themeColor\s*=\s*""accent3""", RegexOptions.IgnoreCase);
+        }
+
+        /// <summary>OpenXML が読めない環境向け: 文書テーマのアクセント3 RGB と罫線色が一致するか。</summary>
+        private static bool TryBorderColorsMatchDocumentThemeAccent3(Document document, int topColor, int bottomColor, int leftColor, int rightColor)
+        {
+            if (topColor != bottomColor || bottomColor != leftColor || leftColor != rightColor)
+                return false;
+            if (!TryGetDocumentThemeAccent3Rgb(document, out int r, out int g, out int b))
+                return false;
+            foreach (int expected in BuildWordThemeColorCandidates(r, g, b))
+            {
+                if (topColor == expected)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>文書テーマのアクセント3（オリーブ）の RGB。MsoThemeColorIndex: アクセント3 = 7。</summary>
+        private static bool TryGetDocumentThemeAccent3Rgb(Document document, out int r, out int g, out int b)
+        {
+            r = g = b = 0;
+            object dtObj = null;
+            object schemeObj = null;
+            object cfObj = null;
+            try
+            {
+                dynamic doc = document;
+                dtObj = doc.DocumentTheme;
+                if (dtObj == null) return false;
+                dynamic dt = dtObj;
+                schemeObj = dt.ThemeColorScheme;
+                if (schemeObj == null) return false;
+                dynamic scheme = schemeObj;
+                cfObj = scheme.Colors(7);
+                if (cfObj == null) return false;
+                dynamic cf = cfObj;
+                int rgb = (int)cf.RGB;
+                uint u = unchecked((uint)rgb) & 0xFFFFFFu;
+                r = (int)(u & 0xFF);
+                g = (int)((u >> 8) & 0xFF);
+                b = (int)((u >> 16) & 0xFF);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (cfObj != null) Marshal.ReleaseComObject(cfObj);
+                if (schemeObj != null) Marshal.ReleaseComObject(schemeObj);
+                if (dtObj != null) Marshal.ReleaseComObject(dtObj);
+            }
+        }
+
+        private static int[] BuildWordThemeColorCandidates(int r, int g, int b)
+        {
+            int bgr = r | (g << 8) | (b << 16);
+            int rgbOrder = b | (g << 8) | (r << 16);
+            return new[] { bgr, rgbOrder, unchecked((int)(uint)bgr), unchecked((int)(uint)rgbOrder) };
         }
 
         private string GetCurrentWordFilePath()
