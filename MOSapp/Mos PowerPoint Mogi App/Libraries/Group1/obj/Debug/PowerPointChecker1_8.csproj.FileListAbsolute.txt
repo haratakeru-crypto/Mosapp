@@ -6,3 +6,11 @@ C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Grou
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPoi.11BF25C8.Up2Date
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPointChecker1_8.dll
 C:\Users\kouza\source\repos\Mosapp\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPointChecker1_8.pdb
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\bin\Debug\PowerPointChecker1_8.dll
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\bin\Debug\PowerPointChecker1_8.pdb
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\bin\Debug\PowerPointCheckerCommon.pdb
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPointChecker1_8.csproj.AssemblyReference.cache
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPointChecker1_8.csproj.CoreCompileInputs.cache
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPoi.11BF25C8.Up2Date
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPointChecker1_8.dll
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\Libraries\Group1\obj\Debug\PowerPointChecker1_8.pdb
