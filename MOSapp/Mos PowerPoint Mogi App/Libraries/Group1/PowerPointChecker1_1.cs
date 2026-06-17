@@ -297,6 +297,71 @@ namespace Libraries.Group1
             }
         }
 
+        /// <summary>1-3: テキスト１スライド上で文字入力対象となりうるプレースホルダーか（タイトル・フッター等は除外）。</summary>
+        private static bool IsTask1_3TextPlaceholderCandidate(PptShape sh)
+        {
+            if (sh == null) return false;
+            if (sh.HasTextFrame != MsoTriState.msoTrue) return false;
+            if (sh.Type != MsoShapeType.msoPlaceholder) return false;
+
+            PlaceholderFormat pf = null;
+            try
+            {
+                pf = sh.PlaceholderFormat;
+                if (pf == null) return false;
+                var pt = (PpPlaceholderType)pf.Type;
+                if (IsTask1_3ExcludedPlaceholder(pt) || IsTask1_3TitlePlaceholder(pt))
+                    return false;
+                return IsTask1_3ContentPlaceholderType(pt);
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (pf != null) { try { Marshal.ReleaseComObject(pf); } catch { } }
+            }
+        }
+
+        private static bool IsTask1_3ExcludedPlaceholder(PpPlaceholderType pt)
+        {
+            return pt == PpPlaceholderType.ppPlaceholderFooter
+                || pt == PpPlaceholderType.ppPlaceholderDate
+                || pt == PpPlaceholderType.ppPlaceholderSlideNumber
+                || pt == PpPlaceholderType.ppPlaceholderHeader;
+        }
+
+        private static bool IsTask1_3TitlePlaceholder(PpPlaceholderType pt)
+        {
+            return pt == PpPlaceholderType.ppPlaceholderTitle
+                || pt == PpPlaceholderType.ppPlaceholderCenterTitle
+                || pt == PpPlaceholderType.ppPlaceholderVerticalTitle;
+        }
+
+        private static bool IsTask1_3ContentPlaceholderType(PpPlaceholderType pt)
+        {
+            return pt == PpPlaceholderType.ppPlaceholderBody
+                || pt == PpPlaceholderType.ppPlaceholderVerticalBody
+                || pt == PpPlaceholderType.ppPlaceholderSubtitle;
+        }
+
+        private static bool ShapeContainsText(PptShape sh, string searchText)
+        {
+            if (sh == null || string.IsNullOrEmpty(searchText)) return false;
+            try
+            {
+                if (sh.HasTextFrame != MsoTriState.msoTrue) return false;
+                var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                string text = tf?.TextRange?.Text ?? "";
+                return text.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // =========================================================
         // 1-2: スライド4を非表示にします。
         // =========================================================
@@ -360,35 +425,51 @@ namespace Libraries.Group1
                     catch { }
                     finally { if (layout != null) { try { Marshal.ReleaseComObject(layout); } catch { } layout = null; } }
 
-                    // テキストチェック（「英語教育を始めたばかりのケース」が入力されているか）
+                    // 上側プレースホルダー（本文系・Top 最小）に指定文字列があること
+                    const string requiredText = "英語教育を始めたばかりのケース";
                     bool textOk = false;
                     PptShapes shapes = null;
+                    PptShape upperPlaceholder = null;
                     try
                     {
                         shapes = slide.Shapes;
                         if (shapes != null)
                         {
+                            float minTop = float.MaxValue;
                             for (int i = 1; i <= shapes.Count; i++)
                             {
                                 PptShape sh = null;
                                 try
                                 {
                                     sh = shapes[i];
-                                    if (sh.HasTextFrame != MsoTriState.msoTrue) continue;
-                                    var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
-                                    string text = tf?.TextRange?.Text ?? "";
-                                    if (text.IndexOf("英語教育を始めたばかりのケース", StringComparison.OrdinalIgnoreCase) >= 0)
+                                    if (!IsTask1_3TextPlaceholderCandidate(sh)) continue;
+                                    float top = (float)sh.Top;
+                                    if (top < minTop)
                                     {
-                                        textOk = true;
-                                        break;
+                                        if (upperPlaceholder != null)
+                                        {
+                                            try { Marshal.ReleaseComObject(upperPlaceholder); } catch { }
+                                        }
+                                        upperPlaceholder = sh;
+                                        sh = null;
+                                        minTop = top;
                                     }
                                 }
                                 catch { }
-                                finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
+                                finally
+                                {
+                                    if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
+                                }
                             }
+                            if (upperPlaceholder != null)
+                                textOk = ShapeContainsText(upperPlaceholder, requiredText);
                         }
                     }
-                    finally { if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } } }
+                    finally
+                    {
+                        if (upperPlaceholder != null) { try { Marshal.ReleaseComObject(upperPlaceholder); } catch { } }
+                        if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
+                    }
 
                     return layoutOk && textOk;
                 }
@@ -449,6 +530,72 @@ namespace Libraries.Group1
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
+        /// <summary>1-5: 箇条書き用コンテンツプレースホルダーか（Body/Object、タイトル・フッター等は除外）。</summary>
+        private static bool IsTask1_5BulletListPlaceholder(PptShape sh)
+        {
+            if (sh == null) return false;
+            if (sh.HasTextFrame != MsoTriState.msoTrue) return false;
+            if (sh.Type != MsoShapeType.msoPlaceholder) return false;
+
+            PlaceholderFormat pf = null;
+            try
+            {
+                pf = sh.PlaceholderFormat;
+                if (pf == null) return false;
+                var pt = (PpPlaceholderType)pf.Type;
+                if (IsTask1_3ExcludedPlaceholder(pt) || IsTask1_3TitlePlaceholder(pt))
+                    return false;
+                return pt == PpPlaceholderType.ppPlaceholderBody
+                    || pt == PpPlaceholderType.ppPlaceholderVerticalBody
+                    || pt == PpPlaceholderType.ppPlaceholderObject;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (pf != null) { try { Marshal.ReleaseComObject(pf); } catch { } }
+            }
+        }
+
+        /// <summary>1-5: 箇条書き書式が付いた段落を含むか。</summary>
+        private static bool ShapeHasBulletParagraph(PptShape sh)
+        {
+            if (sh == null) return false;
+            Microsoft.Office.Interop.PowerPoint.TextRange tr = null;
+            try
+            {
+                var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                if (tf == null) return false;
+                tr = tf.TextRange;
+                if (tr == null) return false;
+
+                int paraCount = tr.Paragraphs().Count;
+                for (int i = 1; i <= paraCount; i++)
+                {
+                    Microsoft.Office.Interop.PowerPoint.TextRange para = null;
+                    try
+                    {
+                        para = tr.Paragraphs(i, 1);
+                        if (para?.ParagraphFormat?.Bullet == null) continue;
+                        if (para.ParagraphFormat.Bullet.Type != PpBulletType.ppBulletNone)
+                            return true;
+                    }
+                    catch { }
+                    finally
+                    {
+                        if (para != null) { try { Marshal.ReleaseComObject(para); } catch { } }
+                    }
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // =========================================================
         // 1-5: スライド8の箇条書きのプレースホルダーの文字の間隔を広げます。幅を「4pt」にします。
         // =========================================================
@@ -476,18 +623,15 @@ namespace Libraries.Group1
                             try
                             {
                                 sh = shapes[i];
-                                if (sh.HasTextFrame != MsoTriState.msoTrue) continue;
-                                // プレースホルダーのみ対象
-                                if (sh.Type != MsoShapeType.msoPlaceholder) continue;
+                                if (!IsTask1_5BulletListPlaceholder(sh)) continue;
+                                if (!ShapeHasBulletParagraph(sh)) continue;
                                 try
                                 {
                                     var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
                                     if (tf == null) continue;
                                     var tr = tf.TextRange;
                                     if (tr == null) continue;
-                                    // テキストが空でないことを確認
                                     if (string.IsNullOrWhiteSpace(tr.Text)) continue;
-                                    // 文字間隔（Spacing）を確認
                                     try
                                     {
                                         dynamic tr2 = sh.TextFrame2?.TextRange;

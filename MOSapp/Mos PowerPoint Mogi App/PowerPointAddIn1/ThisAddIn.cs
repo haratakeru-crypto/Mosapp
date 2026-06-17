@@ -276,7 +276,12 @@ namespace PowerPointAddIn1
             var errors = new List<string>();
             var flags = (PPValidationExemptFlags)exemptFlagsInt;
 
-            if (!flags.HasFlag(PPValidationExemptFlags.SlidesCount))
+            if (UsesSlideIndexMapping(start.ProjectId, start.TaskId))
+            {
+                if (!IsSlidesCountValidForTask(start.ProjectId, start.TaskId, start.SlidesCount, current.SlidesCount))
+                    errors.Add("SlidesCount changed");
+            }
+            else if (!flags.HasFlag(PPValidationExemptFlags.SlidesCount))
             {
                 if (current.SlidesCount != start.SlidesCount) errors.Add("SlidesCount changed");
             }
@@ -285,24 +290,26 @@ namespace PowerPointAddIn1
             {
                 foreach (var kvp in start.ShapesCounts)
                 {
-                    if (current.ShapesCounts.ContainsKey(kvp.Key) && current.ShapesCounts[kvp.Key] != kvp.Value)
-                        errors.Add($"ShapesCount on Slide {kvp.Key} changed");
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, kvp.Key, start.SlidesCount, current.SlidesCount);
+                    if (current.ShapesCounts.ContainsKey(currentSlide) && current.ShapesCounts[currentSlide] != kvp.Value)
+                        errors.Add($"ShapesCount on Slide {currentSlide} changed");
                 }
             }
             else
             {
-                // 免除されているが、厳密なデルタチェックを適用
                 foreach (var kvp in start.ShapesCounts)
                 {
-                    int allowedDelta = GetAllowedShapesCountDelta(start.ProjectId, start.TaskId, kvp.Key);
+                    int snapshotSlide = kvp.Key;
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, snapshotSlide, start.SlidesCount, current.SlidesCount);
+                    int allowedDelta = GetAllowedShapesCountDelta(start.ProjectId, start.TaskId, currentSlide);
                     if (allowedDelta != int.MaxValue)
                     {
-                        if (current.ShapesCounts.ContainsKey(kvp.Key))
+                        if (current.ShapesCounts.ContainsKey(currentSlide))
                         {
-                            int actualDelta = current.ShapesCounts[kvp.Key] - kvp.Value;
-                            if (!IsAllowedShapesCountDelta(start.ProjectId, start.TaskId, kvp.Key, allowedDelta, actualDelta))
+                            int actualDelta = current.ShapesCounts[currentSlide] - kvp.Value;
+                            if (!IsAllowedShapesCountDelta(start.ProjectId, start.TaskId, currentSlide, allowedDelta, actualDelta))
                             {
-                                errors.Add(FormatDestructiveShapesCountMessage(kvp.Key, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
+                                errors.Add(FormatDestructiveShapesCountMessage(currentSlide, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
                             }
                         }
                     }
@@ -317,15 +324,17 @@ namespace PowerPointAddIn1
             {
                 foreach (var kvp in start.SlideTextLengths)
                 {
-                    int allowedDelta = GetAllowedTextLengthDelta(start.ProjectId, start.TaskId, kvp.Key);
+                    int snapshotSlide = kvp.Key;
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, snapshotSlide, start.SlidesCount, current.SlidesCount);
+                    int allowedDelta = GetAllowedTextLengthDelta(start.ProjectId, start.TaskId, currentSlide);
                     if (allowedDelta != int.MaxValue)
                     {
-                        if (current.SlideTextLengths.ContainsKey(kvp.Key))
+                        if (current.SlideTextLengths.ContainsKey(currentSlide))
                         {
-                            long actualDelta = current.SlideTextLengths[kvp.Key] - kvp.Value;
-                            if (!IsAllowedTextLengthDelta(start.ProjectId, start.TaskId, kvp.Key, allowedDelta, actualDelta))
+                            long actualDelta = current.SlideTextLengths[currentSlide] - kvp.Value;
+                            if (!IsAllowedTextLengthDelta(start.ProjectId, start.TaskId, currentSlide, allowedDelta, actualDelta))
                             {
-                                errors.Add(FormatDestructiveTextLengthMessage(kvp.Key, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
+                                errors.Add(FormatDestructiveTextLengthMessage(currentSlide, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
                             }
                         }
                     }
@@ -334,42 +343,57 @@ namespace PowerPointAddIn1
 
             // 図形座標・サイズの比較
             bool exemptFullShapePosition = flags.HasFlag(PPValidationExemptFlags.ShapePosition);
+            bool perSlideShapePositionExempt = UsesPerSlideShapePositionExempt(start.ProjectId, start.TaskId);
             bool onlyNewShapesExempt = IsShapePositionExemptForNewShapesOnly(start.ProjectId, start.TaskId);
             int allowedExistingChangesCount = GetAllowedExistingShapePositionChangeCount(start.ProjectId, start.TaskId);
 
-            if (!exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0)
+            if (!exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0 || perSlideShapePositionExempt)
             {
                 int changedExistingShapesCount = 0;
                 foreach (var kvp in start.ShapePositions)
                 {
-                    if (current.ShapePositions.ContainsKey(kvp.Key))
+                    int snapshotSlide = 0;
+                    var slideParts = kvp.Key.Split('_');
+                    if (slideParts.Length > 0)
+                        int.TryParse(slideParts[0], out snapshotSlide);
+
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, snapshotSlide, start.SlidesCount, current.SlidesCount);
+                    string currentKey = slideParts.Length > 1
+                        ? currentSlide + "_" + slideParts[1]
+                        : kvp.Key;
+
+                    if (!current.ShapePositions.ContainsKey(currentKey))
+                        continue;
+
+                    var cPos = current.ShapePositions[currentKey];
+                    var sPos = kvp.Value;
+                    if (Math.Abs(cPos.Item1 - sPos.Item1) > PositionTolerancePt ||
+                        Math.Abs(cPos.Item2 - sPos.Item2) > PositionTolerancePt ||
+                        Math.Abs(cPos.Item3 - sPos.Item3) > PositionTolerancePt ||
+                        Math.Abs(cPos.Item4 - sPos.Item4) > PositionTolerancePt)
                     {
-                        var cPos = current.ShapePositions[kvp.Key];
-                        var sPos = kvp.Value;
-                        if (Math.Abs(cPos.Item1 - sPos.Item1) > PositionTolerancePt ||
-                            Math.Abs(cPos.Item2 - sPos.Item2) > PositionTolerancePt ||
-                            Math.Abs(cPos.Item3 - sPos.Item3) > PositionTolerancePt ||
-                            Math.Abs(cPos.Item4 - sPos.Item4) > PositionTolerancePt)
+                        bool slideShapePositionExempt = exemptFullShapePosition
+                            && (!perSlideShapePositionExempt
+                                || IsShapePositionExemptForSlide(start.ProjectId, start.TaskId, currentSlide));
+
+                        if (slideShapePositionExempt)
                         {
-                            if (exemptFullShapePosition)
+                            if (onlyNewShapesExempt)
                             {
-                                if (onlyNewShapesExempt)
+                                errors.Add($"不正な図形変更: 指示外の既存図形(ID:{currentKey})の位置・サイズが変更されています。");
+                            }
+                            else if (allowedExistingChangesCount >= 0)
+                            {
+                                changedExistingShapesCount++;
+                                if (changedExistingShapesCount > allowedExistingChangesCount)
                                 {
-                                    errors.Add($"不正な図形変更: 指示外の既存図形(ID:{kvp.Key})の位置・サイズが変更されています。");
-                                }
-                                else if (allowedExistingChangesCount >= 0)
-                                {
-                                    changedExistingShapesCount++;
-                                    if (changedExistingShapesCount > allowedExistingChangesCount)
-                                    {
-                                        errors.Add($"上限超過の図形変更: 許可された数以上の既存図形(ID:{kvp.Key})が変更されています。");
-                                    }
+                                    errors.Add($"上限超過の図形変更: 許可された数以上の既存図形(ID:{currentKey})が変更されています。");
                                 }
                             }
-                            else
-                            {
-                                errors.Add($"Shape position/size changed on Slide {kvp.Key.Split('_')[0]} (ID:{kvp.Key})");
-                            }
+                        }
+                        else
+                        {
+                            errors.Add($"Shape position/size changed on Slide {currentSlide} (ID:{currentKey})");
                         }
                     }
                 }
@@ -421,6 +445,148 @@ namespace PowerPointAddIn1
             return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
         }
 
+        private static bool HasTask1_8SummaryZoomExecutedGlobally()
+        {
+            string evidencePath = Path.Combine(Path.GetTempPath(), "mos_ppt_task_evidence.txt");
+            string logPath = Path.Combine(Path.GetTempPath(), "mos_ppt_log.txt");
+            return FileContainsMarker(evidencePath, "[Task1-8] SummaryZoom")
+                || FileContainsMarker(logPath, "[Task1-8] SummaryZoom");
+        }
+
+        private static bool FileContainsMarker(string path, string marker)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(marker) || !File.Exists(path))
+                return false;
+            try
+            {
+                return File.ReadAllLines(path).Any(line =>
+                    line != null && line.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static int GetProject1AdjustedSlideNumber(int logicalSlideNumber)
+        {
+            if (logicalSlideNumber > 1 && HasTask1_8SummaryZoomExecutedGlobally())
+                return logicalSlideNumber + 1;
+            return logicalSlideNumber;
+        }
+
+        private static bool IsProject1Task1_3TargetSlide(int slideIndex)
+        {
+            return slideIndex == GetProject1AdjustedSlideNumber(5);
+        }
+
+        private const int Project1Task1_8InsertSlideIndex = 2;
+        private const int Project1Task1_1InsertAtLogical = 4;
+
+        private static int GetProject1Task1_1OffsetAfterSlide1()
+        {
+            return HasTask1_8SummaryZoomExecutedGlobally() ? 1 : 0;
+        }
+
+        private static int GetProject1Task1_1InsertSlideIndex()
+        {
+            return Project1Task1_1InsertAtLogical + GetProject1Task1_1OffsetAfterSlide1();
+        }
+
+        private static bool IsProject1Task1_1TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == GetProject1Task1_1InsertSlideIndex();
+        }
+
+        private static bool IsProject1Task1_1InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        private static bool IsProject1Task1_1SnapshotPostInsert(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        private static bool UsesSlideIndexMapping(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 8);
+        }
+
+        private static bool IsSlidesCountValidForTask(int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
+        {
+            if (projectId == 1 && (taskId == 1 || taskId == 8))
+            {
+                if (taskId == 1)
+                {
+                    return IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount)
+                        || IsProject1Task1_1SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount);
+                }
+                return currentSlidesCount == snapshotSlidesCount || currentSlidesCount == snapshotSlidesCount + 1;
+            }
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        private static bool IsProject1Task1_8InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        private static int MapProject1Task1_1SnapshotToCurrent(int snapshotSlideIndex)
+        {
+            int offset = GetProject1Task1_1OffsetAfterSlide1();
+            if (snapshotSlideIndex < Project1Task1_1InsertAtLogical)
+                return snapshotSlideIndex + (snapshotSlideIndex >= 2 ? offset : 0);
+            return snapshotSlideIndex + 1 + offset;
+        }
+
+        private static int MapSnapshotSlideToCurrent(
+            int projectId,
+            int taskId,
+            int snapshotSlideIndex,
+            int snapshotSlidesCount,
+            int currentSlidesCount)
+        {
+            if (projectId == 1 && taskId == 1)
+            {
+                if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                    return MapProject1Task1_1SnapshotToCurrent(snapshotSlideIndex);
+                return snapshotSlideIndex;
+            }
+            if (projectId == 1 && taskId == 8)
+            {
+                if (IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                {
+                    if (snapshotSlideIndex >= Project1Task1_8InsertSlideIndex)
+                        return snapshotSlideIndex + 1;
+                    return snapshotSlideIndex;
+                }
+                return snapshotSlideIndex;
+            }
+            return snapshotSlideIndex;
+        }
+
+        private static bool IsProject1Task1_8TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == Project1Task1_8InsertSlideIndex;
+        }
+
+        private static bool UsesPerSlideShapePositionExempt(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8);
+        }
+
+        private static bool IsShapePositionExemptForSlide(int projectId, int taskId, int slideIndex)
+        {
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex);
+            return false;
+        }
+
         private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4)) return true; // 3-1, 3-3, 3-4
@@ -453,16 +619,26 @@ namespace PowerPointAddIn1
             if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5
             if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3
             if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
 
             return int.MaxValue;
         }
 
         private int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
-            // 1-7: 吹き出しへのテキスト入力 (スライド1に「教育者必見」の5文字が追加される)
-            if (projectId == 1 && taskId == 7) return slideIndex == 1 ? 5 : 0;
             // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
             if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
 
             // 変換、削除、インポートなど文字数が可変なものはチェックを省略
             return int.MaxValue;

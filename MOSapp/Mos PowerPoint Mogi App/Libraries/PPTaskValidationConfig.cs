@@ -29,15 +29,15 @@ namespace Libraries
             {
                 switch (taskId)
                 {
-                    case 1: // 1-1 スライド追加（4枚目に挿入）
-                        // SlidesCount は COM 採点（枚数+1・4枚目挿入）で検証するため免除。図形・位置・TextLength も挿入に伴い不一致になる。
+                    case 1: // 1-1 スライド追加（論理4枚目に挿入）
+                        // SlidesCount は COM 採点で検証。挿入スライドのみ緩和、他スライドは GetAllowed*Delta で 0 固定。
                         flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
                     case 2: // 1-2 スライド非表示
                         // 非表示設定のみのため免除不要
                         break;
                     case 3: // 1-3 スライド5のレイアウト変更＋テキスト入力
-                        // プレースホルダーの再配置およびテキスト入力が発生するため、ShapesCount, ShapePosition, TextLength免除が必要
+                        // 対象スライド（論理5）のみ緩和。他スライドは GetAllowed*Delta で 0 固定し厳格化する。
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
                     case 4: // 1-4 スライド6の箇条書き2段組み
@@ -53,9 +53,9 @@ namespace Libraries
                     case 7: // 1-7 スライド1のセクション名変更
                         // セクション名変更のみのため免除不要
                         break;
-                    case 8: // 1-8 サマリーズーム挿入
-                        // スライドの追加や、挿入による以降のスライド番号ズレ（すべての座標と文字数の不一致）を回避するため、すべて免除
-                        flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
+                    case 8: // 1-8 サマリーズーム挿入（スライド2に1枚追加）
+                        // 挿入スライド（2）のみ緩和。他スライドはマッピング後デルタ0。枚数は+1のみ許可。
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
                         break;
                 }
             }
@@ -189,12 +189,256 @@ namespace Libraries
             }
 
             // 従属フラグの自動付与（スライド数や図形数が変化すると、付随するアニメーションも削除/ズレるため除外する）
-            if (flags.HasFlag(PPValidationExemptFlags.SlidesCount) || flags.HasFlag(PPValidationExemptFlags.ShapesCount))
+            // 1-1 / 1-3 / 1-8 は対象スライド以外のアニメーション削除を検知したいため除外しない。
+            if ((flags.HasFlag(PPValidationExemptFlags.SlidesCount) || flags.HasFlag(PPValidationExemptFlags.ShapesCount))
+                && !(projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8)))
             {
                 flags |= PPValidationExemptFlags.AnimationRemoved;
             }
 
             return flags;
+        }
+
+        /// <summary>プロジェクト1の論理スライド番号を、1-8 挿入後の物理番号に補正する。</summary>
+        public static int GetProject1AdjustedSlideNumber(int logicalSlideNumber)
+        {
+            if (logicalSlideNumber > 1 && PPLogReader.HasTask1_8SummaryZoomExecutedGlobally())
+                return logicalSlideNumber + 1;
+            return logicalSlideNumber;
+        }
+
+        /// <summary>1-8 サマリーズーム挿入位置（物理スライド番号）。</summary>
+        public const int Project1Task1_8InsertSlideIndex = 2;
+
+        /// <summary>1-1 スライド挿入位置（論理スライド番号）。</summary>
+        public const int Project1Task1_1InsertAtLogical = 4;
+
+        /// <summary>1-1 挿入時の 1-8 オフセット（スライド2以降に +1）。</summary>
+        public static int GetProject1Task1_1OffsetAfterSlide1()
+        {
+            return PPLogReader.HasTask1_8SummaryZoomExecutedGlobally() ? 1 : 0;
+        }
+
+        /// <summary>1-1 の操作対象スライド（新規挿入スライド、物理番号）。</summary>
+        public static int GetProject1Task1_1InsertSlideIndex()
+        {
+            return Project1Task1_1InsertAtLogical + GetProject1Task1_1OffsetAfterSlide1();
+        }
+
+        /// <summary>1-1 の操作対象スライド（新規挿入スライド）か。</summary>
+        public static bool IsProject1Task1_1TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == GetProject1Task1_1InsertSlideIndex();
+        }
+
+        /// <summary>1-1: スナップショットが挿入前（枚数+1）か。</summary>
+        public static bool IsProject1Task1_1InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        /// <summary>1-1: スナップショット取得時点ですでに挿入済み（一括採点など）。</summary>
+        public static bool IsProject1Task1_1SnapshotPostInsert(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        /// <summary>1-3 の操作対象スライド（論理5）か。</summary>
+        public static bool IsProject1Task1_3TargetSlide(int slideIndex)
+        {
+            return slideIndex == GetProject1AdjustedSlideNumber(5);
+        }
+
+        /// <summary>1-8 の操作対象スライド（新規挿入スライド2）か。</summary>
+        public static bool IsProject1Task1_8TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == Project1Task1_8InsertSlideIndex;
+        }
+
+        /// <summary>スライド挿入によりスナップショット番号と現在番号の対応付けが必要か。</summary>
+        public static bool UsesSlideIndexMapping(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 8);
+        }
+
+        /// <summary>1-8: スナップショットが挿入前（枚数+1）か挿入後（同数）か。</summary>
+        public static bool IsProject1Task1_8InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        /// <summary>1-8: スナップショット取得時点ですでに挿入済み（一括採点など）。</summary>
+        public static bool IsProject1Task1_8SnapshotPostInsert(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        /// <summary>スライド枚数がタスク操作として許容されるか。</summary>
+        public static bool IsSlidesCountValidForTask(int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
+        {
+            if (projectId == 1 && (taskId == 1 || taskId == 8))
+            {
+                if (taskId == 1)
+                {
+                    return IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount)
+                        || IsProject1Task1_1SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount);
+                }
+                return IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount)
+                    || IsProject1Task1_8SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount);
+            }
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        private static int MapProject1Task1_1SnapshotToCurrent(int snapshotSlideIndex)
+        {
+            int offset = GetProject1Task1_1OffsetAfterSlide1();
+            if (snapshotSlideIndex < Project1Task1_1InsertAtLogical)
+                return snapshotSlideIndex + (snapshotSlideIndex >= 2 ? offset : 0);
+            return snapshotSlideIndex + 1 + offset;
+        }
+
+        private static bool TryMapProject1Task1_1CurrentToSnapshot(
+            int currentSlideIndex,
+            out int snapshotSlideIndex,
+            out bool isInsertedSlide)
+        {
+            int offset = GetProject1Task1_1OffsetAfterSlide1();
+            int insertedSlideNum = GetProject1Task1_1InsertSlideIndex();
+
+            if (currentSlideIndex == insertedSlideNum)
+            {
+                snapshotSlideIndex = 0;
+                isInsertedSlide = true;
+                return true;
+            }
+
+            isInsertedSlide = false;
+            if (currentSlideIndex < insertedSlideNum)
+            {
+                if (currentSlideIndex == 1)
+                    snapshotSlideIndex = 1;
+                else if (offset == 1)
+                    snapshotSlideIndex = currentSlideIndex - 1;
+                else
+                    snapshotSlideIndex = currentSlideIndex;
+                return true;
+            }
+
+            snapshotSlideIndex = currentSlideIndex - 1 - offset;
+            return true;
+        }
+
+        /// <summary>現在スライド番号をスナップショット側番号に対応付ける（1-1: 論理4 / 1-8: スライド2に挿入）。</summary>
+        public static bool TryMapCurrentSlideToSnapshot(
+            int projectId,
+            int taskId,
+            int snapshotSlidesCount,
+            int currentSlidesCount,
+            int currentSlideIndex,
+            out int snapshotSlideIndex,
+            out bool isInsertedSlide)
+        {
+            snapshotSlideIndex = currentSlideIndex;
+            isInsertedSlide = false;
+            if (projectId == 1 && taskId == 1)
+            {
+                if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                    return TryMapProject1Task1_1CurrentToSnapshot(currentSlideIndex, out snapshotSlideIndex, out isInsertedSlide);
+
+                if (IsProject1Task1_1SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount))
+                {
+                    snapshotSlideIndex = currentSlideIndex;
+                    isInsertedSlide = IsProject1Task1_1TargetSlide(currentSlideIndex);
+                    return true;
+                }
+
+                return false;
+            }
+            if (projectId == 1 && taskId == 8)
+            {
+                if (IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                {
+                    if (currentSlideIndex == Project1Task1_8InsertSlideIndex)
+                    {
+                        isInsertedSlide = true;
+                        return true;
+                    }
+                    if (currentSlideIndex < Project1Task1_8InsertSlideIndex)
+                    {
+                        snapshotSlideIndex = currentSlideIndex;
+                        return true;
+                    }
+                    snapshotSlideIndex = currentSlideIndex - 1;
+                    return true;
+                }
+
+                if (IsProject1Task1_8SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount))
+                {
+                    snapshotSlideIndex = currentSlideIndex;
+                    isInsertedSlide = currentSlideIndex == Project1Task1_8InsertSlideIndex;
+                    return true;
+                }
+
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>スナップショット側番号を現在スライド番号に対応付ける（ShapePositions 逆引き用）。</summary>
+        public static int MapSnapshotSlideToCurrent(
+            int projectId,
+            int taskId,
+            int snapshotSlideIndex,
+            int snapshotSlidesCount,
+            int currentSlidesCount)
+        {
+            if (projectId == 1 && taskId == 1)
+            {
+                if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                    return MapProject1Task1_1SnapshotToCurrent(snapshotSlideIndex);
+                return snapshotSlideIndex;
+            }
+            if (projectId == 1 && taskId == 8)
+            {
+                if (IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                {
+                    if (snapshotSlideIndex >= Project1Task1_8InsertSlideIndex)
+                        return snapshotSlideIndex + 1;
+                    return snapshotSlideIndex;
+                }
+                return snapshotSlideIndex;
+            }
+            return snapshotSlideIndex;
+        }
+
+        /// <summary>ShapePosition 免除をスライド単位で適用するタスクか。</summary>
+        public static bool UsesPerSlideShapePositionExempt(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8);
+        }
+
+        /// <summary>指定スライドで ShapePosition チェックを免除するか。</summary>
+        public static bool IsShapePositionExemptForSlide(int projectId, int taskId, int slideIndex)
+        {
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex);
+            return false;
+        }
+
+        /// <summary>対象スライドはレイアウト/挿入でアニメーションが変わるため AnimationRemoved を緩和する。</summary>
+        public static bool IsAnimationRemovedCheckExemptForSlide(int projectId, int taskId, int slideIndex)
+        {
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex);
+            return false;
         }
 
         /// <summary>
@@ -213,6 +457,12 @@ namespace Libraries
             if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5 グループ化
             if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3 3Dモデル挿入
             if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1 グラフ作成 (プレースホルダー内挿入のため不変)
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
 
             // フッター関連やレイアウト変更、スライド追加等のタスクは複雑に変動するため無制限
             return int.MaxValue;
@@ -261,6 +511,12 @@ namespace Libraries
         {
             // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
             if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
 
             // 変換、削除、インポートなど文字数が可変なものはチェックを省略
             return int.MaxValue;
