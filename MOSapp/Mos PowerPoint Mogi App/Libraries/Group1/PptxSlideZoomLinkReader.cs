@@ -18,6 +18,595 @@ namespace Libraries.Group1
 
         /// <summary>
         /// プレゼンテーションの <paramref name="presentationSlideNumber1Based"/> 枚目のスライド上のスライドズームが、
+        /// 指定タイトルをリンク先としてすべて持つか検証する。
+        /// </summary>
+        public static bool TryValidateSlideSlideZoomTargetTitles(
+            string pptxFilePath,
+            int presentationSlideNumber1Based,
+            IReadOnlyList<string> requiredTitles,
+            out string errorMessage)
+        {
+            errorMessage = null;
+            if (requiredTitles == null || requiredTitles.Count < 1)
+            {
+                errorMessage = "必須タイトルが指定されていません";
+                return false;
+            }
+
+            if (requiredTitles.Count == 2)
+            {
+                return TryValidateSlideSlideZoomTargetTitles(
+                    pptxFilePath,
+                    presentationSlideNumber1Based,
+                    requiredTitles[0],
+                    requiredTitles[1],
+                    out errorMessage);
+            }
+
+            if (string.IsNullOrEmpty(pptxFilePath) || !File.Exists(pptxFilePath))
+            {
+                errorMessage = "pptx ファイルが見つかりません";
+                return false;
+            }
+
+            if (presentationSlideNumber1Based < 1)
+            {
+                errorMessage = "スライド番号が不正です";
+                return false;
+            }
+
+            var normalizedRequired = new List<string>();
+            foreach (string title in requiredTitles)
+                normalizedRequired.Add(NormalizeTitle(title));
+
+            try
+            {
+                using (var fs = new FileStream(pptxFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var zip = new ZipArchive(fs, ZipArchiveMode.Read))
+                {
+                    if (zip.GetEntry("ppt/presentation.xml") == null)
+                    {
+                        errorMessage = "ppt/presentation.xml が存在しません";
+                        return false;
+                    }
+
+                    var orderedSlidePartPaths = BuildOrderedSlidePartPaths(zip);
+                    if (orderedSlidePartPaths == null || orderedSlidePartPaths.Count < presentationSlideNumber1Based)
+                    {
+                        errorMessage = "プレゼンテーションのスライド一覧を解釈できません";
+                        return false;
+                    }
+
+                    string firstSlidePart = orderedSlidePartPaths[presentationSlideNumber1Based - 1];
+                    string relsPath = "ppt/slides/_rels/" + Path.GetFileName(firstSlidePart) + ".rels";
+                    var relsEntry = zip.GetEntry(relsPath);
+                    if (relsEntry == null)
+                    {
+                        errorMessage = "スライドの .rels が見つかりません: " + relsPath;
+                        return false;
+                    }
+
+                    XmlDocument relsDoc = new XmlDocument();
+                    using (var s = relsEntry.Open())
+                        relsDoc.Load(s);
+
+                    var ridToTarget = BuildRidToTargetMap(relsDoc);
+                    var slideToSlideTargets = CollectSlidePartTargetsFromRelsLoose(relsDoc, firstSlidePart);
+
+                    if (slideToSlideTargets.Count != requiredTitles.Count)
+                    {
+                        string slideXmlPath = firstSlidePart.Replace('\\', '/');
+                        var entrySlide = zip.GetEntry(slideXmlPath);
+                        if (entrySlide != null)
+                        {
+                            XmlDocument slideXmlDoc = new XmlDocument();
+                            using (var st = entrySlide.Open())
+                                slideXmlDoc.Load(st);
+                            var fromIds = CollectSlidePartsFromSlideXmlGraphicData(slideXmlDoc, ridToTarget, firstSlidePart);
+                            if (fromIds.Count == requiredTitles.Count)
+                                slideToSlideTargets = fromIds;
+                        }
+                    }
+
+                    if (slideToSlideTargets.Count != requiredTitles.Count)
+                    {
+                        errorMessage = "スライドズームのリンク先スライドを"
+                            + requiredTitles.Count
+                            + "件特定できませんでした（実際: "
+                            + slideToSlideTargets.Count
+                            + "）";
+                        return false;
+                    }
+
+                    var titles = new List<string>();
+                    foreach (string slidePart in slideToSlideTargets)
+                    {
+                        var entry = zip.GetEntry(slidePart.Replace('\\', '/'));
+                        if (entry == null)
+                        {
+                            errorMessage = "リンク先スライド部分が見つかりません: " + slidePart;
+                            return false;
+                        }
+                        XmlDocument slideDoc = new XmlDocument();
+                        using (var st = entry.Open())
+                            slideDoc.Load(st);
+                        titles.Add(NormalizeTitle(ExtractSlideTitleFromSlidePart(slideDoc)));
+                    }
+
+                    if (!TitlesMatchRequiredSetFuzzy(titles, normalizedRequired))
+                    {
+                        errorMessage = "リンク先スライドのタイトルが問題文と一致しません（実際: "
+                            + string.Join(" | ", titles)
+                            + "）";
+                        return false;
+                    }
+
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = "pptx 解析エラー: " + ex.Message;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// セクションズームが、対応するラベル文字の真下にあり、リンク先セクション名も一致するか検証する（P3-7）。
+        /// </summary>
+        public static bool TryValidateSectionZoomPlacedUnderLabels(
+            string pptxFilePath,
+            int presentationSlideNumber1Based,
+            string labelText1,
+            string expectedSectionName1,
+            string labelText2,
+            string expectedSectionName2,
+            out string errorMessage)
+        {
+            errorMessage = null;
+            if (string.IsNullOrEmpty(pptxFilePath) || !File.Exists(pptxFilePath))
+            {
+                errorMessage = "pptx ファイルが見つかりません";
+                return false;
+            }
+
+            if (presentationSlideNumber1Based < 1)
+            {
+                errorMessage = "スライド番号が不正です";
+                return false;
+            }
+
+            try
+            {
+                using (var fs = new FileStream(pptxFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var zip = new ZipArchive(fs, ZipArchiveMode.Read))
+                {
+                    var sectionGuidToName = BuildSectionGuidToNameMap(zip);
+                    if (sectionGuidToName == null || sectionGuidToName.Count == 0)
+                    {
+                        errorMessage = "セクション定義を解釈できません";
+                        return false;
+                    }
+
+                    var orderedSlidePartPaths = BuildOrderedSlidePartPaths(zip);
+                    if (orderedSlidePartPaths == null || orderedSlidePartPaths.Count < presentationSlideNumber1Based)
+                    {
+                        errorMessage = "プレゼンテーションのスライド一覧を解釈できません";
+                        return false;
+                    }
+
+                    string slidePart = orderedSlidePartPaths[presentationSlideNumber1Based - 1];
+                    var slideEntry = zip.GetEntry(slidePart.Replace('\\', '/'));
+                    if (slideEntry == null)
+                    {
+                        errorMessage = "スライド部分が見つかりません: " + slidePart;
+                        return false;
+                    }
+
+                    XmlDocument slideDoc = new XmlDocument();
+                    using (var st = slideEntry.Open())
+                        slideDoc.Load(st);
+
+                    var labelPairs = new[]
+                    {
+                        Tuple.Create(labelText1, expectedSectionName1),
+                        Tuple.Create(labelText2, expectedSectionName2)
+                    };
+
+                    var labels = CollectMatchingTextLabelsOnSlide(slideDoc, labelPairs);
+                    var zooms = CollectSectionZoomsWithBoundsFromSlideXml(slideDoc, sectionGuidToName);
+
+                    if (zooms.Count != 2)
+                    {
+                        errorMessage = "セクションズームを2件特定できませんでした（実際: " + zooms.Count + "）";
+                        return false;
+                    }
+
+                    var usedLabelIndices = new HashSet<int>();
+                    var usedZoomIndices = new HashSet<int>();
+
+                    foreach (var pair in labelPairs)
+                    {
+                        string requiredLabel = pair.Item1;
+                        string requiredSection = pair.Item2;
+                        string requiredLabelNorm = NormalizeTitleForFuzzyMatch(requiredLabel);
+                        string requiredSectionNorm = NormalizeTitleForFuzzyMatch(requiredSection);
+
+                        int labelIndex = -1;
+                        for (int i = 0; i < labels.Count; i++)
+                        {
+                            if (usedLabelIndices.Contains(i)) continue;
+                            if (TitleFuzzyEquals(labels[i].TextNorm, requiredLabelNorm))
+                            {
+                                labelIndex = i;
+                                break;
+                            }
+                        }
+
+                        if (labelIndex < 0)
+                        {
+                            errorMessage = "ラベル文字が見つかりません: " + requiredLabel;
+                            return false;
+                        }
+                        usedLabelIndices.Add(labelIndex);
+
+                        TextLabelOnSlide label = labels[labelIndex];
+                        int zoomIndex = -1;
+                        for (int i = 0; i < zooms.Count; i++)
+                        {
+                            if (usedZoomIndices.Contains(i)) continue;
+                            if (!TitleFuzzyEquals(zooms[i].SectionNameNorm, requiredSectionNorm)) continue;
+                            if (!IsSectionZoomBelowLabel(zooms[i], label)) continue;
+                            zoomIndex = i;
+                            break;
+                        }
+
+                        if (zoomIndex < 0)
+                        {
+                            errorMessage = "「" + requiredLabel + "」の下にセクション「" + requiredSection + "」へのズームがありません";
+                            return false;
+                        }
+                        usedZoomIndices.Add(zoomIndex);
+                    }
+
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = "pptx 解析エラー: " + ex.Message;
+                return false;
+            }
+        }
+
+        private const double EmuPerPoint = 12700.0;
+        private const double SectionZoomBelowLabelTolerancePt = 5.0;
+        private const double SectionZoomHorizontalAlignMarginPt = 40.0;
+
+        private sealed class SlideBoundsPt
+        {
+            public double Left;
+            public double Top;
+            public double Width;
+            public double Height;
+            public double Right => Left + Width;
+            public double Bottom => Top + Height;
+            public double CenterX => Left + Width / 2.0;
+        }
+
+        private sealed class TextLabelOnSlide
+        {
+            public string TextRaw;
+            public string TextNorm;
+            public SlideBoundsPt Bounds;
+        }
+
+        private sealed class SectionZoomOnSlide
+        {
+            public string SectionNameRaw;
+            public string SectionNameNorm;
+            public SlideBoundsPt Bounds;
+        }
+
+        private static List<TextLabelOnSlide> CollectMatchingTextLabelsOnSlide(
+            XmlDocument slideDoc,
+            Tuple<string, string>[] requiredPairs)
+        {
+            var requiredNorms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in requiredPairs)
+            {
+                string norm = NormalizeTitleForFuzzyMatch(pair.Item1);
+                if (!string.IsNullOrEmpty(norm))
+                    requiredNorms.Add(norm);
+            }
+
+            var results = new List<TextLabelOnSlide>();
+            foreach (XmlNode spNode in slideDoc.SelectNodes("//*[local-name()='sp']"))
+            {
+                var sp = spNode as XmlElement;
+                if (sp == null) continue;
+
+                string textRaw = ExtractAllTextFromShapeXml(sp);
+                if (string.IsNullOrWhiteSpace(textRaw)) continue;
+
+                string textNorm = NormalizeTitleForFuzzyMatch(textRaw);
+                bool matchesRequired = false;
+                foreach (string req in requiredNorms)
+                {
+                    if (TitleFuzzyEquals(textNorm, req))
+                    {
+                        matchesRequired = true;
+                        break;
+                    }
+                }
+                if (!matchesRequired) continue;
+
+                if (!TryParseShapeBoundsPt(sp, out SlideBoundsPt bounds)) continue;
+
+                results.Add(new TextLabelOnSlide
+                {
+                    TextRaw = textRaw.Trim(),
+                    TextNorm = textNorm,
+                    Bounds = bounds
+                });
+            }
+            return results;
+        }
+
+        private static List<SectionZoomOnSlide> CollectSectionZoomsWithBoundsFromSlideXml(
+            XmlDocument slideDoc,
+            Dictionary<string, string> sectionGuidToName)
+        {
+            var results = new List<SectionZoomOnSlide>();
+
+            foreach (XmlNode gfNode in slideDoc.SelectNodes("//*[local-name()='graphicFrame']"))
+            {
+                var graphicFrame = gfNode as XmlElement;
+                if (graphicFrame == null) continue;
+
+                var gd = graphicFrame.SelectSingleNode(".//*[local-name()='graphicData']") as XmlElement;
+                if (gd == null) continue;
+
+                string uri = GetXmlAttributeByLocalName(gd, "uri");
+                if (string.IsNullOrEmpty(uri) || uri.IndexOf("sectionzoom", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                string sectionId = null;
+                foreach (XmlNode n in gd.SelectNodes(".//*"))
+                {
+                    var el = n as XmlElement;
+                    if (el == null) continue;
+                    sectionId = GetXmlAttributeByLocalName(el, "sectionId");
+                    if (string.IsNullOrEmpty(sectionId))
+                        sectionId = GetXmlAttributeByLocalName(el, "sectionGuid");
+                    if (!string.IsNullOrEmpty(sectionId)) break;
+                }
+                if (string.IsNullOrEmpty(sectionId)) continue;
+                if (!TryLookupSectionName(sectionGuidToName, sectionId, out string sectionName)) continue;
+                if (!TryParseShapeBoundsPt(graphicFrame, out SlideBoundsPt bounds)) continue;
+
+                results.Add(new SectionZoomOnSlide
+                {
+                    SectionNameRaw = sectionName,
+                    SectionNameNorm = NormalizeTitleForFuzzyMatch(sectionName),
+                    Bounds = bounds
+                });
+            }
+
+            if (results.Count == 0)
+            {
+                foreach (XmlNode gdNode in slideDoc.SelectNodes("//*[local-name()='graphicData']"))
+                {
+                    var gd = gdNode as XmlElement;
+                    if (gd == null) continue;
+                    string uri = GetXmlAttributeByLocalName(gd, "uri");
+                    if (string.IsNullOrEmpty(uri) || uri.IndexOf("sectionzoom", StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+
+                    string sectionId = null;
+                    foreach (XmlNode n in gd.SelectNodes(".//*"))
+                    {
+                        var el = n as XmlElement;
+                        if (el == null) continue;
+                        sectionId = GetXmlAttributeByLocalName(el, "sectionId");
+                        if (string.IsNullOrEmpty(sectionId))
+                            sectionId = GetXmlAttributeByLocalName(el, "sectionGuid");
+                        if (!string.IsNullOrEmpty(sectionId)) break;
+                    }
+                    if (string.IsNullOrEmpty(sectionId)) continue;
+                    if (!TryLookupSectionName(sectionGuidToName, sectionId, out string sectionName)) continue;
+
+                    var host = FindAncestorByLocalName(gd, "graphicFrame") as XmlElement;
+                    if (host == null) continue;
+                    if (!TryParseShapeBoundsPt(host, out SlideBoundsPt bounds)) continue;
+
+                    results.Add(new SectionZoomOnSlide
+                    {
+                        SectionNameRaw = sectionName,
+                        SectionNameNorm = NormalizeTitleForFuzzyMatch(sectionName),
+                        Bounds = bounds
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        private static XmlNode FindAncestorByLocalName(XmlNode node, string localName)
+        {
+            for (XmlNode p = node?.ParentNode; p != null; p = p.ParentNode)
+            {
+                if (p is XmlElement el && el.LocalName == localName)
+                    return el;
+            }
+            return null;
+        }
+
+        private static string ExtractAllTextFromShapeXml(XmlElement shape)
+        {
+            var sb = new StringBuilder();
+            foreach (XmlNode tNode in shape.SelectNodes(".//*[local-name()='t']"))
+            {
+                if (tNode != null)
+                    sb.Append(tNode.InnerText);
+            }
+            return sb.ToString();
+        }
+
+        private static bool TryParseShapeBoundsPt(XmlElement container, out SlideBoundsPt bounds)
+        {
+            bounds = new SlideBoundsPt();
+            if (container == null) return false;
+
+            XmlElement xfrm = null;
+            if (string.Equals(container.LocalName, "graphicFrame", StringComparison.OrdinalIgnoreCase))
+                xfrm = container.SelectSingleNode("*[local-name()='xfrm']") as XmlElement;
+            if (xfrm == null)
+                xfrm = container.SelectSingleNode(".//*[local-name()='spPr']/*[local-name()='xfrm']") as XmlElement;
+            if (xfrm == null)
+                xfrm = container.SelectSingleNode(".//*[local-name()='xfrm']") as XmlElement;
+            if (xfrm == null) return false;
+
+            XmlElement off = xfrm.SelectSingleNode("*[local-name()='off']") as XmlElement;
+            XmlElement ext = xfrm.SelectSingleNode("*[local-name()='ext']") as XmlElement;
+            if (off == null || ext == null) return false;
+
+            if (!long.TryParse(GetXmlAttributeByLocalName(off, "x"), out long xEmu)) return false;
+            if (!long.TryParse(GetXmlAttributeByLocalName(off, "y"), out long yEmu)) return false;
+            if (!long.TryParse(GetXmlAttributeByLocalName(ext, "cx"), out long cxEmu)) return false;
+            if (!long.TryParse(GetXmlAttributeByLocalName(ext, "cy"), out long cyEmu)) return false;
+
+            bounds.Left = xEmu / EmuPerPoint;
+            bounds.Top = yEmu / EmuPerPoint;
+            bounds.Width = cxEmu / EmuPerPoint;
+            bounds.Height = cyEmu / EmuPerPoint;
+            return bounds.Width > 0 && bounds.Height > 0;
+        }
+
+        private static bool IsSectionZoomBelowLabel(SectionZoomOnSlide zoom, TextLabelOnSlide label)
+        {
+            if (zoom?.Bounds == null || label?.Bounds == null) return false;
+
+            if (zoom.Bounds.Top < label.Bounds.Bottom - SectionZoomBelowLabelTolerancePt)
+                return false;
+
+            double margin = SectionZoomHorizontalAlignMarginPt;
+            return zoom.Bounds.CenterX >= label.Bounds.Left - margin
+                && zoom.Bounds.CenterX <= label.Bounds.Right + margin;
+        }
+
+        private static Dictionary<string, string> BuildSectionGuidToNameMap(ZipArchive zip)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var presEntry = zip.GetEntry("ppt/presentation.xml");
+            if (presEntry == null) return map;
+
+            XmlDocument presDoc = new XmlDocument();
+            using (var s = presEntry.Open())
+                presDoc.Load(s);
+
+            foreach (XmlNode sectionNode in presDoc.SelectNodes("//*[local-name()='section']"))
+            {
+                var section = sectionNode as XmlElement;
+                if (section == null) continue;
+                string guid = section.GetAttribute("id");
+                if (string.IsNullOrEmpty(guid))
+                {
+                    foreach (XmlAttribute attr in section.Attributes)
+                    {
+                        if (attr.LocalName == "id")
+                        {
+                            guid = attr.Value ?? "";
+                            break;
+                        }
+                    }
+                }
+                if (string.IsNullOrEmpty(guid)) continue;
+
+                string name = section.GetAttribute("name");
+                if (string.IsNullOrEmpty(name))
+                {
+                    foreach (XmlAttribute attr in section.Attributes)
+                    {
+                        if (attr.LocalName == "name")
+                        {
+                            name = attr.Value ?? "";
+                            break;
+                        }
+                    }
+                }
+                if (!string.IsNullOrEmpty(name))
+                    map[NormalizeSectionGuidKey(guid)] = name;
+            }
+            return map;
+        }
+
+        private static string NormalizeSectionGuidKey(string guid)
+        {
+            if (string.IsNullOrEmpty(guid)) return "";
+            return guid.Trim().Trim('{', '}');
+        }
+
+        private static bool TryLookupSectionName(Dictionary<string, string> sectionGuidToName, string sectionId, out string sectionName)
+        {
+            sectionName = null;
+            if (string.IsNullOrEmpty(sectionId) || sectionGuidToName == null) return false;
+
+            if (sectionGuidToName.TryGetValue(sectionId, out sectionName)) return true;
+
+            string norm = NormalizeSectionGuidKey(sectionId);
+            if (sectionGuidToName.TryGetValue(norm, out sectionName)) return true;
+
+            foreach (var kvp in sectionGuidToName)
+            {
+                if (string.Equals(NormalizeSectionGuidKey(kvp.Key), norm, StringComparison.OrdinalIgnoreCase))
+                {
+                    sectionName = kvp.Value;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string GetXmlAttributeByLocalName(XmlElement el, string localName)
+        {
+            if (el == null || string.IsNullOrEmpty(localName)) return "";
+            string value = el.GetAttribute(localName);
+            if (!string.IsNullOrEmpty(value)) return value;
+            foreach (XmlAttribute attr in el.Attributes)
+            {
+                if (attr.LocalName == localName)
+                    return attr.Value ?? "";
+            }
+            return "";
+        }
+
+        private static bool TitlesMatchRequiredSetFuzzy(List<string> actualTitles, List<string> requiredNorm)
+        {
+            if (actualTitles == null || requiredNorm == null || actualTitles.Count != requiredNorm.Count)
+                return false;
+
+            var remaining = new List<string>(requiredNorm);
+            foreach (string actual in actualTitles)
+            {
+                int matchIndex = -1;
+                for (int i = 0; i < remaining.Count; i++)
+                {
+                    if (TitleFuzzyEquals(actual, remaining[i]))
+                    {
+                        matchIndex = i;
+                        break;
+                    }
+                }
+                if (matchIndex < 0)
+                    return false;
+                remaining.RemoveAt(matchIndex);
+            }
+            return remaining.Count == 0;
+        }
+
+        /// <summary>
+        /// プレゼンテーションの <paramref name="presentationSlideNumber1Based"/> 枚目のスライド上のスライドズームが、
         /// 指定2タイトルをリンク先として持つか検証する。
         /// </summary>
         public static bool TryValidateSlideSlideZoomTargetTitles(
@@ -330,18 +919,33 @@ namespace Libraries.Group1
                     if (!string.Equals(typ, "title", StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(typ, "ctrTitle", StringComparison.OrdinalIgnoreCase))
                         continue;
-                    var sb = new StringBuilder();
-                    foreach (XmlNode teNode in sp.SelectNodes(".//*[local-name()='t']"))
-                    {
-                        string fragment = teNode.InnerText ?? "";
-                        sb.Append(fragment);
-                    }
-                    string result = sb.ToString().Trim();
+                    string result = ExtractShapeText(sp);
                     if (result.Length > 0)
                         return result;
                 }
             }
+
+            // リンク先スライドの見出しが本文プレースホルダーのみの場合のフォールバック
+            foreach (XmlNode spNode in slideDoc.SelectNodes("//*[local-name()='sp']"))
+            {
+                var sp = spNode as XmlElement;
+                if (sp == null) continue;
+                string result = ExtractShapeText(sp);
+                if (result.Length > 0)
+                    return result;
+            }
             return "";
+        }
+
+        private static string ExtractShapeText(XmlElement sp)
+        {
+            var sb = new StringBuilder();
+            foreach (XmlNode teNode in sp.SelectNodes(".//*[local-name()='t']"))
+            {
+                string fragment = teNode.InnerText ?? "";
+                sb.Append(fragment);
+            }
+            return sb.ToString().Trim();
         }
 
         private static string NormalizeTitle(string s)

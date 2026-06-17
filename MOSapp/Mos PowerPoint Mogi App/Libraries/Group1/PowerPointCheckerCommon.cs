@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
@@ -257,6 +258,142 @@ namespace Libraries.Group1
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// タイトル系プレースホルダーの文字が <paramref name="requiredTitle"/> と一致するスライドを返す。
+        /// 本文やセクションズーム上の「1.機能の概要」など、部分文字列だけ一致するスライドは除外する。
+        /// </summary>
+        public static Slide GetSlideByTitlePlaceholderExact(Presentation pres, string requiredTitle)
+        {
+            if (pres == null || string.IsNullOrEmpty(requiredTitle))
+                return null;
+            string requiredNorm = NormalizeSlideTitleText(requiredTitle);
+            if (string.IsNullOrEmpty(requiredNorm))
+                return null;
+
+            try
+            {
+                Slides slides = pres.Slides;
+                if (slides == null) return null;
+                try
+                {
+                    int count = slides.Count;
+                    for (int i = 1; i <= count; i++)
+                    {
+                        Slide slide = null;
+                        try
+                        {
+                            slide = slides[i];
+                            if (SlideHasTitlePlaceholderExact(slide, requiredNorm))
+                            {
+                                Slide result = slide;
+                                slide = null;
+                                return result;
+                            }
+                        }
+                        finally
+                        {
+                            if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
+                        }
+                    }
+                    return null;
+                }
+                finally
+                {
+                    if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool SlideHasTitlePlaceholderExact(Slide slide, string requiredNorm)
+        {
+            if (slide == null) return false;
+            PptShapes shapes = null;
+            try
+            {
+                shapes = slide.Shapes;
+                if (shapes == null) return false;
+                int sc = shapes.Count;
+                for (int j = 1; j <= sc; j++)
+                {
+                    PptShape sh = null;
+                    try
+                    {
+                        sh = shapes[j];
+                        if (sh.HasTextFrame != MsoTriState.msoTrue) continue;
+                        if (!IsTitleLikePlaceholderShape(sh)) continue;
+
+                        string text = null;
+                        try
+                        {
+                            var pptTf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                            text = pptTf.TextRange?.Text ?? "";
+                        }
+                        catch { continue; }
+
+                        if (string.Equals(NormalizeSlideTitleText(text), requiredNorm, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                    finally
+                    {
+                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
+                    }
+                }
+                return false;
+            }
+            catch { return false; }
+            finally
+            {
+                if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
+            }
+        }
+
+        private static bool IsTitleLikePlaceholderShape(PptShape sh)
+        {
+            try
+            {
+                if ((int)sh.Type != (int)MsoShapeType.msoPlaceholder) return false;
+                var pf = sh.PlaceholderFormat;
+                if (pf == null) return false;
+                try
+                {
+                    var ppt = (PpPlaceholderType)pf.Type;
+                    return ppt == PpPlaceholderType.ppPlaceholderTitle
+                        || ppt == PpPlaceholderType.ppPlaceholderCenterTitle
+                        || ppt == PpPlaceholderType.ppPlaceholderVerticalTitle
+                        || ppt == PpPlaceholderType.ppPlaceholderSubtitle;
+                }
+                finally
+                {
+                    try { Marshal.ReleaseComObject(pf); } catch { }
+                }
+            }
+            catch { return false; }
+        }
+
+        private static string NormalizeSlideTitleText(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder();
+            foreach (char c in s.Trim().Replace("\r", "").Replace("\n", ""))
+            {
+                if (c == ' ' || c == '\u3000' || c == '\t') continue;
+                sb.Append(NormalizeWidthInsensitiveChar(c));
+            }
+            return sb.ToString();
+        }
+
+        private static char NormalizeWidthInsensitiveChar(char c)
+        {
+            if (c >= '\uFF10' && c <= '\uFF19')
+                return (char)('0' + (c - '\uFF10'));
+            if (c == '\uFF0E') return '.';
+            return c;
         }
 
         /// <summary>

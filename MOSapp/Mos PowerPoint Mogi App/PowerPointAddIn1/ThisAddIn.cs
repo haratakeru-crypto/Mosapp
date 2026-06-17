@@ -411,6 +411,28 @@ namespace PowerPointAddIn1
                 return actualDelta == 0 || actualDelta == 1;
             }
 
+            // P3-4: Slide 1 only: allow 0 or +1.
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 1;
+            }
+
+            // P3-6: allow 0 or +3.
+            if (projectId == 3 && taskId == 6)
+            {
+                return actualDelta == 0 || actualDelta == 3;
+            }
+
+            // P3-7: Slide 2: allow 0 or +2. Slide 1: allow 0 or +1 (section zoom side effect).
+            if (projectId == 3 && taskId == 7 && slideIndex == 2)
+            {
+                return actualDelta == 0 || actualDelta == 2;
+            }
+            if (projectId == 3 && taskId == 7 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 1;
+            }
+
             return actualDelta == allowedDelta;
         }
 
@@ -430,6 +452,22 @@ namespace PowerPointAddIn1
         private static string FormatDestructiveShapesCountMessage(int slideIndex, int projectId, int taskId, int allowedDelta, int actualDelta)
         {
             if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 6)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +3、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 7 && slideIndex == 2)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +2、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 7 && slideIndex == 1)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
             }
@@ -589,7 +627,7 @@ namespace PowerPointAddIn1
 
         private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
-            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4)) return true; // 3-1, 3-3, 3-4
+            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 4 && taskId == 6) return true; // 4-6
             if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3, 5-5
             if (projectId == 6 && taskId == 3) return true; // 6-3
@@ -603,6 +641,8 @@ namespace PowerPointAddIn1
             if (projectId == 4 && taskId == 4) return 1; // 4-4
             if (projectId == 4 && taskId == 5) return 1; // 4-5
             if (projectId == 5 && taskId == 4) return 1; // 5-4
+            if (projectId == 3 && taskId == 5) return 1; // P3-5
+            // P3-7: section zoom side effects on multiple slides — no cap (-1). ShapesCount still strict per slide.
             if (projectId == 6 && taskId == 4) return 1; // 6-4
             if (projectId == 9 && taskId == 1) return -1; // デフォルトへ (deltaで制御)
             if (projectId == 9 && taskId == 6) return 1; // 9-6
@@ -612,9 +652,16 @@ namespace PowerPointAddIn1
 
         private int GetAllowedShapesCountDelta(int projectId, int taskId, int slideIndex)
         {
-            if (projectId == 3 && taskId == 1) return slideIndex == 5 ? 0 : 0; // 3-1
-            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // 3-3
-            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 2 : 0; // 3-4
+            if (projectId == 3 && taskId == 1) return slideIndex == 7 ? 0 : 0; // P3-1
+            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // P3-3
+            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 1 : 0; // P3-4
+            if (projectId == 3 && taskId == 6) return 0;                       // P3-6
+            if (projectId == 3 && taskId == 7)
+            {
+                if (slideIndex == 2) return 2; // P3-7 section zoom x2
+                if (slideIndex == 1) return 1; // P3-7 section side effect
+                return 0;
+            }
             if (projectId == 5 && taskId == 3) return 0;                       // 5-3
             if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5
             if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3

@@ -10,7 +10,9 @@
 | P1 改修前 commit（Checker1_1 旧版） | `d03e149` |
 | P1 改修 commit（参考） | `81ecce9` |
 | JSON 旧版 source（P2以降） | commit `9df05ff`（旧タスク構成・旧文言。新CSVのタスク数とは一致しない） |
-| Legacy 配置 | `Libraries/Group1/Legacy/*.Legacy.cs` |
+| Legacy 配置（Checker） | `Libraries/Group1/Legacy/*.Legacy.cs` |
+| Legacy 配置（破壊的操作） | `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（2026-06-17, P3 完了・P3-7 既存図形位置は無制限に更新） |
+| 破壊的操作一覧（主） | 本ファイル「破壊的操作免除一覧」 |
 | 元 CSV | `Mos PowerPoint Mogi App/PP修正版問題文一覧_類似付き.csv` |
 
 > **git 確認（依頼1実施時）**: `PowerPointChecker1_1.cs` は HEAD（`81ecce9`）に P1 改修済み。作業ツリーに**未コミットの追加差分**あり。Legacy の 1_1 は commit `d03e149` から復元。
@@ -49,19 +51,13 @@
 | P2-6 | 旧2-5 | スライド2の男の子と？マークの２つの画像が、スライドの左上隅から登場するようにします。アニメーションの継続時間は"0.55"秒にします。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_05 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
 | P2-7 | 旧2-6 | スライド「今年度募集について」の箇条書きに設定されたアニメーションの効果を「プラス」に変更します。また、クリックするとすべて同時に動くようにします。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_06 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
 | P2-8 | 旧2-7 | スライド４の星の図形にアニメーションの軌跡「ニュートロン」を設定します。円の図形にはアニメーションを設定しません。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_07 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
-| P3-1 | 旧3-1 | あなたはPower Point 新機能についての発表用資料を作成しています。 スライド７にSmartArtグラフィック「タイムライン」の手順を追加し、文字列「" | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_01 | P3 実装時に PowerPointChecker1_3.cs 上書き |  |  |
-| P3-2 | 旧3-2 | スライド７のSmartArtグラフィックに、色「グラデーション循環-アクセント６」を設定します。 | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_02 | P3 実装時に PowerPointChecker1_3.cs 上書き |  |  |
-| P3-3 | 旧3-3 | スライド６の箇条書きを「ターゲットリスト」のSmartArtに変更します。 | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_03 | P3 実装時に PowerPointChecker1_3.cs 上書き |  |  |
-| P3-4 | 旧6-3 | スライド１に3Dモデル「虫眼鏡」を挿入します。幅を「"2.5"」に変更して中央の楕円の図形の中に配置します。正確な位置は問いません。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_03 | P6 実装時に PowerPointChecker1_6.cs 上書き |  |  |
-| P3-5 | 旧6-4 | スライド10の3Dモデルのビューを上前面にし、高さを「"6.5"」に変更します。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_04 | P6 実装時に PowerPointChecker1_6.cs 上書き |  |  |
-| P3-6 | 旧3-4 | 「機能の概要」のスライドにスライドズームを挿入して「画面録画で説明」「ズーム機能で訴求力アップ」「デザインアイデアで魅力的に！」へリンクを作成します。タイトルの | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_04 | P3 実装時に PowerPointChecker1_3.cs 上書き | 旧3-4 は P1-8, P3-6 でも参照 |  |
-| P3-7 | — | スライド２にセクションズームのリンクを挿入します。セクション「1.機能の概要」と「2.伝わるスライドの要素」にリンクを作成し、それぞれ文字の下に配置します。 | — | — | — | スライド2を選択
-↓
-[挿入]タブ
-↓
-[ズーム]をクリック
-↓
-[セクションズ… | 新規 |
+| P3-1 | 旧3-1 | あなたはPower Point 新機能についての発表用資料を作成しています。 スライド７にSmartArtグラフィック「タイムライン」の手順を追加し、文字列「" | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_01 | P3 実装時に PowerPointChecker1_3.cs 上書き | 基本タイムラインは layout Id=hProcess11 | 済 |
+| P3-2 | 旧3-2 | スライド７のSmartArtグラフィックに、色「グラデーション循環-アクセント６」を設定します。 | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_02 | P3 実装時に PowerPointChecker1_3.cs 上書き |  | 済 |
+| P3-3 | 旧3-3 | スライド６の箇条書きを「ターゲットリスト」のSmartArtに変更します。 | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_03 | P3 実装時に PowerPointChecker1_3.cs 上書き | ターゲットリストは layout Id=target3 | 済 |
+| P3-4 | 旧6-3 | スライド１に3Dモデル「虫眼鏡」を挿入します。幅を「"2.5"」に変更して中央の楕円の図形の中に配置します。正確な位置は問いません。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_03 | P3 実装時に PowerPointChecker1_3.cs 上書き | 旧6-3 を P3-4 に移植 | 済 |
+| P3-5 | 旧6-4 | スライド10の3Dモデルのビューを上前面にし、高さを「"6.5"」に変更します。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_04 | P3 実装時に PowerPointChecker1_3.cs 上書き | 旧6-4 を P3-5 に移植 | 済 |
+| P3-6 | 旧3-4 | 「機能の概要」のスライドにスライドズームを挿入して「画面録画で説明」「ズーム機能で訴求力アップ」「デザインアイデアで魅力的に！」へリンクを作成します。タイトルの | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_04 | P3 実装時に PowerPointChecker1_3.cs 上書き | 旧3-4 は P1-8, P3-6 でも参照。3件ズーム。タイトルPH完全一致。配置は0pt隙間許容 | 済 |
+| P3-7 | — | スライド２にセクションズームのリンクを挿入します。セクション「1.機能の概要」と「2.伝わるスライドの要素」にリンクを作成し、それぞれ文字の下に配置します。 | — | — | P3 実装時に PowerPointChecker1_3.cs 上書き | 新規。ラベル文字とセクション名の1対1ペアリング検証（入れ替えは×） | 済 |
 | P4-1 | 旧1-7 | あなたは英語教育プログラムの提案用資料を作成しています。 スライド１の青い図形に、「"教育者必見"」と入力します。 | PowerPointChecker1_1.Legacy.cs | CheckTask_1_1_07 | P1 実装時に PowerPointChecker1_1.cs 上書き |  |  |
 | P4-2 | 旧5-2 | スライド４の文字列「いつでも体験可能です!」に、文字の塗りつぶし「青、アクセント1」を設定します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_02 | P5 実装時に PowerPointChecker1_5.cs 上書き |  |  |
 | P4-3 | 旧4-2 | スライド１枚目の子供の画像に、図の効果「光彩:18pt;緑､アクセントカラー6」を設定します。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_02 | P4 実装時に PowerPointChecker1_4.cs 上書き |  |  |
@@ -140,6 +136,104 @@
 
 > **既知課題（P2-4）**: P2-1〜8 を一連で行うと、P2-4 の「すべてのスライドに適用」により P2-1 または P2-3 が最終採点で × になる。詳細・対策案は [`PPtasks_md/P2-4_累積採点と画面切り替え_課題と対策.md`](../PPtasks_md/P2-4_累積採点と画面切り替え_課題と対策.md) を参照。
 
+## P3 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==3` では **taskId = P3-X**。**現行** `PowerPointChecker1_3.cs` のメソッド名は **P3-X = `CheckTask_1_3_0X`** に揃えた。P3-4/5 は旧6-3/6-4 ロジックを移植。P3-6 は旧3-4 を3件ズームに拡張。P3-7 は新規（`PptxSlideZoomLinkReader.TryValidateSectionZoomPlacedUnderLabels` でラベル下のセクションズームを1対1検証）。
+
+| P3（taskId） | 現行メソッド | Legacy メソッド（参照元） | 検証メモ |
+|--------------|-------------|-------------------------|----------|
+| P3-1 (1) | `CheckTask_1_3_01` | 旧3-1 | SmartArt layout Id=hProcess11 |
+| P3-2 (2) | `CheckTask_1_3_02` | 旧3-2 | 色のみ |
+| P3-3 (3) | `CheckTask_1_3_03` | 旧3-3 | SmartArt layout Id=target3 |
+| P3-4 (4) | `CheckTask_1_3_04` | 旧6-3 (`CheckTask_1_6_03`) | 3Dモデル「虫眼鏡」幅2.5 |
+| P3-5 (5) | `CheckTask_1_3_05` | 旧6-4 (`CheckTask_1_6_04`) | 上前面ビュー・高さ6.5 |
+| P3-6 (6) | `CheckTask_1_3_06` | 旧3-4 (`CheckTask_1_3_04`) | 3件スライドズーム。タイトルPH「機能の概要」完全一致 |
+| P3-7 (7) | `CheckTask_1_3_07` | —（新規） | セクションズーム2件。ラベルとリンク先セクションの対応必須 |
+
+## 破壊的操作免除一覧（`PPTaskValidationConfig`）
+
+**日常の参照は本セクション（MD）を主とする。** 旧 taskId のコード確認は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（P3 完了時点スナップショット）。それでも不明なときのみ `git log -p -- Libraries/PPTaskValidationConfig.cs`。
+
+- **現行 config の正**: `Libraries/PPTaskValidationConfig.cs`（実行時はここだけ有効）
+- **VSTO 重複**: `PowerPointAddIn1/ThisAddIn.cs` にデルタ判定のコピーあり → config 変更時は両方更新
+- **taskId**: P1/P2/P3 は **新番号（Px-X = taskId）**。projectId 4〜11 は **旧番号のまま**（P4 実装時に付け替え予定）
+- **AnimationRemoved**: `SlidesCount` または `ShapesCount` 免除時に自動付与（P1 の 1-1/1-3/1-8 を除く）
+
+### 列の凡例
+
+| 列 | 意味 |
+|----|------|
+| 免除フラグ | `ShapesCount` / `TextLength` / `SlidesCount` / `ShapePosition`（+ 自動 `AnimationRemoved`） |
+| 図形数デルタ | スライド別の許容増減。`無制限` = `int.MaxValue`。`0 or +N` = `IsAllowedShapesCountDelta` で緩和 |
+| 文字数デルタ | 同上。例: 9-6 スライド1は `0 or -57` |
+| 既存図形位置 | `新規のみ` = `IsShapePositionExemptForNewShapesOnly`。`上限N` = 既存図形の移動・サイズ変更を N 件まで |
+
+### P1（projectId=1, taskId=P1-X）
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|-------------|------|
+| 1 (P1-1) | 旧1-1 | Slides, Shapes, Text, Position | 挿入スライドのみ無制限、他0 | 挿入スライドのみ無制限、他0 | 挿入スライドのみ免除（スライド番号マッピング） | 1-8 実行後は論理4→物理5 |
+| 2 (P1-2) | 旧1-3 | なし | — | — | — | 非表示のみ |
+| 3 (P1-3) | 旧1-5 | Shapes, Text, Position | 論理5のみ無制限、他0 | 論理5のみ無制限、他0 | 論理5のみ免除 | |
+| 4 (P1-4) | 旧1-6 | Position | — | — | 全スライド免除 | 2段組みでレイアウト変化 |
+| 5–7 | 旧10-3等 | なし | — | — | — | P1 実装済み・config は旧1-x系 |
+| 8 (P1-8) | 旧3-4 | Shapes, Text, Position | スライド2のみ無制限、他0 | スライド2のみ無制限、他0 | スライド2のみ免除 | サマリーズーム挿入・スライド番号マッピング |
+
+### P2（projectId=2, taskId=P2-X）
+
+| taskId | 免除フラグ | 備考 |
+|--------|-----------|------|
+| 1–8 | なし | 画面切り替え・アニメーション中心 |
+
+### P3（projectId=3, taskId=P3-X）
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|------|
+| 1 (P3-1) | 旧3-1 | Shapes, Text, Position | スライド7: 0 | 新規のみ | SmartArt はプレースホルダー内 |
+| 2 (P3-2) | 旧3-2 | なし | — | — | 色変更のみ |
+| 3 (P3-3) | 旧3-3 | Shapes, Text, Position | スライド6: 0 | 新規のみ | |
+| 4 (P3-4) | 旧6-3 | Shapes, Position | スライド1: 0 or +1 | 新規のみ | 旧 config は projectId=6 taskId=3 |
+| 5 (P3-5) | 旧6-4 | Position | — | 上限1 | 旧 config は projectId=6 taskId=4 |
+| 6 (P3-6) | 旧3-4 | Shapes, Position | 全スライド: 0 or +3 | 新規のみ | タイトル指定のためスライド番号非固定。配置はタイトルPH下端に0pt隙間許容 |
+| 7 (P3-7) | — | Shapes, **Text**, Position | スライド2: 0 or +2、スライド1: 0 or +1 | 無制限（副作用） | COM: ラベル下に対応セクションへのズーム必須（入れ替え×）。破壊的: セクション操作の副作用を許容 |
+
+### 旧 projectId 4〜11（P4 実装前・config は旧番号のまま）
+
+| projectId | taskId | 旧タスク | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 将来の新タスク（参考） |
+|-----------|--------|----------|-----------|-------------|-------------|-------------|----------------------|
+| 4 | 4 | 旧4-4 | Position | — | — | 上限1 | P4-6 |
+| 4 | 5 | 旧4-5 | Position | — | — | 上限1 | P4-5, P5-1 |
+| 4 | 6 | 旧4-6 | Position | — | — | 新規のみ | P5-4 |
+| 5 | 3 | 旧5-3 | Shapes, Position | 全スライド: 0 | — | 新規のみ | P5-3 |
+| 5 | 4 | 旧5-4 | Shapes, Position | — | — | 上限1 | P5-2 |
+| 5 | 5 | 旧5-5 | Shapes, Position | スライド3: 0 or -2 | — | 新規のみ | P5-5 |
+| 6 | 3 | 旧6-3 | Shapes, Position | スライド1: 0 or +1 | — | 新規のみ | → **P3-4** に移植済み |
+| 6 | 4 | 旧6-4 | Position | — | — | 上限1 | → **P3-5** に移植済み |
+| 7 | 2 | 旧7-2 | Slides, Shapes, Text, Position | 無制限 | 無制限 | 無制限 | P7 系 |
+| 7 | 3 | 旧7-3 | 同上 | 無制限 | 無制限 | 無制限 | P7-3 |
+| 8 | 1 | 旧8-1 | Shapes | 無制限 | — | — | P9-1 等 |
+| 8 | 2 | 旧8-2 | Shapes | 無制限 | — | — | |
+| 9 | 1 | 旧9-1 | Shapes, Position | スライド2: 0 | — | 新規のみ | P9-4 |
+| 9 | 4,5 | 旧9-4/5 | Shapes, Text, Position | 無制限 | 無制限 | 無制限 | P7-4, P7-5 |
+| 9 | 6 | 旧9-6 | Text, Position | — | スライド1: 0 or -57 | 上限1 | P7-2 |
+| 9 | 7 | 旧9-7 | Position | — | — | 無制限 | P8-4 |
+| 10 | 5 | 旧10-5 | Shapes, Position | 無制限 | — | 無制限 | P10-1 |
+| 10 | 7 | 旧10-7 | Shapes, Position | 無制限 | — | 新規のみ | P10-6 |
+| 11 | 1 | 旧11-1 | Shapes, Position | 無制限 | — | 無制限 | P8-3 |
+| 11 | 6 | 旧11-6 | Position | — | — | 上限1 | P4-8 |
+
+### 破壊的操作の旧→新移植メモ（taskId 付け替え時に参照）
+
+| 旧 config（projectId, taskId） | 移植先（新） | Legacy 参照 |
+|-------------------------------|-------------|-------------|
+| (3, 4) 旧3-4 スライドズーム | P3-6 (3,6)、P1-8 (1,8) は別設定 | `PPTaskValidationConfig.Legacy.cs` の case 6 / 1-8 |
+| (6, 3) 旧6-3 3D挿入 | P3-4 (3, 4) | Legacy の `projectId == 6 && taskId == 3` |
+| (6, 4) 旧6-4 3Dサイズ | P3-5 (3, 5) | Legacy の `projectId == 6 && taskId == 4` |
+| (4, 5) 旧4-5 画像配置 | P4-5, P5-1（未実装） | Legacy の case 5 |
+| (5, 1) 旧5-1 印刷 | P6-5, P6-7（未実装） | 現行 config に該当行なし（免除なし） |
+
+> P4 着手時: 上記「旧 4〜11」表の該当行を **新 projectId=4, taskId=P4-X** に書き換え、本表と Legacy を更新すること。
+
 ## 要注意（旧タスクの再利用）
 
 同じ旧タスクを複数の新タスクが参照。Legacy をコピーする際は差分を必ず確認。
@@ -163,8 +257,8 @@
 ## プロジェクト実装チェックリスト
 
 - [ ] **P1**（8 タスク）— 完了確認中
-- [ ] **P2**（8 タスク）— 未着手
-- [ ] **P3**（7 タスク）— 未着手
+- [x] **P2**（8 タスク）— 完了（P2-4 累積採点の既知課題あり）
+- [x] **P3**（7 タスク）— 完了（採点・破壊的操作とも検証済み）
 - [ ] **P4**（8 タスク）— 未着手
 - [ ] **P5**（7 タスク）— 未着手
 - [ ] **P6**（7 タスク）— 未着手
@@ -176,5 +270,6 @@
 ## 推奨実装順
 
 1. **P1** — 検証・コミット
-2. **P2** — 旧2-x がすべて `PowerPointChecker1_2.Legacy.cs` に揃っている
-3. **P3 以降** — 上書きリスク表を確認してから着手
+2. ~~**P2**~~ — 完了
+3. ~~**P3**~~ — 完了
+4. **P4 以降** — 上書きリスク表を確認してから着手
