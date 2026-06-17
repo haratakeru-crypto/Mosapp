@@ -21,7 +21,7 @@
 
 - **旧 X-Y**: 旧プロジェクト X のタスク Y
 - **Legacy ファイル**: `PowerPointChecker1_{旧プロジェクト}.Legacy.cs`
-- **Legacy メソッド**: `CheckTask_1_{旧P}_{旧T}`（ゼロ埋め2桁）
+- **Legacy メソッド**: `CheckTask_1_{旧P}_{旧T}`（ゼロ埋め2桁）。**P2 以降の現行**は `CheckTask_1_{P}_{新T}`（P2-X → `CheckTask_1_2_0X`）に揃える
 - **類似なし**: CSV の類似問題列が空欄 → 新規採点実装
 
 ## 全タスク対応表
@@ -36,19 +36,19 @@
 | P1-6 | 旧7-1 | スライド８にセクションを追加します。セクション名は「"まとめ"」にします。 | PowerPointChecker1_7.Legacy.cs | CheckTask_1_7_01 | P7 実装時に PowerPointChecker1_7.cs 上書き |  |  |
 | P1-7 | 旧11-2 | スライド１のセクション名を「"はじめに"」とします。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_02 | P11 実装時に PowerPointChecker1_11.cs 上書き |  |  |
 | P1-8 | 旧3-4 | スライド１の後ろにサマリーズームスライドを挿入し［1.教育理念］、［4.募集要項］の各スライドへのリンクを作成します。スライド１と８へのリンクは含めません。タイ | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_04 | P3 実装時に PowerPointChecker1_3.cs 上書き | 旧3-4 は P1-8, P3-6 でも参照 |  |
-| P2-1 | 旧2-1 | あなたはMOS合格対策講座のコースガイダンス資料を作成しています。 すべてのスライドに、画面切り替え「スプリット」を設定します。効果のオプションを「ワイプアウト | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_01 | P2 実装時に PowerPointChecker1_2.cs 上書き |  |  |
-| P2-2 | 旧2-2 | すべての画面切り替えの継続時間を3秒に設定します。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_02 | P2 実装時に PowerPointChecker1_2.cs 上書き |  |  |
-| P2-3 | 旧2-3 | スライド3、4、5に「切り替え」の画面切り替え効果を設定します。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_03 | P2 実装時に PowerPointChecker1_2.cs 上書き |  |  |
+| P2-1 | 旧2-1 | あなたはMOS合格対策講座のコースガイダンス資料を作成しています。 すべてのスライドに、画面切り替え「スプリット」を設定します。効果のオプションを「ワイプアウト | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_01 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
+| P2-2 | 旧2-2 | すべての画面切り替えの継続時間を3秒に設定します。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_02 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
+| P2-3 | 旧2-3 | スライド3、4、5に「切り替え」の画面切り替え効果を設定します。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_03 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
 | P2-4 | — | すべてのスライドが、"５"秒後に自動で次のスライドへ進むように画面切り替えのタイミングを設定します。 | — | — | — | [画面切り替え]タブ
 ↓
 [自動]チェックボックスを
 クリックしオン
 ↓
-[自動… | 新規 |
-| P2-5 | 旧2-4 | スライド６の3Ｄモデル「黒板」に、アニメーション「ジャンプしてターン」を設定します。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_04 | P2 実装時に PowerPointChecker1_2.cs 上書き |  |  |
-| P2-6 | 旧2-5 | スライド2の男の子と？マークの２つの画像が、スライドの左上隅から登場するようにします。アニメーションの継続時間は"0.55"秒にします。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_05 | P2 実装時に PowerPointChecker1_2.cs 上書き |  |  |
-| P2-7 | 旧2-6 | スライド「今年度募集について」の箇条書きに設定されたアニメーションの効果を「プラス」に変更します。また、クリックするとすべて同時に動くようにします。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_06 | P2 実装時に PowerPointChecker1_2.cs 上書き |  |  |
-| P2-8 | 旧2-7 | スライド４の星の図形にアニメーションの軌跡「ニュートロン」を設定します。円の図形にはアニメーションを設定しません。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_07 | P2 実装時に PowerPointChecker1_2.cs 上書き |  |  |
+[自動… | 済 |
+| P2-5 | 旧2-4 | スライド６の3Ｄモデル「黒板」に、アニメーション「ジャンプしてターン」を設定します。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_04 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
+| P2-6 | 旧2-5 | スライド2の男の子と？マークの２つの画像が、スライドの左上隅から登場するようにします。アニメーションの継続時間は"0.55"秒にします。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_05 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
+| P2-7 | 旧2-6 | スライド「今年度募集について」の箇条書きに設定されたアニメーションの効果を「プラス」に変更します。また、クリックするとすべて同時に動くようにします。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_06 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
+| P2-8 | 旧2-7 | スライド４の星の図形にアニメーションの軌跡「ニュートロン」を設定します。円の図形にはアニメーションを設定しません。 | PowerPointChecker1_2.Legacy.cs | CheckTask_1_2_07 | P2 実装時に PowerPointChecker1_2.cs 上書き |  | 済 |
 | P3-1 | 旧3-1 | あなたはPower Point 新機能についての発表用資料を作成しています。 スライド７にSmartArtグラフィック「タイムライン」の手順を追加し、文字列「" | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_01 | P3 実装時に PowerPointChecker1_3.cs 上書き |  |  |
 | P3-2 | 旧3-2 | スライド７のSmartArtグラフィックに、色「グラデーション循環-アクセント６」を設定します。 | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_02 | P3 実装時に PowerPointChecker1_3.cs 上書き |  |  |
 | P3-3 | 旧3-3 | スライド６の箇条書きを「ターゲットリスト」のSmartArtに変更します。 | PowerPointChecker1_3.Legacy.cs | CheckTask_1_3_03 | P3 実装時に PowerPointChecker1_3.cs 上書き |  |  |
@@ -122,6 +122,23 @@
 | P10-6 | 旧10-7 | スライドマスターの［タイトルのみ］レイアウトをもとに「"タイトル付きの図と表"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレー | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_07 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
 | P10-7 | 旧11-4 | 配布資料マスターの日付を削除します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_04 | P11 実装時に PowerPointChecker1_11.cs 上書き | 旧11-4 は P10-7, P10-8 でも参照 |  |
 | P10-8 | 旧11-4 | 配布資料マスターのフッターに「"四季を楽しむ"」と表示します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_04 | P11 実装時に PowerPointChecker1_11.cs 上書き | 旧11-4 は P10-7, P10-8 でも参照 |  |
+
+## P2 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==2` では **taskId = P2-X**。**現行** `PowerPointChecker1_2.cs` のメソッド名は **P2-X = `CheckTask_1_2_0X`** に揃えた。Legacy は旧2-x番号のまま `Legacy/` に退避。破壊的操作検知（`PPTaskValidationConfig` / スナップショット）は **taskId（P2-X）** で紐づく。
+
+| P2（taskId） | 現行メソッド | Legacy メソッド（旧2-x） |
+|--------------|-------------|-------------------------|
+| P2-1 (1) | `CheckTask_1_2_01` | 同左 |
+| P2-2 (2) | `CheckTask_1_2_02` | 同左 |
+| P2-3 (3) | `CheckTask_1_2_03` | 同左 |
+| P2-4 (4) | `CheckTask_1_2_04` | —（新規） |
+| P2-5 (5) | `CheckTask_1_2_05` | `CheckTask_1_2_04` |
+| P2-6 (6) | `CheckTask_1_2_06` | `CheckTask_1_2_05` |
+| P2-7 (7) | `CheckTask_1_2_07` | `CheckTask_1_2_06` |
+| P2-8 (8) | `CheckTask_1_2_08` | `CheckTask_1_2_07` |
+
+> **既知課題（P2-4）**: P2-1〜8 を一連で行うと、P2-4 の「すべてのスライドに適用」により P2-1 または P2-3 が最終採点で × になる。詳細・対策案は [`PPtasks_md/P2-4_累積採点と画面切り替え_課題と対策.md`](../PPtasks_md/P2-4_累積採点と画面切り替え_課題と対策.md) を参照。
 
 ## 要注意（旧タスクの再利用）
 

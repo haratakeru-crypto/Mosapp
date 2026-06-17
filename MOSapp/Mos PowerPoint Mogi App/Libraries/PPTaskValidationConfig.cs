@@ -61,7 +61,8 @@ namespace Libraries
             }
             else if (projectId == 2)
             {
-                // セクション操作や画面切り替えのため免除不要
+                // P2: taskId 1〜8 = P2-1〜P2-8。現行 CheckTask_1_2_01〜08（Legacy は旧2-x 番号のまま）
+                // 画面切り替え・アニメーション中心のため、プロジェクト全体で免除フラグは未設定
             }
             else if (projectId == 3)
             {
