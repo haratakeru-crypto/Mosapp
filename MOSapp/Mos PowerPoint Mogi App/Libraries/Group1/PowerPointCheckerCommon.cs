@@ -605,5 +605,296 @@ namespace Libraries.Group1
                 if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
             }
         }
+
+        /// <summary>
+        /// スライド内（グループ内を含む）で指定テキストを含む図形を探す。
+        /// </summary>
+        public static PptShape FindShapeWithTextDeep(Slide slide, string searchText)
+        {
+            if (slide == null || string.IsNullOrEmpty(searchText))
+                return null;
+
+            PptShapes shapes = null;
+            try
+            {
+                shapes = slide.Shapes;
+                return FindShapeWithTextInShapeCollection(shapes, searchText, searchGroups: true);
+            }
+            catch { return null; }
+            finally
+            {
+                if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
+            }
+        }
+
+        private static PptShape FindShapeWithTextInShapeCollection(PptShapes shapes, string searchText, bool searchGroups)
+        {
+            if (shapes == null || string.IsNullOrEmpty(searchText))
+                return null;
+
+            try
+            {
+                int count = shapes.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    PptShape sh = null;
+                    try
+                    {
+                        sh = shapes[i];
+                        PptShape found = TryFindShapeWithTextOnShape(sh, searchText, searchGroups);
+                        if (found != null)
+                        {
+                            if (ReferenceEquals(found, sh))
+                                sh = null;
+                            return found;
+                        }
+                    }
+                    finally
+                    {
+                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
+                    }
+                }
+                return null;
+            }
+            catch { return null; }
+        }
+
+        private static PptShape TryFindShapeWithTextOnShape(PptShape sh, string searchText, bool searchGroups)
+        {
+            if (sh == null) return null;
+
+            if (sh.HasTextFrame == MsoTriState.msoTrue)
+            {
+                string text = null;
+                try
+                {
+                    var pptTf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                    text = pptTf.TextRange?.Text;
+                }
+                catch { }
+
+                if (TryFindTextSpan(text, searchText, out _, out _))
+                {
+                    return sh;
+                }
+            }
+
+            if (!searchGroups || sh.Type != MsoShapeType.msoGroup)
+                return null;
+
+            Microsoft.Office.Interop.PowerPoint.GroupShapes group = null;
+            try
+            {
+                group = sh.GroupItems;
+                return FindShapeWithTextInGroupShapes(group, searchText, searchGroups: true);
+            }
+            catch { return null; }
+            finally
+            {
+                if (group != null) { try { Marshal.ReleaseComObject(group); } catch { } }
+            }
+        }
+
+        private static PptShape FindShapeWithTextInGroupShapes(Microsoft.Office.Interop.PowerPoint.GroupShapes group, string searchText, bool searchGroups)
+        {
+            if (group == null || string.IsNullOrEmpty(searchText))
+                return null;
+
+            try
+            {
+                int count = group.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    PptShape sh = null;
+                    try
+                    {
+                        sh = group[i];
+                        PptShape found = TryFindShapeWithTextOnShape(sh, searchText, searchGroups);
+                        if (found != null)
+                        {
+                            if (ReferenceEquals(found, sh))
+                                sh = null;
+                            return found;
+                        }
+                    }
+                    finally
+                    {
+                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
+                    }
+                }
+                return null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// 図形テキスト内の検索語位置を返す（! / ！ のゆらぎに対応）。
+        /// </summary>
+        public static bool TryFindTextSpan(string fullText, string searchText, out int start, out int length)
+        {
+            start = 0;
+            length = 0;
+            if (string.IsNullOrEmpty(fullText) || string.IsNullOrEmpty(searchText))
+                return false;
+
+            int idx = fullText.IndexOf(searchText, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                start = idx + 1;
+                length = searchText.Length;
+                return true;
+            }
+
+            string alt = searchText.Replace('!', '！');
+            if (!string.Equals(alt, searchText, StringComparison.Ordinal))
+            {
+                idx = fullText.IndexOf(alt, StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                {
+                    start = idx + 1;
+                    length = alt.Length;
+                    return true;
+                }
+            }
+
+            alt = searchText.Replace('！', '!');
+            if (!string.Equals(alt, searchText, StringComparison.Ordinal))
+            {
+                idx = fullText.IndexOf(alt, StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                {
+                    start = idx + 1;
+                    length = alt.Length;
+                    return true;
+                }
+            }
+
+            string core = searchText.TrimEnd('!', '！');
+            if (core.Length > 0 && core.Length < searchText.Length)
+            {
+                idx = fullText.IndexOf(core, StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                {
+                    start = idx + 1;
+                    length = core.Length;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 図形内の指定テキスト部分がテーマ色フォントかどうか（部分書式・RGB 解決にも対応）。
+        /// </summary>
+        public static bool IsShapeSubstringFontThemeColor(PptShape sh, Presentation pres, string searchText, MsoThemeColorIndex themeColor)
+        {
+            if (sh == null || pres == null || string.IsNullOrEmpty(searchText))
+                return false;
+            if (sh.HasTextFrame != MsoTriState.msoTrue)
+                return false;
+
+            Microsoft.Office.Interop.PowerPoint.TextFrame tf = null;
+            try
+            {
+                tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                if (tf == null) return false;
+                TextRange tr = null;
+                try
+                {
+                    tr = tf.TextRange;
+                    if (tr == null) return false;
+                    string fullText = null;
+                    try { fullText = tr.Text; } catch { }
+                    if (!TryFindTextSpan(fullText, searchText, out int start, out int length))
+                        return false;
+
+                    TextRange sub = null;
+                    try
+                    {
+                        sub = tr.Characters(start, length);
+                        return sub != null && IsTextRangeFontThemeColor(sub, pres, themeColor);
+                    }
+                    finally
+                    {
+                        if (sub != null) { try { Marshal.ReleaseComObject(sub); } catch { } }
+                    }
+                }
+                finally
+                {
+                    if (tr != null) { try { Marshal.ReleaseComObject(tr); } catch { } }
+                }
+            }
+            finally
+            {
+                if (tf != null) { try { Marshal.ReleaseComObject(tf); } catch { } }
+            }
+        }
+
+        private static bool IsTextRangeFontThemeColor(TextRange tr, Presentation pres, MsoThemeColorIndex themeColor)
+        {
+            if (tr == null) return false;
+
+            Font font = null;
+            try
+            {
+                font = tr.Font;
+                if (font == null) return false;
+                Microsoft.Office.Interop.PowerPoint.ColorFormat cf = null;
+                try
+                {
+                    cf = font.Color;
+                    if (IsFontColorThemeColor(cf, pres, themeColor))
+                        return true;
+                }
+                finally
+                {
+                    if (cf != null) { try { Marshal.ReleaseComObject(cf); } catch { } }
+                }
+            }
+            finally
+            {
+                if (font != null) { try { Marshal.ReleaseComObject(font); } catch { } }
+            }
+
+            string text = null;
+            try { text = tr.Text ?? ""; } catch { }
+            int len = text.Length;
+            if (len <= 1) return false;
+
+            for (int i = 1; i <= len; i++)
+            {
+                TextRange ch = null;
+                Font chFont = null;
+                Microsoft.Office.Interop.PowerPoint.ColorFormat chCf = null;
+                try
+                {
+                    ch = tr.Characters(i, 1);
+                    if (ch == null) return false;
+                    chFont = ch.Font;
+                    if (chFont == null) return false;
+                    chCf = chFont.Color;
+                    if (!IsFontColorThemeColor(chCf, pres, themeColor))
+                        return false;
+                }
+                finally
+                {
+                    if (chCf != null) { try { Marshal.ReleaseComObject(chCf); } catch { } }
+                    if (chFont != null) { try { Marshal.ReleaseComObject(chFont); } catch { } }
+                    if (ch != null) { try { Marshal.ReleaseComObject(ch); } catch { } }
+                }
+            }
+            return true;
+        }
+
+        private static bool IsFontColorThemeColor(Microsoft.Office.Interop.PowerPoint.ColorFormat cf, Presentation pres, MsoThemeColorIndex themeColor)
+        {
+            if (cf == null) return false;
+            try
+            {
+                return cf.ObjectThemeColor == themeColor;
+            }
+            catch { return false; }
+        }
     }
 }

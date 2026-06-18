@@ -1,36 +1,61 @@
 # Legacy — 破壊的操作免除設定（PPTaskValidationConfig）
 
-P4 着手前（P3 完了時点）の `PPTaskValidationConfig.cs` 参照用。**ビルド対象外**（`.csproj` に含めない）。
+P3 完了時点の `PPTaskValidationConfig.cs` を**凍結保存**した参照用コピー。**ビルド対象外**（`.csproj` に含めない）。
 
-## Baseline
+`Libraries/Group1/Legacy/*.Legacy.cs`（チェッカー）と**同じ運用**: Px 実装中は**編集しない**。
+
+## 何のためにあるか
+
+| 用途 | 参照先 |
+|------|--------|
+| **日常・現行タスクの免除一覧** | `tasks/PP_類題採点対応表.md`（主） |
+| **実行時の設定** | `Libraries/PPTaskValidationConfig.cs` |
+| **VSTO のデルタ判定** | `PowerPointAddIn1/ThisAddIn.cs`（config と同期） |
+| **旧 `(projectId, taskId)` のコード確認** | 本ファイル（例: `projectId == 6 && taskId == 3`） |
+| **最終手段** | `git log -p -- Libraries/PPTaskValidationConfig.cs` |
+
+## Px 実装時に更新するファイル（本 Legacy は含めない）
+
+```
+✅ Libraries/PPTaskValidationConfig.cs
+✅ PowerPointAddIn1/ThisAddIn.cs   （デルタ判定の重複あり）
+✅ tasks/PP_類題採点対応表.md       （破壊的操作免除一覧・P4 セクション等）
+❌ Libraries/Legacy/PPTaskValidationConfig.Legacy.cs  ← 触らない
+```
+
+## Baseline（凍結時点）
 
 | 項目 | 値 |
 |------|-----|
 | 作成日 | 2026-06-17 |
-| 最終更新 | 2026-06-17（P3-7 既存図形位置: 上限1 → 無制限に現行 config と同期） |
-| スナップショット元 | `Libraries/PPTaskValidationConfig.cs`（P3 全タスク完了時点） |
-| git HEAD（参考） | `4840fd5` |
-| 人間向け一覧 | `tasks/PP_類題採点対応表.md` →「破壊的操作免除一覧」 |
+| 凍結内容 | P3 完了時点。`projectId` 1〜3 は新 taskId（P1/P2/P3-X）、**4〜11 は旧 taskId のまま** |
+| git 復元基準 | `37275f4`（PP_Project3採点完了） |
+| 人間向け一覧 | `tasks/PP_類題採点対応表.md` |
 
-## ファイル
+## チェッカー Legacy との対応
 
-| ファイル | 内容 |
-|----------|------|
-| `PPTaskValidationConfig.Legacy.cs` | 上記時点の免除設定一式（GetExemptFlags / デルタ判定 / 既存図形上限など） |
+| 種類 | パス | 凍結の意味 |
+|------|------|-----------|
+| チェッカー | `Group1/Legacy/PowerPointChecker1_*.Legacy.cs` | 上書き前の**採点ロジック** |
+| 破壊的操作 | `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs` | P4 着手前の**旧番号 config** |
 
-## 使い方
+どちらも「新タスク実装のたびに同期更新」は**しない**。新設定は現行ファイルと MD に書く。
 
-1. **日常**: `tasks/PP_類題採点対応表.md` の免除表を見る（主）
-2. **旧 taskId のコード確認**: 本 Legacy ファイルを検索（例: `projectId == 6 && taskId == 3`）
-3. **最終手段**: `git log -p -- Libraries/PPTaskValidationConfig.cs`
+## 再スナップショットが必要なときだけ
 
-## Px 実装時の運用
+次のような**意図的なマイルストーン**でのみ、管理者が手動でコピーし直す（日常の Px 1 件完了ごとではない）。
 
-- **P4 着手前**: 必要なら本フォルダを再度コピーして baseline を更新
-- **taskId 付け替え後**: 対応表の免除行を現行 config に合わせて更新。旧設定は本 Legacy に残る
-- **チェッカー Legacy**（`Group1/Legacy/`）とは別管理。クラス名は同じ `PPTaskValidationConfig` のため、本フォルダを Compile に含めると重複エラーになる
+- 旧 projectId 4〜11 をすべて新番号に付け替え終えた大きな区切り
+- 対応表の「旧→新移植メモ」が Legacy の旧番号と乖離したと判断したとき
+
+その際も **git で履歴を残す**こと。実行中の `PPTaskValidationConfig.cs` を無断で Legacy に上書きしない。
+
+## 採点への影響
+
+本ファイルを編集しても**採点結果は変わらない**（コンパイルされないため）。  
+誤って Legacy だけを現行 config と同期すると、**将来の移植参照**（例: 旧 `(4,5)` → P5-1）が壊れるだけ。
 
 ## 注意
 
-- VSTO（`PowerPointAddIn1/ThisAddIn.cs`）にもデルタ判定の重複実装あり。config 変更時は **両方** を更新すること
-- 現行 config は P1/P2/P3 のみ **新 taskId（Px-X）** で記述。projectId 4〜11 は **旧番号のまま**（P4 実装時に付け替え予定）
+- クラス名は現行と同じ `PPTaskValidationConfig` のため、Compile に含めると重複エラーになる
+- `projectId == 4` のブロックは**旧 4-4/4-5/4-6** のまま。P4-X の設定は現行 config と対応表を見る

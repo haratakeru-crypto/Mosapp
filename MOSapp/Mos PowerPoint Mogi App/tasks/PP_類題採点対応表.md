@@ -11,7 +11,7 @@
 | P1 改修 commit（参考） | `81ecce9` |
 | JSON 旧版 source（P2以降） | commit `9df05ff`（旧タスク構成・旧文言。新CSVのタスク数とは一致しない） |
 | Legacy 配置（Checker） | `Libraries/Group1/Legacy/*.Legacy.cs` |
-| Legacy 配置（破壊的操作） | `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（2026-06-17, P3 完了・P3-7 既存図形位置は無制限に更新） |
+| Legacy 配置（破壊的操作） | `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（**凍結**・P3 完了時点・旧 projectId 4〜11） |
 | 破壊的操作一覧（主） | 本ファイル「破壊的操作免除一覧」 |
 | 元 CSV | `Mos PowerPoint Mogi App/PP修正版問題文一覧_類似付き.csv` |
 
@@ -150,13 +150,39 @@
 | P3-6 (6) | `CheckTask_1_3_06` | 旧3-4 (`CheckTask_1_3_04`) | 3件スライドズーム。タイトルPH「機能の概要」完全一致 |
 | P3-7 (7) | `CheckTask_1_3_07` | —（新規） | セクションズーム2件。ラベルとリンク先セクションの対応必須 |
 
+## P4 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==4` では **taskId = P4-X**。**現行** `PowerPointChecker1_4.cs` のメソッド名は **P4-X = `CheckTask_1_4_0X`** に揃えた。
+
+| P4（taskId） | 現行メソッド | Legacy メソッド（参照元） | 検証メモ |
+|--------------|-------------|-------------------------|----------|
+| P4-1 (1) | `CheckTask_1_4_01` | 旧1-7 (`CheckTask_1_1_07`) | 「教育者必見」テキスト |
+| P4-2 (2) | `CheckTask_1_4_02` | 旧5-2 (`CheckTask_1_5_02`) | スライド4・アクセント1塗り |
+| P4-3 (3) | `CheckTask_1_4_03` | 旧4-2 相当（新規） | 光彩18pt・アクセント6 |
+| P4-4 (4) | `CheckTask_1_4_04` | 旧4-1 (`CheckTask_1_4_01`) | 楕円ぼかし+テクスチャライザー |
+| P4-5 (5) | `CheckTask_1_4_05` | 旧4-5 (`CheckTask_1_4_05`) | 画像上端揃え |
+| P4-6 (6) | `CheckTask_1_4_06` | 旧4-4 (`CheckTask_1_4_04`) | スライド5右画像トリミング |
+| P4-7 (7) | `CheckTask_1_4_07` | 旧11-3 (`CheckTask_1_11_03`) | スライド2・アクセント1塗り60％・濃い青枠線0.75pt |
+| P4-8 (8) | `CheckTask_1_4_08` | 旧11-6 (`CheckTask_1_11_06`) | スライド3・垂直中央 |
+
 ## 破壊的操作免除一覧（`PPTaskValidationConfig`）
 
-**日常の参照は本セクション（MD）を主とする。** 旧 taskId のコード確認は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（P3 完了時点スナップショット）。それでも不明なときのみ `git log -p -- Libraries/PPTaskValidationConfig.cs`。
+**日常の参照は本セクション（MD）を主とする。** 旧 `(projectId, taskId)` のコード確認は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（**凍結・編集禁止**）。それでも不明なときのみ `git log -p -- Libraries/PPTaskValidationConfig.cs`。
+
+### 破壊的操作 config の更新ルール
+
+| ファイル | Px 実装時 | 役割 |
+|----------|-----------|------|
+| `Libraries/PPTaskValidationConfig.cs` | **更新する** | 実行時の正（Grader / スナップショット比較） |
+| `PowerPointAddIn1/ThisAddIn.cs` | **更新する** | VSTO リアルタイム監視（デルタ判定は config と同期） |
+| `tasks/PP_類題採点対応表.md` | **更新する** | 人間向け一覧（本セクション） |
+| `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs` | **更新しない** | P3 完了時点の旧番号スナップショット（Checker Legacy と同様） |
+
+> Legacy を誤って編集しても**採点結果は変わらない**（ビルド対象外）。壊れるのは旧番号の移植参照のみ。詳細は `Libraries/Legacy/README.md`。
 
 - **現行 config の正**: `Libraries/PPTaskValidationConfig.cs`（実行時はここだけ有効）
 - **VSTO 重複**: `PowerPointAddIn1/ThisAddIn.cs` にデルタ判定のコピーあり → config 変更時は両方更新
-- **taskId**: P1/P2/P3 は **新番号（Px-X = taskId）**。projectId 4〜11 は **旧番号のまま**（P4 実装時に付け替え予定）
+- **taskId**: P1/P2/P3/P4 は **新番号（Px-X = taskId）**。projectId 5〜11 は **旧番号のまま**（P5 実装時に付け替え予定）
 - **AnimationRemoved**: `SlidesCount` または `ShapesCount` 免除時に自動付与（P1 の 1-1/1-3/1-8 を除く）
 
 ### 列の凡例
@@ -197,13 +223,26 @@
 | 6 (P3-6) | 旧3-4 | Shapes, Position | 全スライド: 0 or +3 | 新規のみ | タイトル指定のためスライド番号非固定。配置はタイトルPH下端に0pt隙間許容 |
 | 7 (P3-7) | — | Shapes, **Text**, Position | スライド2: 0 or +2、スライド1: 0 or +1 | 無制限（副作用） | COM: ラベル下に対応セクションへのズーム必須（入れ替え×）。破壊的: セクション操作の副作用を許容 |
 
-### 旧 projectId 4〜11（P4 実装前・config は旧番号のまま）
+### P4（projectId=4, taskId=P4-X）
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|------|
+| 1 (P4-1) | 旧1-7 | Text | スライド1: 無制限、他0 | — | テキスト入力のみ |
+| 2 (P4-2) | 旧5-2 | なし | — | — | 文字色変更のみ |
+| 3 (P4-3) | 旧4-2 | なし | — | — | 図の効果（光彩） |
+| 4 (P4-4) | 旧4-1 | なし | — | — | スタイル+アート効果 |
+| 5 (P4-5) | 旧4-5 | Position | — | 上限1 | 画像上端揃え |
+| 6 (P4-6) | 旧4-4 | Position | — | 上限1 | トリミング |
+| 7 (P4-7) | 旧11-3 | なし | — | — | アクセント1塗り60％・濃い青枠線0.75pt |
+| 8 (P4-8) | 旧11-6 | Position | — | 上限1 | 垂直中央配置 |
+
+### 旧 projectId 4〜11（P5 実装前・config は旧番号のまま）
 
 | projectId | taskId | 旧タスク | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 将来の新タスク（参考） |
 |-----------|--------|----------|-----------|-------------|-------------|-------------|----------------------|
-| 4 | 4 | 旧4-4 | Position | — | — | 上限1 | P4-6 |
-| 4 | 5 | 旧4-5 | Position | — | — | 上限1 | P4-5, P5-1 |
-| 4 | 6 | 旧4-6 | Position | — | — | 新規のみ | P5-4 |
+| 4 | 4 | 旧4-4 | Position | — | — | 上限1 | → **P4-6** に移植済み |
+| 4 | 5 | 旧4-5 | Position | — | — | 上限1 | → **P4-5**, P5-1 |
+| 4 | 6 | 旧4-6 | Position | — | — | 新規のみ | → **P5-4** |
 | 5 | 3 | 旧5-3 | Shapes, Position | 全スライド: 0 | — | 新規のみ | P5-3 |
 | 5 | 4 | 旧5-4 | Shapes, Position | — | — | 上限1 | P5-2 |
 | 5 | 5 | 旧5-5 | Shapes, Position | スライド3: 0 or -2 | — | 新規のみ | P5-5 |
@@ -229,10 +268,10 @@
 | (3, 4) 旧3-4 スライドズーム | P3-6 (3,6)、P1-8 (1,8) は別設定 | `PPTaskValidationConfig.Legacy.cs` の case 6 / 1-8 |
 | (6, 3) 旧6-3 3D挿入 | P3-4 (3, 4) | Legacy の `projectId == 6 && taskId == 3` |
 | (6, 4) 旧6-4 3Dサイズ | P3-5 (3, 5) | Legacy の `projectId == 6 && taskId == 4` |
-| (4, 5) 旧4-5 画像配置 | P4-5, P5-1（未実装） | Legacy の case 5 |
+| (4, 5) 旧4-5 画像配置 | P4-5 (4,5)、P5-1 (5,1) | Legacy の `projectId==4 && taskId==5`（**旧番号**。現行 P4-5 は config の projectId=4 taskId=5） |
 | (5, 1) 旧5-1 印刷 | P6-5, P6-7（未実装） | 現行 config に該当行なし（免除なし） |
 
-> P4 着手時: 上記「旧 4〜11」表の該当行を **新 projectId=4, taskId=P4-X** に書き換え、本表と Legacy を更新すること。
+> P5 着手時: 上記「旧 5〜11」表と **Legacy（凍結）** の旧番号行を参照し、現行 `PPTaskValidationConfig.cs` と本 MD の P5 セクションに書き換える。**Legacy ファイル自体は更新しない。**
 
 ## 要注意（旧タスクの再利用）
 
@@ -259,7 +298,7 @@
 - [ ] **P1**（8 タスク）— 完了確認中
 - [x] **P2**（8 タスク）— 完了（P2-4 累積採点の既知課題あり）
 - [x] **P3**（7 タスク）— 完了（採点・破壊的操作とも検証済み）
-- [ ] **P4**（8 タスク）— 未着手
+- [ ] **P4**（8 タスク）— 実装済み・検証待ち
 - [ ] **P5**（7 タスク）— 未着手
 - [ ] **P6**（7 タスク）— 未着手
 - [ ] **P7**（5 タスク）— 未着手
@@ -272,4 +311,5 @@
 1. **P1** — 検証・コミット
 2. ~~**P2**~~ — 完了
 3. ~~**P3**~~ — 完了
-4. **P4 以降** — 上書きリスク表を確認してから着手
+4. **P4** — 実装済み・手動検証待ち
+5. **P5 以降** — 上書きリスク表を確認してから着手

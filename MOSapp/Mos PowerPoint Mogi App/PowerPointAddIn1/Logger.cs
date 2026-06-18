@@ -6,7 +6,7 @@ namespace PowerPointAddIn1
 {
     /// <summary>
     /// PowerPoint 操作ログを記録するクラス。
-    /// mos_ppt_log.txt に全般を記録するほか、5-1/10-4/11-7 の採点根拠は mos_ppt_task_evidence.txt にも追記する（単体リセットでメインログが消されても採点可能にする）。
+    /// mos_ppt_log.txt に全般を記録するほか、4-3/5-1/10-4/11-7 の採点根拠は mos_ppt_task_evidence.txt にも追記する（単体リセットでメインログが消されても採点可能にする）。
     /// </summary>
     public static class Logger
     {
@@ -81,6 +81,12 @@ namespace PowerPointAddIn1
         public static void LogTask11_7Print()
         {
             LogTaskTag("Task11-7", "Print");
+        }
+
+        /// <summary>4-3: スライド1画像に光彩18pt・アクセント6を適用したことを記録。</summary>
+        public static void LogTask4_3Glow()
+        {
+            LogTaskTag("Task4-3", "Glow18Accent6");
         }
 
         /// <summary>1-2: スライド2の複製状態（2,3枚目同レイアウト）を検出したことを記録。</summary>
@@ -212,6 +218,7 @@ namespace PowerPointAddIn1
                         || string.Equals(taskTag, "Task1-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task1-4", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task1-8", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task4-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal))

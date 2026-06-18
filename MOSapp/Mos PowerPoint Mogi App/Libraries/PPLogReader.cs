@@ -9,7 +9,7 @@ namespace Libraries
 {
     /// <summary>
     /// PowerPoint VSTO アドインで生成されたログファイルを読み込むユーティリティ。
-    /// メインログ（mos_ppt_log.txt）に加え、1-2/1-3/1-4/1-8/5-1/10-4/11-7 用の採点証跡（mos_ppt_task_evidence.txt）を扱う。
+    /// メインログ（mos_ppt_log.txt）に加え、1-2/1-3/1-4/1-8/4-3/5-1/10-4/11-7 用の採点証跡（mos_ppt_task_evidence.txt）を扱う。
     /// </summary>
     public static class PPLogReader
     {
@@ -41,7 +41,7 @@ namespace Libraries
 
         /// <summary>
         /// 採点用証跡ログのパス（%TEMP%\mos_ppt_task_evidence.txt）。
-        /// 1-2/1-3/1-4/1-8/5-1/10-4/11-7 など、単体プロジェクトリセット後も採点に必要な行だけを VSTO が追記する。
+        /// 1-2/1-3/1-4/1-8/4-3/5-1/10-4/11-7 など、単体プロジェクトリセット後も採点に必要な行だけを VSTO が追記する。
         /// <see cref="ClearLog"/> では消えない。全プロジェクトリセット時に <see cref="ClearTaskEvidence"/> で消す。
         /// </summary>
         public static string GetTaskEvidenceLogPath()
@@ -122,7 +122,7 @@ namespace Libraries
 
         /// <summary>
         /// 単体プロジェクトリセット時、そのプロジェクトのログ依存採点タスクに対応する証跡行だけを削除する。
-        /// 1→1-2/1-3/1-4/1-8、5→5-1、10→10-4、11→11-7。他プロジェクトでは何もしない。
+        /// 1→1-2/1-3/1-4/1-8、4→4-3、5→5-1、10→10-4、11→11-7。他プロジェクトでは何もしない。
         /// </summary>
         public static void ClearTaskEvidenceForProject(int projectId)
         {
@@ -181,6 +181,8 @@ namespace Libraries
                     };
                 case 5:
                     return new[] { "[Task5-1] Print" };
+                case 4:
+                    return new[] { "[Task4-3] Glow18Accent6" };
                 case 10:
                     return new[] { "[Task10-4] Grayscale" };
                 case 11:
@@ -226,6 +228,12 @@ namespace Libraries
         public static bool HasTask10_4GrayscaleExecuted()
         {
             return HasGradingEvidenceMarker("[Task10-4] Grayscale");
+        }
+
+        /// <summary>証跡またはメインログに 4-3 光彩設定記録（[Task4-3] Glow18Accent6）が含まれるか。</summary>
+        public static bool HasTask4_3GlowExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task4-3] Glow18Accent6");
         }
 
         /// <summary>証跡またはメインログに 5-1 の印刷記録（[Task5-1] Print）が含まれるか。</summary>

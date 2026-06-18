@@ -6,6 +6,7 @@ using System.Text;
 using System.Xml.Linq;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using Libraries;
 using PowerPoint = Microsoft.Office.Interop.PowerPoint;
 using Office = Microsoft.Office.Core;
 
@@ -19,6 +20,8 @@ namespace PowerPointAddIn1
         private bool _lastBlackAndWhite;
         private Timer _audio8_4PollTimer;
         private bool _task8_4Logged;
+        private Timer _glow4_3PollTimer;
+        private bool _task4_3GlowLogged;
         private Timer _layout10_7PollTimer;
         private bool _task10_7Logged;
         private Timer _printOptionsPollTimer;
@@ -76,6 +79,12 @@ namespace PowerPointAddIn1
             _audio8_4PollTimer.Interval = 1000;
             _audio8_4PollTimer.Tick += Audio8_4PollTimer_Tick;
             _audio8_4PollTimer.Start();
+
+            _task4_3GlowLogged = false;
+            _glow4_3PollTimer = new Timer();
+            _glow4_3PollTimer.Interval = 1000;
+            _glow4_3PollTimer.Tick += Glow4_3PollTimer_Tick;
+            _glow4_3PollTimer.Start();
 
             _task10_7Logged = false;
             _layout10_7PollTimer = new Timer();
@@ -151,6 +160,11 @@ namespace PowerPointAddIn1
                 {
                     TryLogTask11_7PrintOnTaskBoundary();
                 }
+                // 4-3 は光彩が 4-4 で外れるため、離脱直前に COM/OpenXML で証跡を確定する。
+                if (_currentTaskProjectId == 4 && _currentTaskTaskId == 3)
+                {
+                    TryLogTask4_3GlowOnTaskBoundary();
+                }
 
                 // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
                 // ※ プロジェクトIDが変わる場合は、比較対象のプレゼンテーションが異なるためスキップする
@@ -178,6 +192,7 @@ namespace PowerPointAddIn1
                     _task1_4PrevPresentationKey = null;
                 }
                 if (!(projectId == 1 && taskId == 8)) _task1_8Logged = false;
+                if (!(projectId == 4 && taskId == 3)) _task4_3GlowLogged = false;
 
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
@@ -628,7 +643,6 @@ namespace PowerPointAddIn1
         private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
-            if (projectId == 4 && taskId == 6) return true; // 4-6
             if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3, 5-5
             if (projectId == 6 && taskId == 3) return true; // 6-3
             if (projectId == 9 && taskId == 1) return true; // 9-1
@@ -638,8 +652,9 @@ namespace PowerPointAddIn1
 
         private int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
         {
-            if (projectId == 4 && taskId == 4) return 1; // 4-4
-            if (projectId == 4 && taskId == 5) return 1; // 4-5
+            if (projectId == 4 && taskId == 5) return 1; // P4-5
+            if (projectId == 4 && taskId == 6) return 1; // P4-6
+            if (projectId == 4 && taskId == 8) return 1; // P4-8
             if (projectId == 5 && taskId == 4) return 1; // 5-4
             if (projectId == 3 && taskId == 5) return 1; // P3-5
             // P3-7: section zoom side effects on multiple slides — no cap (-1). ShapesCount still strict per slide.
@@ -686,6 +701,8 @@ namespace PowerPointAddIn1
                 return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 8)
                 return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 4 && taskId == 1)
+                return slideIndex == 1 ? int.MaxValue : 0; // P4-1
 
             // 変換、削除、インポートなど文字数が可変なものはチェックを省略
             return int.MaxValue;
@@ -1096,6 +1113,238 @@ namespace PowerPointAddIn1
             catch { }
         }
 
+        private void Glow4_3PollTimer_Tick(object sender, EventArgs e)
+        {
+            if (_task4_3GlowLogged) return;
+            if (!IsCurrentTask(4, 3)) return;
+            try
+            {
+                TryDetectAndLogTask4_3Glow();
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 4-3 から離脱する直前に光彩を即時確認し、条件一致なら証跡ログを確定する。
+        /// </summary>
+        private void TryLogTask4_3GlowOnTaskBoundary()
+        {
+            try
+            {
+                TryDetectAndLogTask4_3Glow();
+            }
+            catch { }
+        }
+
+        private bool TryDetectAndLogTask4_3Glow()
+        {
+            if (_task4_3GlowLogged) return true;
+            if (!TryDetectTask4_3GlowOnActivePresentation())
+                return false;
+
+            Logger.LogTask4_3Glow();
+            _task4_3GlowLogged = true;
+            return true;
+        }
+
+        private bool TryDetectTask4_3GlowOnActivePresentation()
+        {
+            if (Application == null || Application.Presentations == null) return false;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return false;
+
+                PowerPoint.Slides slides = null;
+                PowerPoint.Slide slide = null;
+                PowerPoint.Shapes shapes = null;
+                try
+                {
+                    slides = pres.Slides;
+                    if (slides == null || slides.Count < 1) return false;
+                    slide = slides[1];
+                    if (slide == null) return false;
+                    shapes = slide.Shapes;
+                    if (shapes != null && HasTask4_3Glow18Accent6Com(shapes))
+                        return true;
+                }
+                finally
+                {
+                    if (shapes != null) try { Marshal.ReleaseComObject(shapes); } catch { }
+                    if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+                }
+
+                string tempPath = Path.Combine(Path.GetTempPath(), "mos_4_3_vsto_" + Guid.NewGuid().ToString("N") + ".pptx");
+                try
+                {
+                    pres.SaveCopyAs(tempPath);
+                    return PptxGlowOpenXmlReader.ContainsGlow18ptAccent6OnSlide(tempPath, 1);
+                }
+                finally
+                {
+                    if (File.Exists(tempPath))
+                    {
+                        try { File.Delete(tempPath); } catch { }
+                    }
+                }
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool HasTask4_3Glow18Accent6Com(PowerPoint.Shapes shapes)
+        {
+            if (shapes == null) return false;
+            int count = 0;
+            try { count = shapes.Count; } catch { return false; }
+            for (int i = 1; i <= count; i++)
+            {
+                PowerPoint.Shape sh = null;
+                try
+                {
+                    sh = shapes[i];
+                    if (HasTask4_3Glow18Accent6Com(sh))
+                        return true;
+                }
+                finally
+                {
+                    if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { }
+                }
+            }
+            return false;
+        }
+
+        private static bool HasTask4_3Glow18Accent6Com(PowerPoint.GroupShapes group)
+        {
+            if (group == null) return false;
+            int count = 0;
+            try { count = group.Count; } catch { return false; }
+            for (int i = 1; i <= count; i++)
+            {
+                PowerPoint.Shape sh = null;
+                try
+                {
+                    sh = group[i];
+                    if (HasTask4_3Glow18Accent6Com(sh))
+                        return true;
+                }
+                finally
+                {
+                    if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { }
+                }
+            }
+            return false;
+        }
+
+        private static bool HasTask4_3Glow18Accent6Com(PowerPoint.Shape sh)
+        {
+            if (sh == null) return false;
+
+            try
+            {
+                if (sh.Type == Office.MsoShapeType.msoGroup)
+                {
+                    PowerPoint.GroupShapes group = null;
+                    try
+                    {
+                        group = sh.GroupItems;
+                        return HasTask4_3Glow18Accent6Com(group);
+                    }
+                    finally
+                    {
+                        if (group != null) try { Marshal.ReleaseComObject(group); } catch { }
+                    }
+                }
+            }
+            catch { }
+
+            if (!IsTask4_3PictureCandidate(sh))
+                return false;
+
+            dynamic glow = null;
+            try
+            {
+                glow = sh.Glow;
+                if (glow == null) return false;
+
+                float radius = 0f;
+                try { radius = (float)glow.Radius; } catch { }
+                if (radius < 14f || radius > 22f) return false;
+
+                PowerPoint.ColorFormat cf = null;
+                try
+                {
+                    cf = glow.Color;
+                    if (cf == null) return false;
+                    try
+                    {
+                        if (cf.ObjectThemeColor == Office.MsoThemeColorIndex.msoThemeColorAccent6)
+                            return true;
+                    }
+                    catch { }
+
+                    try
+                    {
+                        int rgb = (int)cf.RGB;
+                        int r = rgb & 0xFF;
+                        int g = (rgb >> 8) & 0xFF;
+                        int b = (rgb >> 16) & 0xFF;
+                        if (r >= 60 && r <= 140 && g >= 140 && g <= 210 && b >= 40 && b <= 120)
+                            return true;
+                    }
+                    catch { }
+                }
+                finally
+                {
+                    if (cf != null) try { Marshal.ReleaseComObject(cf); } catch { }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (glow != null) try { Marshal.ReleaseComObject(glow); } catch { }
+            }
+
+            return false;
+        }
+
+        private static bool IsTask4_3PictureCandidate(PowerPoint.Shape sh)
+        {
+            if (sh == null) return false;
+            try
+            {
+                int t = (int)sh.Type;
+                if (t == (int)Office.MsoShapeType.msoPicture || t == 11)
+                    return true;
+                if (sh.Type != Office.MsoShapeType.msoPlaceholder)
+                    return false;
+
+                PowerPoint.PlaceholderFormat pf = null;
+                try
+                {
+                    pf = sh.PlaceholderFormat;
+                    if (pf != null && pf.ContainedType == Office.MsoShapeType.msoPicture)
+                        return true;
+                }
+                catch { }
+                finally
+                {
+                    if (pf != null) try { Marshal.ReleaseComObject(pf); } catch { }
+                }
+
+                string name = null;
+                try { name = sh.Name; } catch { }
+                name = (name ?? string.Empty).ToLowerInvariant();
+                return name.Contains("picture") || name.Contains("画像") || name.Contains("図");
+            }
+            catch { return false; }
+        }
+
         private void GrayscalePollTimer_Tick(object sender, EventArgs e)
         {
             if (!IsCurrentTask(10, 4))
@@ -1391,6 +1640,12 @@ namespace PowerPointAddIn1
                 _layout10_7PollTimer.Stop();
                 _layout10_7PollTimer.Dispose();
                 _layout10_7PollTimer = null;
+            }
+            if (_glow4_3PollTimer != null)
+            {
+                _glow4_3PollTimer.Stop();
+                _glow4_3PollTimer.Dispose();
+                _glow4_3PollTimer = null;
             }
             if (_grayscalePollTimer != null)
             {

@@ -32,4 +32,5 @@ P1 改修前の旧採点ロジック参照用。**ビルド対象外**（`.cspro
 ## 注意
 
 - クラス名は現行と同じ `PowerPointChecker1_X` のため、本フォルダを Compile に含めると重複エラーになる
-- P{N} 実装完了時に `PowerPointChecker1_N.cs` が上書きされても、Legacy は残る
+- P{N} 実装完了時に `PowerPointChecker1_N.cs` が上書きされても、Legacy は残る（**編集しない**）
+- 破壊的操作の Legacy は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（Checker Legacy とは別フォルダ。同じく**凍結**）

@@ -90,10 +90,12 @@ namespace Libraries
             {
                 switch (taskId)
                 {
-                    case 4: // 4-4 画像のトリミング
-                    case 5: // 4-5 画像の配置
-                    case 6: // 4-6 順序入れ替え
-                        // 画像のサイズや重なり順、座標が変化するため、ShapePosition免除が必要
+                    case 1: // P4-1 テキスト入力（教育者必見）
+                        flags |= PPValidationExemptFlags.TextLength;
+                        break;
+                    case 5: // P4-5 画像の配置
+                    case 6: // P4-6 画像のトリミング
+                    case 8: // P4-8 テキストボックス垂直中央配置
                         flags |= PPValidationExemptFlags.ShapePosition;
                         break;
                 }
@@ -548,6 +550,8 @@ namespace Libraries
                 return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 8)
                 return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 4 && taskId == 1)
+                return slideIndex == 1 ? int.MaxValue : 0; // P4-1 スライド1へのテキスト入力
 
             // 変換、削除、インポートなど文字数が可変なものはチェックを省略
             return int.MaxValue;
@@ -616,7 +620,6 @@ namespace Libraries
         public static bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
-            if (projectId == 4 && taskId == 6) return true; // 4-6 順序入れ替え (座標は不変)
             if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3 図形変更, 5-5 グループ化
             if (projectId == 6 && taskId == 3) return true; // 6-3 3Dモデル挿入
             if (projectId == 9 && taskId == 1) return true; // 9-1 グラフ作成
@@ -630,8 +633,9 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
         {
-            if (projectId == 4 && taskId == 4) return 1; // 4-4 画像のトリミング
-            if (projectId == 4 && taskId == 5) return 1; // 4-5 画像の配置
+            if (projectId == 4 && taskId == 5) return 1; // P4-5 画像の配置
+            if (projectId == 4 && taskId == 6) return 1; // P4-6 画像のトリミング
+            if (projectId == 4 && taskId == 8) return 1; // P4-8 垂直中央配置
             if (projectId == 5 && taskId == 4) return 1; // 5-4 図形のサイズ変更
             if (projectId == 3 && taskId == 5) return 1; // P3-5 3Dモデルのサイズ変更
             // P3-7: セクションズームの副作用で複数スライドの既存図形がずれるため上限なし（-1）。図形数は GetAllowedShapesCountDelta で厳格化。
