@@ -48,18 +48,25 @@ namespace New_MOSWordVSTOAddIn
         private int _suppressOrientationPollLogs;
         private int _suppressPageBorderPollLogs;
         private int _suppressStyleSetPollLogs;
+        private int _suppressResolvePollLogs;
+        private int _suppressDeletePollLogs;
         private int _heavyCheckTickCounter;
 
-        /// <summary>4-3: 吹き出しに「エコと節約」があり未解決のコメント数。ポーリングで 1→0 になったときログする。</summary>
+        /// <summary>4-3: 未解決エコ件数。1→0 で ReviewResolveComment を補完ログ。</summary>
         private int _lastUnresolvedEcoCommentCount = -1;
 
-        /// <summary>4-3: 吹き出しに「エコと節約」が含まれるコメントが1件でもあるか（解決済み含む）。解決済みのみ残っている教材で削除したときの検知用。</summary>
+        /// <summary>4-3: エコ関連コメント総数（解決済み含む）。0 へ減ったら削除ログ候補。</summary>
+        private int _lastEcoRelatedCommentCount = -1;
+
+        /// <summary>4-3: Comment.Index → Done の前回値。</summary>
+        private readonly Dictionary<int, bool> _ecoCommentDoneByIndex = new Dictionary<int, bool>();
+
+        /// <summary>4-3: 当該試行で ReviewResolveComment を記録済みか。</summary>
+        private bool _ecoResolveLoggedForAttempt;
+
         private bool? _lastAnyEcoPhraseInBalloons;
 
         private string _ecoBaselineDocumentKey;
-
-        /// <summary>4-3: 前ティックの Comments.Count。吹き出し本文が Range で読めない環境でも削除を検知する。</summary>
-        private int _lastCommentsCountForEco = -1;
 
         /// <summary>7-1: 前ティックの ActiveDocument.FullName（文書切替でベースライン再取得するため）</summary>
         private string _p7LastCompatDocFullName;
@@ -105,6 +112,12 @@ namespace New_MOSWordVSTOAddIn
             _suppressStyleSetPollLogs = 2;
         }
 
+        internal void RegisterRibbonLoggedReviewDeleteComment()
+        {
+            _suppressResolvePollLogs = 3;
+            _suppressDeletePollLogs = 2;
+        }
+
         internal void RegisterRibbonLoggedWatermark()
         {
             _suppressWatermarkPollLogs = 2;
@@ -125,6 +138,28 @@ namespace New_MOSWordVSTOAddIn
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ThisAddIn] SyncWatermarkPollingBaselineOnTaskSwitch: " + ex.Message);
+            }
+        }
+
+        /// <summary>4-3 開始時: 未解決エコ件数のベースラインを現文書から再取得する。</summary>
+        internal void SyncEcoCommentBaselineOnTaskSwitch(int projectId, int taskId)
+        {
+            if (projectId != 4 || taskId != 3)
+                return;
+            _lastUnresolvedEcoCommentCount = -1;
+            _lastEcoRelatedCommentCount = -1;
+            _ecoBaselineDocumentKey = null;
+            _ecoCommentDoneByIndex.Clear();
+            _ecoResolveLoggedForAttempt = false;
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(projectId);
+                if (doc != null)
+                    SeedEcoCommentBaseline(doc);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] SyncEcoCommentBaselineOnTaskSwitch: " + ex.Message);
             }
         }
 
@@ -322,21 +357,21 @@ namespace New_MOSWordVSTOAddIn
             // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
             Word.Document doc = app.ActiveDocument;
 
-                // 1-1: ベースラインも View.ShowAll のみ（採点・ポーリングと一致）
                 if (app.ActiveWindow?.View != null)
                     _lastShowAllState = app.ActiveWindow.View.ShowAll;
+
+                // 4-3: コメントペイン操作中も未解決件数の遷移を追跡（軽量のため defer より前に実行）
+                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
 
                 // ナビペイン・検索ダイアログ・コメントペイン操作中は侵入的 COM をスキップ
                 if (ShouldDeferIntrusiveDocumentCom(app))
                     return;
 
-                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
-
                 _lastColumnBreakCount = CountColumnBreaks(doc);
                 _lastMarginsModerate = IsMarginsModeratePreset(doc);
                 _lastOrientationFingerprint = GetAllSectionsOrientationFingerprint(doc);
                 _lastPageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
-                _lastHeading1LineSimple = IsHeading1LineSimplePattern(doc);
+                _lastHeading1LineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
 
                 ApplyWatermarkPollingBaseline(doc);
@@ -370,7 +405,7 @@ namespace New_MOSWordVSTOAddIn
                 }
         }
 
-        /// <summary>4-3: 未解決エコ件数の変化を追跡。1→0 のとき解決/削除をログ。加えて「エコ」吹き出しが true→false（解決済みスレッドの削除など）でも ReviewDeleteComment をログする。</summary>
+        /// <summary>4-3: 解決（Done）・削除（件数0）を検知して証跡を記録。</summary>
         private void UpdateEcoCommentBaselineAndMaybeLog(Word.Document doc, int newUnresolvedEcoCount)
         {
             try
@@ -384,53 +419,109 @@ namespace New_MOSWordVSTOAddIn
                     {
                         _ecoBaselineDocumentKey = key;
                         _lastUnresolvedEcoCommentCount = -1;
+                        _lastEcoRelatedCommentCount = -1;
                         _lastAnyEcoPhraseInBalloons = null;
-                        _lastCommentsCountForEco = -1;
+                        _ecoCommentDoneByIndex.Clear();
+                        _ecoResolveLoggedForAttempt = false;
                     }
                 }
             }
             catch { }
 
-            bool anyPhrase = false;
-            try
-            {
-                if (doc != null)
-                    anyPhrase = DocumentHasAnyEcoCommentBalloonPoll(doc);
-            }
-            catch { }
+            bool resolveLoggedThisTick = DetectEcoCommentDoneTransitions(doc);
 
+            int ecoRelatedCount = CountEcoRelatedComments(doc);
+            bool anyPhrase = ecoRelatedCount > 0;
+
+            // 未解決→0 は「解決」または「削除」で起きる。コメントがまだ残っているときだけ解決とみなす。
             bool willLogUnresolved = _lastUnresolvedEcoCommentCount >= 0 && _lastUnresolvedEcoCommentCount > 0 && newUnresolvedEcoCount == 0;
-            bool phraseDisappeared = _lastAnyEcoPhraseInBalloons == true && !anyPhrase && doc != null;
+            int prevUnresolved = _lastUnresolvedEcoCommentCount;
+            int prevEcoRelated = _lastEcoRelatedCommentCount;
 
-            int cc = -1;
-            try
-            {
-                if (doc != null && doc.Comments != null)
-                    cc = doc.Comments.Count;
-            }
-            catch { cc = -1; }
+            if (willLogUnresolved && doc != null && ecoRelatedCount > 0)
+                TryLogReviewResolveComment();
 
-            bool commentCountDropped = _lastCommentsCountForEco >= 0 && cc >= 0 && cc < _lastCommentsCountForEco;
-
-            if (willLogUnresolved && doc != null)
+            // 削除ログ: 解決済みのあと削除された場合のみ（削除のみでは prevUnresolved>0 のまま消える）
+            bool deleteOnlySuspect = prevUnresolved > 0 && ecoRelatedCount == 0 && !resolveLoggedThisTick;
+            if (prevEcoRelated > 0 && ecoRelatedCount == 0 && _ecoResolveLoggedForAttempt && !deleteOnlySuspect)
             {
-                bool stillHasEcoBalloon = anyPhrase;
-                string commandId = stillHasEcoBalloon ? "ReviewResolveComment" : "ReviewDeleteComment";
-                WordEvidenceHelper.LogCommandWithEvidence(commandId);
-            }
-            else if (phraseDisappeared)
-            {
-                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
-            }
-            else if (commentCountDropped && doc != null && IsProject4CommentTaskActive() && DocumentBodyContainsEcoPhraseForTask4_3(doc))
-            {
-                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
+                if (_suppressDeletePollLogs > 0)
+                    _suppressDeletePollLogs--;
+                else
+                    WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
             }
 
             _lastUnresolvedEcoCommentCount = newUnresolvedEcoCount;
+            _lastEcoRelatedCommentCount = ecoRelatedCount;
             _lastAnyEcoPhraseInBalloons = anyPhrase;
-            if (cc >= 0)
-                _lastCommentsCountForEco = cc;
+        }
+
+        private void SeedEcoCommentBaseline(Word.Document doc)
+        {
+            _ecoCommentDoneByIndex.Clear();
+            foreach (Word.Comment c in doc.Comments)
+            {
+                try
+                {
+                    if (!CommentRelatesToEcoPhrasePoll(c, doc))
+                        continue;
+                    bool done = false;
+                    try { done = c.Done; } catch { }
+                    _ecoCommentDoneByIndex[c.Index] = done;
+                }
+                finally
+                {
+                    Marshal.ReleaseComObject(c);
+                }
+            }
+            int unresolved = CountUnresolvedEcoComments(doc);
+            int related = CountEcoRelatedComments(doc);
+            _lastUnresolvedEcoCommentCount = unresolved;
+            _lastEcoRelatedCommentCount = related;
+            _lastAnyEcoPhraseInBalloons = related > 0;
+        }
+
+        private bool DetectEcoCommentDoneTransitions(Word.Document doc)
+        {
+            if (doc?.Comments == null)
+                return false;
+            bool loggedResolve = false;
+            var seen = new HashSet<int>();
+            foreach (Word.Comment c in doc.Comments)
+            {
+                try
+                {
+                    if (!CommentRelatesToEcoPhrasePoll(c, doc))
+                        continue;
+                    int idx = c.Index;
+                    seen.Add(idx);
+                    bool done = false;
+                    try { done = c.Done; } catch { }
+                    if (_ecoCommentDoneByIndex.TryGetValue(idx, out bool wasDone) && !wasDone && done)
+                        loggedResolve |= TryLogReviewResolveComment();
+                    _ecoCommentDoneByIndex[idx] = done;
+                }
+                finally
+                {
+                    Marshal.ReleaseComObject(c);
+                }
+            }
+            var stale = _ecoCommentDoneByIndex.Keys.Where(k => !seen.Contains(k)).ToList();
+            foreach (int k in stale)
+                _ecoCommentDoneByIndex.Remove(k);
+            return loggedResolve;
+        }
+
+        private bool TryLogReviewResolveComment()
+        {
+            if (_suppressResolvePollLogs > 0)
+            {
+                _suppressResolvePollLogs--;
+                return false;
+            }
+            WordEvidenceHelper.LogCommandWithEvidence("ReviewResolveComment");
+            _ecoResolveLoggedForAttempt = true;
+            return true;
         }
 
         /// <summary>
@@ -464,6 +555,16 @@ namespace New_MOSWordVSTOAddIn
                 SyncNavigationPaneOpenState(app);
                 // View.ShowAll の読み取りのみ。Selection / ScreenUpdating は触らない（Copilot 等の UI 点滅を抑える）。
                 UpdateShowAllPolling(app);
+                if (IsProject4CommentTaskActive())
+                {
+                    try
+                    {
+                        Word.Document doc = app.ActiveDocument;
+                        if (doc != null)
+                            UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+                    }
+                    catch { }
+                }
             }
             catch { /* ignore */ }
         }
@@ -593,14 +694,15 @@ namespace New_MOSWordVSTOAddIn
 
         private void ShowAllPoll_TickCore(Word.Application app)
         {
-            // ナビペイン・Ctrl+F 検索・コメントペイン操作中は eco コメント・heavy Find 等の侵入的 COM を止める
-            if (ShouldDeferIntrusiveDocumentCom(app))
-                return;
-
             // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
             Word.Document doc = app.ActiveDocument;
 
-                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+            // 4-3: コメントペイン操作中も未解決件数の遷移を追跡
+            UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+
+            // ナビペイン・Ctrl+F 検索・コメントペイン操作中は heavy Find 等の侵入的 COM を止める
+            if (ShouldDeferIntrusiveDocumentCom(app))
+                return;
 
                 // 7-4/7-5: FullName のみの軽量検知（毎ティック≈1.2秒）。重いポーリング（約6秒）だと次プロジェクト押下前に取りこぼす。
                 try
@@ -669,7 +771,7 @@ namespace New_MOSWordVSTOAddIn
                     }
                     _lastPageBorderFingerprint = borderFp;
 
-                    bool lineSimple = IsHeading1LineSimplePattern(doc);
+                    bool lineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
                     if (_lastHeading1LineSimple.HasValue && lineSimple && !_lastHeading1LineSimple.Value)
                     {
                         if (_suppressStyleSetPollLogs > 0)
@@ -1082,6 +1184,117 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        private static string _ecoAnchorDocKeyPoll;
+        private static int _ecoAnchorStartPoll = -1;
+        private static int _ecoAnchorEndPoll = -1;
+
+        private static bool TryGetEcoPhraseAnchorPoll(Word.Document doc, out int start, out int end)
+        {
+            start = end = -1;
+            if (doc == null)
+                return false;
+            string key = "";
+            try { key = doc.FullName ?? ""; } catch { }
+            if (!string.IsNullOrEmpty(key) && key == _ecoAnchorDocKeyPoll && _ecoAnchorStartPoll >= 0)
+            {
+                start = _ecoAnchorStartPoll;
+                end = _ecoAnchorEndPoll;
+                return true;
+            }
+            Word.Range searchRange = null;
+            Word.Find find = null;
+            try
+            {
+                if (doc.Content == null)
+                    return false;
+                searchRange = doc.Content.Duplicate;
+                find = searchRange.Find;
+                find.ClearFormatting();
+                find.Text = "エコと節約";
+                find.Forward = true;
+                find.Wrap = Word.WdFindWrap.wdFindStop;
+                find.Format = false;
+                find.Replacement.Text = "";
+                if (!find.Execute())
+                    return false;
+                start = searchRange.Start;
+                end = searchRange.End;
+                _ecoAnchorDocKeyPoll = key;
+                _ecoAnchorStartPoll = start;
+                _ecoAnchorEndPoll = end;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (find != null)
+                {
+                    try { Marshal.ReleaseComObject(find); } catch { }
+                }
+                if (searchRange != null)
+                {
+                    try { Marshal.ReleaseComObject(searchRange); } catch { }
+                }
+            }
+        }
+
+        private static bool CommentAnchorOverlapsEcoPoll(Word.Comment c, Word.Document doc)
+        {
+            if (!TryGetEcoPhraseAnchorPoll(doc, out int ecoStart, out int ecoEnd))
+                return false;
+            Word.Range scope = null;
+            try
+            {
+                scope = c.Scope;
+                if (scope == null)
+                    return false;
+                return scope.Start <= ecoEnd && scope.End >= ecoStart;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (scope != null)
+                {
+                    try { Marshal.ReleaseComObject(scope); } catch { }
+                }
+            }
+        }
+
+        /// <summary>エコ関連コメント総数（解決済み含む）。</summary>
+        private static int CountEcoRelatedComments(Word.Document doc)
+        {
+            if (doc?.Comments == null || doc.Comments.Count == 0)
+                return 0;
+            Word.Comments comments = doc.Comments;
+            int count = 0;
+            try
+            {
+                foreach (Word.Comment c in comments)
+                {
+                    try
+                    {
+                        if (CommentRelatesToEcoPhrasePoll(c, doc))
+                            count++;
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(c);
+                    }
+                }
+                return count;
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(comments);
+            }
+        }
+
         /// <summary>吹き出し（返信含む）に「エコと節約」があり、かつ未解決（Done でない）コメントの件数。</summary>
         private static int CountUnresolvedEcoComments(Word.Document doc)
         {
@@ -1095,7 +1308,7 @@ namespace New_MOSWordVSTOAddIn
                 {
                     try
                     {
-                        if (!CommentHasEcoTextInBalloon(c))
+                        if (!CommentRelatesToEcoPhrasePoll(c, doc))
                             continue;
                         bool done = false;
                         try { done = c.Done; } catch { }
@@ -1151,6 +1364,38 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>「エコと節約」コメントが解決済み（Done）で文書に残っているか。削除との区別に使う。</summary>
+        private static bool DocumentHasResolvedEcoComment(Word.Document doc)
+        {
+            if (doc?.Comments == null || doc.Comments.Count == 0)
+                return false;
+            Word.Comments comments = doc.Comments;
+            try
+            {
+                foreach (Word.Comment c in comments)
+                {
+                    try
+                    {
+                        if (!CommentRelatesToEcoPhrasePoll(c, doc))
+                            continue;
+                        bool done = false;
+                        try { done = c.Done; } catch { }
+                        if (done)
+                            return true;
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(c);
+                    }
+                }
+                return false;
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(comments);
+            }
+        }
+
         /// <summary>いずれかのコメント吹き出し（返信含む）に「エコと節約」があるか。採点側の DocumentHasAnyEcoCommentBalloon と同趣旨。</summary>
         private static bool DocumentHasAnyEcoCommentBalloonPoll(Word.Document doc)
         {
@@ -1163,7 +1408,7 @@ namespace New_MOSWordVSTOAddIn
                 {
                     try
                     {
-                        if (CommentHasEcoTextInBalloon(c))
+                        if (CommentRelatesToEcoPhrasePoll(c, doc))
                             return true;
                     }
                     finally
@@ -1207,6 +1452,17 @@ namespace New_MOSWordVSTOAddIn
             {
                 return false;
             }
+        }
+
+        private static bool CommentRelatesToEcoPhrasePoll(Word.Comment c, Word.Document doc)
+        {
+            if (CommentHasEcoTextInBalloon(c))
+                return true;
+            string scope = "";
+            try { scope = c.Scope?.Text ?? ""; } catch { }
+            if (NormalizedContainsEcoPoll(NormalizeCommentBodyForEcoPoll(scope)))
+                return true;
+            return CommentAnchorOverlapsEcoPoll(c, doc);
         }
 
         private static bool CommentHasEcoTextInBalloon(Word.Comment c)
@@ -1383,67 +1639,6 @@ namespace New_MOSWordVSTOAddIn
                 }
             }
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// WordChecker1_4 の 4-4（線・シンプル）と同条件。
-        /// </summary>
-        private static bool IsHeading1LineSimplePattern(Word.Document document)
-        {
-            Word.Style headingStyle = null;
-            Word.Borders borders = null;
-            Word.Border bottomBorder = null;
-            try
-            {
-                headingStyle = GetHeading1Style(document);
-
-                if (headingStyle == null)
-                    return false;
-
-                borders = headingStyle.ParagraphFormat.Borders;
-                bottomBorder = borders[Word.WdBorderType.wdBorderBottom];
-                return bottomBorder != null
-                       && (Word.WdLineStyle)bottomBorder.LineStyle == Word.WdLineStyle.wdLineStyleSingle
-                       && (Word.WdLineWidth)bottomBorder.LineWidth == Word.WdLineWidth.wdLineWidth050pt;
-            }
-            catch
-            {
-                return false;
-            }
-            finally
-            {
-                if (bottomBorder != null)
-                    Marshal.ReleaseComObject(bottomBorder);
-                if (borders != null)
-                    Marshal.ReleaseComObject(borders);
-                if (headingStyle != null)
-                    Marshal.ReleaseComObject(headingStyle);
-            }
-        }
-
-        /// <summary>
-        /// 表示言語によるスタイル名差異を吸収して Heading 1 を取得する。
-        /// </summary>
-        private static Word.Style GetHeading1Style(Word.Document document)
-        {
-            try
-            {
-                return document.Styles[Word.WdBuiltinStyle.wdStyleHeading1];
-            }
-            catch
-            {
-                // 旧ロジック互換の名前フォールバック
-                try { return document.Styles["見出し 1"]; }
-                catch
-                {
-                    try { return document.Styles["見出し1"]; }
-                    catch
-                    {
-                        try { return document.Styles["Heading 1"]; }
-                        catch { return null; }
-                    }
-                }
-            }
         }
 
         private static bool TryGetOptionsShowAll(Word.Application app)
@@ -1638,6 +1833,7 @@ namespace New_MOSWordVSTOAddIn
 
                     Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
                     _addIn.SyncWatermarkPollingBaselineOnTaskSwitch(projectId);
+                    _addIn.SyncEcoCommentBaselineOnTaskSwitch(projectId, taskId);
                     TakeSnapshot(projectId, taskId, attemptNo);
                 }
                 catch (Exception ex)

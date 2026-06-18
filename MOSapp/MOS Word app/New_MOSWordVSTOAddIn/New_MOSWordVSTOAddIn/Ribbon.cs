@@ -75,6 +75,10 @@ namespace New_MOSWordVSTOAddIn
                 {
                     Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
                 }
+                else if (string.Equals(commandId, "ReviewDeleteComment", StringComparison.OrdinalIgnoreCase))
+                {
+                    Globals.ThisAddIn?.RegisterRibbonLoggedReviewDeleteComment();
+                }
 
                 bool cutSkipped = false;
                 if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))

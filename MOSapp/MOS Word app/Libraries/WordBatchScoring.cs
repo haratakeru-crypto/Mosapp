@@ -1005,6 +1005,20 @@ namespace Libraries
                 failReason = "CutParagraphSelection detected";
                 return false;
             }
+            if (projectId == 4 && taskId == 3
+                && LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment")
+                && !LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment"))
+            {
+                failReason = "ReviewDeleteComment without resolve";
+                return false;
+            }
+            if (projectId == 4 && taskId == 3
+                && LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment")
+                && !LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment"))
+            {
+                failReason = "ReviewResolveComment without delete";
+                return false;
+            }
             if (LogReader.HasLoggedDestructiveError(projectId, taskId, attemptNo))
             {
                 failReason = "logged destructive error";
