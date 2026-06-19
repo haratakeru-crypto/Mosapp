@@ -870,7 +870,7 @@ namespace Libraries.Group1
             return count;
         }
 
-        /// <summary>4-6: ページ罫線4辺が純粋な accent3（themeTint/themeShade なし）か。</summary>
+        /// <summary>4-6: ページ罫線4辺が純粋な accent3（themeTint/themeShade なし）。XML の tint は veto、純粋 accent3 は COM または OpenXML で判定。</summary>
         public static bool ArePageBordersPureAccent3(Document document)
         {
             if (document == null)
@@ -879,9 +879,18 @@ namespace Libraries.Group1
             {
                 string docXml = null;
                 try { docXml = document.WordOpenXML; } catch { }
-                if (!string.IsNullOrEmpty(docXml) && TryArePgBordersPureAccent3(docXml))
+
+                bool xmlHasPgBorders = TryExtractPgBordersXml(docXml, out string pgBordersXml);
+                bool xmlPure = xmlHasPgBorders && IsPgBordersXmlPureAccent3(pgBordersXml);
+                if (xmlHasPgBorders && IsPgBordersXmlTintedAccent3(pgBordersXml))
+                    return false;
+
+                bool comPure = ArePageBordersPureAccent3Com(document, pgBordersXml);
+                if (comPure)
                     return true;
-                return ArePageBordersPureAccent3Com(document);
+                if (xmlPure)
+                    return true;
+                return false;
             }
             catch
             {
@@ -889,8 +898,9 @@ namespace Libraries.Group1
             }
         }
 
-        private static bool TryArePgBordersPureAccent3(string xml)
+        private static bool TryExtractPgBordersXml(string xml, out string pgBordersXml)
         {
+            pgBordersXml = null;
             if (string.IsNullOrEmpty(xml))
                 return false;
             int start = xml.IndexOf("<w:pgBorders", StringComparison.OrdinalIgnoreCase);
@@ -900,7 +910,14 @@ namespace Libraries.Group1
             if (end < 0)
                 return false;
             end += "</w:pgBorders>".Length;
-            string pgBordersXml = xml.Substring(start, end - start);
+            pgBordersXml = xml.Substring(start, end - start);
+            return true;
+        }
+
+        private static bool IsPgBordersXmlPureAccent3(string pgBordersXml)
+        {
+            if (string.IsNullOrEmpty(pgBordersXml))
+                return false;
             return IsPgBorderSidePureAccent3(pgBordersXml, "top")
                 && IsPgBorderSidePureAccent3(pgBordersXml, "left")
                 && IsPgBorderSidePureAccent3(pgBordersXml, "bottom")
@@ -918,6 +935,23 @@ namespace Libraries.Group1
             if (HasNonPureThemeTintOrShade(attrs))
                 return false;
             return true;
+        }
+
+        private static bool IsPgBordersXmlTintedAccent3(string pgBordersXml)
+        {
+            if (string.IsNullOrEmpty(pgBordersXml))
+                return false;
+            foreach (string sideName in new[] { "top", "left", "bottom", "right" })
+            {
+                var match = Regex.Match(pgBordersXml, $@"<w:{sideName}\s+([^/>]*)/>", RegexOptions.IgnoreCase);
+                if (!match.Success)
+                    continue;
+                string attrs = match.Groups[1].Value;
+                if (Regex.IsMatch(attrs, @"w:themeColor\s*=\s*""accent3""", RegexOptions.IgnoreCase)
+                    && HasNonPureThemeTintOrShade(attrs))
+                    return true;
+            }
+            return false;
         }
 
         private static bool HasNonPureThemeTintOrShade(string attrs)
@@ -939,7 +973,9 @@ namespace Libraries.Group1
             return false;
         }
 
-        private static bool ArePageBordersPureAccent3Com(Document document)
+        private const float PageBorderPureAccent3MaxTint = 0.05f;
+
+        private static bool ArePageBordersPureAccent3Com(Document document, string pgBordersXml)
         {
             Section sec = null;
             Borders borders = null;
@@ -957,14 +993,7 @@ namespace Libraries.Group1
                         b = borders[side];
                         if (b == null)
                             return false;
-                        dynamic color = b.Color;
-                        WdThemeColorIndex theme = WdThemeColorIndex.wdNotThemeColor;
-                        try { theme = (WdThemeColorIndex)color.ObjectThemeColor; } catch { return false; }
-                        if (theme != WdThemeColorIndex.wdThemeColorAccent3)
-                            return false;
-                        float tint = 0f;
-                        try { tint = (float)color.TintAndShade; } catch { }
-                        if (Math.Abs(tint) > 0.05f)
+                        if (!TryGetPageBorderSidePureAccent3Com(b, pgBordersXml, ToPgBorderSideName(side)))
                             return false;
                     }
                     finally
@@ -985,6 +1014,76 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(borders);
                 if (sec != null)
                     Marshal.ReleaseComObject(sec);
+            }
+        }
+
+        private static string ToPgBorderSideName(WdBorderType side)
+        {
+            switch (side)
+            {
+                case WdBorderType.wdBorderTop: return "top";
+                case WdBorderType.wdBorderBottom: return "bottom";
+                case WdBorderType.wdBorderLeft: return "left";
+                case WdBorderType.wdBorderRight: return "right";
+                default: return string.Empty;
+            }
+        }
+
+        /// <summary>COM: accent3 かつ Tint/Shade なし。テーマ色が COM で取れない場合は OpenXML の同一辺で補完。</summary>
+        private static bool TryGetPageBorderSidePureAccent3Com(Border border, string pgBordersXml, string sideName)
+        {
+            if (border == null)
+                return false;
+
+            try
+            {
+                dynamic color = border.Color;
+                WdThemeColorIndex theme = WdThemeColorIndex.wdNotThemeColor;
+                try { theme = (WdThemeColorIndex)color.ObjectThemeColor; } catch { }
+
+                if (theme == WdThemeColorIndex.wdThemeColorAccent3)
+                {
+                    if (TryReadBorderColorTint(color, out float tint, out bool gotTint) && gotTint)
+                        return Math.Abs(tint) <= PageBorderPureAccent3MaxTint;
+                }
+                else if (theme != WdThemeColorIndex.wdNotThemeColor)
+                {
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(pgBordersXml))
+                    return false;
+                return IsPgBorderSidePureAccent3(pgBordersXml, sideName);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryReadBorderColorTint(dynamic color, out float tint, out bool gotTint)
+        {
+            tint = 0f;
+            gotTint = false;
+            if (color == null)
+                return false;
+            try
+            {
+                object tintVal = color.TintAndShade;
+                if (tintVal == null)
+                    return true;
+                if (tintVal is float f)
+                    tint = f;
+                else if (tintVal is double d)
+                    tint = (float)d;
+                else
+                    tint = Convert.ToSingle(tintVal, CultureInfo.InvariantCulture);
+                gotTint = true;
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 

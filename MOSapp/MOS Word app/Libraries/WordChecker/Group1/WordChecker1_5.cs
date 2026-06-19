@@ -48,8 +48,8 @@ namespace Libraries.Group1
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        /// <summary>指定段落内にアンカーされた画像の折り返しが「上下」(wdWrapTopBottom) か。</summary>
-        private static bool IsWrapTopBottomInParagraph(Document document, int paraStart, int paraEnd)
+        /// <summary>指定段落内にアンカーされた浮動 Shape の折り返しが指定タイプか。</summary>
+        private static bool IsWrapTypeInParagraph(Document document, int paraStart, int paraEnd, WdWrapType wrapType)
         {
             if (document == null) return false;
             Microsoft.Office.Interop.Word.Shapes shapes = null;
@@ -67,7 +67,7 @@ namespace Libraries.Group1
                         WrapFormat wf = sh.WrapFormat;
                         try
                         {
-                            if (wf != null && wf.Type == WdWrapType.wdWrapTopBottom)
+                            if (wf != null && wf.Type == wrapType)
                                 return true;
                         }
                         finally { if (wf != null) Marshal.ReleaseComObject(wf); }
@@ -81,6 +81,18 @@ namespace Libraries.Group1
             return false;
         }
 
+        /// <summary>指定段落内にアンカーされた画像の折り返しが「上下」(wdWrapTopBottom) か。</summary>
+        private static bool IsWrapTopBottomInParagraph(Document document, int paraStart, int paraEnd)
+        {
+            return IsWrapTypeInParagraph(document, paraStart, paraEnd, WdWrapType.wdWrapTopBottom);
+        }
+
+        /// <summary>指定段落内にアンカーされた画像の折り返しが「狭く」(wdWrapTight) か。</summary>
+        private static bool IsWrapTightInParagraph(Document document, int paraStart, int paraEnd)
+        {
+            return IsWrapTypeInParagraph(document, paraStart, paraEnd, WdWrapType.wdWrapTight);
+        }
+
         private bool CheckTask_1_5_02(string filePath)
         {
             Application wordApp = null; Document document = null;
@@ -90,24 +102,20 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
-                // 「5月21日より5日間の」の先頭の画像の文字列の折り返しが「狭く」= wdWrapTight
                 Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "5月21日より5日間の"); find.Execute();
                 if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
-                bool result = false;
-                foreach (Microsoft.Office.Interop.Word.Shape sh in document.Shapes)
-                {
-                    try
-                    {
-                        WrapFormat wf = sh.WrapFormat;
-                        if (wf.Type == WdWrapType.wdWrapTight) { result = true; Marshal.ReleaseComObject(wf); break; }
-                        Marshal.ReleaseComObject(wf);
-                    }
-                    catch { }
-                }
-                Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
-                // 5-2: 現在「狭く」、または当該タスクの証跡で WrapTight 操作あり
+                Range paraRange = searchRange.Paragraphs[1].Range;
+                int paraStart = paraRange.Start;
+                int paraEnd = paraRange.End;
+
+                bool result = IsWrapTightInParagraph(document, paraStart, paraEnd);
+
+                Marshal.ReleaseComObject(paraRange);
+                Marshal.ReleaseComObject(find);
+                Marshal.ReleaseComObject(searchRange);
+                // 5-2: 段落内が「狭く」かつ WrapTight 操作の証跡あり（5-3 以降も折り返しは維持される想定）
                 bool logOk = LogReader.HasTaskEvidence(5, 2, "WrapTight");
-                return result || logOk;
+                return result && logOk;
 
             }
             catch { return false; }
