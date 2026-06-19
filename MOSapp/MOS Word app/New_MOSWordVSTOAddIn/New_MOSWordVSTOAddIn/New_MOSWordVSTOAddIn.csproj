@@ -239,6 +239,7 @@
     </Compile>
     <Compile Include="WordEvidenceHelper.cs" />
     <Compile Include="..\..\Libraries\WordChecker\Group1\WordWatermarkInspection.cs" Link="WordWatermarkInspection.cs" />
+    <Compile Include="..\..\Libraries\WordChecker\Group1\WordP7CompanyValidation.cs" Link="WordP7CompanyValidation.cs" />
     <Compile Include="..\..\Libraries\WordChecker\WordFindHelper.cs" Link="WordFindHelper.cs" />
     <Compile Include="Ribbon.cs">
       <SubType>Code</SubType>
