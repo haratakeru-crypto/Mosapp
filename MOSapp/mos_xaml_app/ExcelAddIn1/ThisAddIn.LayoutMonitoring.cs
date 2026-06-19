@@ -911,21 +911,27 @@ namespace ExcelAddIn1
 
                                 Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
                                 {
-                                    if (rowChanged)
+                                if (rowChanged)
+                                {
+                                    if (!IsLikelyFormatOnlyUsedRangeDrift(old, now))
                                     {
                                         if (now.UsedRowCount > old.UsedRowCount)
                                             Logger.LogOperation("InsertRows", $"{sheetName}!Rows:{old.UsedRowCount}->{now.UsedRowCount};Trigger=BoundaryFlush");
                                         else
                                             Logger.LogOperation("DeleteRows", $"{sheetName}!Rows:{old.UsedRowCount}->{now.UsedRowCount};Trigger=BoundaryFlush");
                                     }
+                                }
 
-                                    if (colChanged)
+                                if (colChanged)
+                                {
+                                    if (!IsLikelyFormatOnlyUsedRangeDrift(old, now))
                                     {
                                         if (now.UsedColumnCount > old.UsedColumnCount)
                                             Logger.LogOperation("InsertColumns", $"{sheetName}!Cols:{old.UsedColumnCount}->{now.UsedColumnCount};Trigger=BoundaryFlush");
                                         else
                                             Logger.LogOperation("DeleteColumns", $"{sheetName}!Cols:{old.UsedColumnCount}->{now.UsedColumnCount};Trigger=BoundaryFlush");
                                     }
+                                }
 
                                     if (sortFilterChanged)
                                         Logger.LogOperation("SortOrFilter", $"{sheetName}!{now.SortFilterSignature};Trigger=BoundaryFlush");
@@ -1111,18 +1117,24 @@ namespace ExcelAddIn1
 
             if (!suppressLayoutLog && oldS.UsedRowCount != newS.UsedRowCount)
             {
-                if (newS.UsedRowCount > oldS.UsedRowCount)
-                    Logger.LogOperation("InsertRows", $"{sheetName}!Rows:{oldS.UsedRowCount}->{newS.UsedRowCount}");
-                else
-                    Logger.LogOperation("DeleteRows", $"{sheetName}!Rows:{oldS.UsedRowCount}->{newS.UsedRowCount}");
+                if (!IsLikelyFormatOnlyUsedRangeDrift(oldS, newS))
+                {
+                    if (newS.UsedRowCount > oldS.UsedRowCount)
+                        Logger.LogOperation("InsertRows", $"{sheetName}!Rows:{oldS.UsedRowCount}->{newS.UsedRowCount}");
+                    else
+                        Logger.LogOperation("DeleteRows", $"{sheetName}!Rows:{oldS.UsedRowCount}->{newS.UsedRowCount}");
+                }
             }
 
             if (!suppressLayoutLog && oldS.UsedColumnCount != newS.UsedColumnCount)
             {
-                if (newS.UsedColumnCount > oldS.UsedColumnCount)
-                    Logger.LogOperation("InsertColumns", $"{sheetName}!Cols:{oldS.UsedColumnCount}->{newS.UsedColumnCount}");
-                else
-                    Logger.LogOperation("DeleteColumns", $"{sheetName}!Cols:{oldS.UsedColumnCount}->{newS.UsedColumnCount}");
+                if (!IsLikelyFormatOnlyUsedRangeDrift(oldS, newS))
+                {
+                    if (newS.UsedColumnCount > oldS.UsedColumnCount)
+                        Logger.LogOperation("InsertColumns", $"{sheetName}!Cols:{oldS.UsedColumnCount}->{newS.UsedColumnCount}");
+                    else
+                        Logger.LogOperation("DeleteColumns", $"{sheetName}!Cols:{oldS.UsedColumnCount}->{newS.UsedColumnCount}");
+                }
             }
 
             if (!suppressLayoutLog && oldS.CellFormatSignature != newS.CellFormatSignature)
@@ -1146,6 +1158,34 @@ namespace ExcelAddIn1
             if (double.IsNaN(a) && double.IsNaN(b)) return true;
             if (double.IsNaN(a) || double.IsNaN(b)) return false;
             return Math.Abs(a - b) < 0.0001;
+        }
+
+        /// <summary>
+        /// セル書式変更に伴い UsedRange の行数/列数だけがわずかに変わった誤検知を抑える。
+        /// </summary>
+        private static bool IsLikelyFormatOnlyUsedRangeDrift(SheetLayoutSnapshot oldS, SheetLayoutSnapshot newS)
+        {
+            if (oldS.CellFormatSignature == newS.CellFormatSignature)
+                return false;
+
+            if (Math.Abs(oldS.UsedRowCount - newS.UsedRowCount) > 1)
+                return false;
+            if (Math.Abs(oldS.UsedColumnCount - newS.UsedColumnCount) > 1)
+                return false;
+
+            if (oldS.TableStyleSignature != newS.TableStyleSignature) return false;
+            if (oldS.TableRangeSignature != newS.TableRangeSignature) return false;
+            if (oldS.SortFilterSignature != newS.SortFilterSignature) return false;
+            if (oldS.ShapeCount != newS.ShapeCount) return false;
+            if (oldS.ShapeGeometrySignature != newS.ShapeGeometrySignature) return false;
+            if (oldS.NamedRangeSignature != newS.NamedRangeSignature) return false;
+            if (oldS.ExternalDataSignature != newS.ExternalDataSignature) return false;
+            if (oldS.ConditionalFormatSignature != newS.ConditionalFormatSignature) return false;
+            if (oldS.HyperlinkSignature != newS.HyperlinkSignature) return false;
+            if (oldS.HPageBreakCount != newS.HPageBreakCount) return false;
+            if (oldS.VPageBreakCount != newS.VPageBreakCount) return false;
+
+            return true;
         }
 
         private struct SheetLayoutSnapshot : IEquatable<SheetLayoutSnapshot>

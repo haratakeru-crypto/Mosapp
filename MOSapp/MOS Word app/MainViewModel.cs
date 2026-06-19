@@ -13,6 +13,7 @@ using WordWindow = Microsoft.Office.Interop.Word.Window;
 using Microsoft.Office.Interop.Word;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Threading;
 using Libraries;
 
 namespace MOS_Word_app
@@ -296,9 +297,12 @@ namespace MOS_Word_app
 
                 try
                 {
+                    // 別プロジェクトへ切り替える前に編集内容をディスクへ保存してから閉じる
+                    SaveAndCloseAllWordDocuments();
+
                     WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
 
-                    // 同じパスで既に開いているドキュメントがあれば保存せずに閉じる（メモリではなくフォルダから開き直す）
+                    // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、常にフォルダから開き直す
                     string pathLower = System.IO.Path.GetFullPath(project.FilePath).ToLowerInvariant();
                     try
                     {
@@ -312,6 +316,8 @@ namespace MOS_Word_app
                                 try { docFullPath = System.IO.Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
                                 if (fullName == pathLower || docFullPath == pathLower)
                                 {
+                                    if (!openDoc.Saved)
+                                        openDoc.Save();
                                     openDoc.Close(SaveChanges: false);
                                     break;
                                 }
@@ -408,6 +414,70 @@ namespace MOS_Word_app
                 ResultMessage = $"リセット中にエラーが発生しました: {ex.Message}";
                 MessageBox.Show($"リセット中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        /// <summary>
+        /// 開いているすべての Word 文書を保存する。
+        /// </summary>
+        private static void SaveAllWordDocuments()
+        {
+            try
+            {
+                WordApp wordApp = null;
+                try
+                {
+                    wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                }
+                catch (COMException)
+                {
+                    return;
+                }
+                if (wordApp == null) return;
+                try
+                {
+                    wordApp.DisplayAlerts = WdAlertLevel.wdAlertsNone;
+                    for (int i = wordApp.Documents.Count; i >= 1; i--)
+                    {
+                        WordDoc doc = null;
+                        try
+                        {
+                            doc = wordApp.Documents[i];
+                            if (!doc.Saved)
+                                doc.Save();
+                        }
+                        catch (COMException comEx) when (comEx.HResult == unchecked((int)0x80010108))
+                        {
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[SaveAllWordDocuments] 保存エラー: {ex.Message}");
+                        }
+                        finally
+                        {
+                            try { if (doc != null) Marshal.ReleaseComObject(doc); } catch { }
+                        }
+                    }
+                }
+                finally
+                {
+                    try { if (wordApp != null) Marshal.ReleaseComObject(wordApp); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SaveAllWordDocuments] Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// プロジェクト切替前に作業内容をディスクに残して Word 文書を閉じる。
+        /// </summary>
+        private static void SaveAndCloseAllWordDocuments()
+        {
+            SaveAllWordDocuments();
+            CloseAllWordDocuments();
+            Thread.Sleep(200);
         }
 
         /// <summary>

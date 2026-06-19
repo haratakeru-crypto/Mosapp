@@ -73,6 +73,7 @@ namespace Libraries
                     try { wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone; } catch { }
                     try { wordApp.Visible = true; } catch { }
                     WordWindowLayoutHelper.PositionWordForBatchScoring(wordApp);
+                    SaveAllOpenDocuments(wordApp);
                 }
 
                 foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
