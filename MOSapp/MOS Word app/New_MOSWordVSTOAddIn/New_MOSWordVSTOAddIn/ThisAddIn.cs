@@ -37,6 +37,9 @@ namespace New_MOSWordVSTOAddIn
         private string _lastOrientationFingerprint;
         private string _lastPageBorderFingerprint;
         private bool? _lastHeading1LineSimple;
+        private bool? _lastLineStylish;
+        private string _lastStyleSetLineFingerprint;
+        private bool _styleSetLineSimpleLoggedThisDoc;
         /// <summary>4-5: 下書き1 透かしの有無（社外秘・至急は含めない）</summary>
         private bool? _lastDraft1WatermarkFound;
         /// <summary>透かし指紋（スナップショット比較・4-1 等の [Op] 補完用）</summary>
@@ -372,6 +375,9 @@ namespace New_MOSWordVSTOAddIn
                 _lastOrientationFingerprint = GetAllSectionsOrientationFingerprint(doc);
                 _lastPageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
                 _lastHeading1LineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
+                _lastLineStylish = WordWatermarkInspection.IsDocumentStyleSetLineStylish(doc);
+                _lastStyleSetLineFingerprint = WordWatermarkInspection.GetStyleSetLineFingerprint(doc);
+                _styleSetLineSimpleLoggedThisDoc = false;
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
 
                 ApplyWatermarkPollingBaseline(doc);
@@ -772,14 +778,50 @@ namespace New_MOSWordVSTOAddIn
                     _lastPageBorderFingerprint = borderFp;
 
                     bool lineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
+                    string styleSetFp = WordWatermarkInspection.GetStyleSetLineFingerprint(doc);
                     if (_lastHeading1LineSimple.HasValue && lineSimple && !_lastHeading1LineSimple.Value)
                     {
                         if (_suppressStyleSetPollLogs > 0)
                             _suppressStyleSetPollLogs--;
                         else
+                        {
                             WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineSimple");
+                            _styleSetLineSimpleLoggedThisDoc = true;
+                            _lastStyleSetLineFingerprint = styleSetFp;
+                        }
+                    }
+                    else if (_lastHeading1LineSimple.HasValue && _lastHeading1LineSimple.Value && !lineSimple)
+                    {
+                        // シンプル適用後に別スタイルセットへ変更した場合（スタイリッシュ等）のフォールバック
+                        if (_suppressStyleSetPollLogs > 0)
+                            _suppressStyleSetPollLogs--;
+                        else
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineStylish");
+                    }
+                    else if (_styleSetLineSimpleLoggedThisDoc && lineSimple
+                        && !string.IsNullOrEmpty(_lastStyleSetLineFingerprint)
+                        && !string.IsNullOrEmpty(styleSetFp)
+                        && !string.Equals(styleSetFp, _lastStyleSetLineFingerprint, StringComparison.Ordinal))
+                    {
+                        // COM 上はシンプルのまま見えても OpenXML スタイル定義が変わった場合
+                        if (_suppressStyleSetPollLogs > 0)
+                            _suppressStyleSetPollLogs--;
+                        else
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineStylish");
                     }
                     _lastHeading1LineSimple = lineSimple;
+                    if (!string.IsNullOrEmpty(styleSetFp))
+                        _lastStyleSetLineFingerprint = styleSetFp;
+
+                    bool lineStylish = WordWatermarkInspection.IsDocumentStyleSetLineStylish(doc);
+                    if (_lastLineStylish.HasValue && lineStylish && !_lastLineStylish.Value)
+                    {
+                        if (_suppressStyleSetPollLogs > 0)
+                            _suppressStyleSetPollLogs--;
+                        else
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineStylish");
+                    }
+                    _lastLineStylish = lineStylish;
 
                     // 2-3: リボンの色ギャラリーを直接フックできないため、対象文字の色状態変化だけで補完ログを出す
                     string colorFp = GetTask1_2_03ColorFingerprint(doc);

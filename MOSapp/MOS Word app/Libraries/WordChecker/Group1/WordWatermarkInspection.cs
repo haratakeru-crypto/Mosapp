@@ -179,34 +179,695 @@ namespace Libraries.Group1
             }
         }
 
-        /// <summary>4-4: スタイルセット「線（シンプル）」— 見出し1に0.5pt単線、見出し2に下罫線なし。</summary>
-        public static bool IsDocumentStyleSetLineSimple(Document doc)
+        private static readonly string[] StyleSetLineStyleIdsHeading2 =
         {
-            if (doc == null)
-                return false;
-            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading1, out int h1Style, out int h1Width))
-                return false;
-            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading2, out int h2Style, out int _))
-                return false;
-            bool h1Ok = h1Style == (int)WdLineStyle.wdLineStyleSingle
-                        && h1Width == (int)WdLineWidth.wdLineWidth050pt;
-            bool h2NoBorder = h2Style == 0 || h2Style == (int)WdLineStyle.wdLineStyleNone;
-            return h1Ok && h2NoBorder;
+            "Heading2", "heading2", "見出し2"
+        };
+
+        private static readonly string[] StyleSetLineStyleIdsTitle =
+        {
+            "Title", "title", "表題"
+        };
+
+        private static readonly string[] StyleSetLineStyleIdsHeading1 =
+        {
+            "Heading1", "heading1", "見出し1"
+        };
+
+        /// <summary>4-4: 見出し1/2・表題スタイル定義の OpenXML スナップショット（スタイルセット切替検知用）。</summary>
+        public static string GetStyleSetLineFingerprint(Document doc)
+        {
+            var parts = new List<string>(10);
+            AppendStyleSetLineComMetrics(parts, doc);
+
+            string stylesXml = TryGetOpenXmlStylesBlob(doc);
+            if (!string.IsNullOrEmpty(stylesXml))
+            {
+                AppendStyleBlockFingerprint(parts, stylesXml, StyleSetLineStyleIdsHeading1);
+                AppendStyleBlockFingerprint(parts, stylesXml, StyleSetLineStyleIdsHeading2);
+                AppendStyleBlockFingerprint(parts, stylesXml, StyleSetLineStyleIdsTitle);
+            }
+
+            parts.Add("H2ParaBdr:" + (HasAnyHeading2ParagraphBottomBorderCom(doc) ? "1" : "0"));
+            parts.Add("H2XmlBdr:" + (HasHeading2ParagraphBottomBorderInOpenXml(doc) ? "1" : "0"));
+            return string.Join("|", parts);
         }
 
-        /// <summary>4-4 否定用: スタイルセット「線（スタイリッシュ）」— 見出し1に0.5pt単線かつ見出し2にも下罫線あり。</summary>
+        private static void AppendStyleSetLineComMetrics(List<string> parts, Document doc)
+        {
+            if (doc == null)
+                return;
+
+            if (TryGetStyleFontMetrics(doc, WdBuiltinStyle.wdStyleHeading1, out _, out float h1Size, out int h1Theme, out _))
+            {
+                parts.Add(string.Format(CultureInfo.InvariantCulture, "H1Sz={0}", h1Size));
+                parts.Add("H1Th=" + h1Theme);
+            }
+
+            if (TryGetStyleFontMetrics(doc, WdBuiltinStyle.wdStyleHeading2, out _, out float h2Size, out int h2Theme, out _))
+            {
+                parts.Add(string.Format(CultureInfo.InvariantCulture, "H2Sz={0}", h2Size));
+                parts.Add("H2Th=" + h2Theme);
+            }
+
+            if (TryGetStyleBottomBorderColor(doc, WdBuiltinStyle.wdStyleHeading1, out int h1BorderColor))
+                parts.Add("H1BdrClr=" + h1BorderColor);
+        }
+
+        private static bool TryGetStyleBottomBorderColor(Document doc, WdBuiltinStyle styleId, out int color)
+        {
+            color = 0;
+            Style style = null;
+            Borders borders = null;
+            Border bottom = null;
+            try
+            {
+                style = doc.Styles[styleId];
+                if (style == null)
+                    return false;
+                borders = style.ParagraphFormat.Borders;
+                bottom = borders[WdBorderType.wdBorderBottom];
+                if (bottom == null)
+                    return false;
+                try
+                {
+                    color = (int)bottom.Color;
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (bottom != null)
+                    Marshal.ReleaseComObject(bottom);
+                if (borders != null)
+                    Marshal.ReleaseComObject(borders);
+                if (style != null)
+                    Marshal.ReleaseComObject(style);
+            }
+        }
+
+        private static void AppendStyleBlockFingerprint(List<string> parts, string stylesXml, string[] styleIds)
+        {
+            foreach (string styleId in styleIds)
+            {
+                if (string.IsNullOrEmpty(styleId))
+                    continue;
+                string pattern = $@"<w:style\b[^>]*\bw:styleId=""{Regex.Escape(styleId)}""[^>]*>([\s\S]*?)</w:style>";
+                Match styleMatch = Regex.Match(stylesXml, pattern, RegexOptions.IgnoreCase);
+                if (!styleMatch.Success)
+                    continue;
+                parts.Add(styleId + ":" + styleMatch.Groups[1].Value);
+                return;
+            }
+        }
+
+        /// <summary>4-4: スタイルセット「線（シンプル）」— 見出し1に0.5pt単線、見出し2・表題に下罫線なし、見出し1/2フォントプロファイル一致。</summary>
+        public static bool IsDocumentStyleSetLineSimple(Document doc)
+        {
+            if (doc == null || IsDocumentStyleSetLineStylish(doc))
+                return false;
+
+            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading1, out int h1Style, out int h1Width))
+                return false;
+            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading2, out int h2Style, out int h2Width))
+                return false;
+
+            bool h1Ok = h1Style == (int)WdLineStyle.wdLineStyleSingle
+                        && h1Width == (int)WdLineWidth.wdLineWidth050pt;
+            if (!h1Ok)
+                return false;
+
+            if (HasMeaningfulBottomBorder(h2Style, h2Width))
+                return false;
+            if (HasStyleBottomBorderCom(doc, WdBuiltinStyle.wdStyleTitle))
+                return false;
+            if (HasAnyHeading2ParagraphBottomBorder(doc))
+                return false;
+
+            string stylesXml = TryGetOpenXmlStylesBlob(doc);
+            if (StyleBlockHasBottomBorder(stylesXml, StyleSetLineStyleIdsHeading2))
+                return false;
+            if (StyleBlockHasBottomBorder(stylesXml, StyleSetLineStyleIdsTitle))
+                return false;
+
+            return HasLineSimpleFontProfile(doc);
+        }
+
+        /// <summary>4-4 否定用: スタイルセット「線（スタイリッシュ）」等、シンプル以外の線スタイルセット。</summary>
         public static bool IsDocumentStyleSetLineStylish(Document doc)
         {
             if (doc == null)
                 return false;
+
+            if (HasStyleSetLineStylishAppearance(doc))
+                return true;
+
+            if (HasAnyHeading2ParagraphBottomBorder(doc))
+                return true;
+
+            if (HasStyleSetLineStylishByHeading2Com(doc))
+                return true;
+            if (HasStyleBottomBorderCom(doc, WdBuiltinStyle.wdStyleTitle))
+                return true;
+
+            string stylesXml = TryGetOpenXmlStylesBlob(doc);
+            if (StyleBlockHasBottomBorder(stylesXml, StyleSetLineStyleIdsHeading2))
+                return true;
+            if (StyleBlockHasBottomBorder(stylesXml, StyleSetLineStyleIdsTitle))
+                return true;
+            if (IsHeading1BottomBorderAccentThemed(doc, stylesXml))
+                return true;
+
+            return CountHeadingLikeStylesWithBottomBorder(stylesXml) >= 2;
+        }
+
+        /// <summary>本文中の見出し2段落に実効下罫線があるか（COM + document.xml）。</summary>
+        private static bool HasAnyHeading2ParagraphBottomBorder(Document doc)
+        {
+            if (HasAnyHeading2ParagraphBottomBorderCom(doc))
+                return true;
+            return HasHeading2ParagraphBottomBorderInOpenXml(doc);
+        }
+
+        private static bool HasAnyHeading2ParagraphBottomBorderCom(Document doc)
+        {
+            if (doc == null)
+                return false;
+
+            Paragraphs paragraphs = null;
+            try
+            {
+                paragraphs = doc.Paragraphs;
+                int count = 0;
+                try { count = paragraphs.Count; } catch { return false; }
+
+                for (int i = 1; i <= count; i++)
+                {
+                    Paragraph para = null;
+                    try
+                    {
+                        para = paragraphs[i];
+                        if (!IsHeading2Paragraph(para))
+                            continue;
+                        if (TryGetParagraphEffectiveBottomBorder(para, out int lineStyle, out int lineWidth)
+                            && HasMeaningfulBottomBorder(lineStyle, lineWidth))
+                            return true;
+                    }
+                    catch { }
+                    finally
+                    {
+                        if (para != null)
+                            Marshal.ReleaseComObject(para);
+                    }
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (paragraphs != null)
+                    Marshal.ReleaseComObject(paragraphs);
+            }
+        }
+
+        private static bool HasHeading2ParagraphBottomBorderInOpenXml(Document doc)
+        {
+            string xml = TryGetFullWordOpenXml(doc);
+            if (string.IsNullOrEmpty(xml))
+                return false;
+
+            string bodyXml = ExtractOpenXmlDocumentBodyBlob(xml);
+            if (string.IsNullOrEmpty(bodyXml))
+                bodyXml = xml;
+
+            foreach (Match pMatch in Regex.Matches(bodyXml, @"<w:p\b[^>]*>([\s\S]*?)</w:p>", RegexOptions.IgnoreCase))
+            {
+                string pInner = pMatch.Groups[1].Value;
+                if (!ParagraphBlockUsesHeading2Style(pInner))
+                    continue;
+                if (ParagraphPropertiesBlockHasBottomBorder(pInner))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsHeading2Paragraph(Paragraph para)
+        {
+            if (para == null)
+                return false;
+
+            try
+            {
+                if (IsHeading2StyleName(GetStyleNameFromObject(para.get_Style())))
+                    return true;
+
+                Range range = para.Range;
+                if (range != null)
+                {
+                    try
+                    {
+                        if (range.Characters.Count > 0)
+                        {
+                            Range firstChar = range.Characters[1];
+                            try
+                            {
+                                if (IsHeading2StyleName(GetStyleNameFromObject(firstChar.get_Style())))
+                                    return true;
+                            }
+                            finally
+                            {
+                                Marshal.ReleaseComObject(firstChar);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(range);
+                    }
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
+        private static bool IsHeading2StyleName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+
+            string normalized = name.Replace(" ", string.Empty).Replace("　", string.Empty);
+            return normalized.IndexOf("Heading2", StringComparison.OrdinalIgnoreCase) >= 0
+                || normalized.IndexOf("heading2", StringComparison.OrdinalIgnoreCase) >= 0
+                || normalized.IndexOf("見出し2", StringComparison.Ordinal) >= 0
+                || normalized.IndexOf("見出し２", StringComparison.Ordinal) >= 0;
+        }
+
+        private static string GetStyleNameFromObject(object styleObj)
+        {
+            if (styleObj == null)
+                return string.Empty;
+
+            if (styleObj is string styleName)
+                return styleName ?? string.Empty;
+
+            if (styleObj is Style style)
+            {
+                try { return style.NameLocal ?? string.Empty; }
+                catch { }
+            }
+
+            return styleObj.ToString() ?? string.Empty;
+        }
+
+        private static bool TryGetParagraphEffectiveBottomBorder(Paragraph para, out int lineStyle, out int lineWidth)
+        {
+            lineStyle = 0;
+            lineWidth = 0;
+            if (para == null)
+                return false;
+
+            Borders borders = null;
+            Border bottom = null;
+            Range range = null;
+            try
+            {
+                range = para.Range;
+                borders = range.ParagraphFormat.Borders;
+                bottom = borders[WdBorderType.wdBorderBottom];
+                if (bottom == null)
+                    return true;
+                try { lineStyle = (int)bottom.LineStyle; } catch { }
+                try { lineWidth = (int)bottom.LineWidth; } catch { }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (bottom != null)
+                    Marshal.ReleaseComObject(bottom);
+                if (borders != null)
+                    Marshal.ReleaseComObject(borders);
+                if (range != null)
+                    Marshal.ReleaseComObject(range);
+            }
+        }
+
+        private static string TryGetFullWordOpenXml(Document doc)
+        {
+            if (doc == null)
+                return string.Empty;
+            try
+            {
+                return doc.WordOpenXML ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string ExtractOpenXmlDocumentBodyBlob(string wordOpenXml)
+        {
+            if (string.IsNullOrEmpty(wordOpenXml))
+                return string.Empty;
+
+            var sb = new StringBuilder(wordOpenXml.Length);
+            foreach (Match m in Regex.Matches(
+                wordOpenXml,
+                @"<pkg:xmlData[^>]*>([\s\S]*?)</pkg:xmlData>",
+                RegexOptions.IgnoreCase))
+            {
+                string chunk = m.Groups[1].Value;
+                if (chunk.IndexOf("<w:body", StringComparison.OrdinalIgnoreCase) >= 0
+                    || chunk.IndexOf("<w:p ", StringComparison.OrdinalIgnoreCase) >= 0
+                    || chunk.IndexOf("<w:p>", StringComparison.OrdinalIgnoreCase) >= 0)
+                    sb.Append('\n').Append(chunk);
+            }
+
+            if (sb.Length > 0)
+                return sb.ToString();
+            return wordOpenXml;
+        }
+
+        private static bool ParagraphBlockUsesHeading2Style(string paragraphInnerXml)
+        {
+            if (string.IsNullOrEmpty(paragraphInnerXml))
+                return false;
+
+            Match styleMatch = Regex.Match(
+                paragraphInnerXml,
+                @"<w:pStyle\b[^>]*\bw:val=""([^""]+)""",
+                RegexOptions.IgnoreCase);
+            if (!styleMatch.Success)
+                return false;
+
+            string styleVal = styleMatch.Groups[1].Value ?? string.Empty;
+            foreach (string id in StyleSetLineStyleIdsHeading2)
+            {
+                if (string.Equals(styleVal, id, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return string.Equals(styleVal, "2", StringComparison.Ordinal);
+        }
+
+        private static bool ParagraphPropertiesBlockHasBottomBorder(string paragraphInnerXml)
+        {
+            if (string.IsNullOrEmpty(paragraphInnerXml))
+                return false;
+
+            Match pPrMatch = Regex.Match(
+                paragraphInnerXml,
+                @"<w:pPr\b[^>]*>([\s\S]*?)</w:pPr>",
+                RegexOptions.IgnoreCase);
+            string pPrBlock = pPrMatch.Success ? pPrMatch.Groups[1].Value : paragraphInnerXml;
+            return TryGetParagraphBottomBorderFromStyleBlock(pPrBlock, out bool hasBorder) && hasBorder;
+        }
+
+        private static bool HasStyleSetLineStylishByHeading2Com(Document doc)
+        {
             if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading1, out int h1Style, out int h1Width))
                 return false;
             if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading2, out int h2Style, out int h2Width))
                 return false;
             bool h1Ok = h1Style == (int)WdLineStyle.wdLineStyleSingle
                         && h1Width == (int)WdLineWidth.wdLineWidth050pt;
-            bool h2HasBorder = h2Style == (int)WdLineStyle.wdLineStyleSingle && h2Width > 0;
-            return h1Ok && h2HasBorder;
+            return h1Ok && HasMeaningfulBottomBorder(h2Style, h2Width);
+        }
+
+        /// <summary>
+        /// 4-4: 線（スタイリッシュ）の見た目 — 見出し2サイズ拡大・見出し1サイズ拡大・アクセント2色など。
+        /// Word 365 実測: シンプル H1/H2=18/14pt theme=4、スタイリッシュ H1/H2=20/18pt theme=13/5。
+        /// </summary>
+        private static bool HasStyleSetLineStylishAppearance(Document doc)
+        {
+            if (!TryGetStyleFontMetrics(doc, WdBuiltinStyle.wdStyleHeading2, out _, out float h2Size, out int h2Theme, out _))
+                return false;
+            if (!TryGetStyleFontMetrics(doc, WdBuiltinStyle.wdStyleHeading1, out _, out float h1Size, out int h1Theme, out _))
+                return false;
+
+            if (h2Size >= 17f)
+                return true;
+            if (h1Size >= 19f)
+                return true;
+            if (h2Theme == (int)WdThemeColorIndex.wdThemeColorAccent2)
+                return true;
+            if (h1Theme == 13)
+                return true;
+
+            return false;
+        }
+
+        /// <summary>4-4: 線（シンプル）の見出し1/2スタイル定義フォントプロファイル。</summary>
+        private static bool HasLineSimpleFontProfile(Document doc)
+        {
+            if (!TryGetStyleFontMetrics(doc, WdBuiltinStyle.wdStyleHeading2, out _, out float h2Size, out int h2Theme, out _))
+                return false;
+            if (!TryGetStyleFontMetrics(doc, WdBuiltinStyle.wdStyleHeading1, out _, out float h1Size, out int h1Theme, out _))
+                return false;
+
+            if (h2Size > 15f)
+                return false;
+            if (h1Size > 18.5f)
+                return false;
+
+            int accent1 = (int)WdThemeColorIndex.wdThemeColorAccent1;
+            int notTheme = (int)WdThemeColorIndex.wdNotThemeColor;
+            if (h2Theme != notTheme && h2Theme != accent1)
+                return false;
+            if (h1Theme != notTheme && h1Theme != accent1)
+                return false;
+
+            return true;
+        }
+
+        private static bool TryGetStyleFontMetrics(
+            Document doc,
+            WdBuiltinStyle styleId,
+            out int bold,
+            out float size,
+            out int theme,
+            out float tint)
+        {
+            bold = 0;
+            size = 0f;
+            theme = (int)WdThemeColorIndex.wdNotThemeColor;
+            tint = float.NaN;
+
+            Style style = null;
+            Font font = null;
+            try
+            {
+                style = doc.Styles[styleId];
+                if (style == null)
+                    return false;
+                font = style.Font;
+                if (font == null)
+                    return false;
+                try { bold = font.Bold; } catch { }
+                try { size = (float)font.Size; } catch { }
+                try { theme = (int)font.TextColor.ObjectThemeColor; } catch { }
+                try { tint = font.TextColor.TintAndShade; } catch { }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (font != null)
+                    Marshal.ReleaseComObject(font);
+                if (style != null)
+                    Marshal.ReleaseComObject(style);
+            }
+        }
+
+        private static bool HasStyleBottomBorderCom(Document doc, WdBuiltinStyle styleId)
+        {
+            if (!TryGetStyleBottomBorder(doc, styleId, out int lineStyle, out int lineWidth))
+                return false;
+            return HasMeaningfulBottomBorder(lineStyle, lineWidth);
+        }
+
+        private static bool HasMeaningfulBottomBorder(int lineStyle, int lineWidth)
+        {
+            if (lineStyle == 0 || lineStyle == (int)WdLineStyle.wdLineStyleNone)
+                return false;
+            return lineWidth > 0 || lineStyle != (int)WdLineStyle.wdLineStyleNone;
+        }
+
+        /// <summary>見出し1下罫線がアクセント系テーマ色なら「線（スタイリッシュ）」側とみなす（シンプルは text/dark 系が多い）。</summary>
+        private static bool IsHeading1BottomBorderAccentThemed(Document doc, string stylesXml)
+        {
+            if (TryGetStyleBottomBorderThemeFromOpenXml(stylesXml, StyleSetLineStyleIdsHeading1, out string theme))
+                return IsAccentThemeColorName(theme);
+            return false;
+        }
+
+        private static bool IsAccentThemeColorName(string theme)
+        {
+            if (string.IsNullOrEmpty(theme))
+                return false;
+            return theme.IndexOf("accent", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string TryGetOpenXmlStylesBlob(Document doc)
+        {
+            if (doc == null)
+                return string.Empty;
+            try
+            {
+                string xml = doc.WordOpenXML;
+                if (string.IsNullOrEmpty(xml))
+                    return string.Empty;
+                return ExtractOpenXmlStylesBlob(xml);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static string ExtractOpenXmlStylesBlob(string wordOpenXml)
+        {
+            if (string.IsNullOrEmpty(wordOpenXml))
+                return string.Empty;
+
+            var sb = new StringBuilder(wordOpenXml.Length);
+            foreach (Match m in Regex.Matches(
+                wordOpenXml,
+                @"<pkg:xmlData[^>]*>([\s\S]*?)</pkg:xmlData>",
+                RegexOptions.IgnoreCase))
+            {
+                string chunk = m.Groups[1].Value;
+                if (chunk.IndexOf("<w:style", StringComparison.OrdinalIgnoreCase) >= 0
+                    || chunk.IndexOf("<w:styles", StringComparison.OrdinalIgnoreCase) >= 0)
+                    sb.Append('\n').Append(chunk);
+            }
+
+            if (sb.Length > 0)
+                return sb.ToString();
+            return wordOpenXml;
+        }
+
+        private static bool StyleBlockHasBottomBorder(string stylesXml, params string[] styleIds)
+        {
+            if (string.IsNullOrEmpty(stylesXml) || styleIds == null)
+                return false;
+            foreach (string styleId in styleIds)
+            {
+                if (string.IsNullOrEmpty(styleId))
+                    continue;
+                if (TryGetStyleBottomBorderFromOpenXml(stylesXml, styleId, out bool hasBorder) && hasBorder)
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool TryGetStyleBottomBorderFromOpenXml(string stylesXml, string styleId, out bool hasBorder)
+        {
+            hasBorder = false;
+            if (string.IsNullOrEmpty(stylesXml) || string.IsNullOrEmpty(styleId))
+                return false;
+
+            string pattern = $@"<w:style\b[^>]*\bw:styleId=""{Regex.Escape(styleId)}""[^>]*>([\s\S]*?)</w:style>";
+            Match styleMatch = Regex.Match(stylesXml, pattern, RegexOptions.IgnoreCase);
+            if (!styleMatch.Success)
+                return false;
+
+            return TryGetParagraphBottomBorderFromStyleBlock(styleMatch.Groups[1].Value, out hasBorder);
+        }
+
+        private static bool TryGetStyleBottomBorderThemeFromOpenXml(string stylesXml, string[] styleIds, out string themeColor)
+        {
+            themeColor = null;
+            if (string.IsNullOrEmpty(stylesXml) || styleIds == null)
+                return false;
+
+            foreach (string styleId in styleIds)
+            {
+                if (string.IsNullOrEmpty(styleId))
+                    continue;
+                string pattern = $@"<w:style\b[^>]*\bw:styleId=""{Regex.Escape(styleId)}""[^>]*>([\s\S]*?)</w:style>";
+                Match styleMatch = Regex.Match(stylesXml, pattern, RegexOptions.IgnoreCase);
+                if (!styleMatch.Success)
+                    continue;
+                if (!TryGetParagraphBottomBorderFromStyleBlock(styleMatch.Groups[1].Value, out bool hasBorder) || !hasBorder)
+                    continue;
+
+                Match bottomMatch = Regex.Match(
+                    styleMatch.Groups[1].Value,
+                    @"<w:bottom\b([^/>]*)/>",
+                    RegexOptions.IgnoreCase);
+                if (!bottomMatch.Success)
+                    continue;
+
+                Match themeMatch = Regex.Match(bottomMatch.Groups[1].Value, @"w:themeColor=""([^""]+)""", RegexOptions.IgnoreCase);
+                if (themeMatch.Success)
+                {
+                    themeColor = themeMatch.Groups[1].Value;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetParagraphBottomBorderFromStyleBlock(string styleBlock, out bool hasBorder)
+        {
+            hasBorder = false;
+            if (string.IsNullOrEmpty(styleBlock))
+                return false;
+
+            Match bottomMatch = Regex.Match(styleBlock, @"<w:bottom\b([^/>]*)/>", RegexOptions.IgnoreCase);
+            if (!bottomMatch.Success)
+                return false;
+
+            Match valMatch = Regex.Match(bottomMatch.Groups[1].Value, @"w:val=""([^""]+)""", RegexOptions.IgnoreCase);
+            if (!valMatch.Success)
+            {
+                hasBorder = true;
+                return true;
+            }
+
+            string val = valMatch.Groups[1].Value.Trim().ToLowerInvariant();
+            hasBorder = val != "none" && val != "nil" && val != "hidden";
+            return true;
+        }
+
+        private static int CountHeadingLikeStylesWithBottomBorder(string stylesXml)
+        {
+            if (string.IsNullOrEmpty(stylesXml))
+                return 0;
+
+            int count = 0;
+            foreach (Match styleMatch in Regex.Matches(stylesXml, @"<w:style\b[^>]*>([\s\S]*?)</w:style>", RegexOptions.IgnoreCase))
+            {
+                string fullBlock = styleMatch.Value;
+                if (!Regex.IsMatch(fullBlock, @"w:styleId=""(Heading\d|Title|表題|見出し)", RegexOptions.IgnoreCase))
+                    continue;
+                if (TryGetParagraphBottomBorderFromStyleBlock(styleMatch.Groups[1].Value, out bool hasBorder) && hasBorder)
+                    count++;
+            }
+            return count;
         }
 
         /// <summary>4-6: ページ罫線4辺が純粋な accent3（themeTint/themeShade なし）か。</summary>
