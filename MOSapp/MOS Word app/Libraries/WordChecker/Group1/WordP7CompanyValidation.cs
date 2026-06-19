@@ -68,6 +68,35 @@ namespace Libraries.Group1
             return false;
         }
 
+        /// <summary>OpenXML 優先で会社名の生値を取得（採点 veto 用）。</summary>
+        public static bool TryGetCompanyRaw(Document document, out string company)
+        {
+            company = null;
+            if (document == null)
+                return false;
+
+            try
+            {
+                string xml = document.WordOpenXML;
+                if (!string.IsNullOrEmpty(xml) && TryExtractCompanyFromOpenXml(xml, out string xmlCompany)
+                    && !string.IsNullOrEmpty(xmlCompany))
+                {
+                    company = xmlCompany;
+                    return true;
+                }
+            }
+            catch { }
+
+            company = TryGetCompanyFromCom(document);
+            return !string.IsNullOrEmpty(company);
+        }
+
+        /// <summary>会社名に半角カナが含まれるか（7-2 veto: ログがあっても ✖）。</summary>
+        public static bool HasHalfWidthKatakanaCompany(Document document)
+        {
+            return TryGetCompanyRaw(document, out string company) && ContainsHalfWidthKatakana(company);
+        }
+
         public static string TryGetCompanyFromCom(Document document)
         {
             if (document == null)

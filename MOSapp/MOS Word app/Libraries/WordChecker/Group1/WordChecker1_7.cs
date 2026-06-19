@@ -73,8 +73,16 @@ namespace Libraries.Group1
                         bool stateOk = WordP7CompanyValidation.IsProject7CompanyValid(project7);
                         string company = WordP7CompanyValidation.TryGetCompanyFromCom(project7) ?? "";
                         LogCompanyStateDiagnosticsIfNeeded(filePath, logOk, stateOk, company);
-                        if (!stateOk)
+
+                        // 半角カナのみ veto（問題1）。読取不可・空は 7-4/7-5 後にログで救済する。
+                        if (WordP7CompanyValidation.HasHalfWidthKatakanaCompany(project7))
                             return false;
+
+                        bool saveAsFollowUp = LogReader.HasTaskEvidence(7, 4, "FileSaveAsTxt")
+                            || LogReader.HasTaskEvidence(7, 5, "FileSaveAsDocm");
+                        if (logOk && saveAsFollowUp)
+                            return true;
+
                         return logOk || stateOk;
                     }
 

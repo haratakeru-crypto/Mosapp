@@ -20,6 +20,7 @@ namespace Libraries
             "4-3",  // コメントの解決 (ReviewResolveComment)
             "6-1",  // 文字列を表に変換 (TableConvertTextToTable)
             "7-1",  // 互換モードの解除 (UpgradeDocument)
+            "7-2",  // 会社名設定 (SetDocumentCompany ポーリング補助)
             "7-3",  // インテグラルヘッダー（IntegralHeader ポーリング補助）
             "7-4",  // テキスト保存 (FileSaveAsTxt)
             "7-5",  // マクロ有効保存 (FileSaveAsDocm)
@@ -59,6 +60,14 @@ namespace Libraries
         public static IEnumerable<string> GetVSTORequiredTaskIds()
         {
             return VSTORequiredTaskIds;
+        }
+
+        /// <summary>
+        /// 採点直前に VSTO 証跡フラッシュが必要か（ShowAll / Company 等のポーリング同期）。
+        /// </summary>
+        public static bool RequiresVstoEvidenceFlush(int groupId, int projectId, int taskId)
+        {
+            return RequiresVSTOCheck(groupId, projectId, taskId);
         }
     }
 }
