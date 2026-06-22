@@ -104,11 +104,20 @@ namespace Libraries
             {
                 switch (taskId)
                 {
-                    case 3: // 5-3 図形変更
-                    case 4: // 5-4 図形のサイズ変更
-                    case 5: // 5-5 図形のグループ化
-                        // 図形の結合や変形、リサイズが発生するため、ShapesCount, ShapePosition免除が必要
+                    case 1: // P5-1 丸4個右端揃え（旧4-5）
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 2: // P5-2 四角幅揃え（旧5-4）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 3: // P5-3 星→スマイル（旧5-3）— 図形変更は図形数不変のため ShapesCount 免除なし
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 4: // P5-4 重なり順変更（旧4-6）
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 5: // P5-5 グループ化（旧5-5）— グループ化後は子図形テキストの集計方法が変わる
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
                         break;
                 }
             }
@@ -470,8 +479,8 @@ namespace Libraries
                 if (slideIndex == 1) return 1; // セクション操作の副作用（図形+1）
                 return 0;
             }
-            if (projectId == 5 && taskId == 3) return 0;                       // 5-3 図形変更 (全スライド不変)
-            if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5 グループ化
+            if (projectId == 5 && taskId == 3) return 0;                       // P5-3 図形変更 (全スライド不変)
+            if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5 グループ化
             if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3 3Dモデル挿入
             if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1 グラフ作成 (プレースホルダー内挿入のため不変)
             if (projectId == 1 && taskId == 1)
@@ -492,8 +501,8 @@ namespace Libraries
         /// スライド1に限り 0 または +1 を許容する（削除や大量追加は引き続き不許可）。
         /// 3-4（スライドズーム挿入）は結果表示時にスナップショットが挿入後状態で取られると actualDelta が 0 になるため、
         /// スライド1では 0 または +2 を許容する。
-        /// 5-5（グループ化）は結果表示時にスナップショットがグループ化後状態で取られると actualDelta が 0 になるため、
-        /// スライド3では 0 または -2 を許容する。
+        /// P5-5（グループ化）は結果表示時にスナップショットがグループ化後状態で取られると actualDelta が 0 になるため、
+        /// スライド6では 0 または -2 を許容する。
         /// </summary>
         public static bool IsAllowedShapesCountDelta(int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
         {
@@ -527,8 +536,8 @@ namespace Libraries
                 return actualDelta == 0 || actualDelta == 1;
             }
 
-            // 5-5: Slide 3 only: allow 0 or -2 (snapshot may be taken after group is already created during result grading).
-            if (projectId == 5 && taskId == 5 && slideIndex == 3)
+            // P5-5: Slide 6 only: allow 0 or -2 (snapshot may be taken after group is already created during result grading).
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
             {
                 return actualDelta == 0 || actualDelta == -2;
             }
@@ -597,7 +606,7 @@ namespace Libraries
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
             }
-            if (projectId == 5 && taskId == 5 && slideIndex == 3)
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または -2、実際の変化: {actualDelta}）";
             }
@@ -620,7 +629,7 @@ namespace Libraries
         public static bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
-            if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3 図形変更, 5-5 グループ化
+            if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3 図形変更, P5-4 z-order, P5-5 グループ化
             if (projectId == 6 && taskId == 3) return true; // 6-3 3Dモデル挿入
             if (projectId == 9 && taskId == 1) return true; // 9-1 グラフ作成
             if (projectId == 10 && taskId == 7) return true; // 10-7 プレースホルダー追加
@@ -636,7 +645,8 @@ namespace Libraries
             if (projectId == 4 && taskId == 5) return 1; // P4-5 画像の配置
             if (projectId == 4 && taskId == 6) return 1; // P4-6 画像のトリミング
             if (projectId == 4 && taskId == 8) return 1; // P4-8 垂直中央配置
-            if (projectId == 5 && taskId == 4) return 1; // 5-4 図形のサイズ変更
+            if (projectId == 5 && taskId == 1) return 4; // P5-1 丸4個右端揃え（旧4-5）
+            if (projectId == 5 && taskId == 2) return 1; // P5-2 四角幅揃え（旧5-4）
             if (projectId == 3 && taskId == 5) return 1; // P3-5 3Dモデルのサイズ変更
             // P3-7: セクションズームの副作用で複数スライドの既存図形がずれるため上限なし（-1）。図形数は GetAllowedShapesCountDelta で厳格化。
             if (projectId == 6 && taskId == 4) return 1; // 6-4 3Dモデルのサイズ変更

@@ -66,13 +66,13 @@
 | P4-6 | 旧4-4 | スライド５の右側の画像の右端を、スライドの右端に揃えてトリミングします。画像の右端以外は変更しないでください。トリミングした領域をプレゼンテーションから完全に削 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_04 | P4 実装時に PowerPointChecker1_4.cs 上書き |  |  |
 | P4-7 | 旧11-3 | 2枚目のスライドのテキストボックスに、塗りつぶし「青、アクセント1、白+基本色60％」、枠線「濃い青」、太さ「0.75pt」を設定します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_03 | P11 実装時に PowerPointChecker1_11.cs 上書き |  |  |
 | P4-8 | 旧11-6 | スライド３のコンテンツ領域にあるテキストボックスを、スライドの垂直方向の中央に配置します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_06 | P11 実装時に PowerPointChecker1_11.cs 上書き |  |  |
-| P5-1 | 旧4-5 | あなたはMOS合格対策講座のコースガイダンス資料を作成しています。 スライド３の丸の図形４個の右端を揃えます。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_05 | P4 実装時に PowerPointChecker1_4.cs 上書き | 旧4-5 は P4-5, P5-1 でも参照 |  |
-| P5-2 | 旧5-4 | スライド５の小さい四角の大きさを他の四角と同じ幅にします。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_04 | P5 実装時に PowerPointChecker1_5.cs 上書き |  |  |
-| P5-3 | 旧5-3 | スライド４の星の図形をスマイルに変更します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_03 | P5 実装時に PowerPointChecker1_5.cs 上書き |  |  |
-| P5-4 | 旧4-6 | スライド６の図形を手前から「対策講座」「PC教室」「通信講座」になるように重なりの順番を変更します。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_06 | P4 実装時に PowerPointChecker1_4.cs 上書き |  |  |
-| P5-5 | 旧5-5 | スライド６の3つの論理積ゲートの図形をグループ化します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_05 | P5 実装時に PowerPointChecker1_5.cs 上書き |  |  |
-| P5-6 | 旧4-3 | スライド「MOSって何？」の男の子の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_03 | P4 実装時に PowerPointChecker1_4.cs 上書き |  |  |
-| P5-7 | 旧11-5 | スライド２の[?]のアイコンに「濃い赤」の塗りつぶしを設定します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_05 | P11 実装時に PowerPointChecker1_11.cs 上書き |  |  |
+| P5-1 | 旧4-5 | あなたはMOS合格対策講座のコースガイダンス資料を作成しています。 スライド３の丸の図形４個の右端を揃えます。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_05 | P5 実装時に PowerPointChecker1_5.cs 上書き | スライド3・円ちょうど4個・右端2pt | 済 |
+| P5-2 | 旧5-4 | スライド５の小さい四角の大きさを他の四角と同じ幅にします。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_04 | P5 実装時に PowerPointChecker1_5.cs 上書き | 角丸四角含む・max-min幅0.5pt | 済 |
+| P5-3 | 旧5-3 | スライド４の星の図形をスマイルに変更します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_03 | P5 実装時に PowerPointChecker1_5.cs 上書き |  | 済 |
+| P5-4 | 旧4-6 | スライド６の図形を手前から「対策講座」「PC教室」「通信講座」になるように重なりの順番を変更します。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_06 | P5 実装時に PowerPointChecker1_5.cs 上書き | スライド6・Z順テキスト指定 | 済 |
+| P5-5 | 旧5-5 | スライド６の3つの論理積ゲートの図形をグループ化します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_05 | P5 実装時に PowerPointChecker1_5.cs 上書き | スライド6・3メンバー同一種類 | 済 |
+| P5-6 | 旧4-3 | スライド「MOSって何？」の男の子の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_03 | P5 実装時に PowerPointChecker1_5.cs 上書き | タイトル指定・最大画像・Decorative | 済 |
+| P5-7 | 旧11-5 | スライド２の[?]のアイコンに「濃い赤」の塗りつぶしを設定します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_05 | P5 実装時に PowerPointChecker1_5.cs 上書き | スライド2・Graphic/Icon・濃い赤RGB | 済 |
 | P6-1 | 旧10-1 | あなたは、「伝わる」プレゼンテーションのテクニックを紹介する資料を作成しています。 プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_01 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
 | P6-2 | 旧8-5 | プレゼンテーションを常に読み取り専用にします。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_05 | P8 実装時に PowerPointChecker1_8.cs 上書き |  |  |
 | P6-3 | 旧7-4 | スライドショーを自動プレゼンテーションとして設定します。 | PowerPointChecker1_7.Legacy.cs | CheckTask_1_7_04 | P7 実装時に PowerPointChecker1_7.cs 上書き |  |  |
@@ -165,6 +165,20 @@
 | P4-7 (7) | `CheckTask_1_4_07` | 旧11-3 (`CheckTask_1_11_03`) | スライド2・アクセント1塗り60％・濃い青枠線0.75pt |
 | P4-8 (8) | `CheckTask_1_4_08` | 旧11-6 (`CheckTask_1_11_06`) | スライド3・垂直中央 |
 
+## P5 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==5` では **taskId = P5-X**。**現行** `PowerPointChecker1_5.cs` のメソッド名は **P5-X = `CheckTask_1_5_0X`** に揃えた（Phase A: 全スタブ。Phase B で Legacy 参照しつつ順次実装）。
+
+| P5（taskId） | 現行メソッド | Legacy メソッド（参照元） | 検証メモ |
+|--------------|-------------|-------------------------|----------|
+| P5-1 (1) | `CheckTask_1_5_01` | 旧4-5 (`CheckTask_1_4_05`) | スライド3・円ちょうど4個・右端2pt |
+| P5-2 (2) | `CheckTask_1_5_02` | 旧5-4 (`CheckTask_1_5_04`) | スライド5・角丸四角3つ以上・max-min幅0.5pt未満 |
+| P5-3 (3) | `CheckTask_1_5_03` | 旧5-3 (`CheckTask_1_5_03`) | スライド4スマイル1・星0・全体スマイル1 |
+| P5-4 (4) | `CheckTask_1_5_04` | 旧4-6 (`CheckTask_1_4_06`) | スライド6・Z: 対策講座 > PC教室 > 通信講座 |
+| P5-5 (5) | `CheckTask_1_5_05` | 旧5-5 (`CheckTask_1_5_05`) | スライド6・3メンバーグループ・同一AutoShape・寸法一致 |
+| P5-6 (6) | `CheckTask_1_5_06` | 旧4-3 (`CheckTask_1_4_03`) | 「MOSって何？」・最大画像・Decorative |
+| P5-7 (7) | `CheckTask_1_5_07` | 旧11-5 (`CheckTask_1_11_05`) | スライド2・Graphic/Icon・濃い赤#C00000付近 |
+
 ## 破壊的操作免除一覧（`PPTaskValidationConfig`）
 
 **日常の参照は本セクション（MD）を主とする。** 旧 `(projectId, taskId)` のコード確認は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（**凍結・編集禁止**）。それでも不明なときのみ `git log -p -- Libraries/PPTaskValidationConfig.cs`。
@@ -182,7 +196,7 @@
 
 - **現行 config の正**: `Libraries/PPTaskValidationConfig.cs`（実行時はここだけ有効）
 - **VSTO 重複**: `PowerPointAddIn1/ThisAddIn.cs` にデルタ判定のコピーあり → config 変更時は両方更新
-- **taskId**: P1/P2/P3/P4 は **新番号（Px-X = taskId）**。projectId 5〜11 は **旧番号のまま**（P5 実装時に付け替え予定）
+- **taskId**: P1/P2/P3/P4/P5 は **新番号（Px-X = taskId）**。projectId 6〜11 は **旧番号のまま**（P6 実装時に付け替え予定）
 - **AnimationRemoved**: `SlidesCount` または `ShapesCount` 免除時に自動付与（P1 の 1-1/1-3/1-8 を除く）
 
 ### 列の凡例
@@ -236,16 +250,26 @@
 | 7 (P4-7) | 旧11-3 | なし | — | — | アクセント1塗り60％・濃い青枠線0.75pt |
 | 8 (P4-8) | 旧11-6 | Position | — | 上限1 | 垂直中央配置 |
 
-### 旧 projectId 4〜11（P5 実装前・config は旧番号のまま）
+### P5（projectId=5, taskId=P5-X）
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|------|
+| 1 (P5-1) | 旧4-5 | Position | — | 上限4 | 丸右端揃え（円ちょうど4個・右端2pt） |
+| 2 (P5-2) | 旧5-4 | Shapes, Position | — | 上限1 | 四角幅揃え |
+| 3 (P5-3) | 旧5-3 | Position | 全スライド: 0 | 新規のみ | 図形変更（図形数不変）。checker: スライド4スマイル1・星0・全体1 |
+| 4 (P5-4) | 旧4-6 | Position | — | 新規のみ | z-order（対策講座 > PC教室 > 通信講座） |
+| 5 (P5-5) | 旧5-5 | Shapes, **Text**, Position | スライド6: 0 or -2 | 新規のみ | グループ化。Text免除は子図形テキスト集計差対策 |
+| 6 (P5-6) | 旧4-3 | なし | — | — | 代替テキスト装飾化（最大画像・Decorative） |
+| 7 (P5-7) | 旧11-5 | なし | — | — | 塗りつぶし色のみ（#C00000付近・ただの赤除外） |
+
+### 旧 projectId 4〜11（P6 実装前・config は旧番号のまま）
 
 | projectId | taskId | 旧タスク | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 将来の新タスク（参考） |
 |-----------|--------|----------|-----------|-------------|-------------|-------------|----------------------|
 | 4 | 4 | 旧4-4 | Position | — | — | 上限1 | → **P4-6** に移植済み |
-| 4 | 5 | 旧4-5 | Position | — | — | 上限1 | → **P4-5**, P5-1 |
-| 4 | 6 | 旧4-6 | Position | — | — | 新規のみ | → **P5-4** |
-| 5 | 3 | 旧5-3 | Shapes, Position | 全スライド: 0 | — | 新規のみ | P5-3 |
-| 5 | 4 | 旧5-4 | Shapes, Position | — | — | 上限1 | P5-2 |
-| 5 | 5 | 旧5-5 | Shapes, Position | スライド3: 0 or -2 | — | 新規のみ | P5-5 |
+| 4 | 5 | 旧4-5 | Position | — | — | 上限1 | → **P4-5**, **P5-1** に移植済み |
+| 4 | 6 | 旧4-6 | Position | — | — | 新規のみ | → **P5-4** に移植済み |
+| 5 | 1〜7 | 旧5-x等 | — | — | — | — | → **P5-1〜7** に移植済み（config 更新済み） |
 | 6 | 3 | 旧6-3 | Shapes, Position | スライド1: 0 or +1 | — | 新規のみ | → **P3-4** に移植済み |
 | 6 | 4 | 旧6-4 | Position | — | — | 上限1 | → **P3-5** に移植済み |
 | 7 | 2 | 旧7-2 | Slides, Shapes, Text, Position | 無制限 | 無制限 | 無制限 | P7 系 |

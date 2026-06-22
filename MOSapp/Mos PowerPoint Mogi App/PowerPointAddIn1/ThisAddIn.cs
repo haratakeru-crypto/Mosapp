@@ -150,12 +150,7 @@ namespace PowerPointAddIn1
                     return;
 
                 // --- タスク切り替え時の処理 ---
-                // 5-1 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
-                if (_currentTaskProjectId == 5 && _currentTaskTaskId == 1)
-                {
-                    TryLogTask5_1PrintOnTaskBoundary();
-                }
-                // 11-7 も同様に、タスク離脱直前の即時再評価で証跡を確定する。
+                // 11-7 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
                 if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
                 {
                     TryLogTask11_7PrintOnTaskBoundary();
@@ -448,6 +443,12 @@ namespace PowerPointAddIn1
                 return actualDelta == 0 || actualDelta == 1;
             }
 
+            // P5-5: Slide 6 only: allow 0 or -2.
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
+            {
+                return actualDelta == 0 || actualDelta == -2;
+            }
+
             return actualDelta == allowedDelta;
         }
 
@@ -485,6 +486,10 @@ namespace PowerPointAddIn1
             if (projectId == 3 && taskId == 7 && slideIndex == 1)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または -2、実際の変化: {actualDelta}）";
             }
             return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
         }
@@ -643,7 +648,7 @@ namespace PowerPointAddIn1
         private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
-            if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3, 5-5
+            if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3, P5-4, P5-5
             if (projectId == 6 && taskId == 3) return true; // 6-3
             if (projectId == 9 && taskId == 1) return true; // 9-1
             if (projectId == 10 && taskId == 7) return true; // 10-7
@@ -655,7 +660,8 @@ namespace PowerPointAddIn1
             if (projectId == 4 && taskId == 5) return 1; // P4-5
             if (projectId == 4 && taskId == 6) return 1; // P4-6
             if (projectId == 4 && taskId == 8) return 1; // P4-8
-            if (projectId == 5 && taskId == 4) return 1; // 5-4
+            if (projectId == 5 && taskId == 1) return 4; // P5-1 丸4個右端揃え
+            if (projectId == 5 && taskId == 2) return 1; // P5-2
             if (projectId == 3 && taskId == 5) return 1; // P3-5
             // P3-7: section zoom side effects on multiple slides — no cap (-1). ShapesCount still strict per slide.
             if (projectId == 6 && taskId == 4) return 1; // 6-4
@@ -677,8 +683,8 @@ namespace PowerPointAddIn1
                 if (slideIndex == 1) return 1; // P3-7 section side effect
                 return 0;
             }
-            if (projectId == 5 && taskId == 3) return 0;                       // 5-3
-            if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5
+            if (projectId == 5 && taskId == 3) return 0;                       // P5-3
+            if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5
             if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3
             if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1
             if (projectId == 1 && taskId == 1)
@@ -899,9 +905,8 @@ namespace PowerPointAddIn1
         {
             try
             {
-                bool isTask5_1 = IsCurrentTask(5, 1);
                 bool isTask11_7 = IsCurrentTask(11, 7);
-                if (!isTask5_1 && !isTask11_7) return;
+                if (!isTask11_7) return;
                 if (Application == null || Application.Presentations == null) return;
                 PowerPoint.Presentation pres = null;
                 try
@@ -949,13 +954,6 @@ namespace PowerPointAddIn1
 
                         if (changed)
                         {
-                            if (isTask5_1 && !_task5_1PrintLogged &&
-                                outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputThreeSlideHandouts &&
-                                copies == 4 && collate)
-                            {
-                                Logger.LogTask5_1Print();
-                                _task5_1PrintLogged = true;
-                            }
                             if (isTask11_7 && !_task11_7PrintLogged &&
                                 outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages &&
                                 copies == 3 && collate)
