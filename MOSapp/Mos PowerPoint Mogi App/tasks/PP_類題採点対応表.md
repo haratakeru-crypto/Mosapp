@@ -73,13 +73,13 @@
 | P5-5 | 旧5-5 | スライド６の3つの論理積ゲートの図形をグループ化します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_05 | P5 実装時に PowerPointChecker1_5.cs 上書き | スライド6・3メンバー同一種類 | 済 |
 | P5-6 | 旧4-3 | スライド「MOSって何？」の男の子の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。 | PowerPointChecker1_4.Legacy.cs | CheckTask_1_4_03 | P5 実装時に PowerPointChecker1_5.cs 上書き | タイトル指定・最大画像・Decorative | 済 |
 | P5-7 | 旧11-5 | スライド２の[?]のアイコンに「濃い赤」の塗りつぶしを設定します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_05 | P5 実装時に PowerPointChecker1_5.cs 上書き | スライド2・Graphic/Icon・濃い赤RGB | 済 |
-| P6-1 | 旧10-1 | あなたは、「伝わる」プレゼンテーションのテクニックを紹介する資料を作成しています。 プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_01 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
-| P6-2 | 旧8-5 | プレゼンテーションを常に読み取り専用にします。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_05 | P8 実装時に PowerPointChecker1_8.cs 上書き |  |  |
-| P6-3 | 旧7-4 | スライドショーを自動プレゼンテーションとして設定します。 | PowerPointChecker1_7.Legacy.cs | CheckTask_1_7_04 | P7 実装時に PowerPointChecker1_7.cs 上書き |  |  |
-| P6-4 | 旧10-2 | スライド４，５，６を選択し、「"書式のポイント"」という名前の目的別スライドショーを作成します。スライドショーは実行しません。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_02 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
-| P6-5 | 旧5-1 | すべてのスライドをアウトラインで、部単位に"６"部印刷するように設定します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_01 | P5 実装時に PowerPointChecker1_5.cs 上書き | 旧5-1 は P6-5, P6-7 でも参照 |  |
-| P6-6 | 旧11-7 | ノートですべてのスライドを"3"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_07 | P11 実装時に PowerPointChecker1_11.cs 上書き |  |  |
-| P6-7 | 旧5-1 | 印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで"４"部印刷するように設定します。印刷は実行しないでください。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_01 | P5 実装時に PowerPointChecker1_5.cs 上書き | 旧5-1 は P6-5, P6-7 でも参照 |  |
+| P6-1 | 旧10-1 | あなたは、「伝わる」プレゼンテーションのテクニックを紹介する資料を作成しています。 プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_01 | P6 実装時に PowerPointChecker1_6.cs 上書き |  | 済 |
+| P6-2 | 旧8-5 | プレゼンテーションを常に読み取り専用にします。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_05 | P6 実装時に PowerPointChecker1_6.cs 上書き |  | 済 |
+| P6-3 | 旧7-4 | スライドショーを自動プレゼンテーションとして設定します。 | PowerPointChecker1_7.Legacy.cs | CheckTask_1_7_04 | P6 実装時に PowerPointChecker1_6.cs 上書き | VSTO キオスク証跡要 | 済 |
+| P6-4 | 旧10-2 | スライド４，５，６を選択し、「"書式のポイント"」という名前の目的別スライドショーを作成します。スライドショーは実行しません。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_02 | P6 実装時に PowerPointChecker1_6.cs 上書き | Legacy 名称「教育」→「書式のポイント」 | 済 |
+| P6-5 | 旧5-1 | すべてのスライドをアウトラインで、部単位に"６"部印刷するように設定します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_01 | P6 実装時に PowerPointChecker1_6.cs 上書き | 旧5-1 は P6-5, P6-7 でも参照。Outline/6部 | 済 |
+| P6-6 | 旧11-7 | ノートですべてのスライドを"3"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_07 | P6 実装時に PowerPointChecker1_6.cs 上書き | VSTO 印刷証跡要 | 済 |
+| P6-7 | 旧5-1 | 印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで"４"部印刷するように設定します。印刷は実行しないでください。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_01 | P6 実装時に PowerPointChecker1_6.cs 上書き | Grayscale/3スライド/4部/PrintColorType | 済 |
 | P7-1 | 旧6-1 | あなたは、情報モラルの重要性について発表する資料を作成しています。 スライド１にコメント「"情報発信の責任を考える"」を挿入します。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_01 | P6 実装時に PowerPointChecker1_6.cs 上書き |  |  |
 | P7-2 | 旧9-6 | スライド１枚目の文字列「情報学習支援」に、Webページ「"https://rabbitway.jp/"」を表示するハイパーリンクを設定します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_06 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
 | P7-3 | 旧7-3 | スライド６の後ろに、文書「まとめ」のアウトラインを使用してスライドを挿入します。 | PowerPointChecker1_7.Legacy.cs | CheckTask_1_7_03 | P7 実装時に PowerPointChecker1_7.cs 上書き |  |  |
@@ -179,6 +179,20 @@
 | P5-6 (6) | `CheckTask_1_5_06` | 旧4-3 (`CheckTask_1_4_03`) | 「MOSって何？」・最大画像・Decorative |
 | P5-7 (7) | `CheckTask_1_5_07` | 旧11-5 (`CheckTask_1_11_05`) | スライド2・Graphic/Icon・濃い赤#C00000付近 |
 
+## P6 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==6` では **taskId = P6-X**。**現行** `PowerPointChecker1_6.cs` のメソッド名は **P6-X = `CheckTask_1_6_0X`** に揃える（Phase A: 全スタブ `return false`。Phase B で Legacy 参照しつつタスク単位に実装）。
+
+| P6（taskId） | 現行メソッド | Legacy メソッド（参照元） | 検証メモ | Phase B |
+|--------------|-------------|-------------------------|----------|---------|
+| P6-1 (1) | `CheckTask_1_6_01` | 旧10-1 (`CheckTask_1_10_01`) | 全スライドコメント0 + プロパティ空 | [x] |
+| P6-2 (2) | `CheckTask_1_6_02` | 旧8-5 (`CheckTask_1_8_05`) | OpenXML readOnlyRecommended | [x] |
+| P6-3 (3) | `CheckTask_1_6_03` | 旧7-4 (`CheckTask_1_7_04`) | ppShowTypeKiosk + VSTO `[Task6-3] Kiosk` | [x] |
+| P6-4 (4) | `CheckTask_1_6_04` | 旧10-2 (`CheckTask_1_10_02`) | ショー名「書式のポイント」・スライド4-6 | [x] |
+| P6-5 (5) | `CheckTask_1_6_05` | 旧5-1 (`CheckTask_1_5_01`) | Outline/6部/Collate + VSTO `[Task6-5] Print` | [x] |
+| P6-6 (6) | `CheckTask_1_6_06` | 旧11-7 (`CheckTask_1_11_07`) | Notes/3部/ページ単位（Collate OFF）+ VSTO `[Task6-6] Print` | [x] |
+| P6-7 (7) | `CheckTask_1_6_07` | 旧5-1 (`CheckTask_1_5_01`) | Grayscale/3スライド/4部/PrintColorType + VSTO `[Task6-7] Print` | [x] |
+
 ## 破壊的操作免除一覧（`PPTaskValidationConfig`）
 
 **日常の参照は本セクション（MD）を主とする。** 旧 `(projectId, taskId)` のコード確認は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（**凍結・編集禁止**）。それでも不明なときのみ `git log -p -- Libraries/PPTaskValidationConfig.cs`。
@@ -196,7 +210,7 @@
 
 - **現行 config の正**: `Libraries/PPTaskValidationConfig.cs`（実行時はここだけ有効）
 - **VSTO 重複**: `PowerPointAddIn1/ThisAddIn.cs` にデルタ判定のコピーあり → config 変更時は両方更新
-- **taskId**: P1/P2/P3/P4/P5 は **新番号（Px-X = taskId）**。projectId 6〜11 は **旧番号のまま**（P6 実装時に付け替え予定）
+- **taskId**: P1〜P6 は **新番号（Px-X = taskId）**。projectId 7〜11 は **旧番号のまま**（各 Px 実装時に付け替え）
 - **AnimationRemoved**: `SlidesCount` または `ShapesCount` 免除時に自動付与（P1 の 1-1/1-3/1-8 を除く）
 
 ### 列の凡例
@@ -262,16 +276,24 @@
 | 6 (P5-6) | 旧4-3 | なし | — | — | 代替テキスト装飾化（最大画像・Decorative） |
 | 7 (P5-7) | 旧11-5 | なし | — | — | 塗りつぶし色のみ（#C00000付近・ただの赤除外） |
 
-### 旧 projectId 4〜11（P6 実装前・config は旧番号のまま）
+### P6（projectId=6, taskId=P6-X）— 完了
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|-------------|------|
+| 1 (P6-1) | 旧10-1 | なし | — | — | — | ドキュメント検査 |
+| 2 (P6-2) | 旧8-5 | なし | — | — | — | 読み取り専用推奨 |
+| 3 (P6-3) | 旧7-4 | なし | — | — | — | キオスク設定 |
+| 4 (P6-4) | 旧10-2 | なし | — | — | — | 目的別スライドショー「書式のポイント」 |
+| 5 (P6-5) | 旧5-1 | なし | — | — | — | アウトライン6部・部単位 |
+| 6 (P6-6) | 旧11-7 | なし | — | — | — | ノート3部・**ページ単位**（Collate OFF） |
+| 7 (P6-7) | 旧5-1 | なし | — | — | — | グレースケール配布資料3スライド/頁・4部 |
+
+> 旧 `projectId=6 taskId=3/4`（6-3/6-4 3Dモデル）は **P3-4/5 に移植済み**。Phase A で config から削除済み。
+
+### 旧 projectId 7〜11（P7 以降・config は旧番号のまま）
 
 | projectId | taskId | 旧タスク | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 将来の新タスク（参考） |
 |-----------|--------|----------|-----------|-------------|-------------|-------------|----------------------|
-| 4 | 4 | 旧4-4 | Position | — | — | 上限1 | → **P4-6** に移植済み |
-| 4 | 5 | 旧4-5 | Position | — | — | 上限1 | → **P4-5**, **P5-1** に移植済み |
-| 4 | 6 | 旧4-6 | Position | — | — | 新規のみ | → **P5-4** に移植済み |
-| 5 | 1〜7 | 旧5-x等 | — | — | — | — | → **P5-1〜7** に移植済み（config 更新済み） |
-| 6 | 3 | 旧6-3 | Shapes, Position | スライド1: 0 or +1 | — | 新規のみ | → **P3-4** に移植済み |
-| 6 | 4 | 旧6-4 | Position | — | — | 上限1 | → **P3-5** に移植済み |
 | 7 | 2 | 旧7-2 | Slides, Shapes, Text, Position | 無制限 | 無制限 | 無制限 | P7 系 |
 | 7 | 3 | 旧7-3 | 同上 | 無制限 | 無制限 | 無制限 | P7-3 |
 | 8 | 1 | 旧8-1 | Shapes | 無制限 | — | — | P9-1 等 |
@@ -293,7 +315,7 @@
 | (6, 3) 旧6-3 3D挿入 | P3-4 (3, 4) | Legacy の `projectId == 6 && taskId == 3` |
 | (6, 4) 旧6-4 3Dサイズ | P3-5 (3, 5) | Legacy の `projectId == 6 && taskId == 4` |
 | (4, 5) 旧4-5 画像配置 | P4-5 (4,5)、P5-1 (5,1) | Legacy の `projectId==4 && taskId==5`（**旧番号**。現行 P4-5 は config の projectId=4 taskId=5） |
-| (5, 1) 旧5-1 印刷 | P6-5, P6-7（未実装） | 現行 config に該当行なし（免除なし） |
+| (5, 1) 旧5-1 印刷 | P6-5 (6,5), P6-7 (6,7) | Phase A: P6 config 枠のみ。Phase B で checker + VSTO |
 
 > P5 着手時: 上記「旧 5〜11」表と **Legacy（凍結）** の旧番号行を参照し、現行 `PPTaskValidationConfig.cs` と本 MD の P5 セクションに書き換える。**Legacy ファイル自体は更新しない。**
 
@@ -323,8 +345,9 @@
 - [x] **P2**（8 タスク）— 完了（P2-4 累積採点の既知課題あり）
 - [x] **P3**（7 タスク）— 完了（採点・破壊的操作とも検証済み）
 - [ ] **P4**（8 タスク）— 実装済み・検証待ち
-- [ ] **P5**（7 タスク）— 未着手
-- [ ] **P6**（7 タスク）— 未着手
+- [ ] **P5**（7 タスク）— 完了・検証済み
+- [x] **P6 Phase A**（7 タスク）— スキャフォールド完了（Checker スタブ・Grader・config）
+- [x] **P6 Phase B** — P6-1 → … → P6-7 をタスク単位に実装・検証
 - [ ] **P7**（5 タスク）— 未着手
 - [ ] **P8**（5 タスク）— 未着手
 - [ ] **P9**（5 タスク）— 未着手

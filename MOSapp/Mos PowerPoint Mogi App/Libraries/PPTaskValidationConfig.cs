@@ -126,15 +126,16 @@ namespace Libraries
             }
             else if (projectId == 6)
             {
+                // P6: taskId 1〜7 = P6-1〜P6-7。Phase A: 旧6-3/6-4（→ P3-4/5）を削除。免除は Phase B でタスク単位に追記。
                 switch (taskId)
                 {
-                    case 3: // 6-3 3Dモデル挿入
-                        // 3Dモデルが追加および配置されるため、ShapesCount, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
-                        break;
-                    case 4: // 6-4 3Dモデルのサイズ変更
-                        // オブジェクトの寸法が変化するため、ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapePosition;
+                    case 1: // P6-1 ドキュメント検査
+                    case 2: // P6-2 読み取り専用
+                    case 3: // P6-3 キオスク
+                    case 4: // P6-4 目的別スライドショー
+                    case 5: // P6-5 アウトライン印刷6部
+                    case 6: // P6-6 ノート印刷3部
+                    case 7: // P6-7 グレースケール配布資料4部
                         break;
                 }
             }
@@ -484,7 +485,6 @@ namespace Libraries
             }
             if (projectId == 5 && taskId == 3) return 0;                       // P5-3 図形変更 (全スライド不変)
             if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5 グループ化
-            if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3 3Dモデル挿入
             if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1 グラフ作成 (プレースホルダー内挿入のため不変)
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
@@ -510,12 +510,6 @@ namespace Libraries
         public static bool IsAllowedShapesCountDelta(int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
         {
             if (allowedDelta == int.MaxValue) return true;
-
-            // 6-3: Slide 1 only: allow 0 or +1. Disallow deletions (<0) and bulk additions (>1).
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == 1;
-            }
 
             // P3-4: Slide 1 only: allow 0 or +1 (3Dモデル挿入)。
             if (projectId == 3 && taskId == 4 && slideIndex == 1)
@@ -586,13 +580,9 @@ namespace Libraries
             return actualDelta == allowedDelta;
         }
 
-        /// <summary>破壊的操作ログ用。6-3は「0 または +1」、3-4 スライド1は「0 または +2」、5-5 スライド3は「0 または -2」、それ以外は従来の期待値表記。</summary>
+        /// <summary>破壊的操作ログ用。P3-4 スライド1は「0 または +1」、P3-6 は「0 または +3」、P5-5 スライド6は「0 または -2」、それ以外は従来の期待値表記。</summary>
         public static string FormatDestructiveShapesCountMessage(int slideIndex, int projectId, int taskId, int allowedDelta, int actualDelta)
         {
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
-            {
-                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
-            }
             if (projectId == 3 && taskId == 4 && slideIndex == 1)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
@@ -633,7 +623,6 @@ namespace Libraries
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3 図形変更, P5-4 z-order, P5-5 グループ化
-            if (projectId == 6 && taskId == 3) return true; // 6-3 3Dモデル挿入
             if (projectId == 9 && taskId == 1) return true; // 9-1 グラフ作成
             if (projectId == 10 && taskId == 7) return true; // 10-7 プレースホルダー追加
             return false;
@@ -652,7 +641,6 @@ namespace Libraries
             if (projectId == 5 && taskId == 2) return 1; // P5-2 四角幅揃え（旧5-4）
             if (projectId == 3 && taskId == 5) return 1; // P3-5 3Dモデルのサイズ変更
             // P3-7: セクションズームの副作用で複数スライドの既存図形がずれるため上限なし（-1）。図形数は GetAllowedShapesCountDelta で厳格化。
-            if (projectId == 6 && taskId == 4) return 1; // 6-4 3Dモデルのサイズ変更
             if (projectId == 9 && taskId == 6) return 1; // 9-6 ハイパーリンク (書き換えによるサイズ変化を許容)
             if (projectId == 11 && taskId == 6) return 1; // 11-6 整列
             return -1;

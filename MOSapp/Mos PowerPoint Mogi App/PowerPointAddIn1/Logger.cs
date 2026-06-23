@@ -83,6 +83,24 @@ namespace PowerPointAddIn1
             LogTaskTag("Task11-7", "Print");
         }
 
+        /// <summary>P6-5: アウトライン・6部・部単位で印刷設定したことを記録。</summary>
+        public static void LogTask6_5Print()
+        {
+            LogTaskTag("Task6-5", "Print");
+        }
+
+        /// <summary>P6-6: ノート・3部・ページ単位（Collate OFF）で印刷設定したことを記録。</summary>
+        public static void LogTask6_6Print()
+        {
+            LogTaskTag("Task6-6", "Print");
+        }
+
+        /// <summary>P6-7: グレースケール配布資料3スライド/頁・4部で印刷設定したことを記録。</summary>
+        public static void LogTask6_7Print()
+        {
+            LogTaskTag("Task6-7", "Print");
+        }
+
         /// <summary>4-3: スライド1画像に光彩18pt・アクセント6を適用したことを記録。</summary>
         public static void LogTask4_3Glow()
         {
@@ -135,6 +153,12 @@ namespace PowerPointAddIn1
         public static void LogTask7_4Kiosk()
         {
             LogTaskTag("Task7-4", "Kiosk");
+        }
+
+        /// <summary>P6-3: スライドショーを自動プレゼンテーション（Kiosk）に設定したことを記録。</summary>
+        public static void LogTask6_3Kiosk()
+        {
+            LogTaskTag("Task6-3", "Kiosk");
         }
 
         /// <summary>10-1: ドキュメント検査実行を記録。</summary>
@@ -220,6 +244,9 @@ namespace PowerPointAddIn1
                         || string.Equals(taskTag, "Task1-8", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task4-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task6-5", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task6-6", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task6-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal))
                     {

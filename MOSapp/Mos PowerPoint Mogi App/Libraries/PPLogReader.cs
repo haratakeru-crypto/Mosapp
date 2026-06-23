@@ -272,6 +272,8 @@ namespace Libraries
                     return new[] { "[Task4-3] Glow18Accent6" };
                 case 10:
                     return new[] { "[Task10-4] Grayscale" };
+                case 6:
+                    return new[] { "[Task6-5] Print", "[Task6-6] Print", "[Task6-7] Print" };
                 case 11:
                     return new[] { "[Task11-7] Print" };
                 default:
@@ -419,6 +421,24 @@ namespace Libraries
             return HasGradingEvidenceMarker("[Task5-1] Print");
         }
 
+        /// <summary>証跡またはメインログに P6-5 の印刷記録（[Task6-5] Print）が含まれるか。</summary>
+        public static bool HasTask6_5PrintExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task6-5] Print");
+        }
+
+        /// <summary>証跡またはメインログに P6-6 の印刷記録（[Task6-6] Print）が含まれるか。</summary>
+        public static bool HasTask6_6PrintExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task6-6] Print");
+        }
+
+        /// <summary>証跡またはメインログに P6-7 の印刷記録（[Task6-7] Print）が含まれるか。</summary>
+        public static bool HasTask6_7PrintExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task6-7] Print");
+        }
+
         /// <summary>証跡またはメインログに 1-8 サマリーズーム挿入記録（[Task1-8] SummaryZoom）が含まれるか。</summary>
         public static bool HasTask1_8SummaryZoomExecuted()
         {
@@ -541,6 +561,12 @@ namespace Libraries
         public static bool HasTask7_4KioskExecuted()
         {
             return HasLogLineContaining("[Task7-4] Kiosk");
+        }
+
+        /// <summary>ログに P6-3 Kiosk 設定記録（[Task6-3] Kiosk）が含まれるか。</summary>
+        public static bool HasTask6_3KioskExecuted()
+        {
+            return HasLogLineContaining("[Task6-3] Kiosk");
         }
 
         /// <summary>ログに 10-1 ドキュメント検査記録（[Task10-1] DocumentInspector）が含まれるか。</summary>

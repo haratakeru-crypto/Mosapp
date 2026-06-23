@@ -68,8 +68,12 @@ namespace PowerPointAddIn1
         private int _lastPrintOutputType = -1;
         private int _lastPrintCopies = -1;
         private int _lastPrintCollate = -1;
+        private int _lastPrintColorType = -1;
         private bool _printOptionsInitialized;
         private bool _task5_1PrintLogged;
+        private bool _task6_5PrintLogged;
+        private bool _task6_6PrintLogged;
+        private bool _task6_7PrintLogged;
         private bool _task11_7PrintLogged;
 
         private Timer _kiosk7_4PollTimer;
@@ -108,6 +112,9 @@ namespace PowerPointAddIn1
             _grayscalePollTimer.Start();
 
             _task5_1PrintLogged = false;
+            _task6_5PrintLogged = false;
+            _task6_6PrintLogged = false;
+            _task6_7PrintLogged = false;
             _task11_7PrintLogged = false;
             _printOptionsPollTimer = new Timer();
             _printOptionsPollTimer.Interval = 1000;
@@ -161,11 +168,15 @@ namespace PowerPointAddIn1
             {
                 if (!File.Exists(CurrentTaskFilePath))
                 {
-                    // 最終タスク（11-7）でレビュー遷移時に current_task が消えるケースでも、
+                    // 最終タスク（11-7 / P6-7）でレビュー遷移時に current_task が消えるケースでも、
                     // 離脱直前の印刷設定を1回だけ再評価して証跡を確定する。
                     if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
                     {
                         TryLogTask11_7PrintOnTaskBoundary();
+                    }
+                    if (_currentTaskProjectId == 6 && _currentTaskTaskId == 7)
+                    {
+                        TryLogTask6_7PrintOnTaskBoundary();
                     }
                     _currentTaskProjectId = -1;
                     _currentTaskTaskId = -1;
@@ -188,10 +199,22 @@ namespace PowerPointAddIn1
                     return;
 
                 // --- タスク切り替え時の処理 ---
-                // 11-7 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
+                // 11-7 / P6-5 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
                 if (taskIdentityChanged && _currentTaskProjectId == 11 && _currentTaskTaskId == 7)
                 {
                     TryLogTask11_7PrintOnTaskBoundary();
+                }
+                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 5)
+                {
+                    TryLogTask6_5PrintOnTaskBoundary();
+                }
+                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 6)
+                {
+                    TryLogTask6_6PrintOnTaskBoundary();
+                }
+                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 7)
+                {
+                    TryLogTask6_7PrintOnTaskBoundary();
                 }
                 // 4-3 は光彩が 4-4 で外れるため、離脱直前に COM/OpenXML で証跡を確定する。
                 if (taskIdentityChanged && _currentTaskProjectId == 4 && _currentTaskTaskId == 3)
@@ -231,6 +254,10 @@ namespace PowerPointAddIn1
                 }
                 if (!(projectId == 1 && taskId == 8)) _task1_8Logged = false;
                 if (!(projectId == 4 && taskId == 3)) _task4_3GlowLogged = false;
+                if (!(projectId == 7 && taskId == 4) && !(projectId == 6 && taskId == 3)) _task7_4KioskLogged = false;
+                if (!(projectId == 6 && taskId == 5)) _task6_5PrintLogged = false;
+                if (!(projectId == 6 && taskId == 6)) _task6_6PrintLogged = false;
+                if (!(projectId == 6 && taskId == 7)) _task6_7PrintLogged = false;
 
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
@@ -458,12 +485,6 @@ namespace PowerPointAddIn1
         {
             if (allowedDelta == int.MaxValue) return true;
 
-            // 6-3: Slide 1 only: allow 0 or +1. Disallow deletions (<0) and bulk additions (>1).
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == 1;
-            }
-
             // P3-4: Slide 1 only: allow 0 or +1.
             if (projectId == 3 && taskId == 4 && slideIndex == 1)
             {
@@ -510,10 +531,6 @@ namespace PowerPointAddIn1
 
         private static string FormatDestructiveShapesCountMessage(int slideIndex, int projectId, int taskId, int allowedDelta, int actualDelta)
         {
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
-            {
-                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
-            }
             if (projectId == 3 && taskId == 4 && slideIndex == 1)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
@@ -692,7 +709,6 @@ namespace PowerPointAddIn1
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3, P5-4, P5-5
-            if (projectId == 6 && taskId == 3) return true; // 6-3
             if (projectId == 9 && taskId == 1) return true; // 9-1
             if (projectId == 10 && taskId == 7) return true; // 10-7
             return false;
@@ -707,7 +723,6 @@ namespace PowerPointAddIn1
             if (projectId == 5 && taskId == 2) return 1; // P5-2
             if (projectId == 3 && taskId == 5) return 1; // P3-5
             // P3-7: section zoom side effects on multiple slides — no cap (-1). ShapesCount still strict per slide.
-            if (projectId == 6 && taskId == 4) return 1; // 6-4
             if (projectId == 9 && taskId == 1) return -1; // デフォルトへ (deltaで制御)
             if (projectId == 9 && taskId == 6) return 1; // 9-6
             if (projectId == 11 && taskId == 6) return 1; // 11-6
@@ -728,7 +743,6 @@ namespace PowerPointAddIn1
             }
             if (projectId == 5 && taskId == 3) return 0;                       // P5-3
             if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5
-            if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3
             if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
@@ -977,8 +991,11 @@ namespace PowerPointAddIn1
         {
             try
             {
+                bool isTask6_5 = IsCurrentTask(6, 5);
+                bool isTask6_6 = IsCurrentTask(6, 6);
+                bool isTask6_7 = IsCurrentTask(6, 7);
                 bool isTask11_7 = IsCurrentTask(11, 7);
-                if (!isTask11_7) return;
+                if (!isTask6_5 && !isTask6_6 && !isTask6_7 && !isTask11_7) return;
                 if (Application == null || Application.Presentations == null) return;
                 PowerPoint.Presentation pres = null;
                 try
@@ -996,6 +1013,7 @@ namespace PowerPointAddIn1
                         _lastPrintOutputType = -1;
                         _lastPrintCopies = -1;
                         _lastPrintCollate = -1;
+                        _lastPrintColorType = -1;
                     _task7_4KioskLogged = false;
                     }
 
@@ -1008,6 +1026,8 @@ namespace PowerPointAddIn1
                         int copies = po.NumberOfCopies;
                         int collateInt = Convert.ToInt32(po.Collate);
                         bool collate = (collateInt == (int)Office.MsoTriState.msoTrue);
+                        int printColorType = -1;
+                        try { printColorType = (int)po.PrintColorType; } catch { }
 
                         if (!_printOptionsInitialized)
                         {
@@ -1015,17 +1035,39 @@ namespace PowerPointAddIn1
                             _lastPrintOutputType = outputType;
                             _lastPrintCopies = copies;
                             _lastPrintCollate = collateInt;
+                            _lastPrintColorType = printColorType;
                             _printOptionsInitialized = true;
                             return;
                         }
 
-                        bool changed = (_lastPrintOutputType != outputType || _lastPrintCopies != copies || _lastPrintCollate != collateInt);
+                        bool changed = (_lastPrintOutputType != outputType || _lastPrintCopies != copies
+                            || _lastPrintCollate != collateInt || _lastPrintColorType != printColorType);
                         _lastPrintOutputType = outputType;
                         _lastPrintCopies = copies;
                         _lastPrintCollate = collateInt;
+                        _lastPrintColorType = printColorType;
 
                         if (changed)
                         {
+                            if (isTask6_5 && !_task6_5PrintLogged &&
+                                outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputOutline &&
+                                copies == 6 && collate)
+                            {
+                                Logger.LogTask6_5Print();
+                                _task6_5PrintLogged = true;
+                            }
+                            if (isTask6_6 && !_task6_6PrintLogged &&
+                                outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages &&
+                                copies == 3 && !collate)
+                            {
+                                Logger.LogTask6_6Print();
+                                _task6_6PrintLogged = true;
+                            }
+                            if (isTask6_7 && !_task6_7PrintLogged && MatchesTask6_7PrintOptions(po))
+                            {
+                                Logger.LogTask6_7Print();
+                                _task6_7PrintLogged = true;
+                            }
                             if (isTask11_7 && !_task11_7PrintLogged &&
                                 outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages &&
                                 copies == 3 && collate)
@@ -1075,6 +1117,136 @@ namespace PowerPointAddIn1
                         {
                             Logger.LogTask5_1Print();
                             _task5_1PrintLogged = true;
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// P6-5 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// </summary>
+        private void TryLogTask6_5PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task6_5PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        int outputType = (int)po.OutputType;
+                        int copies = po.NumberOfCopies;
+                        bool collate = (Convert.ToInt32(po.Collate) == (int)Office.MsoTriState.msoTrue);
+
+                        if (outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputOutline
+                            && copies == 6
+                            && collate)
+                        {
+                            Logger.LogTask6_5Print();
+                            _task6_5PrintLogged = true;
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// P6-6 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// </summary>
+        private void TryLogTask6_6PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task6_6PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        int outputType = (int)po.OutputType;
+                        int copies = po.NumberOfCopies;
+                        bool collate = (Convert.ToInt32(po.Collate) == (int)Office.MsoTriState.msoTrue);
+
+                        if (outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages
+                            && copies == 3
+                            && !collate)
+                        {
+                            Logger.LogTask6_6Print();
+                            _task6_6PrintLogged = true;
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        private static bool MatchesTask6_7PrintOptions(PowerPoint.PrintOptions po)
+        {
+            if (po == null) return false;
+            try
+            {
+                return (int)po.OutputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputThreeSlideHandouts
+                    && po.NumberOfCopies == 4
+                    && po.PrintColorType == PowerPoint.PpPrintColorType.ppPrintBlackAndWhite;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// P6-7 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// プロジェクト6最終タスクで current_task が消える経路の取りこぼしも補完する。
+        /// </summary>
+        private void TryLogTask6_7PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task6_7PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        if (MatchesTask6_7PrintOptions(po))
+                        {
+                            Logger.LogTask6_7Print();
+                            _task6_7PrintLogged = true;
                         }
                     }
                     finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
@@ -1455,7 +1627,9 @@ namespace PowerPointAddIn1
         private void Kiosk7_4PollTimer_Tick(object sender, EventArgs e)
         {
             if (_task7_4KioskLogged) return;
-            if (!IsCurrentTask(7, 4)) return;
+            bool isTask7_4 = IsCurrentTask(7, 4);
+            bool isTask6_3 = IsCurrentTask(6, 3);
+            if (!isTask7_4 && !isTask6_3) return;
             try
             {
                 if (Application == null || Application.Presentations == null) return;
@@ -1471,7 +1645,10 @@ namespace PowerPointAddIn1
                         if (ss == null) return;
                         if (ss.ShowType == PowerPoint.PpSlideShowType.ppShowTypeKiosk)
                         {
-                            Logger.LogTask7_4Kiosk();
+                            if (isTask6_3)
+                                Logger.LogTask6_3Kiosk();
+                            else if (isTask7_4)
+                                Logger.LogTask7_4Kiosk();
                             _task7_4KioskLogged = true;
                         }
                     }
