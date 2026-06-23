@@ -14,15 +14,15 @@
    アドイン側はそれを検知し、その時点のプレゼンテーションの「スナップショット（現在の状態）」をファイルに保存します。
 
 2. **操作中（裏側の監視）**:
-   ユーザーがタスクの指示に従って操作します。タスクを切り替える（次の問題へ進む）タイミングで、アドイン側は保存しておいた「開始時のスナップショット」と「移動直前の状態」を比較し、本来変更してはならない部分（例: 触ってはいけない図形の移動、余計な文字入力など）があれば、「破壊的操作エラー」としてログファイルに記録します。  
-   現行ではこれに加えて、`MoveToNextProject()` 側でも遷移直前に `PPSnapshotChecker.CompareAndGetErrors()` を実行し、検知エラーを `mos_ppt_destructive_errors.log` に追記しています。
+   ユーザーがタスクの指示に従って操作します。タスクを切り替える（次の問題へ進む）タイミングで、VSTO アドイン側は保存しておいた「開始時のスナップショット（`project-task-attempt` 一致時のみ）」と「移動直前の状態」を比較し、本来変更してはならない部分があれば `PPLogReader.AppendDestructiveErrors` 経由で `mos_ppt_destructive_errors.log` に記録します。
+   プロジェクト遷移（`MoveToNextProject`）では破壊的操作ログへ追記しません（Word 方式に合わせ、記録は VSTO 境界と Grader ゲートに一本化）。
 
-3. **採点ボタン押下時（リアルタイム監視）**:
-   試験アプリ側は、採点開始時に以下の2つのチェックを行います。
-   - **過去のログチェック**: アドインが記録した「破壊的操作エラー」の履歴がないかを確認します（これで、タスク遷移時に裏で行われた不正操作を検知します）。
-   - **スナップショットのリアルタイムチェック**: 現在のPowerPointの状態と、開始時のスナップショットを再度比較します（これで、採点ボタンを押す直前に行われた不正操作を検知します）。
-
-   これらのチェックをすべてクリアした場合のみ、本来のタスクごとの機能チェック（COM検証）へ進みます。
+3. **採点ボタン押下時（ゲート順）**:
+   試験アプリ側は、採点開始時に以下のチェックを行います（Word の `WordGradingGate` と同型）。
+   - **① 過去の破壊的操作ログ**: `PPLogReader.HasLoggedDestructiveError(project, task, attempt)`
+   - **② 許可外ログ操作**: `PPLogReader.HasDisallowedOperations`
+   - **③ スナップショット比較**: `PPSnapshotChecker.CompareAndGetErrors(project, task, attempt, flags)` — 失敗時は `PPLogReader.AppendDestructiveErrors` で記録
+   - **④ COM 採点**: `PowerPointChecker1_X`
 
 ---
 
@@ -38,7 +38,7 @@
     *   **役割**: アプリバーのUI制御。タスクが切り替わった際に `WriteCurrentTaskFile()` を呼び出し、現在のプロジェクト番号、タスク番号、および上記の `PPTaskValidationConfig` から取得した「免除フラグ」をセットで `%TEMP%\mos_ppt_current_task.txt` に書き込み、VSTOアドインにタスク開始を通知します。
 *   **`PowerPointGrader.cs`**
     *   **役割**: 「採点」ボタンが押下された際に呼ばれるメインの採点クラスです。
-    *   **詳細**: タスクごとのロジック（`PowerPointChecker1_X` など）を呼び出す前に、`HasLoggedDestructiveError()`（破壊的操作ログ確認）→ `FailsLogChecks()`（許可外ログ操作確認）→ `PPSnapshotChecker.CompareAndGetErrors()`（リアルタイム比較）の順でチェックします。いずれかでエラー（不正な変更）があれば、即座に「✖（不合格）」を返します。
+    *   **詳細**: タスクごとのロジック（`PowerPointChecker1_X` など）を呼び出す前に、`PPLogReader.HasLoggedDestructiveError` → `FailsLogChecks` → `PPSnapshotChecker.CompareAndGetErrors` の順でチェックします。スナップショット比較で失敗した場合は `PPLogReader.AppendDestructiveErrors` で記録します。採点直前の再スナップショットには `SnapshotGen`（世代番号）を使用し、古い基準の再利用を防ぎます。
 *   **`Libraries/PPSnapshotChecker.cs`**
     *   **役割**: リアルタイムのスナップショット比較エンジン。
     *   **詳細**: `mos_ppt_snapshot.txt` （開始時の状態）を読み込み、現在の PowerPoint 上の「スライド数」「図形の数」「スライド単位の文字数」「総テキスト文字数（`TextFrame2`優先）」「アニメーション数」「図形の座標」を取得して比較します。免除フラグ（ExemptFlags）に加えて、`PPTaskValidationConfig` のタスク別デルタ判定（図形数/文字数）や既存図形変更数の上限判定を適用し、免除タスクでも指示外操作を検知します。

@@ -83,7 +83,8 @@ namespace MOS_PowerPoint_app.Views
         private readonly HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
-        
+        private bool _isScoring;
+
         public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null)
         {
             InitializeComponent();
@@ -297,6 +298,37 @@ namespace MOS_PowerPoint_app.Views
             }
         }
 
+        private void BeginScoringSession()
+        {
+            _isScoring = true;
+            _timer?.Stop();
+            _projectTimer?.Stop();
+            _slideMonitorTimer?.Stop();
+            System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] BeginScoringSession");
+        }
+
+        private void EndScoringSession(bool restartTimers = true)
+        {
+            _isScoring = false;
+            try
+            {
+                WriteCurrentTaskFile(force: true);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] EndScoringSession WriteCurrentTaskFile: " + ex.Message);
+            }
+
+            if (restartTimers && !MainWindow.IsTimerDisabled && !_isPaused)
+            {
+                _timer?.Start();
+                _projectTimer?.Start();
+                _slideMonitorTimer?.Start();
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] EndScoringSession restartTimers={restartTimers}");
+        }
+
         private void InitializeSlideMonitor()
         {
             PowerPointChecker1_1.ResetTask4SlideDeletionState();
@@ -449,10 +481,7 @@ namespace MOS_PowerPoint_app.Views
             {
                 System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Showing result window (scoring all projects first)");
 
-                // 採点中に UI タイマーが MoveToNextProject / OpenProjectDocument を走らせて COM と競合しないよう停止する
-                _timer?.Stop();
-                _projectTimer?.Stop();
-                _slideMonitorTimer?.Stop();
+                BeginScoringSession();
                 
                 // 「採点中です」オーバーレイを表示
                 // 待機を徹底するため画面中央に表示（Owner は付けず、ワークエリア中央 = CenterScreen）
@@ -585,6 +614,10 @@ namespace MOS_PowerPoint_app.Views
                 }
                 System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] Error showing result window: {ex.Message}");
                 MessageBox.Show($"結果画面の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                EndScoringSession(restartTimers: false);
             }
         }
 
@@ -943,12 +976,20 @@ namespace MOS_PowerPoint_app.Views
             {
                 SyncProjectToMainViewModel();
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint)");
-                
-                // プロジェクト一覧画面の採点と同じ処理を実行（MainViewModel.ExecuteScore → 採点結果ダイアログ表示）
-                if (_onScoreClick != null)
-                    _onScoreClick();
-                else
-                    MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                BeginScoringSession();
+                try
+                {
+                    // プロジェクト一覧画面の採点と同じ処理を実行（MainViewModel.ExecuteScore → 採点結果ダイアログ表示）
+                    if (_onScoreClick != null)
+                        _onScoreClick();
+                    else
+                        MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                finally
+                {
+                    EndScoringSession(restartTimers: true);
+                }
             }
             catch (Exception ex)
             {
@@ -2057,19 +2098,23 @@ namespace MOS_PowerPoint_app.Views
         /// <summary>
         /// VSTO アドインが現在タスクを参照するため、共有ファイルに ProjectId,TaskId を書き出す。
         /// </summary>
-        private void WriteCurrentTaskFile()
+        private void WriteCurrentTaskFile(bool force = false)
         {
+            if (_isScoring && !force)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] WriteCurrentTaskFile skipped (scoring in progress)");
+                return;
+            }
+
             try
             {
-                string path = Libraries.PPLogReader.GetCurrentTaskFilePath();
                 var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
                 if (_fromResultWindow)
                 {
                     EnsureRetryAttemptPrepared(_currentProjectId, _currentTaskId);
                 }
                 int attemptNo = GetCurrentTaskAttempt(_currentProjectId, _currentTaskId);
-                string content = $"{_currentProjectId},{_currentTaskId},{(int)flags},{attemptNo}";
-                File.WriteAllText(path, content, Encoding.UTF8);
+                Libraries.PPLogReader.WriteCurrentTaskFile(_currentProjectId, _currentTaskId, (int)flags, attemptNo, 0);
             }
             catch (Exception ex)
             {
@@ -2094,26 +2139,8 @@ namespace MOS_PowerPoint_app.Views
 
         private async Task MoveToNextProjectCoreAsync()
         {
-            // プロジェクト遷移直前に破壊的操作チェックを完了し、違反があればログに記録（遷移は継続）
-            try
-            {
-                var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
-                var swDestructive = Stopwatch.StartNew();
-                var errors = Libraries.PPSnapshotChecker.CompareAndGetErrors(_currentProjectId, _currentTaskId, flags);
-                PPGradingPerf.Log("MoveToNextProject.destructiveSnapshotCheck", swDestructive.ElapsedMilliseconds, $"P{_currentProjectId}-T{_currentTaskId} errCount={errors?.Count ?? 0}");
-                if (errors != null && errors.Count > 0)
-                {
-                    string logPath = Libraries.PPLogReader.GetDestructiveLogPath();
-                    string errorMsg = string.Join(" | ", errors);
-                    int attemptNo = GetCurrentTaskAttempt(_currentProjectId, _currentTaskId);
-                    File.AppendAllText(logPath, $"{_currentProjectId},{_currentTaskId},{attemptNo}:{errorMsg}{Environment.NewLine}");
-                    System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Destructive check failed for {_currentProjectId}-{_currentTaskId}: {errorMsg}");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Destructive check error: {ex.Message}");
-            }
+            // 破壊的操作の記録は VSTO タスク境界と Grader ゲートに一本化（Word 方式）。
+            // プロジェクト遷移時は destructive_errors.log へ追記しない。
 
             // current_task を消す前に、印刷系タスク（5-1/11-7）は同期再評価して証跡を確定する。
             // 最終タスク 11-7 での高速遷移時の取りこぼしを防ぐため、アプリ側でも境界補完する。
@@ -2779,38 +2806,46 @@ namespace MOS_PowerPoint_app.Views
             if (resultWindow == null)
                 return;
 
-            foreach (var key in keysToScore)
+            BeginScoringSession();
+            try
             {
-                if (!TryParseTaskKey(key, out int projectId, out int taskId))
-                    continue;
-
-                int attemptNo = GetCurrentTaskAttempt(projectId, taskId);
-                bool? passed = null;
-                bool isError = false;
-                try
+                foreach (var key in keysToScore)
                 {
-                    using (var grader = new PowerPointGrader())
+                    if (!TryParseTaskKey(key, out int projectId, out int taskId))
+                        continue;
+
+                    int attemptNo = GetCurrentTaskAttempt(projectId, taskId);
+                    bool? passed = null;
+                    bool isError = false;
+                    try
                     {
-                        if (!grader.Connect())
+                        using (var grader = new PowerPointGrader())
                         {
-                            isError = true;
-                        }
-                        else
-                        {
-                            grader.StartTaskAndWaitForSnapshot(projectId, taskId, attemptNo, 2000, 50);
-                            passed = grader.GradeTask(projectId, taskId, attemptNo);
+                            if (!grader.Connect())
+                            {
+                                isError = true;
+                            }
+                            else
+                            {
+                                grader.StartTaskAndWaitForSnapshot(projectId, taskId, attemptNo, 2000, 50);
+                                passed = grader.GradeTask(projectId, taskId, attemptNo);
+                            }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    isError = true;
-                    System.Diagnostics.Debug.WriteLine($"[RetryAttempt] Rescore error for {key}: {ex.Message}");
-                }
+                    catch (Exception ex)
+                    {
+                        isError = true;
+                        System.Diagnostics.Debug.WriteLine($"[RetryAttempt] Rescore error for {key}: {ex.Message}");
+                    }
 
-                resultWindow.ApplyRetryScoreResult(projectId, taskId, passed, isError);
-                if (!isError)
-                    _retryTaskKeys.Remove(key);
+                    resultWindow.ApplyRetryScoreResult(projectId, taskId, passed, isError);
+                    if (!isError)
+                        _retryTaskKeys.Remove(key);
+                }
+            }
+            finally
+            {
+                EndScoringSession(restartTimers: true);
             }
         }
 

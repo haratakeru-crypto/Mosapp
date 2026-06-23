@@ -119,6 +119,9 @@ namespace Libraries
                     case 5: // P5-5 グループ化（旧5-5）— グループ化後は子図形テキストの集計方法が変わる
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
                         break;
+                    case 7: // P5-7 アイコン塗りつぶし（スライド2）— 塗りつぶしで境界ボックスが微変動し得る
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
                 }
             }
             else if (projectId == 6)

@@ -58,6 +58,93 @@ namespace Libraries
             return Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
         }
 
+        /// <summary>current_task ファイルの固定フィールド数（ProjectId,TaskId,ExemptFlags,AttemptNo,SnapshotGen）。</summary>
+        public const int CurrentTaskFieldCount = 5;
+
+        /// <summary>
+        /// 現在タスク共有ファイルを原子的に書き込む。
+        /// 形式: ProjectId,TaskId,ExemptFlags,AttemptNo,SnapshotGen（5項目固定）。
+        /// UI 遷移は SnapshotGen=0、採点時は &gt;0。
+        /// </summary>
+        public static void WriteCurrentTaskFile(int projectId, int taskId, int exemptFlags, int attemptNo, int snapshotGen = 0)
+        {
+            try
+            {
+                if (attemptNo < 1) attemptNo = 1;
+                if (snapshotGen < 0) snapshotGen = 0;
+                string content = $"{projectId},{taskId},{exemptFlags},{attemptNo},{snapshotGen}";
+                AtomicWriteAllText(GetCurrentTaskFilePath(), content);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] WriteCurrentTaskFile: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// current_task を読み取る。5項目固定かつ全フィールドが数値として解釈できる場合のみ true。
+        /// 途中書き込み（フィールド数不足）や空行は無視する。
+        /// </summary>
+        public static bool TryReadCurrentTaskFile(out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen)
+        {
+            return TryReadCurrentTaskFile(GetCurrentTaskFilePath(), out projectId, out taskId, out exemptFlags, out attemptNo, out snapshotGen);
+        }
+
+        /// <summary>指定パスの current_task を読み取る（<see cref="TryReadCurrentTaskFile(out int, out int, out int, out int, out int)"/> と同条件）。</summary>
+        public static bool TryReadCurrentTaskFile(string path, out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen)
+        {
+            projectId = taskId = exemptFlags = attemptNo = snapshotGen = 0;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return false;
+
+            string line;
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    line = sr.ReadToEnd().Trim();
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(line))
+                return false;
+
+            string[] parts = line.Split(',');
+            if (parts.Length != CurrentTaskFieldCount)
+                return false;
+
+            if (!int.TryParse(parts[0].Trim(), out projectId)) return false;
+            if (!int.TryParse(parts[1].Trim(), out taskId)) return false;
+            if (!int.TryParse(parts[2].Trim(), out exemptFlags)) return false;
+            if (!int.TryParse(parts[3].Trim(), out attemptNo)) return false;
+            if (!int.TryParse(parts[4].Trim(), out snapshotGen)) return false;
+            if (attemptNo < 1) attemptNo = 1;
+            if (snapshotGen < 0) snapshotGen = 0;
+            return true;
+        }
+
+        private static void AtomicWriteAllText(string path, string content)
+        {
+            string tempPath = path + ".tmp";
+            var encoding = new UTF8Encoding(false);
+            File.WriteAllText(tempPath, content, encoding);
+            try
+            {
+                if (File.Exists(path))
+                    File.Replace(tempPath, path, null);
+                else
+                    File.Move(tempPath, path);
+            }
+            catch
+            {
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                throw;
+            }
+        }
+
         /// <summary>破壊的操作ログのパスを取得（%TEMP%\mos_ppt_destructive_errors.log）</summary>
         public static string GetDestructiveLogPath()
         {
@@ -207,6 +294,44 @@ namespace Libraries
             }
         }
 
+        /// <summary>破壊的操作ログに同一 project-task-attempt の記録があるか。</summary>
+        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
+        {
+            try
+            {
+                string path = GetDestructiveLogPath();
+                if (!File.Exists(path)) return false;
+                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                foreach (string line in File.ReadAllLines(path))
+                {
+                    if (line != null && line.StartsWith(prefix, StringComparison.Ordinal))
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] HasLoggedDestructiveError: " + ex.Message);
+            }
+            return false;
+        }
+
+        /// <summary>破壊的操作ログへ追記（Word の AppendDestructiveErrors 相当）。</summary>
+        public static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, IList<string> errors)
+        {
+            if (errors == null || errors.Count == 0) return;
+            try
+            {
+                string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
+                if (string.IsNullOrWhiteSpace(body)) return;
+                string key = $"{projectId},{taskId},{attemptNo}:";
+                File.AppendAllText(GetDestructiveLogPath(), key + body + Environment.NewLine, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] AppendDestructiveErrors: " + ex.Message);
+            }
+        }
+
         /// <summary>スナップショットファイルをクリアする。</summary>
         public static void ClearSnapshot()
         {
@@ -220,6 +345,58 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine("[PPLogReader] Error clearing snapshot: " + ex.Message);
             }
+        }
+
+        private static int _snapshotGenerationCounter;
+
+        /// <summary>採点直前のスナップショット再取得用に、単調増加の世代番号を払い出す。</summary>
+        public static int AllocateSnapshotGeneration()
+        {
+            return Interlocked.Increment(ref _snapshotGenerationCounter);
+        }
+
+        /// <summary>スナップショットファイルから TaskId / AttemptNo / SnapshotGen を読み取る。</summary>
+        public static bool TryReadSnapshotMeta(string snapshotPath, out int projectId, out int taskId, out int attemptNo, out int snapshotGen)
+        {
+            projectId = -1;
+            taskId = -1;
+            attemptNo = 1;
+            snapshotGen = 0;
+            if (string.IsNullOrWhiteSpace(snapshotPath) || !File.Exists(snapshotPath))
+                return false;
+
+            bool hasTaskId = false;
+            foreach (string line in File.ReadAllLines(snapshotPath))
+            {
+                if (string.IsNullOrEmpty(line)) continue;
+                int colonIndex = line.IndexOf(':');
+                if (colonIndex < 0) continue;
+                string key = line.Substring(0, colonIndex);
+                string value = line.Substring(colonIndex + 1);
+                if (string.Equals(key, "TaskId", StringComparison.Ordinal))
+                {
+                    var ids = value.Split(',');
+                    if (ids.Length != 2) return false;
+                    hasTaskId = int.TryParse(ids[0], out projectId) && int.TryParse(ids[1], out taskId);
+                }
+                else if (string.Equals(key, "SnapshotGen", StringComparison.Ordinal))
+                {
+                    int.TryParse(value, out snapshotGen);
+                }
+                else if (string.Equals(key, "AttemptNo", StringComparison.Ordinal))
+                {
+                    int.TryParse(value, out attemptNo);
+                    if (attemptNo < 1) attemptNo = 1;
+                }
+            }
+            return hasTaskId;
+        }
+
+        /// <summary>後方互換: AttemptNo を返さないオーバーロード。</summary>
+        public static bool TryReadSnapshotMeta(string snapshotPath, out int projectId, out int taskId, out int snapshotGen)
+        {
+            bool ok = TryReadSnapshotMeta(snapshotPath, out projectId, out taskId, out int attemptNo, out snapshotGen);
+            return ok;
         }
 
         /// <summary>

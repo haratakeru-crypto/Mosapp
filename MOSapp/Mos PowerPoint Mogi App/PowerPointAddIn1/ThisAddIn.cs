@@ -15,6 +15,45 @@ namespace PowerPointAddIn1
     public partial class ThisAddIn
     {
         private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
+        private const int CurrentTaskFieldCount = 5;
+
+        /// <summary>
+        /// current_task を読み取る（PPLogReader と同一条件: 5項目固定・途中書き込みは無視）。
+        /// </summary>
+        private static bool TryReadCurrentTaskFromFile(string path, out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen)
+        {
+            projectId = taskId = exemptFlags = attemptNo = snapshotGen = 0;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return false;
+
+            string line;
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    line = sr.ReadToEnd().Trim();
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(line))
+                return false;
+
+            string[] parts = line.Split(',');
+            if (parts.Length != CurrentTaskFieldCount)
+                return false;
+
+            if (!int.TryParse(parts[0].Trim(), out projectId)) return false;
+            if (!int.TryParse(parts[1].Trim(), out taskId)) return false;
+            if (!int.TryParse(parts[2].Trim(), out exemptFlags)) return false;
+            if (!int.TryParse(parts[3].Trim(), out attemptNo)) return false;
+            if (!int.TryParse(parts[4].Trim(), out snapshotGen)) return false;
+            if (attemptNo < 1) attemptNo = 1;
+            if (snapshotGen < 0) snapshotGen = 0;
+            return true;
+        }
 
         private Timer _grayscalePollTimer;
         private bool _lastBlackAndWhite;
@@ -47,6 +86,7 @@ namespace PowerPointAddIn1
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
         private int _currentTaskAttemptNo = 1;
+        private int _currentSnapshotGen = 0;
 
         private const float PositionTolerancePt = 0.5f;
 
@@ -130,54 +170,57 @@ namespace PowerPointAddIn1
                     _currentTaskProjectId = -1;
                     _currentTaskTaskId = -1;
                     _currentTaskAttemptNo = 1;
+                    _currentSnapshotGen = 0;
                     return;
                 }
-                string line = null;
-                try
-                {
-                    line = File.ReadAllText(CurrentTaskFilePath).Trim();
-                    if (string.IsNullOrEmpty(line)) return;
-                }
-                catch { return; }
-                var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 2) return;
-                if (!int.TryParse(parts[0].Trim(), out int projectId) || !int.TryParse(parts[1].Trim(), out int taskId))
+                if (!TryReadCurrentTaskFromFile(CurrentTaskFilePath, out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen))
                     return;
 
                 bool forceSnapshot = !File.Exists(SnapshotFilePath);
 
-                if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId && !forceSnapshot)
+                bool taskIdentityChanged = projectId != _currentTaskProjectId
+                    || taskId != _currentTaskTaskId
+                    || attemptNo != _currentTaskAttemptNo;
+
+                if (!taskIdentityChanged
+                    && snapshotGen == _currentSnapshotGen
+                    && !forceSnapshot)
                     return;
 
                 // --- タスク切り替え時の処理 ---
                 // 11-7 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
-                if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
+                if (taskIdentityChanged && _currentTaskProjectId == 11 && _currentTaskTaskId == 7)
                 {
                     TryLogTask11_7PrintOnTaskBoundary();
                 }
                 // 4-3 は光彩が 4-4 で外れるため、離脱直前に COM/OpenXML で証跡を確定する。
-                if (_currentTaskProjectId == 4 && _currentTaskTaskId == 3)
+                if (taskIdentityChanged && _currentTaskProjectId == 4 && _currentTaskTaskId == 3)
                 {
                     TryLogTask4_3GlowOnTaskBoundary();
                 }
 
                 // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
+                // ※ project-task-attempt が変わったときのみ（SnapshotGen だけの再取得では比較しない）
+                // ※ SnapshotGen が 0→0 の通常 UI 遷移のみ（採点中/採点直後の gen>0 混線では比較しない）
                 // ※ プロジェクトIDが変わる場合は、比較対象のプレゼンテーションが異なるためスキップする
-                if (_currentTaskProjectId != -1 && !forceSnapshot && projectId == _currentTaskProjectId)
+                if (taskIdentityChanged
+                    && _currentTaskProjectId != -1
+                    && !forceSnapshot
+                    && projectId == _currentTaskProjectId
+                    && _currentSnapshotGen == 0
+                    && snapshotGen == 0)
                 {
-                    CheckAndLogDestructiveOperations(_currentTaskProjectId, _currentTaskTaskId, _currentTaskExemptFlags);
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[DestructiveBoundary] prev={_currentTaskProjectId},{_currentTaskTaskId},{_currentTaskAttemptNo},gen={_currentSnapshotGen} " +
+                        $"new={projectId},{taskId},{attemptNo},gen={snapshotGen}");
+                    CheckAndLogDestructiveOperations(_currentTaskProjectId, _currentTaskTaskId, _currentTaskAttemptNo, _currentTaskExemptFlags);
                 }
 
                 _currentTaskProjectId = projectId;
                 _currentTaskTaskId = taskId;
-                _currentTaskExemptFlags = parts.Length >= 3 ? int.Parse(parts[2].Trim()) : 0;
-                int attemptNo = 1;
-                if (parts.Length >= 4)
-                {
-                    int.TryParse(parts[3].Trim(), out attemptNo);
-                    if (attemptNo < 1) attemptNo = 1;
-                }
+                _currentTaskExemptFlags = exemptFlags;
                 _currentTaskAttemptNo = attemptNo;
+                _currentSnapshotGen = snapshotGen;
                 if (!(projectId == 1 && taskId == 2)) _task1_2Logged = false;
                 if (!(projectId == 1 && taskId == 3)) _task1_3Logged = false;
                 if (!(projectId == 1 && taskId == 4))
@@ -227,7 +270,7 @@ namespace PowerPointAddIn1
                 try { pres = Application.ActivePresentation; } catch { }
                 if (pres == null) return null;
 
-                var data = new SnapshotData { ProjectId = pid, TaskId = tid };
+                var data = new SnapshotData { ProjectId = pid, TaskId = tid, AttemptNo = _currentTaskAttemptNo, SnapshotGen = _currentSnapshotGen };
                 var slides = pres.Slides;
                 if (slides != null)
                 {
@@ -720,6 +763,9 @@ namespace PowerPointAddIn1
             {
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine($"TaskId:{data.ProjectId},{data.TaskId}");
+                sb.AppendLine($"AttemptNo:{data.AttemptNo}");
+                if (data.SnapshotGen > 0)
+                    sb.AppendLine($"SnapshotGen:{data.SnapshotGen}");
                 sb.AppendLine($"SlidesCount:{data.SlidesCount}");
                 sb.AppendLine($"TotalTextLength:{data.TotalTextLength}");
                 
@@ -757,6 +803,13 @@ namespace PowerPointAddIn1
                             data.ProjectId = int.Parse(ids[0]);
                             data.TaskId = int.Parse(ids[1]);
                             break;
+                        case "SnapshotGen":
+                            data.SnapshotGen = int.Parse(val);
+                            break;
+                        case "AttemptNo":
+                            data.AttemptNo = int.Parse(val);
+                            if (data.AttemptNo < 1) data.AttemptNo = 1;
+                            break;
                         case "SlidesCount": data.SlidesCount = int.Parse(val); break;
                         case "TotalTextLength": data.TotalTextLength = long.Parse(val); break;
                         case "ShapesCounts":
@@ -789,7 +842,7 @@ namespace PowerPointAddIn1
 
         private class SnapshotData
         {
-            public int ProjectId; public int TaskId; public int SlidesCount;
+            public int ProjectId; public int TaskId; public int AttemptNo = 1; public int SnapshotGen; public int SlidesCount;
             public List<string> SlideNames = new List<string>();
             public Dictionary<int, int> ShapesCounts = new Dictionary<int, int>();
             public long TotalTextLength;
@@ -804,13 +857,17 @@ namespace PowerPointAddIn1
             None = 0, ShapesCount = 1, TextLength = 2, SlidesCount = 4, AnimationRemoved = 8, ShapePosition = 16, All = 31
         }
 
-        private void CheckAndLogDestructiveOperations(int projectId, int taskId, int exemptFlagsInt)
+        private void CheckAndLogDestructiveOperations(int projectId, int taskId, int attemptNo, int exemptFlagsInt)
         {
             try
             {
                 // 現在のスナップショット（開始時のデータ）をロード
                 var startSnapshot = LoadSnapshot();
-                if (startSnapshot == null || startSnapshot.ProjectId != projectId || startSnapshot.TaskId != taskId) return;
+                if (startSnapshot == null
+                    || startSnapshot.ProjectId != projectId
+                    || startSnapshot.TaskId != taskId
+                    || startSnapshot.AttemptNo != attemptNo)
+                    return;
 
                 // 現在のリアルタイムな状態を取得
                 var currentStatus = CaptureCurrentStatus(projectId, taskId);
@@ -820,15 +877,30 @@ namespace PowerPointAddIn1
                 List<string> errors = CompareSnapshots(startSnapshot, currentStatus, exemptFlagsInt);
                 if (errors.Count > 0)
                 {
-                    // ログに記録
+                    AppendDestructiveErrors(projectId, taskId, attemptNo, errors);
                     string errorMsg = string.Join(" | ", errors);
-                    File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId},{_currentTaskAttemptNo}:{errorMsg}{Environment.NewLine}");
-                    System.Diagnostics.Debug.WriteLine($"[DestructiveCheck] Task {projectId}-{taskId} FAILED: {errorMsg}");
+                    System.Diagnostics.Debug.WriteLine($"[DestructiveCheck] Task {projectId}-{taskId}-{attemptNo} FAILED: {errorMsg}");
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[CheckAndLog] " + ex.Message);
+            }
+        }
+
+        /// <summary>PPLogReader.AppendDestructiveErrors と同一フォーマット（VSTO は Libraries 未参照のためローカル実装）。</summary>
+        private static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, List<string> errors)
+        {
+            if (errors == null || errors.Count == 0) return;
+            try
+            {
+                string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
+                if (string.IsNullOrWhiteSpace(body)) return;
+                File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId},{attemptNo}:{body}{Environment.NewLine}", Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[AppendDestructiveErrors] " + ex.Message);
             }
         }
 

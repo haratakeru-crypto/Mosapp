@@ -17,6 +17,11 @@ namespace Libraries
 
         public static List<string> CompareAndGetErrors(int projectId, int taskId, PPValidationExemptFlags exemptFlags)
         {
+            return CompareAndGetErrors(projectId, taskId, 1, exemptFlags);
+        }
+
+        public static List<string> CompareAndGetErrors(int projectId, int taskId, int attemptNo, PPValidationExemptFlags exemptFlags)
+        {
             List<string> errors = new List<string>();
             var swTotal = Stopwatch.StartNew();
 
@@ -42,6 +47,12 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[Validation] ID Mismatch (Skipping): Snapshot={snapshot.ProjectId}-{snapshot.TaskId}, Grading={projectId}-{taskId}");
                 PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors", swTotal.ElapsedMilliseconds, $"skipped id mismatch snap={snapshot.ProjectId}-{snapshot.TaskId}");
+                return errors;
+            }
+            if (attemptNo >= 1 && snapshot.AttemptNo >= 1 && snapshot.AttemptNo != attemptNo)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Validation] Attempt Mismatch (Skipping): Snapshot={snapshot.ProjectId}-{snapshot.TaskId}-{snapshot.AttemptNo}, Grading={projectId}-{taskId}-{attemptNo}");
+                PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors", swTotal.ElapsedMilliseconds, $"skipped attempt mismatch snapA={snapshot.AttemptNo}");
                 return errors;
             }
             System.Diagnostics.Debug.WriteLine($"[Validation] Starting Check for Project{projectId} Task{taskId}");
@@ -329,6 +340,7 @@ namespace Libraries
         {
             public int ProjectId;
             public int TaskId;
+            public int AttemptNo = 1;
             public int SlidesCount;
             public List<string> SlideNames = new List<string>();
             public Dictionary<int, int> ShapesCounts = new Dictionary<int, int>();
@@ -362,6 +374,10 @@ namespace Libraries
                                 int.TryParse(ids[0], out data.ProjectId);
                                 int.TryParse(ids[1], out data.TaskId);
                             }
+                            break;
+                        case "AttemptNo":
+                            int.TryParse(value, out data.AttemptNo);
+                            if (data.AttemptNo < 1) data.AttemptNo = 1;
                             break;
                         case "SlidesCount":
                             int.TryParse(value, out data.SlidesCount);
