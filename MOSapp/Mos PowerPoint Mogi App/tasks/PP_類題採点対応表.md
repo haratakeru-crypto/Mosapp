@@ -80,11 +80,11 @@
 | P6-5 | 旧5-1 | すべてのスライドをアウトラインで、部単位に"６"部印刷するように設定します。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_01 | P6 実装時に PowerPointChecker1_6.cs 上書き | 旧5-1 は P6-5, P6-7 でも参照。Outline/6部 | 済 |
 | P6-6 | 旧11-7 | ノートですべてのスライドを"3"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_07 | P6 実装時に PowerPointChecker1_6.cs 上書き | VSTO 印刷証跡要 | 済 |
 | P6-7 | 旧5-1 | 印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで"４"部印刷するように設定します。印刷は実行しないでください。 | PowerPointChecker1_5.Legacy.cs | CheckTask_1_5_01 | P6 実装時に PowerPointChecker1_6.cs 上書き | Grayscale/3スライド/4部/PrintColorType | 済 |
-| P7-1 | 旧6-1 | あなたは、情報モラルの重要性について発表する資料を作成しています。 スライド１にコメント「"情報発信の責任を考える"」を挿入します。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_01 | P6 実装時に PowerPointChecker1_6.cs 上書き |  |  |
-| P7-2 | 旧9-6 | スライド１枚目の文字列「情報学習支援」に、Webページ「"https://rabbitway.jp/"」を表示するハイパーリンクを設定します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_06 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
-| P7-3 | 旧7-3 | スライド６の後ろに、文書「まとめ」のアウトラインを使用してスライドを挿入します。 | PowerPointChecker1_7.Legacy.cs | CheckTask_1_7_03 | P7 実装時に PowerPointChecker1_7.cs 上書き |  |  |
-| P7-4 | 旧9-4 | スライドのフッターに、スライド番号と「"rabbitway.jp"」をタイトルスライド以外に追加します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_04 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
-| P7-5 | 旧9-5 | ５枚目の「事例１」と６枚目の「事例2」のフッターに「"参考事例"」と挿入します。他のスライドには表示しません。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_05 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
+| P7-1 | 旧6-1 | あなたは、情報モラルの重要性について発表する資料を作成しています。 スライド１にコメント「"情報発信の責任を考える"」を挿入します。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_01 | P7 実装時に PowerPointChecker1_7.cs 上書き | コメント文言は問題文差分あり | 済 |
+| P7-2 | 旧9-6 | スライド１枚目の文字列「情報学習支援」に、Webページ「"https://rabbitway.jp/"」を表示するハイパーリンクを設定します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_06 | P7 実装時に PowerPointChecker1_7.cs 上書き | 旧9-6 とは対象文字列・URL が異なる | 済 |
+| P7-3 | 旧7-3 | スライド６の後ろに、文書「まとめ」のアウトラインを使用してスライドを挿入します。 | PowerPointChecker1_7.Legacy.cs | CheckTask_1_7_03 | P7 実装時に PowerPointChecker1_7.cs 上書き | 旧7-3 はスライド5後・「弊社の他の講座一覧」 | 済 |
+| P7-4 | 旧9-4 | スライドのフッターに、スライド番号と「"rabbitway.jp"」をタイトルスライド以外に追加します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_04 | P7 実装時に PowerPointChecker1_7.cs 上書き | 旧9-4 は www.MOS.jp | 済 |
+| P7-5 | 旧9-5 | ５枚目の「事例１」と６枚目の「事例2」のフッターに「"参考事例"」と挿入します。他のスライドには表示しません。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_05 | P7 実装時に PowerPointChecker1_7.cs 上書き | 旧9-5 はスライド5のみ「集中的に」 | 済 |
 | P8-1 | 旧9-2 | あなたは、「見せる！」　プレゼンテーションの極意を紹介する資料作成しています。 スライド「見せる！スライドの基本ルール」の表を、スタイル「中間スタイル４-アクセ | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_02 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
 | P8-2 | 旧6-2 | スライド１の背景を「濃い緑、テキスト２、白+基本色80％」に変更します。 | PowerPointChecker1_6.Legacy.cs | CheckTask_1_6_02 | P6 実装時に PowerPointChecker1_6.cs 上書き |  |  |
 | P8-3 | 旧11-1 | スライドのサイズを「画面に合わせる16：9」にします | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_01 | P11 実装時に PowerPointChecker1_11.cs 上書き |  |  |
@@ -193,6 +193,18 @@
 | P6-6 (6) | `CheckTask_1_6_06` | 旧11-7 (`CheckTask_1_11_07`) | Notes/3部/ページ単位（Collate OFF）+ VSTO `[Task6-6] Print` | [x] |
 | P6-7 (7) | `CheckTask_1_6_07` | 旧5-1 (`CheckTask_1_5_01`) | Grayscale/3スライド/4部/PrintColorType + VSTO `[Task6-7] Print` | [x] |
 
+## P7 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==7` では **taskId = P7-X**。**現行** `PowerPointChecker1_7.cs` のメソッド名は **P7-X = `CheckTask_1_7_0X`** に揃える（Phase A: 全スタブ `return false`。Phase B で Legacy 参照しつつタスク単位に実装）。
+
+| P7（taskId） | 現行メソッド | Legacy メソッド（参照元） | 検証メモ | Phase B |
+|--------------|-------------|-------------------------|----------|---------|
+| P7-1 (1) | `CheckTask_1_7_01` | 旧6-1 (`CheckTask_1_6_01`) | スライド1コメント「情報発信の責任を考える」 | [x] |
+| P7-2 (2) | `CheckTask_1_7_02` | 旧9-6 (`CheckTask_1_9_06`) | ハイパーリンク・情報学習支援→rabbitway.jp | [x] |
+| P7-3 (3) | `CheckTask_1_7_03` | 旧7-3 (`CheckTask_1_7_03`) | スライド7に「まとめ」 | [x] |
+| P7-4 (4) | `CheckTask_1_7_04` | 旧9-4 (`CheckTask_1_9_04`) | スライド2〜4に番号+rabbitway.jp・タイトル非表示（5以降は不問） | [x] |
+| P7-5 (5) | `CheckTask_1_7_05` | 旧9-5 (`CheckTask_1_9_05`) | スライド5・6のみ「参考事例」 | [x] |
+
 ## 破壊的操作免除一覧（`PPTaskValidationConfig`）
 
 **日常の参照は本セクション（MD）を主とする。** 旧 `(projectId, taskId)` のコード確認は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（**凍結・編集禁止**）。それでも不明なときのみ `git log -p -- Libraries/PPTaskValidationConfig.cs`。
@@ -290,7 +302,19 @@
 
 > 旧 `projectId=6 taskId=3/4`（6-3/6-4 3Dモデル）は **P3-4/5 に移植済み**。Phase A で config から削除済み。
 
-### 旧 projectId 7〜11（P7 以降・config は旧番号のまま）
+### P7（projectId=7, taskId=P7-X）— Phase A 完了
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|-------------|------|
+| 1 (P7-1) | 旧6-1 | なし | — | — | — | コメント挿入 |
+| 2 (P7-2) | 旧9-6 | なし | — | — | — | ハイパーリンク（既存文字列にリンク設定のみ） |
+| 3 (P7-3) | 旧7-3 | Slides, Shapes, Text, Position | 無制限 | 無制限 | 無制限 | アウトライン挿入 |
+| 4 (P7-4) | 旧9-4 | Shapes, Text, Position | 無制限 | 無制限 | 無制限 | フッター |
+| 5 (P7-5) | 旧9-5 | Shapes, Text, Position | 無制限 | 無制限 | 無制限 | フッター（特定スライド） |
+
+> 旧 `projectId=7 taskId=1/2/4`（7-1 セクション、7-2 スライド再利用、7-4 キオスク）は新P7に含まれない。Phase A で config から削除済み。
+
+### 旧 projectId 7〜11（P8 以降・config は旧番号のまま）
 
 | projectId | taskId | 旧タスク | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 将来の新タスク（参考） |
 |-----------|--------|----------|-----------|-------------|-------------|-------------|----------------------|
@@ -348,7 +372,8 @@
 - [ ] **P5**（7 タスク）— 完了・検証済み
 - [x] **P6 Phase A**（7 タスク）— スキャフォールド完了（Checker スタブ・Grader・config）
 - [x] **P6 Phase B** — P6-1 → … → P6-7 をタスク単位に実装・検証
-- [ ] **P7**（5 タスク）— 未着手
+- [x] **P7 Phase A**（5 タスク）— スキャフォールド完了（Checker スタブ・Grader・config・問題文 JSON）
+- [x] **P7 Phase B** — P7-1 → … → P7-5 をタスク単位に実装・検証
 - [ ] **P8**（5 タスク）— 未着手
 - [ ] **P9**（5 タスク）— 未着手
 - [ ] **P10**（8 タスク）— 未着手

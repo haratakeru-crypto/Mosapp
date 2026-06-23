@@ -141,12 +141,19 @@ namespace Libraries
             }
             else if (projectId == 7)
             {
+                // P7: taskId 1〜5 = P7-1〜P7-5。旧7-1/7-2/7-4 は新P7に含まれない。免除は旧タスクから移植。
                 switch (taskId)
                 {
-                    case 2: // 7-2 スライド再利用
-                    case 3: // 7-3 アウトラインからスライド
-                        // 大量のスライドやコンテンツが外部から流入するため、SlidesCount, ShapesCount, TextLength, ShapePosition免除が必要
+                    case 1: // P7-1 コメント挿入（旧6-1）— 免除なし
+                        break;
+                    case 2: // P7-2 ハイパーリンク（既存文字列へのリンク設定のみ。免除なし）
+                        break;
+                    case 3: // P7-3 アウトラインからスライド（旧7-3）
                         flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 4: // P7-4 フッター（旧9-4）
+                    case 5: // P7-5 フッター（旧9-5）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
                 }
             }
