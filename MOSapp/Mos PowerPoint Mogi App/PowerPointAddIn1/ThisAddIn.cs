@@ -57,6 +57,10 @@ namespace PowerPointAddIn1
 
         private Timer _grayscalePollTimer;
         private bool _lastBlackAndWhite;
+        private Timer _slideSize8_3PollTimer;
+        private bool _task8_3SlideSizeLogged;
+        private const float SlideSize8_3AspectRatioTarget = 16f / 9f;
+        private const float SlideSize8_3AspectRatioTolerance = 0.02f;
         private Timer _audio8_4PollTimer;
         private bool _task8_4Logged;
         private Timer _glow4_3PollTimer;
@@ -110,6 +114,12 @@ namespace PowerPointAddIn1
             _grayscalePollTimer.Interval = 500;
             _grayscalePollTimer.Tick += GrayscalePollTimer_Tick;
             _grayscalePollTimer.Start();
+
+            _task8_3SlideSizeLogged = false;
+            _slideSize8_3PollTimer = new Timer();
+            _slideSize8_3PollTimer.Interval = 500;
+            _slideSize8_3PollTimer.Tick += SlideSize8_3PollTimer_Tick;
+            _slideSize8_3PollTimer.Start();
 
             _task5_1PrintLogged = false;
             _task6_5PrintLogged = false;
@@ -221,6 +231,11 @@ namespace PowerPointAddIn1
                 {
                     TryLogTask4_3GlowOnTaskBoundary();
                 }
+                // P8-3 は P8-4 で寸法が上書きされるため、離脱直前に 16:9 を証跡確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 8 && _currentTaskTaskId == 3)
+                {
+                    TryLogTask8_3SlideSize16x9OnTaskBoundary();
+                }
 
                 // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
                 // ※ project-task-attempt が変わったときのみ（SnapshotGen だけの再取得では比較しない）
@@ -258,6 +273,7 @@ namespace PowerPointAddIn1
                 if (!(projectId == 6 && taskId == 5)) _task6_5PrintLogged = false;
                 if (!(projectId == 6 && taskId == 6)) _task6_6PrintLogged = false;
                 if (!(projectId == 6 && taskId == 7)) _task6_7PrintLogged = false;
+                if (!(projectId == 8 && taskId == 3)) _task8_3SlideSizeLogged = false;
 
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
@@ -1587,9 +1603,69 @@ namespace PowerPointAddIn1
             catch { return false; }
         }
 
+        private void SlideSize8_3PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(8, 3)) return;
+                TryLogTask8_3SlideSize16x9IfPageSetupMatches();
+            }
+            catch { }
+        }
+
+        private static bool PageSetupRatioIs16x9(PowerPoint.PageSetup pageSetup)
+        {
+            if (pageSetup == null) return false;
+            float w = (float)pageSetup.SlideWidth;
+            float h = (float)pageSetup.SlideHeight;
+            if (h <= 0f) return false;
+            float ratio = w / h;
+            return Math.Abs(ratio - SlideSize8_3AspectRatioTarget) <= SlideSize8_3AspectRatioTolerance;
+        }
+
+        private void TryLogTask8_3SlideSize16x9IfPageSetupMatches()
+        {
+            if (_task8_3SlideSizeLogged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+
+                PowerPoint.PageSetup pageSetup = null;
+                try
+                {
+                    pageSetup = pres.PageSetup;
+                    if (pageSetup == null) return;
+                    if (!PageSetupRatioIs16x9(pageSetup)) return;
+
+                    Logger.LogTask8_3SlideSize16x9();
+                    _task8_3SlideSizeLogged = true;
+                }
+                finally
+                {
+                    if (pageSetup != null) try { Marshal.ReleaseComObject(pageSetup); } catch { }
+                }
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        /// <summary>P8-3 離脱直前に 16:9 を再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask8_3SlideSize16x9OnTaskBoundary()
+        {
+            TryLogTask8_3SlideSize16x9IfPageSetupMatches();
+        }
+
         private void GrayscalePollTimer_Tick(object sender, EventArgs e)
         {
-            if (!IsCurrentTask(10, 4))
+            bool isTask10_4 = IsCurrentTask(10, 4);
+            bool isTask8_5 = IsCurrentTask(8, 5);
+            if (!isTask10_4 && !isTask8_5)
             {
                 _lastBlackAndWhite = false;
                 return;
@@ -1614,7 +1690,10 @@ namespace PowerPointAddIn1
 
                 if (current && !_lastBlackAndWhite)
                 {
-                    Logger.LogTask10_4Grayscale();
+                    if (isTask8_5)
+                        Logger.LogTask8_5Grayscale();
+                    else if (isTask10_4)
+                        Logger.LogTask10_4Grayscale();
                 }
                 _lastBlackAndWhite = current;
             }
@@ -1899,6 +1978,12 @@ namespace PowerPointAddIn1
                 _grayscalePollTimer.Stop();
                 _grayscalePollTimer.Dispose();
                 _grayscalePollTimer = null;
+            }
+            if (_slideSize8_3PollTimer != null)
+            {
+                _slideSize8_3PollTimer.Stop();
+                _slideSize8_3PollTimer.Dispose();
+                _slideSize8_3PollTimer = null;
             }
             System.Diagnostics.Debug.WriteLine("[PowerPointAddIn1] Add-in shutdown");
         }

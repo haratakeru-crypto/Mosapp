@@ -71,6 +71,18 @@ namespace PowerPointAddIn1
             LogTaskTag("Task10-4", "Grayscale");
         }
 
+        /// <summary>P8-5: 表示グレースケール操作をログに記録。</summary>
+        public static void LogTask8_5Grayscale()
+        {
+            LogTaskTag("Task8-5", "Grayscale");
+        }
+
+        /// <summary>P8-3: スライドサイズ16:9設定をログに記録（P8-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask8_3SlideSize16x9()
+        {
+            LogTaskTag("Task8-3", "SlideSize16x9");
+        }
+
         /// <summary>5-1: 配布資料3スライド・部単位4部で印刷したことを記録。</summary>
         public static void LogTask5_1Print()
         {
@@ -248,7 +260,9 @@ namespace PowerPointAddIn1
                         || string.Equals(taskTag, "Task6-6", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task6-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
-                        || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal))
+                        || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task8-5", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task8-3", StringComparison.Ordinal))
                     {
                         AppendToFile(TaskEvidenceFilePath, logEntry);
                     }

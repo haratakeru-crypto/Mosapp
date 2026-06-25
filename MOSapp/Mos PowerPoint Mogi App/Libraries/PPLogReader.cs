@@ -270,6 +270,8 @@ namespace Libraries
                     return new[] { "[Task5-1] Print" };
                 case 4:
                     return new[] { "[Task4-3] Glow18Accent6" };
+                case 8:
+                    return new[] { "[Task8-3] SlideSize16x9", "[Task8-5] Grayscale" };
                 case 10:
                     return new[] { "[Task10-4] Grayscale" };
                 case 6:
@@ -407,6 +409,18 @@ namespace Libraries
         public static bool HasTask10_4GrayscaleExecuted()
         {
             return HasGradingEvidenceMarker("[Task10-4] Grayscale");
+        }
+
+        /// <summary>証跡ログまたはメインログに [Task8-5] Grayscale が含まれるか。</summary>
+        public static bool HasTask8_5GrayscaleExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task8-5] Grayscale");
+        }
+
+        /// <summary>証跡ログまたはメインログに [Task8-3] SlideSize16x9 が含まれるか（P8-4で寸法上書き後の一括採点用）。</summary>
+        public static bool HasTask8_3SlideSize16x9Executed()
+        {
+            return HasGradingEvidenceMarker("[Task8-3] SlideSize16x9");
         }
 
         /// <summary>証跡またはメインログに 4-3 光彩設定記録（[Task4-3] Glow18Accent6）が含まれるか。</summary>

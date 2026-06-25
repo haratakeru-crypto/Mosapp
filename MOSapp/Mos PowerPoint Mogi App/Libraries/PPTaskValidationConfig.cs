@@ -159,12 +159,20 @@ namespace Libraries
             }
             else if (projectId == 8)
             {
+                // P8: taskId 1〜5 = P8-1〜P8-5。旧8-1〜5（動画/音声/読み取り専用）は新P8に含まれない。免除は旧タスクから移植。
                 switch (taskId)
                 {
-                    case 1: // 8-1 ビデオ挿入
-                    case 2: // 8-2 ビデオ挿入
-                        // ビデオオブジェクトが追加されるため、ShapesCount免除が必要
-                        flags |= PPValidationExemptFlags.ShapesCount;
+                    case 1: // P8-1 表スタイル（旧9-2）— 免除なし
+                        break;
+                    case 2: // P8-2 背景（旧6-2）— 免除なし
+                        break;
+                    case 3: // P8-3 スライドサイズ16:9（旧11-1）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 4: // P8-4 スライド寸法（旧9-7）
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 5: // P8-5 グレースケール表示（旧10-4）— Phase B で VSTO 要否を確認
                         break;
                 }
             }
