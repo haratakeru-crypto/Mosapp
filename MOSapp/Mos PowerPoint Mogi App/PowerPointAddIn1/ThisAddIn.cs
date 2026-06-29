@@ -59,6 +59,10 @@ namespace PowerPointAddIn1
         private bool _lastBlackAndWhite;
         private Timer _slideSize8_3PollTimer;
         private bool _task8_3SlideSizeLogged;
+        private const float SlideSize8_3CmToPt = 72f / 2.54f;
+        private const float SlideSize8_3ExpectedWidthCm = 25.4f;
+        private const float SlideSize8_3ExpectedHeightCm = 14.288f;
+        private const float SlideSize8_3DimensionTolerancePt = 1.5f;
         private const float SlideSize8_3AspectRatioTarget = 16f / 9f;
         private const float SlideSize8_3AspectRatioTolerance = 0.02f;
         private Timer _audio8_4PollTimer;
@@ -1613,14 +1617,22 @@ namespace PowerPointAddIn1
             catch { }
         }
 
-        private static bool PageSetupRatioIs16x9(PowerPoint.PageSetup pageSetup)
+        private static bool PageSetupMatchesP8_3FitToScreen16x9(PowerPoint.PageSetup pageSetup)
         {
             if (pageSetup == null) return false;
             float w = (float)pageSetup.SlideWidth;
             float h = (float)pageSetup.SlideHeight;
             if (h <= 0f) return false;
+
+            float expectedW = SlideSize8_3ExpectedWidthCm * SlideSize8_3CmToPt;
+            float expectedH = SlideSize8_3ExpectedHeightCm * SlideSize8_3CmToPt;
+            bool sizeOk = Math.Abs(w - expectedW) <= SlideSize8_3DimensionTolerancePt
+                && Math.Abs(h - expectedH) <= SlideSize8_3DimensionTolerancePt;
+
             float ratio = w / h;
-            return Math.Abs(ratio - SlideSize8_3AspectRatioTarget) <= SlideSize8_3AspectRatioTolerance;
+            bool ratioOk = Math.Abs(ratio - SlideSize8_3AspectRatioTarget) <= SlideSize8_3AspectRatioTolerance;
+
+            return sizeOk && ratioOk;
         }
 
         private void TryLogTask8_3SlideSize16x9IfPageSetupMatches()
@@ -1639,7 +1651,7 @@ namespace PowerPointAddIn1
                 {
                     pageSetup = pres.PageSetup;
                     if (pageSetup == null) return;
-                    if (!PageSetupRatioIs16x9(pageSetup)) return;
+                    if (!PageSetupMatchesP8_3FitToScreen16x9(pageSetup)) return;
 
                     Logger.LogTask8_3SlideSize16x9();
                     _task8_3SlideSizeLogged = true;

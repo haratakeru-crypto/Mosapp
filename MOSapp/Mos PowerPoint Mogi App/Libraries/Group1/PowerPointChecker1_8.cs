@@ -194,18 +194,22 @@ namespace Libraries.Group1
             }
         }
 
+        private const float P8_3CmToPt = 72f / 2.54f;
+        private const float P8_3ExpectedWidthCm = 25.4f;
+        private const float P8_3ExpectedHeightCm = 14.288f;
+        private const float P8_3DimensionTolerancePt = 1.5f;
         private const float P8_3AspectRatioTarget = 16f / 9f;
         private const float P8_3AspectRatioTolerance = 0.02f;
 
-        /// <summary>P8-3: スライドサイズ16:9（旧11-1）。VSTO 証跡優先（P8-4で上書きされるため）＋COM フォールバック。</summary>
+        /// <summary>P8-3: 「画面に合わせる16:9」（25.4×14.288cm）。VSTO 証跡優先＋COM（寸法+比率）フォールバック。</summary>
         public bool CheckTask_1_8_03()
         {
             if (PPLogReader.HasTask8_3SlideSize16x9Executed())
                 return true;
-            return TryPageSetupIs16x9ViaCom();
+            return TryPageSetupFitToScreen16x9ViaCom();
         }
 
-        private static bool TryPageSetupIs16x9ViaCom()
+        private static bool TryPageSetupFitToScreen16x9ViaCom()
         {
             Presentation pres = null;
             try
@@ -217,7 +221,7 @@ namespace Libraries.Group1
                 {
                     pageSetup = pres.PageSetup;
                     if (pageSetup == null) return false;
-                    return IsPageSetupRatio16x9(pageSetup);
+                    return IsPageSetupFitToScreen16x9(pageSetup);
                 }
                 catch { return false; }
                 finally
@@ -232,14 +236,23 @@ namespace Libraries.Group1
             }
         }
 
-        private static bool IsPageSetupRatio16x9(PageSetup pageSetup)
+        /// <summary>「画面に合わせる(16:9)」相当: 25.4×14.288cm かつ比率16:9（ワイド画面のみの初期状態と区別）。</summary>
+        private static bool IsPageSetupFitToScreen16x9(PageSetup pageSetup)
         {
             if (pageSetup == null) return false;
             float w = (float)pageSetup.SlideWidth;
             float h = (float)pageSetup.SlideHeight;
             if (h <= 0f) return false;
+
+            float expectedW = P8_3ExpectedWidthCm * P8_3CmToPt;
+            float expectedH = P8_3ExpectedHeightCm * P8_3CmToPt;
+            bool sizeOk = Math.Abs(w - expectedW) <= P8_3DimensionTolerancePt
+                && Math.Abs(h - expectedH) <= P8_3DimensionTolerancePt;
+
             float ratio = w / h;
-            return Math.Abs(ratio - P8_3AspectRatioTarget) <= P8_3AspectRatioTolerance;
+            bool ratioOk = Math.Abs(ratio - P8_3AspectRatioTarget) <= P8_3AspectRatioTolerance;
+
+            return sizeOk && ratioOk;
         }
 
         private const float P8_4CmToPt = 72f / 2.54f;
