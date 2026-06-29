@@ -208,6 +208,9 @@
     <Compile Include="..\Libraries\PptxGlowOpenXmlReader.cs">
       <Link>Libraries\PptxGlowOpenXmlReader.cs</Link>
     </Compile>
+    <Compile Include="..\Libraries\PptAudioMediaHelper.cs">
+      <Link>Libraries\PptAudioMediaHelper.cs</Link>
+    </Compile>
     <Compile Include="LogPaneUserControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

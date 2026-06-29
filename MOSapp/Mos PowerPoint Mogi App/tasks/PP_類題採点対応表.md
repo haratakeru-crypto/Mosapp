@@ -90,11 +90,11 @@
 | P8-3 | 旧11-1 | スライドのサイズを「画面に合わせる16：9」にします | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_01 | P8 実装時に PowerPointChecker1_8.cs 上書き | Phase A 完了（スタブ） |  |
 | P8-4 | 旧9-7 | スライドの大きさを、高さ「"17.46"cm」、幅「"27.54"cm」に変更します。スライドは画面に合わせます。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_07 | P8 実装時に PowerPointChecker1_8.cs 上書き | Phase A 完了（スタブ） |  |
 | P8-5 | 旧10-4 | スライドをグレースケールで表示し、スライド２のイラストを「明るいグレースケール」にします。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_04 | P8 実装時に PowerPointChecker1_8.cs 上書き | Phase A 完了（スタブ） |  |
-| P9-1 | 旧8-1 | あなたは、英語教育プログラムのご提案資料を作成しています。 スライド「スクールの様子」に、動画「受講の様子.mp4」を挿入します。挿入にはアイコンを使います。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_01 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
-| P9-2 | 旧8-3 | スライド５のビデオを、開始を「"4"秒」、終了を「"9"秒」に設定します。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_03 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
-| P9-3 | 旧8-4 | スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は"3"秒かけてフェードアウトするようにします。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_04 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
-| P9-4 | 旧9-1 | スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「結果」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシー | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_01 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
-| P9-5 | 旧9-3 | スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_03 | P9 実装時に PowerPointChecker1_9.cs 上書き |  |  |
+| P9-1 | 旧8-1 | あなたは、英語教育プログラムのご提案資料を作成しています。 スライド「スクールの様子」に、動画「受講の様子.mp4」を挿入します。挿入にはアイコンを使います。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_01 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase B 完了 |  |
+| P9-2 | 旧8-3 | スライド５のビデオを、開始を「"4"秒」、終了を「"9"秒」に設定します。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_03 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase B 完了 |  |
+| P9-3 | 旧8-4 | スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は"3"秒かけてフェードアウトするようにします。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_04 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase B 完了 |  |
+| P9-4 | 旧9-1 | スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「結果」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシー | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_01 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase A 完了（スタブ） |  |
+| P9-5 | 旧9-3 | スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_03 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase A 完了（スタブ） |  |
 | P10-1 | 旧10-5 | あなたは、日本の「四季」について紹介する資料を作成しています。 スライドマスターにテーマ「木版活字」を設定します。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_05 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
 | P10-2 | — | スライドマスターにスライド番号を挿入します。 | — | — | — | [表示]タブ
 ↓
@@ -217,6 +217,18 @@
 | P8-4 (4) | `CheckTask_1_8_04` | 旧9-7 (`CheckTask_1_9_07`) | 幅27.54cm×高さ17.46cm（PageSetup） | [x] |
 | P8-5 (5) | `CheckTask_1_8_05` | 旧10-4 (`CheckTask_1_10_04`) | VSTO `[Task8-5] Grayscale` + スライド2明るいグレースケール | [x] |
 
+## P9 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==9` では **taskId = P9-X**。**現行** `PowerPointChecker1_9.cs` のメソッド名は **P9-X = `CheckTask_1_9_0X`** に揃える（Phase A: 全スタブ `return false`。Phase B で Legacy 参照しつつタスク単位に実装）。
+
+| P9（taskId） | 現行メソッド | Legacy メソッド（参照元） | 検証メモ | Phase B |
+|--------------|-------------|-------------------------|----------|---------|
+| P9-1 (1) | `CheckTask_1_9_01` | 旧8-1 (`CheckTask_1_8_01`) | スライド「スクールの様子」に動画（アイコン表示は COM 未判定） | [x] |
+| P9-2 (2) | `CheckTask_1_9_02` | 旧8-3 (`CheckTask_1_8_03`) | スライド5・StartPoint 4秒・EndPoint 9秒（±500ms） | [x] |
+| P9-3 (3) | `CheckTask_1_9_03` | 旧8-4 (`CheckTask_1_8_04`) | VSTO `[Task9-3] PlayAcrossSlides` + `[Task9-3] FadeOut3000`（AND）／COM 同一形状で両条件 | [x] |
+| P9-4 (4) | `CheckTask_1_9_04` | 旧9-1 (`CheckTask_1_9_01`) | スライド2・ChartType=xlColumnClustered(51) | [x] |
+| P9-5 (5) | `CheckTask_1_9_05` | 旧9-3 (`CheckTask_1_9_03`) | スライド2・DataTable ON・ShowLegendKey OFF・Title/Legend OFF | [x] |
+
 ## 破壊的操作免除一覧（`PPTaskValidationConfig`）
 
 **日常の参照は本セクション（MD）を主とする。** 旧 `(projectId, taskId)` のコード確認は `Libraries/Legacy/PPTaskValidationConfig.Legacy.cs`（**凍結・編集禁止**）。それでも不明なときのみ `git log -p -- Libraries/PPTaskValidationConfig.cs`。
@@ -338,7 +350,19 @@
 
 > 旧 `projectId=8 taskId=1/2`（8-1/8-2 ビデオ挿入）の Shapes 免除は新P8に含まれない。Phase A で config から削除済み（旧8-1/3/4/5 は P9 等へ移行）。
 
-### 旧 projectId 7〜11（P9 以降・config は旧番号のまま）
+### P9（projectId=9, taskId=P9-X）— Phase A 完了
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|-------------|------|
+| 1 (P9-1) | 旧8-1 | Shapes | 無制限 | — | — | ビデオ挿入 |
+| 2 (P9-2) | 旧8-3 | なし | — | — | — | ビデオトリム |
+| 3 (P9-3) | 旧8-4 | なし | — | — | — | VSTO `[Task9-3] PlayAcrossSlides` + `[Task9-3] FadeOut3000`（AND） |
+| 4 (P9-4) | 旧9-1 | Shapes, Position | スライド2: 0 | — | 新規のみ | グラフ作成 |
+| 5 (P9-5) | 旧9-3 | なし | — | — | — | データテーブル |
+
+> 旧 `projectId=9 taskId=4/5/6/7`（フッター・ハイパーリンク・サイズ）は新P7/P8へ移行済み。Phase A で config から削除済み。
+
+### 旧 projectId 7〜11（P10 以降・config は旧番号のまま）
 
 | projectId | taskId | 旧タスク | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 将来の新タスク（参考） |
 |-----------|--------|----------|-----------|-------------|-------------|-------------|----------------------|
@@ -403,7 +427,8 @@
 - [x] **P7 Phase B** — P7-1 → … → P7-5 をタスク単位に実装・検証
 - [x] **P8 Phase A**（5 タスク）— スキャフォールド完了（Checker スタブ・Grader・config・問題文 JSON）
 - [x] **P8 Phase B** — P8-1 → … → P8-5 をタスク単位に実装・検証
-- [ ] **P9**（5 タスク）— 未着手
+- [x] **P9 Phase A**（5 タスク）— スキャフォールド完了（Checker スタブ・Grader・config・問題文 JSON）
+- [x] **P9 Phase B** — P9-1 → … → P9-5 をタスク単位に実装・検証
 - [ ] **P10**（8 タスク）— 未着手
 
 ## 推奨実装順

@@ -272,6 +272,8 @@ namespace Libraries
                     return new[] { "[Task4-3] Glow18Accent6" };
                 case 8:
                     return new[] { "[Task8-3] SlideSize16x9", "[Task8-5] Grayscale" };
+                case 9:
+                    return new[] { "[Task9-3] PlayAcrossSlides", "[Task9-3] FadeOut3000" };
                 case 10:
                     return new[] { "[Task10-4] Grayscale" };
                 case 6:

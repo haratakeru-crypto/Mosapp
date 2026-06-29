@@ -7,6 +7,7 @@ using System.Xml.Linq;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using Libraries;
+using Libraries.Group1;
 using PowerPoint = Microsoft.Office.Interop.PowerPoint;
 using Office = Microsoft.Office.Core;
 
@@ -65,8 +66,9 @@ namespace PowerPointAddIn1
         private const float SlideSize8_3DimensionTolerancePt = 1.5f;
         private const float SlideSize8_3AspectRatioTarget = 16f / 9f;
         private const float SlideSize8_3AspectRatioTolerance = 0.02f;
-        private Timer _audio8_4PollTimer;
-        private bool _task8_4Logged;
+        private Timer _audio9_3PollTimer;
+        private bool _task9_3PlayAcrossLogged;
+        private bool _task9_3FadeOutLogged;
         private Timer _glow4_3PollTimer;
         private bool _task4_3GlowLogged;
         private Timer _layout10_7PollTimer;
@@ -135,11 +137,12 @@ namespace PowerPointAddIn1
             _printOptionsPollTimer.Tick += PrintOptionsPollTimer_Tick;
             _printOptionsPollTimer.Start();
 
-            _task8_4Logged = false;
-            _audio8_4PollTimer = new Timer();
-            _audio8_4PollTimer.Interval = 1000;
-            _audio8_4PollTimer.Tick += Audio8_4PollTimer_Tick;
-            _audio8_4PollTimer.Start();
+            _task9_3PlayAcrossLogged = false;
+            _task9_3FadeOutLogged = false;
+            _audio9_3PollTimer = new Timer();
+            _audio9_3PollTimer.Interval = 1000;
+            _audio9_3PollTimer.Tick += Audio9_3PollTimer_Tick;
+            _audio9_3PollTimer.Start();
 
             _task4_3GlowLogged = false;
             _glow4_3PollTimer = new Timer();
@@ -278,6 +281,11 @@ namespace PowerPointAddIn1
                 if (!(projectId == 6 && taskId == 6)) _task6_6PrintLogged = false;
                 if (!(projectId == 6 && taskId == 7)) _task6_7PrintLogged = false;
                 if (!(projectId == 8 && taskId == 3)) _task8_3SlideSizeLogged = false;
+                if (!(projectId == 9 && taskId == 3))
+                {
+                    _task9_3PlayAcrossLogged = false;
+                    _task9_3FadeOutLogged = false;
+                }
 
                 CurrentTaskProjectId = projectId;
                 CurrentTaskTaskId = taskId;
@@ -540,12 +548,6 @@ namespace PowerPointAddIn1
         {
             if (allowedDelta == int.MaxValue) return true;
 
-            // 9-6 slide 1: allow 0 (already replaced at snapshot) or -57 (expected URL→お問い合わせ).
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == -57;
-            }
-
             return actualDelta == allowedDelta;
         }
 
@@ -575,12 +577,11 @@ namespace PowerPointAddIn1
         }
 
         private static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
+
         {
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または -57、実際の変化: {actualDelta}）";
-            }
+
             return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
+
         }
 
         private static bool HasTask1_8SummaryZoomExecutedGlobally()
@@ -729,7 +730,7 @@ namespace PowerPointAddIn1
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3, P5-4, P5-5
-            if (projectId == 9 && taskId == 1) return true; // 9-1
+            if (projectId == 9 && taskId == 4) return true; // P9-4
             if (projectId == 10 && taskId == 7) return true; // 10-7
             return false;
         }
@@ -743,8 +744,6 @@ namespace PowerPointAddIn1
             if (projectId == 5 && taskId == 2) return 1; // P5-2
             if (projectId == 3 && taskId == 5) return 1; // P3-5
             // P3-7: section zoom side effects on multiple slides — no cap (-1). ShapesCount still strict per slide.
-            if (projectId == 9 && taskId == 1) return -1; // デフォルトへ (deltaで制御)
-            if (projectId == 9 && taskId == 6) return 1; // 9-6
             if (projectId == 11 && taskId == 6) return 1; // 11-6
             return -1;
         }
@@ -763,7 +762,7 @@ namespace PowerPointAddIn1
             }
             if (projectId == 5 && taskId == 3) return 0;                       // P5-3
             if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5
-            if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1
+            if (projectId == 9 && taskId == 4) return slideIndex == 2 ? 0 : 0; // P9-4
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 3)
@@ -776,8 +775,6 @@ namespace PowerPointAddIn1
 
         private int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
-            // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
-            if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 3)
@@ -1318,10 +1315,10 @@ namespace PowerPointAddIn1
             catch { }
         }
 
-        private void Audio8_4PollTimer_Tick(object sender, EventArgs e)
+        private void Audio9_3PollTimer_Tick(object sender, EventArgs e)
         {
-            if (_task8_4Logged) return;
-            if (!IsCurrentTask(8, 4)) return;
+            if (_task9_3PlayAcrossLogged && _task9_3FadeOutLogged) return;
+            if (!IsCurrentTask(9, 3)) return;
             try
             {
                 if (Application == null || Application.Presentations == null) return;
@@ -1345,25 +1342,25 @@ namespace PowerPointAddIn1
                             try
                             {
                                 sh = shapes[i];
-                                try
+                                if (!PptAudioMediaHelper.TryIsSoundShape(sh))
+                                    continue;
+
+                                if (!_task9_3PlayAcrossLogged
+                                    && PptAudioMediaHelper.IsAudioPlayAcrossSlides(sh, pres))
                                 {
-                                    if (sh.MediaType != PowerPoint.PpMediaType.ppMediaTypeSound) continue;
+                                    Logger.LogTask9_3PlayAcrossSlides();
+                                    _task9_3PlayAcrossLogged = true;
                                 }
-                                catch { continue; }
-                                PowerPoint.MediaFormat mf = null;
-                                try
+
+                                if (!_task9_3FadeOutLogged
+                                    && PptAudioMediaHelper.IsAudioFadeOutAbout3Seconds(sh))
                                 {
-                                    mf = sh.MediaFormat;
-                                    if (mf == null) continue;
-                                    float fadeIn = (float)mf.FadeInDuration;
-                                    if (Math.Abs(fadeIn - 4000f) < 500f)
-                                    {
-                                        Logger.LogTask8_4Audio();
-                                        _task8_4Logged = true;
-                                        return;
-                                    }
+                                    Logger.LogTask9_3FadeOut3000();
+                                    _task9_3FadeOutLogged = true;
                                 }
-                                finally { if (mf != null) try { Marshal.ReleaseComObject(mf); } catch { } }
+
+                                if (_task9_3PlayAcrossLogged && _task9_3FadeOutLogged)
+                                    return;
                             }
                             finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
                         }
@@ -1967,11 +1964,11 @@ namespace PowerPointAddIn1
                 _printOptionsPollTimer.Dispose();
                 _printOptionsPollTimer = null;
             }
-            if (_audio8_4PollTimer != null)
+            if (_audio9_3PollTimer != null)
             {
-                _audio8_4PollTimer.Stop();
-                _audio8_4PollTimer.Dispose();
-                _audio8_4PollTimer = null;
+                _audio9_3PollTimer.Stop();
+                _audio9_3PollTimer.Dispose();
+                _audio9_3PollTimer = null;
             }
             if (_layout10_7PollTimer != null)
             {

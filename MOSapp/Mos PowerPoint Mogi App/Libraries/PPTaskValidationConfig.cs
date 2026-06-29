@@ -178,25 +178,20 @@ namespace Libraries
             }
             else if (projectId == 9)
             {
+                // P9: taskId 1〜5 = P9-1〜P9-5。旧9-4/5/6/7（フッター・ハイパーリンク・サイズ）は新P7/P8へ移行済み。
                 switch (taskId)
                 {
-                    case 1: // 9-1 表を元にグラフ作成
-                        // グラフオブジェクトが新規作成されるため、ShapesCount, ShapePosition免除が必要
+                    case 1: // P9-1 ビデオ挿入（旧8-1）
+                        flags |= PPValidationExemptFlags.ShapesCount;
+                        break;
+                    case 2: // P9-2 ビデオトリム（旧8-3）— 免除なし
+                        break;
+                    case 3: // P9-3 オーディオ（旧8-4）— 免除なし
+                        break;
+                    case 4: // P9-4 グラフ作成（旧9-1）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
                         break;
-                    case 4: // 9-4, 5 フッター
-                    case 5:
-                        // フッターやスライド番号を有効にすると、各スライドにプレースホルダー（図形）が実体化して追加されるため、
-                        // ShapesCountおよびShapePositionの免除が必要。またテキスト入力のためTextLengthも免除。
-                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
-                        break;
-                    case 6: // 9-6 ハイパーリンク
-                        // リンク設定によりテキスト内容と配置が変わるため、TextLength, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
-                        break;
-                    case 7: // 9-7 サイズ変更
-                        // レイアウト全体の再計算が発生するため、ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapePosition;
+                    case 5: // P9-5 データテーブル（旧9-3）— 免除なし
                         break;
                 }
             }
@@ -500,7 +495,7 @@ namespace Libraries
             }
             if (projectId == 5 && taskId == 3) return 0;                       // P5-3 図形変更 (全スライド不変)
             if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5 グループ化
-            if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1 グラフ作成 (プレースホルダー内挿入のため不変)
+            if (projectId == 9 && taskId == 4) return slideIndex == 2 ? 0 : 0; // P9-4 グラフ作成 (プレースホルダー内挿入のため不変)
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 3)
@@ -563,8 +558,6 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
-            // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
-            if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 3)
@@ -586,11 +579,6 @@ namespace Libraries
         public static bool IsAllowedTextLengthDelta(int projectId, int taskId, int slideIndex, int allowedDelta, long actualDelta)
         {
             if (allowedDelta == int.MaxValue) return true;
-
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == -57;
-            }
 
             return actualDelta == allowedDelta;
         }
@@ -621,14 +609,10 @@ namespace Libraries
             return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
         }
 
-        /// <summary>破壊的操作ログ用。9-6 スライド1は「0 または -57」、それ以外は従来表記。</summary>
-        public static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
-        {
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または -57、実際の変化: {actualDelta}）";
-            }
-            return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
+        /// <summary>破壊的操作ログ用。</summary>
+        public static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
+        {
+            return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
         }
 
         /// <summary>
@@ -638,7 +622,7 @@ namespace Libraries
         {
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3 図形変更, P5-4 z-order, P5-5 グループ化
-            if (projectId == 9 && taskId == 1) return true; // 9-1 グラフ作成
+            if (projectId == 9 && taskId == 4) return true; // P9-4 グラフ作成
             if (projectId == 10 && taskId == 7) return true; // 10-7 プレースホルダー追加
             return false;
         }
@@ -656,7 +640,6 @@ namespace Libraries
             if (projectId == 5 && taskId == 2) return 1; // P5-2 四角幅揃え（旧5-4）
             if (projectId == 3 && taskId == 5) return 1; // P3-5 3Dモデルのサイズ変更
             // P3-7: セクションズームの副作用で複数スライドの既存図形がずれるため上限なし（-1）。図形数は GetAllowedShapesCountDelta で厳格化。
-            if (projectId == 9 && taskId == 6) return 1; // 9-6 ハイパーリンク (書き換えによるサイズ変化を許容)
             if (projectId == 11 && taskId == 6) return 1; // 11-6 整列
             return -1;
         }

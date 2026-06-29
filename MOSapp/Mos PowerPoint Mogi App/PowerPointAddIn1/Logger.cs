@@ -143,10 +143,22 @@ namespace PowerPointAddIn1
             LogTaskTag("Task1-8", "SummaryZoom");
         }
 
-        /// <summary>8-4: オーディオ再生設定（フェードイン4秒等）を記録。</summary>
+        /// <summary>8-4: オーディオ再生設定（フェードイン4秒等）を記録。Legacy 参照用。</summary>
         public static void LogTask8_4Audio()
         {
             LogTaskTag("Task8-4", "Audio");
+        }
+
+        /// <summary>P9-3: スライド切替後も再生を記録（旧8-4）。</summary>
+        public static void LogTask9_3PlayAcrossSlides()
+        {
+            LogTaskTag("Task9-3", "PlayAcrossSlides");
+        }
+
+        /// <summary>P9-3: フェードアウト3秒を記録（旧8-4）。</summary>
+        public static void LogTask9_3FadeOut3000()
+        {
+            LogTaskTag("Task9-3", "FadeOut3000");
         }
 
         /// <summary>7-2: スライドの再利用を記録。</summary>
@@ -262,7 +274,8 @@ namespace PowerPointAddIn1
                         || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task8-5", StringComparison.Ordinal)
-                        || string.Equals(taskTag, "Task8-3", StringComparison.Ordinal))
+                        || string.Equals(taskTag, "Task8-3", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task9-3", StringComparison.Ordinal))
                     {
                         AppendToFile(TaskEvidenceFilePath, logEntry);
                     }
