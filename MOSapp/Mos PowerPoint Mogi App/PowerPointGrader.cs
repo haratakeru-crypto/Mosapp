@@ -362,6 +362,7 @@ namespace MOS_PowerPoint_app
                         case 5: return c10.CheckTask_1_10_05();
                         case 6: return c10.CheckTask_1_10_06();
                         case 7: return c10.CheckTask_1_10_07();
+                        case 8: return c10.CheckTask_1_10_08();
                         default: return false;
                     }
                 default:

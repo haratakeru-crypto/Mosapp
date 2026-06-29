@@ -95,29 +95,14 @@
 | P9-3 | 旧8-4 | スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は"3"秒かけてフェードアウトするようにします。 | PowerPointChecker1_8.Legacy.cs | CheckTask_1_8_04 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase B 完了 |  |
 | P9-4 | 旧9-1 | スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「結果」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシー | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_01 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase A 完了（スタブ） |  |
 | P9-5 | 旧9-3 | スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。 | PowerPointChecker1_9.Legacy.cs | CheckTask_1_9_03 | P9 実装時に PowerPointChecker1_9.cs 上書き | Phase A 完了（スタブ） |  |
-| P10-1 | 旧10-5 | あなたは、日本の「四季」について紹介する資料を作成しています。 スライドマスターにテーマ「木版活字」を設定します。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_05 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
-| P10-2 | — | スライドマスターにスライド番号を挿入します。 | — | — | — | [表示]タブ
-↓
-[スライドマスター]をクリッ
-ク
-↓
-[スライドマスター]タブ… | 新規 |
-| P10-3 | — | スライドマスターの［タイトルスライド］レイアウトのスライド番号を非表示にします。 | — | — | — | [表示]タブ
-↓
-[スライドマスター]をクリッ
-ク
-↓
-[スライドマスター]タブ… | 新規 |
-| P10-4 | 旧10-6 | スライドマスターの［２つのコンテンツ］レイアウトのスライドの背景のデザインを非表示にします。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_06 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
-| P10-5 | — | スライドマスターで［フッター］のプレースホルダーを削除します。 | — | — | — | [表示]タブ
-↓
-[スライドマスター]をクリッ
-ク
-↓
-[スライドマスター]タブ… | 新規 |
-| P10-6 | 旧10-7 | スライドマスターの［タイトルのみ］レイアウトをもとに「"タイトル付きの図と表"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレー | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_07 | P10 実装時に PowerPointChecker1_10.cs 上書き |  |  |
-| P10-7 | 旧11-4 | 配布資料マスターの日付を削除します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_04 | P11 実装時に PowerPointChecker1_11.cs 上書き | 旧11-4 は P10-7, P10-8 でも参照 |  |
-| P10-8 | 旧11-4 | 配布資料マスターのフッターに「"四季を楽しむ"」と表示します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_04 | P11 実装時に PowerPointChecker1_11.cs 上書き | 旧11-4 は P10-7, P10-8 でも参照 |  |
+| P10-1 | 旧10-5 | あなたは、日本の「四季」について紹介する資料を作成しています。 スライドマスターにテーマ「木版活字」を設定します。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_05 | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase A 完了（スタブ） |  |
+| P10-2 | — | スライドマスターにスライド番号を挿入します。 | — | — | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase A 完了（スタブ） |  |
+| P10-3 | — | スライドマスターの［タイトルスライド］レイアウトのスライド番号を非表示にします。 | — | — | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase A 完了（スタブ） |  |
+| P10-4 | 旧10-6 | スライドマスターの［２つのコンテンツ］レイアウトのスライドの背景のデザインを非表示にします。 | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_06 | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase B 完了 |  |
+| P10-5 | — | スライドマスターで［フッター］のプレースホルダーを削除します。 | — | — | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase B 完了 |  |
+| P10-6 | 旧10-7 | スライドマスターの［タイトルのみ］レイアウトをもとに「"タイトル付きの図と表"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレー | PowerPointChecker1_10.Legacy.cs | CheckTask_1_10_07 | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase B 完了 |  |
+| P10-7 | 旧11-4 | 配布資料マスターの日付を削除します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_04 | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase B 完了 |  |
+| P10-8 | 旧11-4 | 配布資料マスターのフッターに「"四季を楽しむ"」と表示します。 | PowerPointChecker1_11.Legacy.cs | CheckTask_1_11_04 | P10 実装時に PowerPointChecker1_10.cs 上書き | Phase B 完了 |  |
 
 ## P2 現行メソッド・破壊的操作 taskId 対応
 
@@ -228,6 +213,21 @@
 | P9-3 (3) | `CheckTask_1_9_03` | 旧8-4 (`CheckTask_1_8_04`) | VSTO `[Task9-3] PlayAcrossSlides` + `[Task9-3] FadeOut3000`（AND）／COM 同一形状で両条件 | [x] |
 | P9-4 (4) | `CheckTask_1_9_04` | 旧9-1 (`CheckTask_1_9_01`) | スライド2・ChartType=xlColumnClustered(51) | [x] |
 | P9-5 (5) | `CheckTask_1_9_05` | 旧9-3 (`CheckTask_1_9_03`) | スライド2・DataTable ON・ShowLegendKey OFF・Title/Legend OFF | [x] |
+
+## P10 現行メソッド・破壊的操作 taskId 対応
+
+`PowerPointGrader` の `projectId==10` では **taskId = P10-X**。**現行** `PowerPointChecker1_10.cs` のメソッド名は **P10-X = `CheckTask_1_10_0X`** に揃える（Phase A: 全スタブ `return false`。Phase B で Legacy 参照しつつタスク単位に実装）。
+
+| P10（taskId） | 現行メソッド | Legacy メソッド（参照元） | 検証メモ | Phase B |
+|--------------|-------------|-------------------------|----------|---------|
+| P10-1 (1) | `CheckTask_1_10_01` | 旧10-5 (`CheckTask_1_10_05`) | テーマ「木版活字」 | [x] |
+| P10-2 (2) | `CheckTask_1_10_02` | —（新規） | スライド2〜7 SlideNumber.Visible（1はP10-3対象外） | [x] |
+| P10-3 (3) | `CheckTask_1_10_03` | —（新規） | タイトルSL番号非表示＋スライド2〜7番号表示 | [x] |
+| P10-4 (4) | `CheckTask_1_10_04` | 旧10-6 (`CheckTask_1_10_06`) | 「２つのコンテンツ」背景非表示 | [x] |
+| P10-5 (5) | `CheckTask_1_10_05` | —（新規） | スライドマスターでフッターPH削除 | [x] |
+| P10-6 (6) | `CheckTask_1_10_06` | 旧10-7 (`CheckTask_1_10_07`) | レイアウト複製・図左/表右 | [x] |
+| P10-7 (7) | `CheckTask_1_10_07` | 旧11-4 (`CheckTask_1_11_04`) | 配布資料日付削除 | [x] |
+| P10-8 (8) | `CheckTask_1_10_08` | 旧11-4 (`CheckTask_1_11_04`) | 配布資料フッター「四季を楽しむ」 | [x] |
 
 ## 破壊的操作免除一覧（`PPTaskValidationConfig`）
 
@@ -362,6 +362,21 @@
 
 > 旧 `projectId=9 taskId=4/5/6/7`（フッター・ハイパーリンク・サイズ）は新P7/P8へ移行済み。Phase A で config から削除済み。
 
+### P10（projectId=10, taskId=P10-X）— Phase A 完了
+
+| taskId | 旧 | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 備考 |
+|--------|-----|-----------|-------------|-------------|-------------|------|
+| 1 (P10-1) | 旧10-5 | Shapes, Position | 無制限 | — | 無制限 | テーマ変更 |
+| 2 (P10-2) | — | Shapes, Text, Position | 無制限 | 無制限 | 無制限 | スライド番号挿入 |
+| 3 (P10-3) | — | Shapes, Text, Position | 無制限 | 無制限 | 無制限 | タイトルSL番号非表示＋2〜7表示 |
+| 4 (P10-4) | 旧10-6 | なし | — | — | — | 背景デザイン非表示 |
+| 5 (P10-5) | — | Shapes, Text, Position | 無制限 | 無制限 | 無制限 | フッターPH削除 |
+| 6 (P10-6) | 旧10-7 | Shapes, Position | 無制限 | — | 新規のみ | レイアウト複製 |
+| 7 (P10-7) | 旧11-4 | なし | — | — | — | 配布資料日付削除（段階3） |
+| 8 (P10-8) | 旧11-4 | Shapes, Text | 無制限 | 無制限 | — | 配布資料フッター（段階1） |
+
+> 旧 `projectId=10 taskId=1/2/3/4/7`（旧10-1〜4・旧10-7白紙複製）は新P6/P8/P10へ移行済み。Phase A で config を P10-1〜8 に付け替え済み。
+
 ### 旧 projectId 7〜11（P10 以降・config は旧番号のまま）
 
 | projectId | taskId | 旧タスク | 免除フラグ | 図形数デルタ | 文字数デルタ | 既存図形位置 | 将来の新タスク（参考） |
@@ -391,6 +406,10 @@
 | (6, 4) 旧6-4 3Dサイズ | P3-5 (3, 5) | Legacy の `projectId == 6 && taskId == 4` |
 | (4, 5) 旧4-5 画像配置 | P4-5 (4,5)、P5-1 (5,1) | Legacy の `projectId==4 && taskId==5`（**旧番号**。現行 P4-5 は config の projectId=4 taskId=5） |
 | (5, 1) 旧5-1 印刷 | P6-5 (6,5), P6-7 (6,7) | Phase A: P6 config 枠のみ。Phase B で checker + VSTO |
+| (10, 5) 旧10-5 テーマ | P10-1 (10,1) | Legacy `CheckTask_1_10_05` |
+| (10, 6) 旧10-6 背景 | P10-4 (10,4) | Legacy `CheckTask_1_10_06` |
+| (10, 7) 旧10-7 レイアウト | P10-6 (10,6) | Legacy `CheckTask_1_10_07` |
+| (11, 4) 旧11-4 配布資料 | P10-7 (10,7), P10-8 (10,8) | Legacy `CheckTask_1_11_04` |
 
 > P5 着手時: 上記「旧 5〜11」表と **Legacy（凍結）** の旧番号行を参照し、現行 `PPTaskValidationConfig.cs` と本 MD の P5 セクションに書き換える。**Legacy ファイル自体は更新しない。**
 
@@ -429,7 +448,8 @@
 - [x] **P8 Phase B** — P8-1 → … → P8-5 をタスク単位に実装・検証
 - [x] **P9 Phase A**（5 タスク）— スキャフォールド完了（Checker スタブ・Grader・config・問題文 JSON）
 - [x] **P9 Phase B** — P9-1 → … → P9-5 をタスク単位に実装・検証
-- [ ] **P10**（8 タスク）— 未着手
+- [x] **P10 Phase A**（8 タスク）— スキャフォールド完了（Checker スタブ・Grader・config・問題文 JSON）
+- [ ] **P10 Phase B** — P10-1 → … → P10-8 をタスク単位に実装・検証
 
 ## 推奨実装順
 

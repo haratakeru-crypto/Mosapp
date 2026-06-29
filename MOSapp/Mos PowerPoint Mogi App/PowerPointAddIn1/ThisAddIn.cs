@@ -731,7 +731,7 @@ namespace PowerPointAddIn1
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3, P5-4, P5-5
             if (projectId == 9 && taskId == 4) return true; // P9-4
-            if (projectId == 10 && taskId == 7) return true; // 10-7
+            if (projectId == 10 && taskId == 6) return true; // P10-6
             return false;
         }
 

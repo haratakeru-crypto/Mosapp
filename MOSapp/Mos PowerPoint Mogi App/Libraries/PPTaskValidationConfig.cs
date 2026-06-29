@@ -197,12 +197,30 @@ namespace Libraries
             }
             else if (projectId == 10)
             {
+                // P10: taskId 1〜8 = P10-1〜P10-8。旧10-1〜4等は新P6/P8等へ移行済み。
                 switch (taskId)
                 {
-                    case 5: // 10-5 テーマ変更
-                    case 7: // 10-7 プレースホルダー追加
-                        // レイアウト変更やオブジェクト追加が発生するため、ShapesCount, ShapePosition免除が必要
+                    case 1: // P10-1 テーマ（旧10-5）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 2: // P10-2 スライドマスターにスライド番号
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
+                        break;
+                    case 3: // P10-3 タイトルスライドレイアウトのスライド番号非表示
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
+                        break;
+                    case 4: // P10-4 背景デザイン非表示（旧10-6）
+                        break;
+                    case 5: // P10-5 フッターPH削除
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
+                        break;
+                    case 6: // P10-6 レイアウト複製（旧10-7）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 7: // P10-7 配布資料日付削除（旧11-4）
+                        break;
+                    case 8: // P10-8 配布資料フッター（旧11-4）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength;
                         break;
                 }
             }
@@ -609,10 +627,10 @@ namespace Libraries
             return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
         }
 
-        /// <summary>破壊的操作ログ用。</summary>
-        public static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
-        {
-            return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
+        /// <summary>破壊的操作ログ用。</summary>
+        public static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
+        {
+            return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
         }
 
         /// <summary>
@@ -623,7 +641,7 @@ namespace Libraries
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3 図形変更, P5-4 z-order, P5-5 グループ化
             if (projectId == 9 && taskId == 4) return true; // P9-4 グラフ作成
-            if (projectId == 10 && taskId == 7) return true; // 10-7 プレースホルダー追加
+            if (projectId == 10 && taskId == 6) return true; // P10-6 レイアウト複製
             return false;
         }
 
