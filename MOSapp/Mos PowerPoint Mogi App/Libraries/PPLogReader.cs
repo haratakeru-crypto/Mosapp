@@ -266,6 +266,13 @@ namespace Libraries
                         "[Task1-4] DeleteThirdSlide",
                         "[Task1-8] SummaryZoom"
                     };
+                case 2:
+                    return new[]
+                    {
+                        "[Task2-1] SplitHorizontalOut",
+                        "[Task2-2] TransitionDuration3Sec",
+                        "[Task2-3] SwitchRight"
+                    };
                 case 5:
                     return new[] { "[Task5-1] Print" };
                 case 4:
@@ -429,6 +436,24 @@ namespace Libraries
         public static bool HasTask4_3GlowExecuted()
         {
             return HasGradingEvidenceMarker("[Task4-3] Glow18Accent6");
+        }
+
+        /// <summary>証跡またはメインログに P2-1 の画面切り替え記録（[Task2-1] SplitHorizontalOut）が含まれるか。</summary>
+        public static bool HasTask2_1SplitHorizontalOutExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task2-1] SplitHorizontalOut");
+        }
+
+        /// <summary>証跡またはメインログに P2-2 の継続時間記録（[Task2-2] TransitionDuration3Sec）が含まれるか。</summary>
+        public static bool HasTask2_2TransitionDuration3SecExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task2-2] TransitionDuration3Sec");
+        }
+
+        /// <summary>証跡またはメインログに P2-3 の切り替え記録（[Task2-3] SwitchRight）が含まれるか。</summary>
+        public static bool HasTask2_3SwitchRightExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task2-3] SwitchRight");
         }
 
         /// <summary>証跡またはメインログに 5-1 の印刷記録（[Task5-1] Print）が含まれるか。</summary>

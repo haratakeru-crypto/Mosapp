@@ -96,6 +96,17 @@ namespace PowerPointAddIn1
         private List<int> _task1_4PrevSlideIds = new List<int>();
         private string _task1_4PrevPresentationKey;
 
+        private Timer _task2_1PollTimer;
+        private bool _task2_1Logged;
+        private const int P2_1EffectSplitHorizontalOut = 3585;
+
+        private Timer _task2_2PollTimer;
+        private bool _task2_2Logged;
+
+        private Timer _task2_3PollTimer;
+        private bool _task2_3Logged;
+        private const int P2_3EffectSwitchRight = 3903;
+
         private Timer _taskFilePollTimer;
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
@@ -173,6 +184,24 @@ namespace PowerPointAddIn1
             _task1_2To1_4PollTimer.Tick += Task1_2To1_4PollTimer_Tick;
             _task1_2To1_4PollTimer.Start();
 
+            _task2_1Logged = false;
+            _task2_1PollTimer = new Timer();
+            _task2_1PollTimer.Interval = 700;
+            _task2_1PollTimer.Tick += Task2_1PollTimer_Tick;
+            _task2_1PollTimer.Start();
+
+            _task2_2Logged = false;
+            _task2_2PollTimer = new Timer();
+            _task2_2PollTimer.Interval = 700;
+            _task2_2PollTimer.Tick += Task2_2PollTimer_Tick;
+            _task2_2PollTimer.Start();
+
+            _task2_3Logged = false;
+            _task2_3PollTimer = new Timer();
+            _task2_3PollTimer.Interval = 700;
+            _task2_3PollTimer.Tick += Task2_3PollTimer_Tick;
+            _task2_3PollTimer.Start();
+
             _taskFilePollTimer = new Timer();
             _taskFilePollTimer.Interval = 500;
             _taskFilePollTimer.Tick += TaskFilePollTimer_Tick;
@@ -243,6 +272,21 @@ namespace PowerPointAddIn1
                 {
                     TryLogTask8_3SlideSize16x9OnTaskBoundary();
                 }
+                // P2-1 は P2-4 で画面切り替えが上書きされるため、離脱直前に証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 1)
+                {
+                    TryLogTask2_1SplitHorizontalOutOnTaskBoundary();
+                }
+                // P2-2 も P2-4 で継続時間が上書きされるため、離脱直前に証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 2)
+                {
+                    TryLogTask2_2TransitionDuration3SecOnTaskBoundary();
+                }
+                // P2-3 も P2-4 で画面切り替えが上書きされるため、離脱直前に証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 3)
+                {
+                    TryLogTask2_3SwitchRightOnTaskBoundary();
+                }
 
                 // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
                 // ※ project-task-attempt が変わったときのみ（SnapshotGen だけの再取得では比較しない）
@@ -281,6 +325,9 @@ namespace PowerPointAddIn1
                 if (!(projectId == 6 && taskId == 6)) _task6_6PrintLogged = false;
                 if (!(projectId == 6 && taskId == 7)) _task6_7PrintLogged = false;
                 if (!(projectId == 8 && taskId == 3)) _task8_3SlideSizeLogged = false;
+                if (!(projectId == 2 && taskId == 1)) _task2_1Logged = false;
+                if (!(projectId == 2 && taskId == 2)) _task2_2Logged = false;
+                if (!(projectId == 2 && taskId == 3)) _task2_3Logged = false;
                 if (!(projectId == 9 && taskId == 3))
                 {
                     _task9_3PlayAcrossLogged = false;
@@ -1670,6 +1717,238 @@ namespace PowerPointAddIn1
             TryLogTask8_3SlideSize16x9IfPageSetupMatches();
         }
 
+        private void Task2_1PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(2, 1)) return;
+                TryLogTask2_1SplitHorizontalOutIfMatches();
+            }
+            catch { }
+        }
+
+        /// <summary>P2-1 離脱直前に画面切り替えを再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask2_1SplitHorizontalOutOnTaskBoundary()
+        {
+            TryLogTask2_1SplitHorizontalOutIfMatches();
+        }
+
+        private void TryLogTask2_1SplitHorizontalOutIfMatches()
+        {
+            if (_task2_1Logged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+                if (!PresentationMatchesP2_1SplitHorizontalOut(pres)) return;
+
+                Logger.LogTask2_1SplitHorizontalOut();
+                _task2_1Logged = true;
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool PresentationMatchesP2_1SplitHorizontalOut(PowerPoint.Presentation pres)
+        {
+            if (pres == null) return false;
+            PowerPoint.Slides slides = null;
+            try
+            {
+                slides = pres.Slides;
+                if (slides == null) return false;
+                int count = slides.Count;
+                if (count < 2) return false;
+                int[] indicesToCheck = count >= 6 ? new[] { 1, 2, 6 } : new[] { 1, 2 };
+                foreach (int i in indicesToCheck)
+                {
+                    PowerPoint.Slide slide = null;
+                    try
+                    {
+                        slide = slides[i];
+                        if (slide == null) return false;
+                        int effectVal;
+                        try { effectVal = (int)slide.SlideShowTransition.EntryEffect; }
+                        catch { return false; }
+                        if (effectVal != P2_1EffectSplitHorizontalOut) return false;
+                    }
+                    finally
+                    {
+                        if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
+            finally
+            {
+                if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+            }
+        }
+
+        private void Task2_2PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(2, 2)) return;
+                TryLogTask2_2TransitionDuration3SecIfMatches();
+            }
+            catch { }
+        }
+
+        /// <summary>P2-2 離脱直前に継続時間を再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask2_2TransitionDuration3SecOnTaskBoundary()
+        {
+            TryLogTask2_2TransitionDuration3SecIfMatches();
+        }
+
+        private void TryLogTask2_2TransitionDuration3SecIfMatches()
+        {
+            if (_task2_2Logged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+                if (!PresentationMatchesP2_2TransitionDuration3Sec(pres)) return;
+
+                Logger.LogTask2_2TransitionDuration3Sec();
+                _task2_2Logged = true;
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool PresentationMatchesP2_2TransitionDuration3Sec(PowerPoint.Presentation pres)
+        {
+            if (pres == null) return false;
+            PowerPoint.Slides slides = null;
+            try
+            {
+                slides = pres.Slides;
+                if (slides == null) return false;
+                int count = slides.Count;
+                if (count <= 0) return false;
+                for (int i = 1; i <= count; i++)
+                {
+                    PowerPoint.Slide slide = null;
+                    try
+                    {
+                        slide = slides[i];
+                        if (slide == null) return false;
+                        float dur;
+                        try { dur = slide.SlideShowTransition.Duration; }
+                        catch { return false; }
+                        bool isSlide345 = (i == 3 || i == 4 || i == 5);
+                        bool ok = isSlide345
+                            ? IsP2TransitionDurationThreeSeconds(dur) || IsP2TransitionDurationSwitchDefault(dur)
+                            : IsP2TransitionDurationThreeSeconds(dur);
+                        if (!ok) return false;
+                    }
+                    finally
+                    {
+                        if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
+            finally
+            {
+                if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+            }
+        }
+
+        private static bool IsP2TransitionDurationThreeSeconds(float duration)
+        {
+            return duration >= 2.9f && duration <= 3.1f;
+        }
+
+        private static bool IsP2TransitionDurationSwitchDefault(float duration)
+        {
+            return duration >= 1.15f && duration <= 1.35f;
+        }
+
+        private void Task2_3PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(2, 3)) return;
+                TryLogTask2_3SwitchRightIfMatches();
+            }
+            catch { }
+        }
+
+        /// <summary>P2-3 離脱直前に切り替え効果を再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask2_3SwitchRightOnTaskBoundary()
+        {
+            TryLogTask2_3SwitchRightIfMatches();
+        }
+
+        private void TryLogTask2_3SwitchRightIfMatches()
+        {
+            if (_task2_3Logged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+                if (!PresentationMatchesP2_3SwitchRight(pres)) return;
+
+                Logger.LogTask2_3SwitchRight();
+                _task2_3Logged = true;
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool PresentationMatchesP2_3SwitchRight(PowerPoint.Presentation pres)
+        {
+            if (pres == null) return false;
+            PowerPoint.Slides slides = null;
+            try
+            {
+                slides = pres.Slides;
+                if (slides == null || slides.Count < 5) return false;
+                for (int slideNum = 3; slideNum <= 5; slideNum++)
+                {
+                    PowerPoint.Slide slide = null;
+                    try
+                    {
+                        slide = slides[slideNum];
+                        if (slide == null) return false;
+                        int effectVal;
+                        try { effectVal = (int)slide.SlideShowTransition.EntryEffect; }
+                        catch { return false; }
+                        if (effectVal != P2_3EffectSwitchRight) return false;
+                    }
+                    finally
+                    {
+                        if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
+            finally
+            {
+                if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+            }
+        }
+
         private void GrayscalePollTimer_Tick(object sender, EventArgs e)
         {
             bool isTask10_4 = IsCurrentTask(10, 4);
@@ -1957,6 +2236,24 @@ namespace PowerPointAddIn1
                 _task1_2To1_4PollTimer.Stop();
                 _task1_2To1_4PollTimer.Dispose();
                 _task1_2To1_4PollTimer = null;
+            }
+            if (_task2_1PollTimer != null)
+            {
+                _task2_1PollTimer.Stop();
+                _task2_1PollTimer.Dispose();
+                _task2_1PollTimer = null;
+            }
+            if (_task2_2PollTimer != null)
+            {
+                _task2_2PollTimer.Stop();
+                _task2_2PollTimer.Dispose();
+                _task2_2PollTimer = null;
+            }
+            if (_task2_3PollTimer != null)
+            {
+                _task2_3PollTimer.Stop();
+                _task2_3PollTimer.Dispose();
+                _task2_3PollTimer = null;
             }
             if (_printOptionsPollTimer != null)
             {

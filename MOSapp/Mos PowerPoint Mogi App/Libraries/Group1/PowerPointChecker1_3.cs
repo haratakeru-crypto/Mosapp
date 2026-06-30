@@ -172,17 +172,7 @@ namespace Libraries.Group1
                             string appliedId = appliedColor.Id ?? "";
                             string appliedName = appliedColor.Name ?? "";
 
-                            bool hasAccent6 = appliedId.IndexOf("accent6", StringComparison.OrdinalIgnoreCase) >= 0
-                                || appliedName.IndexOf("アクセント6", StringComparison.OrdinalIgnoreCase) >= 0
-                                || appliedName.IndexOf("アクセント 6", StringComparison.OrdinalIgnoreCase) >= 0
-                                || appliedName.IndexOf("アクセント６", StringComparison.OrdinalIgnoreCase) >= 0
-                                || appliedName.IndexOf("Accent 6", StringComparison.OrdinalIgnoreCase) >= 0;
-                            bool hasGradientCycle = appliedId.IndexOf("gradient", StringComparison.OrdinalIgnoreCase) >= 0
-                                || appliedId.IndexOf("cycle", StringComparison.OrdinalIgnoreCase) >= 0
-                                || appliedName.IndexOf("グラデーション", StringComparison.OrdinalIgnoreCase) >= 0
-                                || appliedName.IndexOf("循環", StringComparison.OrdinalIgnoreCase) >= 0;
-
-                            if (hasAccent6 && hasGradientCycle)
+                            if (IsP3_2GradientCycleAccent6(appliedId, appliedName))
                                 return true;
 
                             for (int idx = 1; idx <= 20; idx++)
@@ -193,14 +183,7 @@ namespace Libraries.Group1
                                     if (style == null) continue;
                                     string styleId = style.Id ?? "";
                                     string styleName = style.Name ?? "";
-                                    bool styleAccent6 = styleName.IndexOf("アクセント6", StringComparison.OrdinalIgnoreCase) >= 0
-                                        || styleName.IndexOf("アクセント 6", StringComparison.OrdinalIgnoreCase) >= 0
-                                        || styleName.IndexOf("Accent 6", StringComparison.OrdinalIgnoreCase) >= 0;
-                                    bool styleGradient = styleName.IndexOf("グラデーション", StringComparison.OrdinalIgnoreCase) >= 0
-                                        || styleName.IndexOf("循環", StringComparison.OrdinalIgnoreCase) >= 0
-                                        || styleName.IndexOf("Gradient", StringComparison.OrdinalIgnoreCase) >= 0
-                                        || styleName.IndexOf("Cycle", StringComparison.OrdinalIgnoreCase) >= 0;
-                                    if (styleAccent6 && styleGradient && styleId == appliedId)
+                                    if (IsP3_2GradientCycleAccent6(styleId, styleName) && styleId == appliedId)
                                     {
                                         try { Marshal.ReleaseComObject(style); } catch { }
                                         return true;
@@ -229,6 +212,27 @@ namespace Libraries.Group1
             }
             catch { return false; }
             finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+        }
+
+        /// <summary>
+        /// P3-2 正答色「グラデーション 循環 アクセント6」のみ許容。
+        /// 「グラデーション アクセント6」「グラデーション 透過 アクセント6」は除外する。
+        /// </summary>
+        private static bool IsP3_2GradientCycleAccent6(string id, string name)
+        {
+            string combined = ((id ?? "") + " " + (name ?? "")).ToLowerInvariant();
+            bool accent6 = combined.IndexOf("accent6", StringComparison.Ordinal) >= 0
+                || combined.IndexOf("accent 6", StringComparison.Ordinal) >= 0
+                || combined.IndexOf("アクセント6", StringComparison.OrdinalIgnoreCase) >= 0
+                || combined.IndexOf("アクセント 6", StringComparison.OrdinalIgnoreCase) >= 0
+                || combined.IndexOf("アクセント６", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool gradient = combined.IndexOf("gradient", StringComparison.Ordinal) >= 0
+                || combined.IndexOf("グラデーション", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool cycle = combined.IndexOf("cycle", StringComparison.Ordinal) >= 0
+                || combined.IndexOf("循環", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool transparent = combined.IndexOf("transparent", StringComparison.Ordinal) >= 0
+                || combined.IndexOf("透過", StringComparison.OrdinalIgnoreCase) >= 0;
+            return accent6 && gradient && cycle && !transparent;
         }
 
         /// <summary>P3-3: スライド6の箇条書きを「ターゲットリスト」のSmartArtに変更。</summary>

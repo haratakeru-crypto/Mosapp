@@ -2238,12 +2238,11 @@ namespace MOS_PowerPoint_app.Views
         }
 
         /// <summary>
-        /// プロジェクト遷移直前に 5-1 / 11-7 の印刷設定を同期評価し、条件一致なら証跡ログを明示追記する。
+        /// プロジェクト遷移直前に 5-1 の印刷設定を同期評価し、条件一致なら証跡ログを明示追記する。
         /// </summary>
         private void TryFinalizePrintEvidenceBeforeProjectTransition()
         {
             bool isTask5_1 = _currentProjectId == 5 && _currentTaskId == 1;
-            bool isTask11_7 = false;
             if (!isTask5_1)
                 return;
 
@@ -2291,7 +2290,6 @@ namespace MOS_PowerPoint_app.Views
                                   && copies == 4
                                   && collate;
                     }
-                    // isTask11_7の評価は削除されました
 
                     if (!matched && retry + 1 < maxRetries)
                     {

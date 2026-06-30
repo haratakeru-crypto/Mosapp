@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Libraries;
 using Microsoft.Office.Interop.PowerPoint;
 using Microsoft.Office.Core;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
@@ -12,9 +13,12 @@ namespace Libraries.Group1
         /// <summary>
         /// P2-1: 画面切り替え「スプリット」＋「ワイプアウト（横）」(ppEffectSplitHorizontalOut=3585)。
         /// 問題文は全スライドだが、P2-3 で 3〜5 が上書きされるため採点は 1,2,6 のみ（6枚構成時）。
+        /// P2-4 で上書きされた場合は VSTO 証跡でフォールバック。
         /// </summary>
         public bool CheckTask_1_2_01()
         {
+            if (PPLogReader.HasTask2_1SplitHorizontalOutExecuted())
+                return true;
             const int ppEffectSplitHorizontalOut = 3585;
             Presentation pres = null;
             try
@@ -61,9 +65,12 @@ namespace Libraries.Group1
         /// <summary>
         /// P2-2: すべての画面切り替えの継続時間を3秒に設定。
         /// スライド3〜5は P2-3 の「切り替え」適用後に約1.25秒になるため、3秒または1.25秒を許容。
+        /// P2-4 で上書きされた場合は VSTO 証跡でフォールバック。
         /// </summary>
         public bool CheckTask_1_2_02()
         {
+            if (PPLogReader.HasTask2_2TransitionDuration3SecExecuted())
+                return true;
             Presentation pres = null;
             try
             {
@@ -110,9 +117,12 @@ namespace Libraries.Group1
 
         /// <summary>
         /// P2-3: スライド3,4,5に「切り替え」(ppEffectSwitchRight=3903)の画面切り替えを設定。
+        /// P2-4 で上書きされた場合は VSTO 証跡でフォールバック。
         /// </summary>
         public bool CheckTask_1_2_03()
         {
+            if (PPLogReader.HasTask2_3SwitchRightExecuted())
+                return true;
             Presentation pres = null;
             try
             {

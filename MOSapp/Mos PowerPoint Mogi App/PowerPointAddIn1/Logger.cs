@@ -83,6 +83,24 @@ namespace PowerPointAddIn1
             LogTaskTag("Task8-3", "SlideSize16x9");
         }
 
+        /// <summary>P2-1: スプリット＋ワイプアウト（横）の画面切り替えを記録（P2-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask2_1SplitHorizontalOut()
+        {
+            LogTaskTag("Task2-1", "SplitHorizontalOut");
+        }
+
+        /// <summary>P2-2: 全スライド画面切り替え継続時間3秒を記録（P2-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask2_2TransitionDuration3Sec()
+        {
+            LogTaskTag("Task2-2", "TransitionDuration3Sec");
+        }
+
+        /// <summary>P2-3: スライド3〜5に「切り替え」を記録（P2-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask2_3SwitchRight()
+        {
+            LogTaskTag("Task2-3", "SwitchRight");
+        }
+
         /// <summary>5-1: 配布資料3スライド・部単位4部で印刷したことを記録。</summary>
         public static void LogTask5_1Print()
         {
@@ -275,7 +293,10 @@ namespace PowerPointAddIn1
                         || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task8-5", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task8-3", StringComparison.Ordinal)
-                        || string.Equals(taskTag, "Task9-3", StringComparison.Ordinal))
+                        || string.Equals(taskTag, "Task9-3", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task2-1", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task2-2", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task2-3", StringComparison.Ordinal))
                     {
                         AppendToFile(TaskEvidenceFilePath, logEntry);
                     }
