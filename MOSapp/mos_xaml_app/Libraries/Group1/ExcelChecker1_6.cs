@@ -103,7 +103,7 @@ namespace Libraries.Group1
                 results.Add($"Task 6-3 (通貨書式): {(task3 ? "OK" : "NG")}");
 
                 bool task4 = CheckTask_1_6_04_Impl(TARGET_FILE_PATH);
-                results.Add($"Task 6-4 (プロパティタグ): {(task4 ? "OK" : "NG")}");
+                results.Add($"Task 6-4 (プロパティタイトル): {(task4 ? "OK" : "NG")}");
 
                 return string.Join("\n", results);
             }
@@ -358,9 +358,10 @@ namespace Libraries.Group1
                 try
                 {
                     dynamic properties = workbook.BuiltinDocumentProperties;
-                    dynamic keywordsProperty = properties["Keywords"];
-                    string tags = keywordsProperty.Value as string;
-                    if (tags != null && tags.Contains("売上"))
+                    dynamic titleProperty = properties["Title"];
+                    string title = titleProperty.Value as string;
+                    System.Diagnostics.Debug.WriteLine($"[DEBUG] Task 6-4 Title: '{title}'");
+                    if (title != null && title.Contains("売上一覧"))
                     {
                         return true;
                     }

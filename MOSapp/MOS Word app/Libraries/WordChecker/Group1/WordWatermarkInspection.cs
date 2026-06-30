@@ -9,7 +9,8 @@ using Microsoft.Office.Interop.Word;
 namespace Libraries.Group1
 {
     /// <summary>
-    /// 4-5 透かし判定。ギャラリー「下書き1」は表示文字「下書き」＋斜め、「下書き2」は「下書き」＋横書き。
+    /// 4-5 透かし判定。ギャラリー「サンプル２」は表示文字「サンプル」（ヘッダー内）。
+    /// 「下書き1」は「下書き」＋斜め、「下書き2」は「下書き」＋横書き。
     /// WordChecker と VSTO ポーリングで同条件を共有する。
     /// </summary>
     public static class WordWatermarkInspection
@@ -32,6 +33,10 @@ namespace Libraries.Group1
             @"rotation:\s*(-?\d+(?:\.\d+)?)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+        private static readonly Regex HeaderBlockRegex = new Regex(
+            @"<w:hdr\b[^>]*>.*?</w:hdr>",
+            RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
         public static string NormalizeXml(string xml)
         {
             if (string.IsNullOrEmpty(xml))
@@ -44,6 +49,18 @@ namespace Libraries.Group1
             {
                 return xml;
             }
+        }
+
+        /// <summary>透かし「サンプル２」: ヘッダー内に「サンプル」または SAMPLE（下書き・禁止キーワードは除外）。</summary>
+        public static bool IsSample2Watermark(string normalizedXml)
+        {
+            if (string.IsNullOrEmpty(normalizedXml))
+                return false;
+            if (HasForbiddenWatermark(normalizedXml))
+                return false;
+            if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
+                return false;
+            return ContainsSample2TextInWatermarkHeader(normalizedXml);
         }
 
         /// <summary>［デザイン］透かし「下書き1」: 文字「下書き」かつ斜め。社外秘・至急・下書き2（横）は false。</summary>
@@ -103,6 +120,8 @@ namespace Libraries.Group1
                 return "Draft1Diagonal";
             if (IsDraft2HorizontalWatermark(normalizedXml))
                 return "Draft2Horizontal";
+            if (IsSample2Watermark(normalizedXml))
+                return "Sample2";
             if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
                 return "DraftOther";
             return "None";
@@ -160,6 +179,189 @@ namespace Libraries.Group1
             }
         }
 
+        /// <summary>4-4: スタイルセット「線（シンプル）」— 見出し1に0.5pt単線、見出し2に下罫線なし。</summary>
+        public static bool IsDocumentStyleSetLineSimple(Document doc)
+        {
+            if (doc == null)
+                return false;
+            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading1, out int h1Style, out int h1Width))
+                return false;
+            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading2, out int h2Style, out int _))
+                return false;
+            bool h1Ok = h1Style == (int)WdLineStyle.wdLineStyleSingle
+                        && h1Width == (int)WdLineWidth.wdLineWidth050pt;
+            bool h2NoBorder = h2Style == 0 || h2Style == (int)WdLineStyle.wdLineStyleNone;
+            return h1Ok && h2NoBorder;
+        }
+
+        /// <summary>4-4 否定用: スタイルセット「線（スタイリッシュ）」— 見出し1に0.5pt単線かつ見出し2にも下罫線あり。</summary>
+        public static bool IsDocumentStyleSetLineStylish(Document doc)
+        {
+            if (doc == null)
+                return false;
+            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading1, out int h1Style, out int h1Width))
+                return false;
+            if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading2, out int h2Style, out int h2Width))
+                return false;
+            bool h1Ok = h1Style == (int)WdLineStyle.wdLineStyleSingle
+                        && h1Width == (int)WdLineWidth.wdLineWidth050pt;
+            bool h2HasBorder = h2Style == (int)WdLineStyle.wdLineStyleSingle && h2Width > 0;
+            return h1Ok && h2HasBorder;
+        }
+
+        /// <summary>4-6: ページ罫線4辺が純粋な accent3（themeTint/themeShade なし）か。</summary>
+        public static bool ArePageBordersPureAccent3(Document document)
+        {
+            if (document == null)
+                return false;
+            try
+            {
+                string docXml = null;
+                try { docXml = document.WordOpenXML; } catch { }
+                if (!string.IsNullOrEmpty(docXml) && TryArePgBordersPureAccent3(docXml))
+                    return true;
+                return ArePageBordersPureAccent3Com(document);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryArePgBordersPureAccent3(string xml)
+        {
+            if (string.IsNullOrEmpty(xml))
+                return false;
+            int start = xml.IndexOf("<w:pgBorders", StringComparison.OrdinalIgnoreCase);
+            if (start < 0)
+                return false;
+            int end = xml.IndexOf("</w:pgBorders>", start, StringComparison.OrdinalIgnoreCase);
+            if (end < 0)
+                return false;
+            end += "</w:pgBorders>".Length;
+            string pgBordersXml = xml.Substring(start, end - start);
+            return IsPgBorderSidePureAccent3(pgBordersXml, "top")
+                && IsPgBorderSidePureAccent3(pgBordersXml, "left")
+                && IsPgBorderSidePureAccent3(pgBordersXml, "bottom")
+                && IsPgBorderSidePureAccent3(pgBordersXml, "right");
+        }
+
+        private static bool IsPgBorderSidePureAccent3(string pgBordersXml, string sideName)
+        {
+            var match = Regex.Match(pgBordersXml, $@"<w:{sideName}\s+([^/>]*)/>", RegexOptions.IgnoreCase);
+            if (!match.Success)
+                return false;
+            string attrs = match.Groups[1].Value;
+            if (!Regex.IsMatch(attrs, @"w:themeColor\s*=\s*""accent3""", RegexOptions.IgnoreCase))
+                return false;
+            if (HasNonPureThemeTintOrShade(attrs))
+                return false;
+            return true;
+        }
+
+        private static bool HasNonPureThemeTintOrShade(string attrs)
+        {
+            Match mTint = Regex.Match(attrs, @"w:themeTint\s*=\s*""([0-9A-Fa-f]+)""", RegexOptions.IgnoreCase);
+            if (mTint.Success)
+            {
+                int v = Convert.ToInt32(mTint.Groups[1].Value, 16);
+                if (v != 0)
+                    return true;
+            }
+            Match mShade = Regex.Match(attrs, @"w:themeShade\s*=\s*""([0-9A-Fa-f]+)""", RegexOptions.IgnoreCase);
+            if (mShade.Success)
+            {
+                int v = Convert.ToInt32(mShade.Groups[1].Value, 16);
+                if (v != 0)
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool ArePageBordersPureAccent3Com(Document document)
+        {
+            Section sec = null;
+            Borders borders = null;
+            try
+            {
+                if (document.Sections.Count < 1)
+                    return false;
+                sec = document.Sections[1];
+                borders = sec.Borders;
+                foreach (WdBorderType side in new[] { WdBorderType.wdBorderTop, WdBorderType.wdBorderBottom, WdBorderType.wdBorderLeft, WdBorderType.wdBorderRight })
+                {
+                    Border b = null;
+                    try
+                    {
+                        b = borders[side];
+                        if (b == null)
+                            return false;
+                        dynamic color = b.Color;
+                        WdThemeColorIndex theme = WdThemeColorIndex.wdNotThemeColor;
+                        try { theme = (WdThemeColorIndex)color.ObjectThemeColor; } catch { return false; }
+                        if (theme != WdThemeColorIndex.wdThemeColorAccent3)
+                            return false;
+                        float tint = 0f;
+                        try { tint = (float)color.TintAndShade; } catch { }
+                        if (Math.Abs(tint) > 0.05f)
+                            return false;
+                    }
+                    finally
+                    {
+                        if (b != null)
+                            Marshal.ReleaseComObject(b);
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (borders != null)
+                    Marshal.ReleaseComObject(borders);
+                if (sec != null)
+                    Marshal.ReleaseComObject(sec);
+            }
+        }
+
+        private static bool TryGetStyleBottomBorder(Document doc, WdBuiltinStyle styleId, out int lineStyle, out int lineWidth)
+        {
+            lineStyle = 0;
+            lineWidth = 0;
+            Style style = null;
+            Borders borders = null;
+            Border bottom = null;
+            try
+            {
+                style = doc.Styles[styleId];
+                if (style == null)
+                    return false;
+                borders = style.ParagraphFormat.Borders;
+                bottom = borders[WdBorderType.wdBorderBottom];
+                if (bottom == null)
+                    return true;
+                try { lineStyle = (int)bottom.LineStyle; } catch { }
+                try { lineWidth = (int)bottom.LineWidth; } catch { }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (bottom != null)
+                    Marshal.ReleaseComObject(bottom);
+                if (borders != null)
+                    Marshal.ReleaseComObject(borders);
+                if (style != null)
+                    Marshal.ReleaseComObject(style);
+            }
+        }
+
         /// <summary>4-7 後: 禁止透かし・下書き1/2 相当の透かしが残っていない。</summary>
         public static bool IsWatermarkClearedForTask47FollowUp(string normalizedXml)
         {
@@ -171,7 +373,24 @@ namespace Libraries.Group1
                 return false;
             if (IsDraft2HorizontalWatermark(normalizedXml))
                 return false;
-            return normalizedXml.IndexOf("下書き", StringComparison.Ordinal) < 0;
+            if (IsSample2Watermark(normalizedXml))
+                return false;
+            return normalizedXml.IndexOf("下書き", StringComparison.Ordinal) < 0
+                && normalizedXml.IndexOf("サンプル", StringComparison.Ordinal) < 0;
+        }
+
+        private static bool ContainsSample2TextInWatermarkHeader(string normalizedXml)
+        {
+            foreach (Match match in HeaderBlockRegex.Matches(normalizedXml))
+            {
+                string hdr = match.Value;
+                if (hdr.IndexOf("サンプル", StringComparison.Ordinal) >= 0)
+                    return true;
+                if (hdr.IndexOf("SAMPLE", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool ContainsDraft1DiagonalNearDraftText(string normalizedXml)

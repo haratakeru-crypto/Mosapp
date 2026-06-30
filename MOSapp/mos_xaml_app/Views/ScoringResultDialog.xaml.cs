@@ -1,9 +1,12 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using System.Windows.Media;
-using System.IO;
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -19,11 +22,16 @@ namespace MOSExcelMogiApp.Views
     {
         private int _groupId = 1;
         private int _projectId = 1;
+        private DispatcherTimer _keepOnTopTimer;
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         public ScoringResultDialog(int taskCount)
         {
             InitializeComponent();
             DisplayEmptyResults(taskCount);
+            HookForegroundBehavior();
         }
 
         public ScoringResultDialog(int taskCount, List<bool> results, int groupId = 1, int projectId = 1)
@@ -32,6 +40,7 @@ namespace MOSExcelMogiApp.Views
             _groupId = groupId;
             _projectId = projectId;
             DisplayResults(results);
+            HookForegroundBehavior();
         }
 
         public ScoringResultDialog(List<bool> results, int groupId = 1, int projectId = 1)
@@ -40,15 +49,88 @@ namespace MOSExcelMogiApp.Views
             _groupId = groupId;
             _projectId = projectId;
             DisplayResults(results);
+            HookForegroundBehavior();
+        }
+
+        /// <summary>
+        /// 採点結果を最前面のモーダルで表示する（Excel が前面に出ても維持）。
+        /// </summary>
+        public static void ShowResults(Window owner, int taskCount, List<bool> results, int groupId, int projectId)
+        {
+            var w = new ScoringResultDialog(taskCount, results, groupId, projectId)
+            {
+                Owner = owner,
+                Topmost = true,
+                ShowInTaskbar = true
+            };
+
+            if (owner != null)
+            {
+                owner.Topmost = true;
+                owner.Activate();
+            }
+
+            w.ShowDialog();
+
+            if (owner != null)
+                owner.Topmost = true;
+        }
+
+        private void HookForegroundBehavior()
+        {
+            Loaded += ScoringResultDialog_Loaded;
+            Closed += ScoringResultDialog_Closed;
+        }
+
+        private void ScoringResultDialog_Loaded(object sender, RoutedEventArgs e)
+        {
+            BringToForeground();
+            _keepOnTopTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            _keepOnTopTimer.Tick += KeepOnTopTimer_Tick;
+            _keepOnTopTimer.Start();
+        }
+
+        private void ScoringResultDialog_Closed(object sender, EventArgs e)
+        {
+            if (_keepOnTopTimer == null)
+                return;
+
+            _keepOnTopTimer.Stop();
+            _keepOnTopTimer.Tick -= KeepOnTopTimer_Tick;
+            _keepOnTopTimer = null;
+        }
+
+        private void KeepOnTopTimer_Tick(object sender, EventArgs e)
+        {
+            if (!IsVisible)
+                return;
+
+            if (!IsActive)
+            {
+                Topmost = false;
+                Topmost = true;
+                BringToForeground();
+            }
+        }
+
+        private void BringToForeground()
+        {
+            Topmost = true;
+            Activate();
+            try
+            {
+                var helper = new WindowInteropHelper(this);
+                if (helper.Handle != IntPtr.Zero)
+                    SetForegroundWindow(helper.Handle);
+            }
+            catch { }
         }
 
         private void DisplayEmptyResults(int taskCount)
         {
-            // タスク番号を生成 (1, 2, 3, ...)
             var taskNumbers = Enumerable.Range(1, taskCount).ToList();
             TaskNumbersControl.ItemsSource = taskNumbers;
 
-            // 空の結果を表示
             var resultItems = Enumerable.Range(1, taskCount)
                 .Select(i => new ResultItem { Text = "-", Color = Brushes.Gray, TaskId = i })
                 .ToList();
@@ -58,12 +140,10 @@ namespace MOSExcelMogiApp.Views
         private void DisplayResults(List<bool> results)
         {
             System.Diagnostics.Debug.WriteLine($"[DisplayResults] Called with {results.Count} results, groupId: {_groupId}, projectId: {_projectId}");
-            
-            // タスク番号を生成 (1, 2, 3, ...)
+
             var taskNumbers = Enumerable.Range(1, results.Count).ToList();
             TaskNumbersControl.ItemsSource = taskNumbers;
 
-            // 結果をO/Xに変換して色付き
             var resultItems = results.Select((r, index) => {
                 var item = new ResultItem
                 {
@@ -80,11 +160,11 @@ namespace MOSExcelMogiApp.Views
         private void ResultItem_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultItem_MouseDown] Event fired");
-            
+
             if (sender is FrameworkElement element && element.DataContext is ResultItem resultItem)
             {
                 System.Diagnostics.Debug.WriteLine($"[ResultItem_MouseDown] DataContext found - Text: {resultItem.Text}, TaskId: {resultItem.TaskId}, IsClickable: {resultItem.IsClickable}");
-                
+
                 if (resultItem.IsClickable && resultItem.Text == "X")
                 {
                     System.Diagnostics.Debug.WriteLine($"[ResultItem_MouseDown] Showing image for TaskId: {resultItem.TaskId}");
@@ -106,11 +186,10 @@ namespace MOSExcelMogiApp.Views
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[ShowImage] Called with taskId: {taskId}, groupId: {_groupId}, projectId: {_projectId}");
-                
-                // 画像パスを構築: References/Answers/Group{groupId}/Project{projectId}/Task{taskId}.png
+
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 System.Diagnostics.Debug.WriteLine($"[ShowImage] Base directory: {baseDir}");
-                
+
                 string imagePath = Path.Combine(
                     baseDir,
                     "References",
@@ -131,7 +210,6 @@ namespace MOSExcelMogiApp.Views
                 }
                 else
                 {
-                    // 代替パスを試す（プロジェクトルートから）
                     string projectRootPath = Path.Combine(
                         baseDir,
                         "..",
@@ -143,10 +221,10 @@ namespace MOSExcelMogiApp.Views
                         $"Task{taskId}.png"
                     );
                     projectRootPath = Path.GetFullPath(projectRootPath);
-                    
+
                     System.Diagnostics.Debug.WriteLine($"[ShowImage] Trying alternative path: {projectRootPath}");
                     System.Diagnostics.Debug.WriteLine($"[ShowImage] Alternative path exists: {File.Exists(projectRootPath)}");
-                    
+
                     if (File.Exists(projectRootPath))
                     {
                         System.Diagnostics.Debug.WriteLine("[ShowImage] Opening ImageWindow with alternative path");
@@ -179,7 +257,7 @@ namespace MOSExcelMogiApp.Views
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            Close();
         }
     }
 }

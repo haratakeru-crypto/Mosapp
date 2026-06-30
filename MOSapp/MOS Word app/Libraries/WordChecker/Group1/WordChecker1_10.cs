@@ -38,10 +38,9 @@ namespace Libraries.Group1
 
                 // 表記ゆれは許容しない。「ウイルス」で Find し、その直前に「コンピュータ」（6文字）があるか（＝コンピュータウイルス）を厳密に判定
                 const int computerLen = 6; // 「コンピュータ」の文字数
-                searchRange = document.Content;
+                searchRange = WordFindHelper.DuplicateContent(document);
                 find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "ウイルス";
+                WordFindHelper.ConfigureSafeFind(find, "ウイルス");
                 object findTextVirus = "ウイルス";
                 object matchCase = false;
                 object matchWholeWord = false;
@@ -211,10 +210,9 @@ namespace Libraries.Group1
             string[] targets = { "推測できる簡単なパスワード", "身に覚えのないリンク", "サポート切れソフトウェア" };
             foreach (string target in targets)
             {
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = target;
+                WordFindHelper.ConfigureSafeFind(find, target);
 
                 object findText = target;
                 object matchCase = false;
@@ -301,10 +299,9 @@ namespace Libraries.Group1
             string[] targets = { "セキュリティ対策ソフト", "使わなくなった機器" };
             foreach (string target in targets)
             {
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = target;
+                WordFindHelper.ConfigureSafeFind(find, target);
 
                 object findText = target;
                 object matchCase = false;
@@ -410,10 +407,9 @@ namespace Libraries.Group1
                 }
                 if (document == null) return false;
 
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "事例";
+                WordFindHelper.ConfigureSafeFind(find, "事例");
 
                 object missing = System.Reflection.Missing.Value;
                 object forward = true;
@@ -478,7 +474,7 @@ namespace Libraries.Group1
                 bool isB5 = Math.Abs((float)ps.PageWidth - 516f) <= pageTolerance && Math.Abs((float)ps.PageHeight - 729f) <= pageTolerance;
                 
                 // 2. 最後の2段落の行間 (1.6) のチェック
-                Range lastRange = document.Content;
+                Range lastRange = WordFindHelper.DuplicateContent(document);
                 lastRange.Collapse(WdCollapseDirection.wdCollapseEnd);
                 lastRange.MoveStart(WdUnits.wdParagraph, -2);
                 ParagraphFormat pf = lastRange.ParagraphFormat;

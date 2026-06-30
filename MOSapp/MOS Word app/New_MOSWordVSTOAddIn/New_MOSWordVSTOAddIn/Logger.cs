@@ -78,6 +78,23 @@ namespace New_MOSWordVSTOAddIn
             return LogFilePath;
         }
 
+        /// <summary>Word 内で VSTO が稼働中であることを %TEMP% に記録する。</summary>
+        public static void WriteVstoHeartbeat()
+        {
+            try
+            {
+                lock (_lockObject)
+                {
+                    string path = Path.Combine(Path.GetTempPath(), "mos_word_vsto_heartbeat.txt");
+                    File.WriteAllText(path, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Encoding.UTF8);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] WriteVstoHeartbeat: {ex.Message}");
+            }
+        }
+
         public static void SetCurrentTaskContext(int projectId, int taskId, int attemptNo)
         {
             lock (_lockObject)

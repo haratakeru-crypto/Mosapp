@@ -91,11 +91,7 @@
       <Project>{55452BC6-0080-149C-0625-BED9EB0B2900}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn.csproj">
-      <Project>{07f6198f-2781-45a3-b41a-f75f992d27cf}</Project>
-      <Name>New_MOSWordVSTOAddIn</Name>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
+    <!-- VSTO は Rebuild-And-Install-WordVSTO.ps1 / RegisterReleaseWordVsto で別途 Release 登録（Debug ビルド参照で上書きしない） -->
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -151,9 +147,11 @@
     <Compile Include="Libraries\ScoreResultStore.cs" />
     <Compile Include="Libraries\WordBatchScoring.cs" />
     <Compile Include="Libraries\WordChecker\Group1\WordWatermarkInspection.cs" />
+    <Compile Include="Libraries\WordChecker\WordFindHelper.cs" />
     <Compile Include="Libraries\WordWindowLayoutHelper.cs" />
     <Compile Include="Libraries\VSTOCheckerHelper.cs" />
     <Compile Include="Libraries\VSTOInstallerHelper.cs" />
+    <Compile Include="Libraries\WordApplicationManager.cs" />
     <Page Include="TabSearchWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -303,7 +301,7 @@
     <PreBuildEvent>taskkill /IM "MOS Word app.exe" /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestCertificateThumbprint>51697A577CB7A09B44708FAD375E49927D37773A</ManifestCertificateThumbprint>
+    <ManifestCertificateThumbprint>0CF57E9C01FFB2BA2E5EF549F4B8D6E8FC1D000C</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
     <ManifestKeyFile>MOS Word app_TemporaryKey.pfx</ManifestKeyFile>
@@ -312,7 +310,7 @@
     <GenerateManifests>true</GenerateManifests>
   </PropertyGroup>
   <PropertyGroup>
-    <SignManifests>true</SignManifests>
+    <SignManifests>false</SignManifests>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- 発行時に VSTO アドインの出力を publish\WordAddIn にコピーする（Import の後に定義して確実に実行されるようにする） -->
@@ -325,5 +323,14 @@
     <Exec Command="xcopy /Y /E &quot;$(_AddInOutDir)*.*&quot; &quot;$(_AddInPublishDir)&quot;" IgnoreExitCode="false" />
     <WriteLinesToFile File="$(_AddInPublishDir)README.txt" Lines="Word 用 VSTO アドイン（採点連携用）;;1. 本フォルダ内の New_MOSWordVSTOAddIn.vsto をダブルクリックしてインストールしてください。;2. 初回はセキュリティの警告が出る場合があります。信頼してインストールしてください。;3. インストール後、Word を起動するとアドインが読み込まれ、模擬アプリの採点が正しく動作します。" Overwrite="true" Encoding="UTF-8" />
     <Message Importance="high" Text="VSTO アドインを発行フォルダにコピーしました: $(_AddInPublishDir)" />
+  </Target>
+  <Target Name="RegisterReleaseWordVsto" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <_ReleaseVsto>$(ProjectDir)New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\bin\Release\New_MOSWordVSTOAddIn.vsto</_ReleaseVsto>
+      <_VstoInstaller>$(CommonProgramFiles)\Microsoft Shared\VSTO\10.0\VSTOInstaller.exe</_VstoInstaller>
+    </PropertyGroup>
+    <Exec Condition="Exists('$(_ReleaseVsto)') And Exists('$(_VstoInstaller)')"
+          Command="&quot;$(_VstoInstaller)&quot; /Install &quot;$(_ReleaseVsto)&quot; /Silent"
+          ContinueOnError="true" />
   </Target>
 </Project>

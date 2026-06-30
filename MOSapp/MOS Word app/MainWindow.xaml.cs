@@ -107,9 +107,7 @@ namespace MOS_Word_app
             var results = _viewModel?.TaskResults;
             if (results == null || results.Count == 0)
                 return;
-            var dialog = new Views.ScoreResultWindow(results);
-            dialog.Owner = this;
-            dialog.ShowDialog();
+            Views.ScoreResultWindow.ShowResults(this, results);
         }
 
         private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -137,21 +135,8 @@ namespace MOS_Word_app
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // #region agent log
-            try
-            {
-                var line1 = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"Loaded entry\",\"data\":{\"autoOpenGroupId\":" + (App.AutoOpenGroupId?.ToString() ?? "null") + ",\"autoOpenProjectId\":" + (App.AutoOpenProjectId?.ToString() ?? "null") + ",\"projectGroupsCount\":" + (_viewModel.ProjectGroups?.Count ?? 0) + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"C\"}\n";
-                var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
-                try { System.IO.File.AppendAllText(logPath, line1); } catch { System.IO.File.AppendAllText(System.AppDomain.CurrentDomain.BaseDirectory + "debug.log", line1); }
-            }
-            catch { }
-            // #endregion
-
             if (!App.AutoOpenGroupId.HasValue || !App.AutoOpenProjectId.HasValue)
             {
-                // #region agent log
-                try { System.IO.File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"early return no AutoOpen\",\"data\":{\"autoOpenGroupId\":" + (App.AutoOpenGroupId?.ToString() ?? "null") + ",\"autoOpenProjectId\":" + (App.AutoOpenProjectId?.ToString() ?? "null") + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H2\"}\n"); } catch { }
-                // #endregion
                 return;
             }
 
@@ -162,22 +147,8 @@ namespace MOS_Word_app
             var group = _viewModel.ProjectGroups?.FirstOrDefault(g => g.GroupId == groupId);
             var project = group?.Projects?.FirstOrDefault(p => p.ProjectId == projectId);
 
-            // #region agent log
-            try
-            {
-                var canExec = project != null && _viewModel.OpenProjectCommand.CanExecute(project);
-                var line2 = "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"project resolve\",\"data\":{\"groupFound\":" + (group != null).ToString().ToLowerInvariant() + ",\"projectFound\":" + (project != null).ToString().ToLowerInvariant() + ",\"canExecute\":" + canExec.ToString().ToLowerInvariant() + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"D\"}\n";
-                var logPath = @"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log";
-                try { System.IO.File.AppendAllText(logPath, line2); } catch { System.IO.File.AppendAllText(System.AppDomain.CurrentDomain.BaseDirectory + "debug.log", line2); }
-            }
-            catch { }
-            // #endregion
-
             if (project == null)
             {
-                // #region agent log
-                try { System.IO.File.AppendAllText(@"c:\Users\kouza\source\repos\MOS Word app\.cursor\debug.log", "{\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"MainWindow.xaml.cs:MainWindow_Loaded\",\"message\":\"project is null\",\"data\":{\"groupId\":" + groupId + ",\"projectId\":" + projectId + "},\"sessionId\":\"debug-session\",\"hypothesisId\":\"H2\"}\n"); } catch { }
-                // #endregion
                 return;
             }
 

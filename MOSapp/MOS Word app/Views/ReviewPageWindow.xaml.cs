@@ -306,35 +306,63 @@ namespace MOS_Word_app.Views
             return null;
         }
         
-        private void NavigateToTask(ReviewTaskInfo taskInfo)
+        private async void NavigateToTask(ReviewTaskInfo taskInfo)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
-            
-            if (OnNavigateToTask != null && taskInfo.ProjectId > 0 && taskInfo.TaskId > 0)
-            {
-                try
-                {
-                    System.Diagnostics.Debug.WriteLine("ナビゲーション実行開始");
-                    
-                    // タイマーを停止
-                    _timer?.Stop();
-                    
-                    // ナビゲーションを実行
-                    OnNavigateToTask(taskInfo.ProjectId, taskInfo.TaskId);
-                    
-                    System.Diagnostics.Debug.WriteLine("ナビゲーション実行完了");
-                    
-                    // レビューページを閉じる
-                    this.Close();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"ナビゲーション実行エラー: {ex.Message}");
-                }
-            }
-            else
+
+            if (OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0)
             {
                 System.Diagnostics.Debug.WriteLine($"ナビゲーション条件不一致: OnNavigateToTask={OnNavigateToTask != null}, ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
+                return;
+            }
+
+            var openingOverlay = new Window
+            {
+                Title = "タスクを開いています",
+                Width = 320,
+                Height = 120,
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Background = System.Windows.Media.Brushes.White,
+                BorderBrush = System.Windows.Media.Brushes.SteelBlue,
+                BorderThickness = new Thickness(2)
+            };
+            var stack = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(16)
+            };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "タスクを開いています...",
+                FontSize = 14,
+                TextAlignment = TextAlignment.Center,
+                Foreground = System.Windows.Media.Brushes.SteelBlue
+            });
+            openingOverlay.Content = stack;
+            openingOverlay.Show();
+
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("ナビゲーション実行開始");
+                _timer?.Stop();
+                OnNavigateToTask(taskInfo.ProjectId, taskInfo.TaskId);
+                openingOverlay.Close();
+                System.Diagnostics.Debug.WriteLine("ナビゲーション実行完了");
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                openingOverlay.Close();
+                System.Diagnostics.Debug.WriteLine($"ナビゲーション実行エラー: {ex.Message}");
+                MessageBox.Show($"タスクの移動中にエラーが発生しました: {ex.Message}",
+                    "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         

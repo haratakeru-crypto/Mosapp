@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Libraries;
 
@@ -11,6 +12,14 @@ namespace MOS_Word_app
     public static class WordProjectResetHelper
     {
         private const string BasePath = @"C:\MOSTest\Word365";
+
+        private static readonly string[] WordFileExtensions =
+        {
+            ".doc", ".docx", ".docm", ".dot", ".dotx", ".dotm", ".rtf", ".txt"
+        };
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool DeleteFileW(string lpFileName);
 
         public static void ResetProject(int groupId, int projectId)
         {
@@ -25,6 +34,11 @@ namespace MOS_Word_app
             string workingFolder = Path.Combine(BasePath, $"Tab{groupId}");
             string initialFolder = Path.Combine(BasePath, $"Tab{groupId}", "Initial");
             string initialInitialFolder = Path.Combine(BasePath, $"Tab{groupId}", "Initial", "Initial");
+
+            // リセット参照フォルダ内の Word データから Zone.Identifier を削除（保護ビュー防止）
+            UnblockWordFilesInFolder(workingFolder);
+            UnblockWordFilesInFolder(initialFolder);
+            UnblockWordFilesInFolder(initialInitialFolder);
 
             string[] possibleNames = (groupId == 1 && projectId == 7)
                 ? new[] { $"Project{projectId}.doc", $"project{projectId}.doc" }
@@ -56,6 +70,8 @@ namespace MOS_Word_app
             if (string.IsNullOrEmpty(sourceFilePath))
                 throw new FileNotFoundException($"リセット用ファイルが見つかりません: {initialFolder} に Project{projectId}.docx 等を配置してください。");
 
+            RemoveZoneIdentifier(sourceFilePath);
+
             string fileExtension = Path.GetExtension(sourceFilePath);
             string projectFilePath = Path.Combine(workingFolder, $"Project{projectId}{fileExtension}");
             if (!Directory.Exists(workingFolder))
@@ -82,6 +98,8 @@ namespace MOS_Word_app
                 try
                 {
                     File.Copy(sourceFilePath, projectFilePath, overwrite: true);
+                    // File.Copy は Zone.Identifier ADS も引き継ぐため、コピー直後に削除して保護ビューを防ぐ
+                    RemoveZoneIdentifier(projectFilePath);
                     try
                     {
                         var destInfo = new FileInfo(projectFilePath);
@@ -105,6 +123,67 @@ namespace MOS_Word_app
                     retryCount++;
                     Thread.Sleep(200);
                 }
+            }
+        }
+
+        /// <summary>
+        /// ファイルの Zone.Identifier ADS（NTFS 代替データストリーム）を削除する。
+        /// インターネット由来マークを外し、Word の保護ビューで開かれるのを防ぐ。
+        /// </summary>
+        private static void RemoveZoneIdentifier(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return;
+
+            try
+            {
+                var fi = new FileInfo(filePath);
+                bool wasReadOnly = fi.IsReadOnly;
+                if (wasReadOnly)
+                {
+                    try { fi.IsReadOnly = false; } catch { }
+                }
+
+                DeleteFileW(filePath + ":Zone.Identifier");
+
+                if (wasReadOnly)
+                {
+                    try { new FileInfo(filePath).IsReadOnly = true; } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] Zone.Identifier 削除スキップ ({filePath}): {ex.Message}");
+            }
+        }
+
+        /// <summary>リセット参照フォルダ内の Word 関連ファイルから Zone.Identifier を一括削除する。</summary>
+        private static void UnblockWordFilesInFolder(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
+                return;
+
+            try
+            {
+                foreach (string file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
+                {
+                    string ext = Path.GetExtension(file);
+                    if (string.IsNullOrEmpty(ext))
+                        continue;
+
+                    foreach (string allowed in WordFileExtensions)
+                    {
+                        if (ext.Equals(allowed, StringComparison.OrdinalIgnoreCase))
+                        {
+                            RemoveZoneIdentifier(file);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] フォルダ一括解除スキップ ({folderPath}): {ex.Message}");
             }
         }
 

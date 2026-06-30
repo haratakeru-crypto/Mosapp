@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Libraries
 {
@@ -13,6 +15,8 @@ namespace Libraries
     public static class LogReader
     {
         private const string LegacyTaskEvidenceFileName = "mos_word_task_evidence.txt";
+        private const string EvidenceFlushFileName = "mos_word_flush_evidence.txt";
+        private const string CloseNavigationFileName = "mos_word_close_navigation.txt";
 
         /// <summary>
         /// 採点用1行: [timestamp] [ProjectN] [TaskN-M] [CommandId] Executed。Task の N は Project と一致すること。
@@ -24,6 +28,35 @@ namespace Libraries
         public static string GetLogFilePath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_word_log.txt");
+        }
+
+        /// <summary>VSTO アドインが Word 内で動作中であることを示すハートビートファイル。</summary>
+        public static string GetVstoHeartbeatPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_word_vsto_heartbeat.txt");
+        }
+
+        /// <summary>直近で VSTO がハートビートを更新していれば true（既定 5 分以内）。</summary>
+        public static bool IsVstoHeartbeatFresh(int maxAgeSeconds = 300)
+        {
+            try
+            {
+                string path = GetVstoHeartbeatPath();
+                if (!File.Exists(path))
+                    return false;
+
+                string text = File.ReadAllText(path, Encoding.UTF8).Trim();
+                if (!long.TryParse(text, out long unixMs))
+                    return false;
+
+                double ageSec = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - unixMs) / 1000.0;
+                return ageSec >= 0 && ageSec <= maxAgeSeconds;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] IsVstoHeartbeatFresh: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>互換: 旧証跡ファイル名。移行後は使用しない。</summary>
@@ -373,6 +406,62 @@ namespace Libraries
         public static string GetSnapshotFilePath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_word_snapshot.txt");
+        }
+
+        public static string GetEvidenceFlushFilePath()
+        {
+            return Path.Combine(Path.GetTempPath(), EvidenceFlushFileName);
+        }
+
+        public static string GetCloseNavigationFilePath()
+        {
+            return Path.Combine(Path.GetTempPath(), CloseNavigationFileName);
+        }
+
+        /// <summary>
+        /// VSTO にナビゲーションウィンドウを閉じるよう依頼する（開いているときのみ閉じる）。処理完了まで待機する。
+        /// </summary>
+        public static void RequestCloseNavigationPaneIfOpen(int timeoutMs = 600)
+        {
+            string path = GetCloseNavigationFilePath();
+            try
+            {
+                File.WriteAllText(path, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Encoding.UTF8);
+                var sw = Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < timeoutMs)
+                {
+                    if (!File.Exists(path))
+                        return;
+                    Thread.Sleep(30);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] RequestCloseNavigationPaneIfOpen: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 採点直前に VSTO へ ShowAll 等のポーリング同期を依頼し、処理完了（ファイル削除）まで待機する。
+        /// </summary>
+        public static void RequestVstoEvidenceFlush(int timeoutMs = 600)
+        {
+            string path = GetEvidenceFlushFilePath();
+            try
+            {
+                File.WriteAllText(path, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Encoding.UTF8);
+                var sw = Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < timeoutMs)
+                {
+                    if (!File.Exists(path))
+                        return;
+                    Thread.Sleep(30);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] RequestVstoEvidenceFlush: {ex.Message}");
+            }
         }
 
         public static void ClearCurrentTaskFile()

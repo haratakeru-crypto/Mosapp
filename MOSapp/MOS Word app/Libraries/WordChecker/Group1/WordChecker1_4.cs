@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Linq;
@@ -59,19 +58,18 @@ namespace Libraries.Group1
                 if (document == null) return false;
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] ロジック実行開始");
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "1.生活の中でできるエコ活動";
+                WordFindHelper.ConfigureSafeFind(find, "1.生活の中でできるエコ活動");
                 find.Execute();
                 if (!find.Found)
                 {
-                    find.Text = "１.生活の中でできるエコ活動";
+                    WordFindHelper.ConfigureSafeFind(find, "１.生活の中でできるエコ活動");
                     find.Execute();
                 }
                 if (!find.Found)
                 {
-                    find.Text = "生活の中でできるエコ活動";
+                    WordFindHelper.ConfigureSafeFind(find, "生活の中でできるエコ活動");
                     find.Execute();
                 }
                 if (!find.Found)
@@ -177,16 +175,18 @@ namespace Libraries.Group1
                 // 【最重要】COMの Comments コレクションはモダンコメント環境で不安定なため使用しない。
                 // 文書全体の WordOpenXML を取得し、XML内のテキストノードから判定する。
                 bool fileStateCheck = false;
+                bool xmlContainsPhrase = false;
+                bool replyOnSonoTa = false;
                 try
                 {
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
                     string xml = document.WordOpenXML;
                     if (!string.IsNullOrEmpty(xml))
                     {
-                        if (xml.Contains("前田先生に最終確認"))
-                        {
+                        xmlContainsPhrase = xml.Contains("前田先生に最終確認");
+                        if (xmlContainsPhrase)
                             fileStateCheck = true;
-                        }
+                        replyOnSonoTa = DocumentHasMaedaReplyOnSonoTaComment(document);
                     }
                 }
                 catch (Exception ex)
@@ -252,10 +252,9 @@ namespace Libraries.Group1
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_03] ロジック実行開始");
                 // 本文に「エコと節約」があること（教材の前提）
-                Range searchRange = document.Content;
+                Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "エコと節約";
+                WordFindHelper.ConfigureSafeFind(find, "エコと節約");
                 find.Execute();
                 if (!find.Found)
                 {
@@ -269,19 +268,12 @@ namespace Libraries.Group1
 
                 // 吹き出しに「エコと節約」が一度も無い: 未着手 / 削除 / 解決（Word によって吹き出しが消える）の区別。削除は ReviewDeleteComment、解決は VSTO ポーリングの ReviewResolveComment ログで補足。
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_03] コメント状態チェック中...");
-                bool anyEcoBalloon = DocumentHasAnyEcoCommentBalloon(document);
-                // 初期状態と完了後が見分けづらいため、個別リセット後の旧ログ誤判定を避け証跡のみ参照
-                bool logDelete = LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment");
                 bool logResolve = LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment");
-                bool resolvedStateOk = IsEcoCommentAbsentOrResolved(document);
+                bool logDelete = LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment");
+                bool anyEcoComment = DocumentHasAnyEcoCommentBalloon(document);
+                bool result = logResolve && logDelete && !anyEcoComment;
 
-                bool result;
-                if (!anyEcoBalloon)
-                    result = logDelete || logResolve;
-                else
-                    result = resolvedStateOk;
-
-                System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_03] 終了。結果={result}");
+                System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_03] 終了。結果={result} (logResolve={logResolve}, logDelete={logDelete}, anyEcoComment={anyEcoComment})");
                 return result;
             }
             catch (Exception ex)
@@ -341,43 +333,13 @@ namespace Libraries.Group1
                 }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_04] ロジック実行開始");
-                // スタイルセット「線（シンプル）」を狭く判定（見出し1下罫線 + ログ必須）
-                Style headingStyle = null;
-                Borders borders = null;
-                try
-                {
-                    try { headingStyle = document.Styles["見出し 1"]; } catch { headingStyle = document.Styles["Heading 1"]; }
-                    if (headingStyle == null)
-                    {
-                        System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_04] '見出し 1' スタイルが見つかりません。");
-                        return false;
-                    }
-                    borders = headingStyle.ParagraphFormat.Borders;
-                    Border bottomBorder = null;
-                    try { bottomBorder = borders[WdBorderType.wdBorderBottom]; } catch { }
-                    
-                    int lineStyle = -999;
-                    int lineWidth = -999;
-                    if (bottomBorder != null)
-                    {
-                        try { lineStyle = (int)bottomBorder.LineStyle; } catch { }
-                        try { lineWidth = (int)bottomBorder.LineWidth; } catch { }
-                    }
+                bool lineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(document);
+                bool lineStylish = WordWatermarkInspection.IsDocumentStyleSetLineStylish(document);
+                bool logOk = LogReader.HasTaskEvidence(4, 4, "StyleSetLineSimple");
 
-                    bool hasLine = bottomBorder != null &&
-                                   lineStyle == (int)WdLineStyle.wdLineStyleSingle &&
-                                   lineWidth == (int)WdLineWidth.wdLineWidth050pt;
-                    bool logOk = LogReader.HasTaskEvidence(4, 4, "StyleSetLineSimple");
-
-                    bool result = hasLine && logOk;
-                    System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_04] 終了。結果={result} (hasLine={hasLine}, logOk={logOk}, style={lineStyle}, width={lineWidth})");
-                    return result;
-                }
-                finally
-                {
-                    if (borders != null) Marshal.ReleaseComObject(borders);
-                    if (headingStyle != null) Marshal.ReleaseComObject(headingStyle);
-                }
+                bool result = lineSimple && !lineStylish && logOk;
+                System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_04] 終了。結果={result} (lineSimple={lineSimple}, lineStylish={lineStylish}, logOk={logOk})");
+                return result;
             }
             catch (Exception ex)
             {
@@ -443,23 +405,21 @@ namespace Libraries.Group1
                 }
                 catch { }
 
-                // 1) 現在の文書: 下書き1（「下書き」＋斜め）のみ ○。下書き2（横）・社外秘・至急は ×
+                // 1) 現在の文書: 透かし「サンプル２」（ヘッダー内「サンプル」）のみ ○
                 if (WordWatermarkInspection.HasForbiddenWatermark(normalizedXml))
                     return false;
-                if (WordWatermarkInspection.IsDraft1Watermark(normalizedXml))
+                if (WordWatermarkInspection.IsSample2Watermark(normalizedXml))
                     return true;
+                if (WordWatermarkInspection.IsDraft1Watermark(normalizedXml))
+                    return false;
                 if (WordWatermarkInspection.IsDraft2HorizontalWatermark(normalizedXml))
                     return false;
-                if (TryIsDraft1WatermarkViaHeaderShapes(document))
-                    return true;
 
-                // 2) 4-7 後: 透かしなし + 4-5 で下書き1 証跡 + 4-7 相当（ヘッダー/フッター空）
+                // 2) 4-7 後: 透かしなし + 4-5 で透かし挿入証跡 + 4-7 相当（ヘッダー/フッター空）
                 bool cleared = WordWatermarkInspection.IsWatermarkClearedForTask47FollowUp(normalizedXml);
-                bool evidenceDraft1 = LogReader.HasTaskEvidence(4, 5, "Watermark");
+                bool evidenceWatermark = LogReader.HasTaskEvidence(4, 5, "Watermark");
                 bool task47State = IsPrimaryHeaderFooterEmpty(document);
-                return cleared && evidenceDraft1 && task47State;
-
-
+                return cleared && evidenceWatermark && task47State;
 
 
 
@@ -501,7 +461,7 @@ namespace Libraries.Group1
 
                 bool logOk = LogReader.HasTaskEvidence(4, 6, "PageBorders");
                 bool hasTop = false, hasBottom = false, hasLeft = false, hasRight = false;
-                int topColor = -999, bottomColor = -999, leftColor = -999, rightColor = -999, bordersShadow = -999;
+                int bordersShadow = -999;
 
                 if (document.Sections.Count >= 1)
                 {
@@ -518,17 +478,10 @@ namespace Libraries.Group1
                     hasLeft = left != null && (WdLineStyle)left.LineStyle == WdLineStyle.wdLineStyleSingle && (WdLineWidth)left.LineWidth == WdLineWidth.wdLineWidth150pt;
                     hasRight = right != null && (WdLineStyle)right.LineStyle == WdLineStyle.wdLineStyleSingle && (WdLineWidth)right.LineWidth == WdLineWidth.wdLineWidth150pt;
 
-                    try { topColor = (int)top.Color; } catch { }
-                    try { bottomColor = (int)bottom.Color; } catch { }
-                    try { leftColor = (int)left.Color; } catch { }
-                    try { rightColor = (int)right.Color; } catch { }
-
                     Marshal.ReleaseComObject(right); Marshal.ReleaseComObject(left); Marshal.ReleaseComObject(bottom); Marshal.ReleaseComObject(top); Marshal.ReleaseComObject(borders1); Marshal.ReleaseComObject(section1);
                 }
 
-                int[] expectedAccent1Colors = new int[] { -738131969, -721354753 };
-                bool colorOk = false;
-                foreach (int c in expectedAccent1Colors) { if (topColor == c && bottomColor == c && leftColor == c && rightColor == c) { colorOk = true; break; } }
+                bool colorOk = WordWatermarkInspection.ArePageBordersPureAccent3(document);
 
                 bool result = logOk && hasTop && hasBottom && hasLeft && hasRight && colorOk && bordersShadow == 0;
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_06] 終了。結果={result}");
@@ -671,51 +624,6 @@ namespace Libraries.Group1
             return string.IsNullOrEmpty(cleanH) && string.IsNullOrEmpty(cleanF);
         }
 
-        private static string JsonEscape(string s)
-        {
-            if (s == null) return string.Empty;
-            return s
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n")
-                .Replace("\t", "\\t");
-        }
-
-        private static string GetDebug6b16c7LogPath()
-        {
-            try
-            {
-                var d = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory ?? "");
-                for (int i = 0; i < 10 && d != null; i++)
-                {
-                    if (File.Exists(Path.Combine(d.FullName, "MOS Word app.sln")) && d.Parent != null)
-                        return Path.Combine(d.Parent.FullName, "debug-6b16c7.log");
-                    d = d.Parent;
-                }
-            }
-            catch { }
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory ?? "", "debug-6b16c7.log");
-        }
-
-        private static void WriteDebug6b16c7Ndjson(string runId, string hypothesisId, string location, string message, string dataJson)
-        {
-            try
-            {
-                long ts = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-                string path = GetDebug6b16c7LogPath();
-                string line = "{\"sessionId\":\"6b16c7\",\"runId\":\"" + (runId ?? "").Replace("\\", "").Replace("\"", "") +
-                              "\",\"timestamp\":" + ts +
-                              ",\"location\":\"" + location.Replace("\"", "") +
-                              "\",\"message\":\"" + message.Replace("\"", "") +
-                              "\",\"hypothesisId\":\"" + hypothesisId.Replace("\"", "") +
-                              "\",\"data\":" + dataJson + "}\n";
-                File.AppendAllText(path, line, Encoding.UTF8);
-            }
-            catch { }
-        }
-
-
         /// <summary>コメントまたはその返信に指定したテキストが含まれるか判定する</summary>
         private static bool CommentBalloonContainsText(Comment comment, string searchText)
         {
@@ -747,6 +655,76 @@ namespace Libraries.Group1
             }
             catch { }
             finally { if (replies != null) Marshal.ReleaseComObject(replies); }
+            return false;
+        }
+
+        private static bool CommentScopeLooksLikeEcoHeading(string scopeText)
+        {
+            string n = NormalizeCommentBody(scopeText);
+            if (string.IsNullOrEmpty(n))
+                return false;
+            return n.Contains("1.生活の中でできるエコ活動")
+                || n.Contains("１.生活の中でできるエコ活動")
+                || n.Contains("生活の中でできるエコ活動");
+        }
+
+        private static bool CommentScopeLooksLikeSonoTaHeading(string scopeText)
+        {
+            string n = NormalizeCommentBody(scopeText);
+            return !string.IsNullOrEmpty(n) && n.Contains("その他");
+        }
+
+        private static bool DocumentHasMaedaReplyOnSonoTaComment(Document document)
+        {
+            Comments comments = null;
+            try
+            {
+                comments = document.Comments;
+                int count = comments.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Comment comment = null;
+                    try
+                    {
+                        comment = comments[i];
+                        Range scope = null;
+                        string scopeText = "";
+                        try
+                        {
+                            scope = comment.Scope;
+                            scopeText = scope?.Text ?? "";
+                        }
+                        finally { if (scope != null) Marshal.ReleaseComObject(scope); }
+                        if (!CommentScopeLooksLikeSonoTaHeading(scopeText))
+                            continue;
+                        Comments replies = null;
+                        try
+                        {
+                            replies = comment.Replies;
+                            if (replies == null)
+                                continue;
+                            int rc = replies.Count;
+                            for (int r = 1; r <= rc; r++)
+                            {
+                                Comment reply = null;
+                                try
+                                {
+                                    reply = replies[r];
+                                    string rt = "";
+                                    try { rt = reply.Range?.Text ?? ""; } catch { }
+                                    if (NormalizeCommentBody(rt).Contains("前田先生に最終確認"))
+                                        return true;
+                                }
+                                finally { if (reply != null) Marshal.ReleaseComObject(reply); }
+                            }
+                        }
+                        finally { if (replies != null) Marshal.ReleaseComObject(replies); }
+                    }
+                    finally { if (comment != null) Marshal.ReleaseComObject(comment); }
+                }
+            }
+            catch { }
+            finally { if (comments != null) Marshal.ReleaseComObject(comments); }
             return false;
         }
 
@@ -808,6 +786,84 @@ namespace Libraries.Group1
             while (t.IndexOf("  ", StringComparison.Ordinal) >= 0)
                 t = t.Replace("  ", " ");
             return t.Trim();
+        }
+
+        /// <summary>吹き出し本文（返信含む）、Scope、または「エコと節約」アンカー重なりで関連判定。</summary>
+        private static bool CommentRelatesToEcoPhrase(Comment comment, Document document)
+        {
+            if (CommentBalloonContainsEcoPhrase(comment))
+                return true;
+            string scope = "";
+            try { scope = comment.Scope?.Text ?? ""; } catch { }
+            if (NormalizedContainsEco(NormalizeCommentBody(scope)))
+                return true;
+            return CommentAnchorOverlapsEco(comment, document);
+        }
+
+        private static string _ecoAnchorDocKey;
+        private static int _ecoAnchorStart = -1;
+        private static int _ecoAnchorEnd = -1;
+
+        private static bool TryGetEcoPhraseAnchor(Document document, out int start, out int end)
+        {
+            start = end = -1;
+            if (document == null)
+                return false;
+            string key = "";
+            try { key = document.FullName ?? ""; } catch { }
+            if (!string.IsNullOrEmpty(key) && key == _ecoAnchorDocKey && _ecoAnchorStart >= 0)
+            {
+                start = _ecoAnchorStart;
+                end = _ecoAnchorEnd;
+                return true;
+            }
+            Range searchRange = null;
+            Find find = null;
+            try
+            {
+                searchRange = WordFindHelper.DuplicateContent(document);
+                find = searchRange.Find;
+                WordFindHelper.ConfigureSafeFind(find, "エコと節約");
+                if (!find.Execute())
+                    return false;
+                start = searchRange.Start;
+                end = searchRange.End;
+                _ecoAnchorDocKey = key;
+                _ecoAnchorStart = start;
+                _ecoAnchorEnd = end;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (find != null) Marshal.ReleaseComObject(find);
+                if (searchRange != null) Marshal.ReleaseComObject(searchRange);
+            }
+        }
+
+        private static bool CommentAnchorOverlapsEco(Comment comment, Document document)
+        {
+            if (!TryGetEcoPhraseAnchor(document, out int ecoStart, out int ecoEnd))
+                return false;
+            Range scope = null;
+            try
+            {
+                scope = comment.Scope;
+                if (scope == null)
+                    return false;
+                return scope.Start <= ecoEnd && scope.End >= ecoStart;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (scope != null) Marshal.ReleaseComObject(scope);
+            }
         }
 
         /// <summary>吹き出し本文（返信含む）に「エコと節約」が含まれるか。</summary>
@@ -878,7 +934,7 @@ namespace Libraries.Group1
                     try
                     {
                         c = comments[i];
-                        if (CommentBalloonContainsEcoPhrase(c))
+                        if (CommentRelatesToEcoPhrase(c, document))
                         {
                             System.Diagnostics.Debug.WriteLine($"    [DocumentHasAnyEcoCommentBalloon] エコフレーズ発見 (index: {i})");
                             return true;
@@ -887,6 +943,42 @@ namespace Libraries.Group1
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"    [DocumentHasAnyEcoCommentBalloon] 個別コメント処理エラー (index: {i}): {ex.Message}");
+                    }
+                    finally
+                    {
+                        if (c != null) Marshal.ReleaseComObject(c);
+                    }
+                }
+                return false;
+            }
+            finally
+            {
+                if (comments != null) Marshal.ReleaseComObject(comments);
+            }
+        }
+
+        /// <summary>「エコと節約」コメントが解決済み（Done）で残っているか。</summary>
+        private static bool DocumentHasResolvedEcoComment(Document document)
+        {
+            Comments comments = null;
+            try
+            {
+                comments = document?.Comments;
+                if (comments == null || comments.Count == 0)
+                    return false;
+                int count = comments.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Comment c = null;
+                    try
+                    {
+                        c = comments[i];
+                        if (!CommentRelatesToEcoPhrase(c, document))
+                            continue;
+                        bool done = false;
+                        try { done = c.Done; } catch { }
+                        if (done)
+                            return true;
                     }
                     finally
                     {
@@ -918,7 +1010,7 @@ namespace Libraries.Group1
                     try
                     {
                         c = comments[i];
-                        if (!CommentBalloonContainsEcoPhrase(c))
+                        if (!CommentRelatesToEcoPhrase(c, document))
                             continue;
                         bool done = false;
                         try { done = c.Done; } catch { }

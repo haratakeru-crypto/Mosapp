@@ -486,35 +486,78 @@ namespace MOSExcelMogiApp.Views
             return null;
         }
         
-        private void NavigateToTask(ReviewTaskInfo taskInfo)
+        private async void NavigateToTask(ReviewTaskInfo taskInfo)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
-            
-            if (OnNavigateToTask != null && taskInfo.ProjectId > 0 && taskInfo.TaskId > 0)
-            {
-                try
-                {
-                    System.Diagnostics.Debug.WriteLine("ナビゲーション実行開始");
-                    
-                    // タイマーを停止
-                    _timer?.Stop();
-                    
-                    // ナビゲーションを実行
-                    OnNavigateToTask(taskInfo.GroupId > 0 ? taskInfo.GroupId : _groupId, taskInfo.ProjectId, taskInfo.TaskId);
-                    
-                    System.Diagnostics.Debug.WriteLine("ナビゲーション実行完了");
-                    
-                    // レビューページを閉じる
-                    this.Close();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"ナビゲーション実行エラー: {ex.Message}");
-                }
-            }
-            else
+
+            if (OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0)
             {
                 System.Diagnostics.Debug.WriteLine($"ナビゲーション条件不一致: OnNavigateToTask={OnNavigateToTask != null}, ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
+                return;
+            }
+
+            // クリック直後にオーバーレイを表示（Excel 終了待機より前）
+            var openingOverlay = new Window
+            {
+                Title = "タスクを開いています",
+                Width = 320,
+                Height = 110,
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Background = System.Windows.Media.Brushes.White,
+                BorderBrush = System.Windows.Media.Brushes.SteelBlue,
+                BorderThickness = new Thickness(2)
+            };
+            var stack = new System.Windows.Controls.StackPanel
+            {
+                VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                Margin = new Thickness(16)
+            };
+            stack.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = $"タスクを開いています...\nプロジェクト {taskInfo.ProjectId} - タスク {taskInfo.TaskId}",
+                FontSize = 13,
+                TextAlignment = System.Windows.TextAlignment.Center,
+                Foreground = System.Windows.Media.Brushes.SteelBlue
+            });
+            openingOverlay.Content = stack;
+            openingOverlay.Show();
+            // 描画を確定させてからバックグラウンド処理へ
+            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("ナビゲーション実行開始");
+
+                // Excel のバックグラウンド終了処理が走っている場合は完了を待つ（競合によるクラッシュを防止）
+                if (PendingExcelCloseTask != null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[NavigateToTask] Waiting for background Excel close task...");
+                    try { await PendingExcelCloseTask; } catch { }
+                    PendingExcelCloseTask = null;
+                    System.Diagnostics.Debug.WriteLine("[NavigateToTask] Background Excel close task finished.");
+                }
+
+                // タイマーを停止
+                _timer?.Stop();
+
+                // ナビゲーションを実行
+                OnNavigateToTask(taskInfo.GroupId > 0 ? taskInfo.GroupId : _groupId, taskInfo.ProjectId, taskInfo.TaskId);
+
+                openingOverlay.Close();
+                System.Diagnostics.Debug.WriteLine("ナビゲーション実行完了");
+
+                // レビューページを閉じる
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                openingOverlay.Close();
+                System.Diagnostics.Debug.WriteLine($"ナビゲーション実行エラー: {ex.Message}");
             }
         }
         

@@ -1,0 +1,29 @@
+﻿powershell : リモート プロシージャ コールに失敗しました。 (HRESULT からの例外:0x800706BE)
+発生場所 C:\Users\kouza\AppData\Local\Temp\ps-script-7e3cd968-5ef4-49df-8b4c-a0009544eaab.ps1:83 文字:1
++ powershell -ExecutionPolicy Bypass -File "c:\Users\kouza\source\repos ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (リモート プロシージャ コール...の例外:0x800706BE):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+発生場所 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOS Word app\scripts\InspectEcoComments.ps1:4 文字:1
++ $doc = $word.Documents.Open($docPath)
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (:) [], COMException
+    + FullyQualifiedErrorId : System.Runtime.InteropServices.COMException
+ 
+Comments.Count=0
+null 値の式ではメソッドを呼び出せません。
+発生場所 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOS Word app\scripts\InspectEcoComments.ps1:23 文字:5
++     $doc.Close($false)
++     ~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) []、RuntimeException
+    + FullyQualifiedErrorId : InvokeMethodOnNull
+ 
+"0" 個の引数を指定して "Quit" を呼び出し中に例外が発生しました: "RPC サーバーを利用できません。 (HRESULT からの例外:0x8007
+06BA)"
+発生場所 C:\Users\kouza\source\repos\MOSapp\MOSapp\MOS Word app\scripts\InspectEcoComments.ps1:24 文字:5
++     $word.Quit()
++     ~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : COMException
+ 

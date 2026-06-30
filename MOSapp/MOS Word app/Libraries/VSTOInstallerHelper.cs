@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.Win32;
 
 namespace Libraries
@@ -23,7 +25,30 @@ namespace Libraries
 
         private const string RegistryAddInsBasePath = @"Software\Microsoft\Office\Word\Addins";
         private const string LoadBehaviorValueName = "LoadBehavior";
-        private const int LoadBehaviorEnabled = 3; // 起動時に読み込む
+        private const string UninstallBasePath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
+
+        private static string NormalizeFullPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+            try
+            {
+                return Path.GetFullPath(path.Trim());
+            }
+            catch
+            {
+                return path.Trim();
+            }
+        }
+
+        private static bool PathsEqual(string a, string b)
+        {
+            string na = NormalizeFullPath(a);
+            string nb = NormalizeFullPath(b);
+            return !string.IsNullOrEmpty(na)
+                && !string.IsNullOrEmpty(nb)
+                && string.Equals(na, nb, StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         /// Manifest の値から .vsto のローカルパスを取り出す（file:///… と |vstolocal 等に対応）。
@@ -73,7 +98,275 @@ namespace Libraries
                 return false;
 
             int loadBehaviorValue = Convert.ToInt32(loadBehavior);
-            return loadBehaviorValue == LoadBehaviorEnabled;
+            // LoadBehavior: 0=切断, 1=接続, 2=登録済みだが起動時は読み込まない, 3=起動時に読み込む, 8/9=初回利用時読み込み
+            // Word がエラー後に 3→2 に下げることがある。Manifest があれば「インストール済み」とみなす。
+            if (loadBehaviorValue == 0)
+                return false;
+
+            object manifest = addInKey.GetValue("Manifest");
+            return manifest != null && !string.IsNullOrWhiteSpace(manifest.ToString());
+        }
+
+        private static Task<(bool success, string issue)> _backgroundPrepTask;
+
+        /// <summary>
+        /// 起動直後に UI をブロックせず VSTO 準備を開始する。プロジェクト開始時は <see cref="EnsureAddInReadyForExam"/> で完了待ち。
+        /// </summary>
+        public static void StartBackgroundPrepForExam()
+        {
+            if (_backgroundPrepTask != null)
+                return;
+
+            _backgroundPrepTask = Task.Run(() =>
+            {
+                string issue;
+                bool ok = EnsureAddInReadyForExamCore(out issue);
+                return (ok, issue);
+            });
+        }
+
+        /// <summary>
+        /// 試験開始前に Release 版 VSTO を有効化する（Debug 登録の上書き、LoadBehavior=3）。
+        /// バックグラウンド準備が走っていれば完了を待つ。
+        /// </summary>
+        public static bool EnsureAddInReadyForExam(out string issue)
+        {
+            issue = null;
+            if (_backgroundPrepTask != null)
+            {
+                try
+                {
+                    var result = _backgroundPrepTask.GetAwaiter().GetResult();
+                    issue = result.issue;
+                    return result.success;
+                }
+                catch (Exception ex)
+                {
+                    issue = ex.InnerException?.Message ?? ex.Message;
+                    return false;
+                }
+            }
+
+            return EnsureAddInReadyForExamCore(out issue);
+        }
+
+        private static bool EnsureAddInReadyForExamCore(out string issue)
+        {
+            issue = null;
+            try
+            {
+                string releaseVsto = GetReleaseBuildOutputPath();
+                string installed = GetInstallPath();
+                bool pointsToDebug = !string.IsNullOrEmpty(installed)
+                    && installed.IndexOf("\\bin\\Debug\\", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool pointsToWrongBuild = !string.IsNullOrEmpty(installed)
+                    && !string.IsNullOrEmpty(releaseVsto)
+                    && !PathsEqual(installed, releaseVsto);
+
+                if ((!IsInstalled() || pointsToDebug || pointsToWrongBuild)
+                    && !string.IsNullOrEmpty(releaseVsto)
+                    && File.Exists(releaseVsto))
+                {
+                    if (!TrySilentInstall(releaseVsto, out issue))
+                        return false;
+                }
+
+                if (!IsInstalled())
+                {
+                    issue = "VSTO add-in is not registered. Run Rebuild-And-Install-WordVSTO.ps1.";
+                    return false;
+                }
+
+                SetLoadBehaviorForAllKeys(3);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                issue = ex.Message;
+                System.Diagnostics.Debug.WriteLine($"[VSTOInstallerHelper] EnsureAddInReadyForExam: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static void SetLoadBehaviorForAllKeys(int loadBehavior)
+        {
+            foreach (string leaf in RegistryAddInKeyNames)
+            {
+                string path = Path.Combine(RegistryAddInsBasePath, leaf).Replace('/', '\\');
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path, writable: true))
+                {
+                    if (key != null)
+                        key.SetValue(LoadBehaviorValueName, loadBehavior, RegistryValueKind.DWord);
+                }
+            }
+
+            string primary = Path.Combine(RegistryAddInsBasePath, RegistryAddInKeyNameFromManifest).Replace('/', '\\');
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(primary, writable: true))
+            {
+                if (key != null)
+                    key.SetValue(LoadBehaviorValueName, loadBehavior, RegistryValueKind.DWord);
+            }
+        }
+
+        private static bool TrySilentInstall(string vstoPath, out string issue)
+        {
+            issue = null;
+            if (string.IsNullOrWhiteSpace(vstoPath) || !File.Exists(vstoPath))
+            {
+                issue = ".vsto not found: " + (vstoPath ?? "(null)");
+                return false;
+            }
+
+            string installer = GetVstoInstallerPath();
+            if (string.IsNullOrEmpty(installer))
+            {
+                issue = "VSTOInstaller.exe not found.";
+                return false;
+            }
+
+            try
+            {
+                if (!TryUninstallAllRegisteredManifests(installer, out issue))
+                    return false;
+
+                if (!RunVstoInstaller(installer, "/Install \"" + vstoPath + "\" /Silent", out issue))
+                    return false;
+
+                SetLoadBehaviorForAllKeys(3);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                issue = ex.Message;
+                return false;
+            }
+        }
+
+        private static string GetVstoInstallerPath()
+        {
+            string installer = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles),
+                @"Microsoft Shared\VSTO\10.0\VSTOInstaller.exe");
+            return File.Exists(installer) ? installer : null;
+        }
+
+        private static IEnumerable<string> EnumerateRegisteredManifestPaths()
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            string installed = GetInstallPath();
+            if (!string.IsNullOrEmpty(installed))
+                seen.Add(NormalizeFullPath(installed));
+
+            foreach (string manifest in EnumerateUninstallEntryManifests())
+            {
+                string normalized = NormalizeFullPath(manifest);
+                if (!string.IsNullOrEmpty(normalized))
+                    seen.Add(normalized);
+            }
+
+            foreach (string path in seen)
+                yield return path;
+        }
+
+        private static IEnumerable<string> EnumerateUninstallEntryManifests()
+        {
+            using (RegistryKey uninstallRoot = Registry.CurrentUser.OpenSubKey(UninstallBasePath))
+            {
+                if (uninstallRoot == null)
+                    yield break;
+
+                foreach (string subKeyName in uninstallRoot.GetSubKeyNames())
+                {
+                    using (RegistryKey subKey = uninstallRoot.OpenSubKey(subKeyName))
+                    {
+                        if (subKey == null)
+                            continue;
+
+                        string displayName = subKey.GetValue("DisplayName") as string;
+                        if (!string.Equals(displayName, AddInName, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        string uninstallString = subKey.GetValue("UninstallString") as string;
+                        string manifest = ParseManifestFromUninstallString(uninstallString);
+                        if (!string.IsNullOrEmpty(manifest))
+                            yield return manifest;
+
+                        string urlUpdate = subKey.GetValue("UrlUpdateInfo") as string;
+                        string updateManifest = NormalizeManifestToVstoPath(urlUpdate);
+                        if (!string.IsNullOrEmpty(updateManifest))
+                            yield return updateManifest;
+                    }
+                }
+            }
+        }
+
+        private static string ParseManifestFromUninstallString(string uninstallString)
+        {
+            if (string.IsNullOrWhiteSpace(uninstallString))
+                return null;
+
+            const string marker = "/Uninstall ";
+            int idx = uninstallString.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+                return null;
+
+            string tail = uninstallString.Substring(idx + marker.Length).Trim();
+            int space = tail.IndexOf(' ');
+            if (space > 0)
+                tail = tail.Substring(0, space);
+
+            return NormalizeManifestToVstoPath(tail.Trim('"'));
+        }
+
+        private static bool TryUninstallAllRegisteredManifests(string installer, out string issue)
+        {
+            issue = null;
+            bool any = false;
+            foreach (string manifestPath in EnumerateRegisteredManifestPaths())
+            {
+                if (string.IsNullOrEmpty(manifestPath))
+                    continue;
+
+                any = true;
+                if (!RunVstoInstaller(installer, "/Uninstall \"" + manifestPath + "\" /Silent", out issue))
+                    return false;
+            }
+
+            if (!any)
+                return true;
+
+            System.Threading.Thread.Sleep(1500);
+            return true;
+        }
+
+        private static bool RunVstoInstaller(string installer, string arguments, out string issue)
+        {
+            issue = null;
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = installer,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using (var proc = System.Diagnostics.Process.Start(psi))
+            {
+                if (proc == null)
+                {
+                    issue = "Failed to start VSTOInstaller.";
+                    return false;
+                }
+
+                proc.WaitForExit(120000);
+                if (proc.ExitCode != 0)
+                {
+                    issue = "VSTOInstaller failed (" + arguments + "): exit " + proc.ExitCode;
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -145,64 +438,70 @@ namespace Libraries
         private const string InstallerManufacturer = "Rabbit";
         private const string InstallerProductName = "wordvstosetup";
 
-        /// <summary>
-        /// VSTOアドインのビルド出力パス（または配布配置パス）を取得する。
-        /// 検索順:
-        ///   1) インストーラー配置先（C:\Program Files\Rabbit\wordvstosetup\New_MOSWordVSTOAddIn.vsto 等）
-        ///   2) 開発時フォールバック: 実行ディレクトリの親階層を辿って bin\Release（既定）または bin\Debug を検索
-        /// </summary>
-        /// <returns>.vsto ファイルのパス。見つからなければ null。</returns>
-        public static string GetBuildOutputPath()
+        /// <summary>試験用の Release 版 .vsto のみを返す（Debug は登録対象外）。</summary>
+        public static string GetReleaseBuildOutputPath()
         {
             string vstoFileName = AddInName + ".vsto";
-
-            // 1) インストーラーによる配置先を最優先で確認
-            //    例: C:\Program Files\Rabbit\wordvstosetup\New_MOSWordVSTOAddIn.vsto
             foreach (string installedPath in EnumerateInstallerDeployedPaths(vstoFileName))
             {
-                if (File.Exists(installedPath)) return installedPath;
+                if (File.Exists(installedPath))
+                    return installedPath;
             }
 
-            // 2) 開発時フォールバック: ソースリポジトリ内のビルド出力（Release を配布既定とし先に検索）
-            string[] relativeSuffixes = new[]
+            return FindBuildOutputPath(new[]
             {
-                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Release", vstoFileName),
-                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Debug", vstoFileName),
-            };
+                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Release", vstoFileName)
+            });
+        }
 
-            // 2-a) BaseDirectory 直下および相対パス
+        /// <summary>
+        /// VSTOアドインのビルド出力パス（または配布配置パス）を取得する。
+        /// </summary>
+        public static string GetBuildOutputPath()
+        {
+            return GetReleaseBuildOutputPath()
+                ?? FindBuildOutputPath(new[]
+                {
+                    Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Release", AddInName + ".vsto"),
+                    Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Debug", AddInName + ".vsto"),
+                });
+        }
+
+        private static string FindBuildOutputPath(string[] relativeSuffixes)
+        {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             foreach (string suffix in relativeSuffixes)
             {
                 string vstoPath = Path.Combine(baseDir, suffix);
-                if (File.Exists(vstoPath)) return vstoPath;
+                if (File.Exists(vstoPath))
+                    return vstoPath;
             }
 
-            // 2-b) BaseDirectory の親を複数段さかのぼって検索
             string searchDir = Path.GetFullPath(baseDir);
             for (int i = 0; i < 8; i++)
             {
                 string parent = Path.GetDirectoryName(searchDir);
-                if (string.IsNullOrEmpty(parent) || parent == searchDir) break;
+                if (string.IsNullOrEmpty(parent) || parent == searchDir)
+                    break;
                 searchDir = parent;
                 foreach (string suffix in relativeSuffixes)
                 {
                     string vstoPath = Path.Combine(searchDir, suffix);
-                    if (File.Exists(vstoPath)) return vstoPath;
+                    if (File.Exists(vstoPath))
+                        return vstoPath;
                 }
-                // New_MOSWordVSTOAddIn フォルダを含むディレクトリを探す
-                string addInFolder = Path.Combine(searchDir, "New_MOSWordVSTOAddIn");
-                if (Directory.Exists(addInFolder))
+
+                if (Directory.Exists(Path.Combine(searchDir, "New_MOSWordVSTOAddIn")))
                 {
                     foreach (string suffix in relativeSuffixes)
                     {
                         string vstoPath = Path.Combine(searchDir, suffix);
-                        if (File.Exists(vstoPath)) return vstoPath;
+                        if (File.Exists(vstoPath))
+                            return vstoPath;
                     }
                 }
             }
 
-            // 2-c) 実行中アセンブリの Location から同様に親を辿る
             string asmDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             if (!string.IsNullOrEmpty(asmDir))
             {
@@ -212,20 +511,23 @@ namespace Libraries
                     foreach (string suffix in relativeSuffixes)
                     {
                         string vstoPath = Path.Combine(searchDir, suffix);
-                        if (File.Exists(vstoPath)) return vstoPath;
+                        if (File.Exists(vstoPath))
+                            return vstoPath;
                     }
+
                     string parent = Path.GetDirectoryName(searchDir);
-                    if (string.IsNullOrEmpty(parent) || parent == searchDir) break;
+                    if (string.IsNullOrEmpty(parent) || parent == searchDir)
+                        break;
                     searchDir = parent;
                 }
             }
 
-            // 2-d) カレントディレクトリ
             string currentDir = Directory.GetCurrentDirectory();
             foreach (string suffix in relativeSuffixes)
             {
                 string vstoPath = Path.Combine(currentDir, suffix);
-                if (File.Exists(vstoPath)) return vstoPath;
+                if (File.Exists(vstoPath))
+                    return vstoPath;
             }
 
             return null;

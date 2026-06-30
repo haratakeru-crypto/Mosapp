@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using Libraries;
 using Libraries.Group1;
 using Word = Microsoft.Office.Interop.Word;
 
@@ -17,8 +18,15 @@ namespace New_MOSWordVSTOAddIn
         private const string WordDocumentPaneClassName = "_WwG";
 
         private WordDestructiveMonitor _destructiveMonitor;
+        private Timer _showAllFastTimer;
         private Timer _showAllPollTimer;
         private bool? _lastShowAllState;
+        private const int ShowAllFastPollIntervalMs = 300;
+        private static readonly string EvidenceFlushFilePath = Path.Combine(Path.GetTempPath(), "mos_word_flush_evidence.txt");
+        private static readonly string CloseNavigationFilePath = Path.Combine(Path.GetTempPath(), "mos_word_close_navigation.txt");
+
+        /// <summary>ナビゲーションウィンドウが開いているか（CommandBars["Navigation"] で同期）。</summary>
+        private bool _navigationPaneOpen;
         private int _lastColumnBreakCount;
         private string _lastTask1_2_03ColorFingerprint;
 
@@ -40,18 +48,25 @@ namespace New_MOSWordVSTOAddIn
         private int _suppressOrientationPollLogs;
         private int _suppressPageBorderPollLogs;
         private int _suppressStyleSetPollLogs;
+        private int _suppressResolvePollLogs;
+        private int _suppressDeletePollLogs;
         private int _heavyCheckTickCounter;
 
-        /// <summary>4-3: 吹き出しに「エコと節約」があり未解決のコメント数。ポーリングで 1→0 になったときログする。</summary>
+        /// <summary>4-3: 未解決エコ件数。1→0 で ReviewResolveComment を補完ログ。</summary>
         private int _lastUnresolvedEcoCommentCount = -1;
 
-        /// <summary>4-3: 吹き出しに「エコと節約」が含まれるコメントが1件でもあるか（解決済み含む）。解決済みのみ残っている教材で削除したときの検知用。</summary>
+        /// <summary>4-3: エコ関連コメント総数（解決済み含む）。0 へ減ったら削除ログ候補。</summary>
+        private int _lastEcoRelatedCommentCount = -1;
+
+        /// <summary>4-3: Comment.Index → Done の前回値。</summary>
+        private readonly Dictionary<int, bool> _ecoCommentDoneByIndex = new Dictionary<int, bool>();
+
+        /// <summary>4-3: 当該試行で ReviewResolveComment を記録済みか。</summary>
+        private bool _ecoResolveLoggedForAttempt;
+
         private bool? _lastAnyEcoPhraseInBalloons;
 
         private string _ecoBaselineDocumentKey;
-
-        /// <summary>4-3: 前ティックの Comments.Count。吹き出し本文が Range で読めない環境でも削除を検知する。</summary>
-        private int _lastCommentsCountForEco = -1;
 
         /// <summary>7-1: 前ティックの ActiveDocument.FullName（文書切替でベースライン再取得するため）</summary>
         private string _p7LastCompatDocFullName;
@@ -97,6 +112,12 @@ namespace New_MOSWordVSTOAddIn
             _suppressStyleSetPollLogs = 2;
         }
 
+        internal void RegisterRibbonLoggedReviewDeleteComment()
+        {
+            _suppressResolvePollLogs = 3;
+            _suppressDeletePollLogs = 2;
+        }
+
         internal void RegisterRibbonLoggedWatermark()
         {
             _suppressWatermarkPollLogs = 2;
@@ -120,6 +141,28 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>4-3 開始時: 未解決エコ件数のベースラインを現文書から再取得する。</summary>
+        internal void SyncEcoCommentBaselineOnTaskSwitch(int projectId, int taskId)
+        {
+            if (projectId != 4 || taskId != 3)
+                return;
+            _lastUnresolvedEcoCommentCount = -1;
+            _lastEcoRelatedCommentCount = -1;
+            _ecoBaselineDocumentKey = null;
+            _ecoCommentDoneByIndex.Clear();
+            _ecoResolveLoggedForAttempt = false;
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(projectId);
+                if (doc != null)
+                    SeedEcoCommentBaseline(doc);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] SyncEcoCommentBaselineOnTaskSwitch: " + ex.Message);
+            }
+        }
+
         /// <summary>
         /// 4-5 離脱時の保険: 文書に下書き1透かしが残っていれば 4-5 の証跡を補記する。
         /// 重いポーリング前に 4-6/4-7 へ遷移した場合でも、4-5 の第2段採点（証跡必須）を満たせるようにする。
@@ -137,7 +180,7 @@ namespace New_MOSWordVSTOAddIn
                 if (doc == null)
                     return;
                 string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
-                if (WordWatermarkInspection.IsDraft1Watermark(norm))
+                if (WordWatermarkInspection.IsSample2Watermark(norm))
                     WordEvidenceHelper.LogCommandWithEvidence("Watermark");
             }
             catch (Exception ex)
@@ -196,7 +239,8 @@ namespace New_MOSWordVSTOAddIn
         private static void LogWatermarkForDestructiveGate(string fingerprint)
         {
             Logger.LogOperation("Watermark", fingerprint ?? "");
-            if (string.Equals(fingerprint, "Draft1Diagonal", StringComparison.Ordinal))
+            if (string.Equals(fingerprint, "Sample2", StringComparison.Ordinal)
+                || string.Equals(fingerprint, "Draft1Diagonal", StringComparison.Ordinal))
                 WordEvidenceHelper.LogCommandWithEvidence("Watermark");
         }
 
@@ -211,6 +255,8 @@ namespace New_MOSWordVSTOAddIn
         {
             System.Diagnostics.Debug.WriteLine("[New_MOSWordVSTOAddIn] Add-in started");
             System.Diagnostics.Debug.WriteLine($"[New_MOSWordVSTOAddIn] Log file: {Logger.GetLogFilePath()}");
+
+            Logger.WriteVstoHeartbeat();
 
             this.Application.DocumentChange += Application_DocumentChange;
             this.Application.DocumentBeforeSave += Application_DocumentBeforeSave;
@@ -253,6 +299,9 @@ namespace New_MOSWordVSTOAddIn
 
             _destructiveMonitor?.Stop();
             _destructiveMonitor = null;
+            _showAllFastTimer?.Stop();
+            _showAllFastTimer?.Dispose();
+            _showAllFastTimer = null;
             _showAllPollTimer?.Stop();
             _showAllPollTimer?.Dispose();
             _showAllPollTimer = null;
@@ -295,28 +344,34 @@ namespace New_MOSWordVSTOAddIn
                 if (app == null || app.Documents.Count == 0)
                     return;
 
-                // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
-                Word.Document doc = app.ActiveDocument;
+                PreserveSelectionDuring(app, () => RefreshBaselineFromActiveDocumentNoLogCore(app));
+            }
+            catch
+            {
+                // COM 初期化中などは無視
+            }
+        }
 
-                // 4-3: コメントペイン等（_WwG 外フォーカス）でも未解決エコ件数だけは追跡する。全文書 COM をスキップする前に実行。
-                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
-
-                // リボン（フォントサイズ欄等）・代替テキスト等の入力中は COM を触らない
-                if (ShouldSkipDocumentComBecauseFocusNotInEditingPane())
-                    return;
+        private void RefreshBaselineFromActiveDocumentNoLogCore(Word.Application app)
+        {
+            // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
+            Word.Document doc = app.ActiveDocument;
 
                 if (app.ActiveWindow?.View != null)
-                {
-                    bool viewShowAll = app.ActiveWindow.View.ShowAll;
-                    bool optionsShowAll = TryGetOptionsShowAll(app);
-                    _lastShowAllState = viewShowAll || optionsShowAll;
-                }
+                    _lastShowAllState = app.ActiveWindow.View.ShowAll;
+
+                // 4-3: コメントペイン操作中も未解決件数の遷移を追跡（軽量のため defer より前に実行）
+                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+
+                // ナビペイン・検索ダイアログ・コメントペイン操作中は侵入的 COM をスキップ
+                if (ShouldDeferIntrusiveDocumentCom(app))
+                    return;
 
                 _lastColumnBreakCount = CountColumnBreaks(doc);
                 _lastMarginsModerate = IsMarginsModeratePreset(doc);
                 _lastOrientationFingerprint = GetAllSectionsOrientationFingerprint(doc);
                 _lastPageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
-                _lastHeading1LineSimple = IsHeading1LineSimplePattern(doc);
+                _lastHeading1LineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
 
                 ApplyWatermarkPollingBaseline(doc);
@@ -348,14 +403,9 @@ namespace New_MOSWordVSTOAddIn
                     _p7LastCompanyDocFullName = null;
                     _p7LastCompanyMatched = false;
                 }
-            }
-            catch
-            {
-                // COM 初期化中などは無視
-            }
         }
 
-        /// <summary>4-3: 未解決エコ件数の変化を追跡。1→0 のとき解決/削除をログ。加えて「エコ」吹き出しが true→false（解決済みスレッドの削除など）でも ReviewDeleteComment をログする。</summary>
+        /// <summary>4-3: 解決（Done）・削除（件数0）を検知して証跡を記録。</summary>
         private void UpdateEcoCommentBaselineAndMaybeLog(Word.Document doc, int newUnresolvedEcoCount)
         {
             try
@@ -369,66 +419,261 @@ namespace New_MOSWordVSTOAddIn
                     {
                         _ecoBaselineDocumentKey = key;
                         _lastUnresolvedEcoCommentCount = -1;
+                        _lastEcoRelatedCommentCount = -1;
                         _lastAnyEcoPhraseInBalloons = null;
-                        _lastCommentsCountForEco = -1;
+                        _ecoCommentDoneByIndex.Clear();
+                        _ecoResolveLoggedForAttempt = false;
                     }
                 }
             }
             catch { }
 
-            bool anyPhrase = false;
-            try
-            {
-                if (doc != null)
-                    anyPhrase = DocumentHasAnyEcoCommentBalloonPoll(doc);
-            }
-            catch { }
+            bool resolveLoggedThisTick = DetectEcoCommentDoneTransitions(doc);
 
+            int ecoRelatedCount = CountEcoRelatedComments(doc);
+            bool anyPhrase = ecoRelatedCount > 0;
+
+            // 未解決→0 は「解決」または「削除」で起きる。コメントがまだ残っているときだけ解決とみなす。
             bool willLogUnresolved = _lastUnresolvedEcoCommentCount >= 0 && _lastUnresolvedEcoCommentCount > 0 && newUnresolvedEcoCount == 0;
-            bool phraseDisappeared = _lastAnyEcoPhraseInBalloons == true && !anyPhrase && doc != null;
+            int prevUnresolved = _lastUnresolvedEcoCommentCount;
+            int prevEcoRelated = _lastEcoRelatedCommentCount;
 
-            int cc = -1;
-            try
-            {
-                if (doc != null && doc.Comments != null)
-                    cc = doc.Comments.Count;
-            }
-            catch { cc = -1; }
+            if (willLogUnresolved && doc != null && ecoRelatedCount > 0)
+                TryLogReviewResolveComment();
 
-            bool commentCountDropped = _lastCommentsCountForEco >= 0 && cc >= 0 && cc < _lastCommentsCountForEco;
-
-            if (willLogUnresolved && doc != null)
+            // 削除ログ: 解決済みのあと削除された場合のみ（削除のみでは prevUnresolved>0 のまま消える）
+            bool deleteOnlySuspect = prevUnresolved > 0 && ecoRelatedCount == 0 && !resolveLoggedThisTick;
+            if (prevEcoRelated > 0 && ecoRelatedCount == 0 && _ecoResolveLoggedForAttempt && !deleteOnlySuspect)
             {
-                bool stillHasEcoBalloon = anyPhrase;
-                string commandId = stillHasEcoBalloon ? "ReviewResolveComment" : "ReviewDeleteComment";
-                WordEvidenceHelper.LogCommandWithEvidence(commandId);
-            }
-            else if (phraseDisappeared)
-            {
-                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
-            }
-            else if (commentCountDropped && doc != null && DocumentBodyContainsEcoPhraseForTask4_3(doc))
-            {
-                WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
+                if (_suppressDeletePollLogs > 0)
+                    _suppressDeletePollLogs--;
+                else
+                    WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
             }
 
             _lastUnresolvedEcoCommentCount = newUnresolvedEcoCount;
+            _lastEcoRelatedCommentCount = ecoRelatedCount;
             _lastAnyEcoPhraseInBalloons = anyPhrase;
-            if (cc >= 0)
-                _lastCommentsCountForEco = cc;
+        }
+
+        private void SeedEcoCommentBaseline(Word.Document doc)
+        {
+            _ecoCommentDoneByIndex.Clear();
+            foreach (Word.Comment c in doc.Comments)
+            {
+                try
+                {
+                    if (!CommentRelatesToEcoPhrasePoll(c, doc))
+                        continue;
+                    bool done = false;
+                    try { done = c.Done; } catch { }
+                    _ecoCommentDoneByIndex[c.Index] = done;
+                }
+                finally
+                {
+                    Marshal.ReleaseComObject(c);
+                }
+            }
+            int unresolved = CountUnresolvedEcoComments(doc);
+            int related = CountEcoRelatedComments(doc);
+            _lastUnresolvedEcoCommentCount = unresolved;
+            _lastEcoRelatedCommentCount = related;
+            _lastAnyEcoPhraseInBalloons = related > 0;
+        }
+
+        private bool DetectEcoCommentDoneTransitions(Word.Document doc)
+        {
+            if (doc?.Comments == null)
+                return false;
+            bool loggedResolve = false;
+            var seen = new HashSet<int>();
+            foreach (Word.Comment c in doc.Comments)
+            {
+                try
+                {
+                    if (!CommentRelatesToEcoPhrasePoll(c, doc))
+                        continue;
+                    int idx = c.Index;
+                    seen.Add(idx);
+                    bool done = false;
+                    try { done = c.Done; } catch { }
+                    if (_ecoCommentDoneByIndex.TryGetValue(idx, out bool wasDone) && !wasDone && done)
+                        loggedResolve |= TryLogReviewResolveComment();
+                    _ecoCommentDoneByIndex[idx] = done;
+                }
+                finally
+                {
+                    Marshal.ReleaseComObject(c);
+                }
+            }
+            var stale = _ecoCommentDoneByIndex.Keys.Where(k => !seen.Contains(k)).ToList();
+            foreach (int k in stale)
+                _ecoCommentDoneByIndex.Remove(k);
+            return loggedResolve;
+        }
+
+        private bool TryLogReviewResolveComment()
+        {
+            if (_suppressResolvePollLogs > 0)
+            {
+                _suppressResolvePollLogs--;
+                return false;
+            }
+            WordEvidenceHelper.LogCommandWithEvidence("ReviewResolveComment");
+            _ecoResolveLoggedForAttempt = true;
+            return true;
         }
 
         /// <summary>
         /// 1-1 編集記号の表示/非表示は Word の idMso でフックできないため、
         /// View.ShowAll の状態をポーリングし、変化時に ShowAll をログに記録する。
-        /// 向き・ページ罫線・スタイルセット（線シンプル相当）も idMso が発火しない経路があるため同タイマーで差分検知する。
+        /// ShowAll は軽量のため専用の高速タイマー（300ms）を使う。
+        /// 向き・ページ罫線・スタイルセット（線シンプル相当）も idMso が発火しない経路があるため別タイマーで差分検知する。
         /// </summary>
         private void StartShowAllPolling()
         {
-            // Word UI（リボンのテキスト入力等）への干渉を減らすため、ポーリング間隔を控えめにする
+            _showAllFastTimer = new Timer { Interval = ShowAllFastPollIntervalMs };
+            _showAllFastTimer.Tick += ShowAllFastPoll_Tick;
+            _showAllFastTimer.Start();
+
+            // 重い COM 差分検知は従来どおり控えめな間隔
             _showAllPollTimer = new Timer { Interval = 1200 };
             _showAllPollTimer.Tick += ShowAllPoll_Tick;
             _showAllPollTimer.Start();
+        }
+
+        private void ShowAllFastPoll_Tick(object sender, EventArgs e)
+        {
+            Logger.WriteVstoHeartbeat();
+            ProcessEvidenceFlushRequest();
+            ProcessCloseNavigationRequest();
+            try
+            {
+                var app = this.Application;
+                if (app?.ActiveWindow?.View == null || app.Documents.Count == 0)
+                    return;
+                SyncNavigationPaneOpenState(app);
+                // View.ShowAll の読み取りのみ。Selection / ScreenUpdating は触らない（Copilot 等の UI 点滅を抑える）。
+                UpdateShowAllPolling(app);
+                if (IsProject4CommentTaskActive())
+                {
+                    try
+                    {
+                        Word.Document doc = app.ActiveDocument;
+                        if (doc != null)
+                            UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+                    }
+                    catch { }
+                }
+            }
+            catch { /* ignore */ }
+        }
+
+        /// <summary>採点アプリが mos_word_flush_evidence.txt を置いたとき、即座に ShowAll 状態を同期してログに反映する。</summary>
+        private void ProcessEvidenceFlushRequest()
+        {
+            if (!File.Exists(EvidenceFlushFilePath))
+                return;
+
+            try
+            {
+                UpdateShowAllPolling(this.Application);
+            }
+            catch { /* ignore */ }
+            finally
+            {
+                try { File.Delete(EvidenceFlushFilePath); } catch { /* ignore */ }
+            }
+        }
+
+        /// <summary>採点アプリが mos_word_close_navigation.txt を置いたとき、ナビゲーションウィンドウが開いていれば閉じる。</summary>
+        private void ProcessCloseNavigationRequest()
+        {
+            if (!File.Exists(CloseNavigationFilePath))
+                return;
+
+            try
+            {
+                CloseNavigationPaneIfOpen();
+            }
+            catch { /* ignore */ }
+            finally
+            {
+                try { File.Delete(CloseNavigationFilePath); } catch { /* ignore */ }
+            }
+        }
+
+        private bool TryIsNavigationPaneVisible(Word.Application app, out bool documentMapOpen)
+        {
+            documentMapOpen = false;
+            if (app?.CommandBars == null)
+                return false;
+
+            try
+            {
+                var nav = app.CommandBars["Navigation"];
+                if (nav != null && nav.Visible)
+                    return true;
+            }
+            catch { /* ignore */ }
+
+            try
+            {
+                if (app.ActiveWindow != null && app.ActiveWindow.DocumentMap)
+                {
+                    documentMapOpen = true;
+                    return true;
+                }
+            }
+            catch { /* ignore */ }
+
+            return false;
+        }
+
+        private void SyncNavigationPaneOpenState(Word.Application app)
+        {
+            _navigationPaneOpen = TryIsNavigationPaneVisible(app, out _);
+        }
+
+        private void CloseNavigationPaneIfOpen()
+        {
+            var app = Application;
+            if (app == null)
+                return;
+
+            if (!TryIsNavigationPaneVisible(app, out _))
+                return;
+
+            try
+            {
+                app.CommandBars["Navigation"].Visible = false;
+            }
+            catch { /* ignore */ }
+
+            try
+            {
+                if (app.ActiveWindow != null)
+                    app.ActiveWindow.DocumentMap = false;
+            }
+            catch { /* ignore */ }
+
+            _navigationPaneOpen = false;
+        }
+
+        /// <summary>
+        /// 1-1: 採点は <see cref="Word.View.ShowAll"/> のみ参照するため、Options.ShowAll との OR は使わない
+        /// （OR だと Options が true の環境で View のトグルを検知できない）。
+        /// リボン操作時はフォーカスが編集ペイン外になるため、呼び出し元はフォーカス判定より前にすること。
+        /// </summary>
+        private void UpdateShowAllPolling(Word.Application app)
+        {
+            if (app?.ActiveWindow?.View == null)
+                return;
+
+            bool viewShowAll = app.ActiveWindow.View.ShowAll;
+            if (_lastShowAllState.HasValue && _lastShowAllState.Value != viewShowAll)
+                WordEvidenceHelper.LogCommandWithEvidence("ShowAll");
+            _lastShowAllState = viewShowAll;
         }
 
         private void ShowAllPoll_Tick(object sender, EventArgs e)
@@ -439,11 +684,25 @@ namespace New_MOSWordVSTOAddIn
                 if (app?.ActiveWindow?.View == null || app.Documents.Count == 0)
                     return;
 
-                // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
-                Word.Document doc = app.ActiveDocument;
+                PreserveSelectionDuring(app, () => ShowAllPoll_TickCore(app));
+            }
+            catch
+            {
+                // ドキュメント未表示などで COM エラーになることがあるため無視
+            }
+        }
 
-                // 4-3: コメントペイン・リボン等でも未解決エコ件数だけは追跡（ShowAll 等の重い COM より前に実行）
-                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+        private void ShowAllPoll_TickCore(Word.Application app)
+        {
+            // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
+            Word.Document doc = app.ActiveDocument;
+
+            // 4-3: コメントペイン操作中も未解決件数の遷移を追跡
+            UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+
+            // ナビペイン・Ctrl+F 検索・コメントペイン操作中は heavy Find 等の侵入的 COM を止める
+            if (ShouldDeferIntrusiveDocumentCom(app))
+                return;
 
                 // 7-4/7-5: FullName のみの軽量検知（毎ティック≈1.2秒）。重いポーリング（約6秒）だと次プロジェクト押下前に取りこぼす。
                 try
@@ -458,19 +717,6 @@ namespace New_MOSWordVSTOAddIn
                     UpdateP7CompanyPolling(doc);
                 }
                 catch { }
-
-                if (ShouldSkipDocumentComBecauseFocusNotInEditingPane())
-                    return;
-
-                bool viewShowAll = app.ActiveWindow.View.ShowAll;
-                bool optionsShowAll = TryGetOptionsShowAll(app);
-
-                bool currentShowAll = viewShowAll || optionsShowAll;
-                if (_lastShowAllState.HasValue && _lastShowAllState.Value != currentShowAll)
-                {
-                    WordEvidenceHelper.LogCommandWithEvidence("ShowAll");
-                }
-                _lastShowAllState = currentShowAll;
 
                 bool marginsModerate = IsMarginsModeratePreset(doc);
                 if (_lastMarginsModerate.HasValue && marginsModerate && !_lastMarginsModerate.Value)
@@ -525,7 +771,7 @@ namespace New_MOSWordVSTOAddIn
                     }
                     _lastPageBorderFingerprint = borderFp;
 
-                    bool lineSimple = IsHeading1LineSimplePattern(doc);
+                    bool lineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
                     if (_lastHeading1LineSimple.HasValue && lineSimple && !_lastHeading1LineSimple.Value)
                     {
                         if (_suppressStyleSetPollLogs > 0)
@@ -554,7 +800,7 @@ namespace New_MOSWordVSTOAddIn
                     }
                     _lastColumnBreakCount = columnBreakCount;
 
-                    // 4-1 等: 透かし指紋の変化で [Op] Watermark（4-5 は Draft1Diagonal で Executed も）
+                    // 4-1 等: 透かし指紋の変化で [Op] Watermark（4-5 は Sample2 / Draft1Diagonal で Executed も）
                     try
                     {
                         string norm = WordWatermarkInspection.NormalizeXml(doc.WordOpenXML);
@@ -562,7 +808,11 @@ namespace New_MOSWordVSTOAddIn
                         if (_lastWatermarkFingerprint != null
                             && !string.Equals(wmFp, _lastWatermarkFingerprint, StringComparison.Ordinal))
                         {
-                            if (_suppressWatermarkPollLogs > 0)
+                            // 4-5 正答（Sample2）はタスク切替直後の suppress でも必ず証跡を残す
+                            bool isSample2Change = string.Equals(wmFp, "Sample2", StringComparison.Ordinal);
+                            if (isSample2Change)
+                                LogWatermarkForDestructiveGate(wmFp);
+                            else if (_suppressWatermarkPollLogs > 0)
                                 _suppressWatermarkPollLogs--;
                             else
                                 LogWatermarkForDestructiveGate(wmFp);
@@ -575,17 +825,20 @@ namespace New_MOSWordVSTOAddIn
                     // 5-1, 5-2: 画像レイアウトの検知（5月21日...段落付近）
                     try
                     {
-                        Word.Range searchRange = doc.Content;
+                        Word.Range searchRange = doc.Content.Duplicate;
                         Word.Find find = searchRange.Find;
                         find.ClearFormatting();
                         find.Text = "5月21日より5日間の";
+                        find.Format = false;
+                        find.Replacement.Text = "";
+                        find.Wrap = Word.WdFindWrap.wdFindStop;
                         if (find.Execute())
                         {
                             Word.Range paraRange = searchRange.Paragraphs[1].Range;
                             int paraStart = paraRange.Start;
                             int paraEnd = paraRange.End;
 
-                            int currentWrapType = -1; // -1: なし, 0: 行内, 1: 四角形など
+                            int currentWrapType = -1; // -1: なし, 0: 行内, 1: 四角形, 2: 狭く, 3: 上下, 4: その他
 
                             // 行内画像チェック
                             if (paraRange.InlineShapes.Count > 0)
@@ -603,7 +856,9 @@ namespace New_MOSWordVSTOAddIn
                                         if (anchor >= paraStart && anchor <= paraEnd)
                                         {
                                             if (sh.WrapFormat.Type == Word.WdWrapType.wdWrapSquare) currentWrapType = 1;
-                                            else currentWrapType = 2; // その他
+                                            else if (sh.WrapFormat.Type == Word.WdWrapType.wdWrapTight) currentWrapType = 2;
+                                            else if (sh.WrapFormat.Type == Word.WdWrapType.wdWrapTopBottom) currentWrapType = 3;
+                                            else currentWrapType = 4;
                                             break;
                                         }
                                     }
@@ -613,7 +868,8 @@ namespace New_MOSWordVSTOAddIn
 
                             if (_lastLaptopWrapType != currentWrapType)
                             {
-                                if (currentWrapType == 0) WordEvidenceHelper.LogCommandWithEvidence("WrapInline");
+                                if (currentWrapType == 3) WordEvidenceHelper.LogCommandWithEvidence("WrapTopBottom");
+                                else if (currentWrapType == 2) WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
                                 else if (currentWrapType == 1) WordEvidenceHelper.LogCommandWithEvidence("WrapSquare");
                             }
                             _lastLaptopWrapType = currentWrapType;
@@ -648,11 +904,6 @@ namespace New_MOSWordVSTOAddIn
                     }
                     catch { }
                 }
-            }
-            catch
-            {
-                // ドキュメント未表示などで COM エラーになることがあるため無視
-            }
         }
 
         /// <summary>7-2: Project7.doc 上で Company が目標値へ遷移したとき SetDocumentCompany をログする。</summary>
@@ -763,6 +1014,108 @@ namespace New_MOSWordVSTOAddIn
 
 
         /// <summary>
+        /// ポーリング中の COM アクセスで選択網掛けが消えないよう、選択位置を保存してから ScreenUpdating を止めて実行する。
+        /// </summary>
+        private static void PreserveSelectionDuring(Word.Application app, Action action)
+        {
+            if (action == null)
+                return;
+            if (app == null)
+            {
+                action();
+                return;
+            }
+
+            int selStart = -1;
+            int selEnd = -1;
+            bool screenUpdatingWasEnabled = true;
+            try
+            {
+                try
+                {
+                    Word.Selection sel = app.Selection;
+                    if (sel != null)
+                    {
+                        selStart = sel.Start;
+                        selEnd = sel.End;
+                    }
+                }
+                catch { /* ignore */ }
+
+                try
+                {
+                    screenUpdatingWasEnabled = app.ScreenUpdating;
+                    app.ScreenUpdating = false;
+                }
+                catch { /* ignore */ }
+
+                action();
+            }
+            finally
+            {
+                int afterStart = -1;
+                int afterEnd = -1;
+                try
+                {
+                    Word.Selection afterSel = app.Selection;
+                    if (afterSel != null)
+                    {
+                        afterStart = afterSel.Start;
+                        afterEnd = afterSel.End;
+                    }
+                }
+                catch { /* ignore */ }
+
+                bool selectionChangedByPoll = afterStart >= 0 && (afterStart != selStart || afterEnd != selEnd);
+                bool userExpandedSelection = selStart >= 0 && selStart == selEnd && afterEnd > afterStart;
+                try
+                {
+                    if (selStart >= 0 && selEnd >= 0
+                        && selectionChangedByPoll
+                        && !userExpandedSelection)
+                    {
+                        app.Selection.SetRange(selStart, selEnd);
+                    }
+                }
+                catch { /* ignore */ }
+
+                try
+                {
+                    app.ScreenUpdating = screenUpdatingWasEnabled;
+                }
+                catch { /* ignore */ }
+            }
+        }
+
+        /// <summary>
+        /// ナビペイン・検索ダイアログ・コメントペイン等、編集ペイン外操作中は侵入的な文書 COM を遅延する。
+        /// </summary>
+        private static bool ShouldDeferIntrusiveDocumentCom(Word.Application app)
+        {
+            return ShouldSkipDocumentComBecauseFocusNotInEditingPane();
+        }
+
+        private static bool IsProject4CommentTaskActive()
+        {
+            try
+            {
+                string path = Path.Combine(Path.GetTempPath(), "mos_word_current_task.txt");
+                if (!File.Exists(path))
+                    return false;
+                var parts = File.ReadAllText(path).Trim().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2)
+                    return false;
+                if (!int.TryParse(parts[0].Trim(), out int projectId) || !int.TryParse(parts[1].Trim(), out int taskId))
+                    return false;
+                return projectId == 4 && taskId >= 1 && taskId <= 3;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// キーボードフォーカスが文書編集ペイン（_WwG）上にないとき true。
         /// リボンの数値欄・代替テキスト等の入力中は COM を触らない。
         /// GetFocus が取れない場合は false（従来どおり実行）。
@@ -809,8 +1162,137 @@ namespace New_MOSWordVSTOAddIn
 
         private static int CountColumnBreaks(Word.Document doc)
         {
-            string text = doc.Content?.Text ?? string.Empty;
-            return text.Count(c => c == (char)14);
+            Word.Range content = null;
+            try
+            {
+                if (doc?.Content == null)
+                    return 0;
+                content = doc.Content.Duplicate;
+                string text = content.Text ?? string.Empty;
+                return text.Count(c => c == (char)14);
+            }
+            catch
+            {
+                return 0;
+            }
+            finally
+            {
+                if (content != null)
+                {
+                    try { Marshal.ReleaseComObject(content); } catch { }
+                }
+            }
+        }
+
+        private static string _ecoAnchorDocKeyPoll;
+        private static int _ecoAnchorStartPoll = -1;
+        private static int _ecoAnchorEndPoll = -1;
+
+        private static bool TryGetEcoPhraseAnchorPoll(Word.Document doc, out int start, out int end)
+        {
+            start = end = -1;
+            if (doc == null)
+                return false;
+            string key = "";
+            try { key = doc.FullName ?? ""; } catch { }
+            if (!string.IsNullOrEmpty(key) && key == _ecoAnchorDocKeyPoll && _ecoAnchorStartPoll >= 0)
+            {
+                start = _ecoAnchorStartPoll;
+                end = _ecoAnchorEndPoll;
+                return true;
+            }
+            Word.Range searchRange = null;
+            Word.Find find = null;
+            try
+            {
+                if (doc.Content == null)
+                    return false;
+                searchRange = doc.Content.Duplicate;
+                find = searchRange.Find;
+                find.ClearFormatting();
+                find.Text = "エコと節約";
+                find.Forward = true;
+                find.Wrap = Word.WdFindWrap.wdFindStop;
+                find.Format = false;
+                find.Replacement.Text = "";
+                if (!find.Execute())
+                    return false;
+                start = searchRange.Start;
+                end = searchRange.End;
+                _ecoAnchorDocKeyPoll = key;
+                _ecoAnchorStartPoll = start;
+                _ecoAnchorEndPoll = end;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (find != null)
+                {
+                    try { Marshal.ReleaseComObject(find); } catch { }
+                }
+                if (searchRange != null)
+                {
+                    try { Marshal.ReleaseComObject(searchRange); } catch { }
+                }
+            }
+        }
+
+        private static bool CommentAnchorOverlapsEcoPoll(Word.Comment c, Word.Document doc)
+        {
+            if (!TryGetEcoPhraseAnchorPoll(doc, out int ecoStart, out int ecoEnd))
+                return false;
+            Word.Range scope = null;
+            try
+            {
+                scope = c.Scope;
+                if (scope == null)
+                    return false;
+                return scope.Start <= ecoEnd && scope.End >= ecoStart;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (scope != null)
+                {
+                    try { Marshal.ReleaseComObject(scope); } catch { }
+                }
+            }
+        }
+
+        /// <summary>エコ関連コメント総数（解決済み含む）。</summary>
+        private static int CountEcoRelatedComments(Word.Document doc)
+        {
+            if (doc?.Comments == null || doc.Comments.Count == 0)
+                return 0;
+            Word.Comments comments = doc.Comments;
+            int count = 0;
+            try
+            {
+                foreach (Word.Comment c in comments)
+                {
+                    try
+                    {
+                        if (CommentRelatesToEcoPhrasePoll(c, doc))
+                            count++;
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(c);
+                    }
+                }
+                return count;
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(comments);
+            }
         }
 
         /// <summary>吹き出し（返信含む）に「エコと節約」があり、かつ未解決（Done でない）コメントの件数。</summary>
@@ -826,7 +1308,7 @@ namespace New_MOSWordVSTOAddIn
                 {
                     try
                     {
-                        if (!CommentHasEcoTextInBalloon(c))
+                        if (!CommentRelatesToEcoPhrasePoll(c, doc))
                             continue;
                         bool done = false;
                         try { done = c.Done; } catch { }
@@ -855,10 +1337,14 @@ namespace New_MOSWordVSTOAddIn
             {
                 if (doc?.Content == null)
                     return false;
-                searchRange = doc.Content;
+                searchRange = doc.Content.Duplicate;
                 find = searchRange.Find;
                 find.ClearFormatting();
                 find.Text = "エコと節約";
+                find.Forward = true;
+                find.Wrap = Word.WdFindWrap.wdFindStop;
+                find.Format = false;
+                find.Replacement.Text = "";
                 return find.Execute();
             }
             catch
@@ -878,6 +1364,38 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>「エコと節約」コメントが解決済み（Done）で文書に残っているか。削除との区別に使う。</summary>
+        private static bool DocumentHasResolvedEcoComment(Word.Document doc)
+        {
+            if (doc?.Comments == null || doc.Comments.Count == 0)
+                return false;
+            Word.Comments comments = doc.Comments;
+            try
+            {
+                foreach (Word.Comment c in comments)
+                {
+                    try
+                    {
+                        if (!CommentRelatesToEcoPhrasePoll(c, doc))
+                            continue;
+                        bool done = false;
+                        try { done = c.Done; } catch { }
+                        if (done)
+                            return true;
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(c);
+                    }
+                }
+                return false;
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(comments);
+            }
+        }
+
         /// <summary>いずれかのコメント吹き出し（返信含む）に「エコと節約」があるか。採点側の DocumentHasAnyEcoCommentBalloon と同趣旨。</summary>
         private static bool DocumentHasAnyEcoCommentBalloonPoll(Word.Document doc)
         {
@@ -890,7 +1408,7 @@ namespace New_MOSWordVSTOAddIn
                 {
                     try
                     {
-                        if (CommentHasEcoTextInBalloon(c))
+                        if (CommentRelatesToEcoPhrasePoll(c, doc))
                             return true;
                     }
                     finally
@@ -936,6 +1454,17 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        private static bool CommentRelatesToEcoPhrasePoll(Word.Comment c, Word.Document doc)
+        {
+            if (CommentHasEcoTextInBalloon(c))
+                return true;
+            string scope = "";
+            try { scope = c.Scope?.Text ?? ""; } catch { }
+            if (NormalizedContainsEcoPoll(NormalizeCommentBodyForEcoPoll(scope)))
+                return true;
+            return CommentAnchorOverlapsEcoPoll(c, doc);
+        }
+
         private static bool CommentHasEcoTextInBalloon(Word.Comment c)
         {
             string raw = "";
@@ -977,7 +1506,7 @@ namespace New_MOSWordVSTOAddIn
             Word.Font font = null;
             try
             {
-                searchRange = doc.Content;
+                searchRange = doc.Content.Duplicate;
                 find = searchRange.Find;
                 find.ClearFormatting();
                 find.Text = "朗読を楽しみましょう！";
@@ -1038,6 +1567,8 @@ namespace New_MOSWordVSTOAddIn
                 return false;
 
             bool isAccent1 = theme == (int)Word.WdThemeColorIndex.wdThemeColorAccent1;
+            if (shade <= -0.35f)
+                return false;
             bool isDarker25 = shade >= -0.31f && shade <= -0.19f;
 
             int r = rgb & 0xFF;
@@ -1045,7 +1576,19 @@ namespace New_MOSWordVSTOAddIn
             int b = (rgb >> 16) & 0xFF;
             bool isBlue = b >= r && b >= g && b > 0;
 
-            return isAccent1 && isDarker25 && isBlue;
+            if (isDarker25)
+                return isAccent1 && isBlue;
+
+            if (!isAccent1 || !isBlue)
+                return false;
+
+            // TintAndShade が 0 の環境: 解決 RGB がアクセント1基準より約20〜30%暗いか（50%は拒否）
+            float textLum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
+            const float accent1BaseLum = 0.45f;
+            float ratio = textLum / accent1BaseLum;
+            if (ratio < 0.60f)
+                return false;
+            return ratio >= 0.70f && ratio <= 0.80f;
         }
 
         /// <summary>3-1: 先頭セクションの余白が「やや狭い」プリセット相当か（WordChecker1_3 と同じ許容誤差）。</summary>
@@ -1096,67 +1639,6 @@ namespace New_MOSWordVSTOAddIn
                 }
             }
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// WordChecker1_4 の 4-4（線・シンプル）と同条件。
-        /// </summary>
-        private static bool IsHeading1LineSimplePattern(Word.Document document)
-        {
-            Word.Style headingStyle = null;
-            Word.Borders borders = null;
-            Word.Border bottomBorder = null;
-            try
-            {
-                headingStyle = GetHeading1Style(document);
-
-                if (headingStyle == null)
-                    return false;
-
-                borders = headingStyle.ParagraphFormat.Borders;
-                bottomBorder = borders[Word.WdBorderType.wdBorderBottom];
-                return bottomBorder != null
-                       && (Word.WdLineStyle)bottomBorder.LineStyle == Word.WdLineStyle.wdLineStyleSingle
-                       && (Word.WdLineWidth)bottomBorder.LineWidth == Word.WdLineWidth.wdLineWidth050pt;
-            }
-            catch
-            {
-                return false;
-            }
-            finally
-            {
-                if (bottomBorder != null)
-                    Marshal.ReleaseComObject(bottomBorder);
-                if (borders != null)
-                    Marshal.ReleaseComObject(borders);
-                if (headingStyle != null)
-                    Marshal.ReleaseComObject(headingStyle);
-            }
-        }
-
-        /// <summary>
-        /// 表示言語によるスタイル名差異を吸収して Heading 1 を取得する。
-        /// </summary>
-        private static Word.Style GetHeading1Style(Word.Document document)
-        {
-            try
-            {
-                return document.Styles[Word.WdBuiltinStyle.wdStyleHeading1];
-            }
-            catch
-            {
-                // 旧ロジック互換の名前フォールバック
-                try { return document.Styles["見出し 1"]; }
-                catch
-                {
-                    try { return document.Styles["見出し1"]; }
-                    catch
-                    {
-                        try { return document.Styles["Heading 1"]; }
-                        catch { return null; }
-                    }
-                }
-            }
         }
 
         private static bool TryGetOptionsShowAll(Word.Application app)
@@ -1351,6 +1833,7 @@ namespace New_MOSWordVSTOAddIn
 
                     Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
                     _addIn.SyncWatermarkPollingBaselineOnTaskSwitch(projectId);
+                    _addIn.SyncEcoCommentBaselineOnTaskSwitch(projectId, taskId);
                     TakeSnapshot(projectId, taskId, attemptNo);
                 }
                 catch (Exception ex)
@@ -1427,6 +1910,9 @@ namespace New_MOSWordVSTOAddIn
                     errors.Add($"PageBorderFingerprint changed {baseline.PageBorderFingerprint}->{current.PageBorderFingerprint}");
                 if (!HasFlag(exemptFlagsInt, 256) && !string.Equals(baseline.WatermarkFingerprint ?? "None", current.WatermarkFingerprint ?? "None", StringComparison.Ordinal))
                     errors.Add($"WatermarkFingerprint changed {baseline.WatermarkFingerprint}->{current.WatermarkFingerprint}");
+                if (baseline.ProjectId == 8 && baseline.TaskId == 3
+                    && current.FootnoteReferenceCount != baseline.FootnoteReferenceCount)
+                    errors.Add($"FootnoteReferenceCount changed {baseline.FootnoteReferenceCount}->{current.FootnoteReferenceCount}");
                 return errors;
             }
 
@@ -1459,6 +1945,14 @@ namespace New_MOSWordVSTOAddIn
                     d.WatermarkFingerprint = "None";
                 }
                 d.PageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
+                try
+                {
+                    d.FootnoteReferenceCount = WordFindHelper.CountFootnoteReferencesInXml(doc.WordOpenXML);
+                }
+                catch
+                {
+                    d.FootnoteReferenceCount = 0;
+                }
                 return d;
             }
 
@@ -1494,6 +1988,7 @@ namespace New_MOSWordVSTOAddIn
                 sb.AppendLine($"CompatibilityMode={d.CompatibilityMode}");
                 sb.AppendLine($"WatermarkFingerprint={d.WatermarkFingerprint ?? "None"}");
                 sb.AppendLine($"PageBorderFingerprint={d.PageBorderFingerprint ?? ""}");
+                sb.AppendLine($"FootnoteReferenceCount={d.FootnoteReferenceCount}");
                 File.WriteAllText(SnapshotFilePath, sb.ToString(), Encoding.UTF8);
             }
 
@@ -1525,6 +2020,7 @@ namespace New_MOSWordVSTOAddIn
                         case "CompatibilityMode": int.TryParse(val, out int c); d.CompatibilityMode = c; break;
                         case "WatermarkFingerprint": d.WatermarkFingerprint = val; break;
                         case "PageBorderFingerprint": d.PageBorderFingerprint = val; break;
+                        case "FootnoteReferenceCount": int.TryParse(val, out int fn); d.FootnoteReferenceCount = fn; break;
                     }
                 }
                 if (string.IsNullOrEmpty(d.WatermarkFingerprint))
@@ -1548,6 +2044,7 @@ namespace New_MOSWordVSTOAddIn
                 public int CompatibilityMode = -1;
                 public string WatermarkFingerprint = "None";
                 public string PageBorderFingerprint = "";
+                public int FootnoteReferenceCount;
             }
         }
 

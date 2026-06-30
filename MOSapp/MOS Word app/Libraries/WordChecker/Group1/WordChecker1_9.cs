@@ -27,10 +27,9 @@ namespace Libraries.Group1
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
 
-                searchRange = document.Content;
+                searchRange = WordFindHelper.DuplicateContent(document);
                 find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "ゴールデンウィーク";
+                WordFindHelper.ConfigureSafeFind(find, "ゴールデンウィーク");
                 find.Execute();
                 
                 if (!find.Found) return false;
@@ -204,10 +203,9 @@ namespace Libraries.Group1
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                 if (document == null) return false;
 
-                searchRange = document.Content;
+                searchRange = WordFindHelper.DuplicateContent(document);
                 find = searchRange.Find;
-                find.ClearFormatting();
-                find.Text = "合計";
+                WordFindHelper.ConfigureSafeFind(find, "合計");
                 find.Execute();
                 
                 if (!find.Found) return false;

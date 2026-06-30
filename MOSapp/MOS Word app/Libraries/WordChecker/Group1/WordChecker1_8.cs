@@ -131,14 +131,20 @@ namespace Libraries.Group1
                 if (string.IsNullOrEmpty(xml)) return false;
 
                 // 1. 脚注設定（w:footnotePr）の中に w:numFmt w:val="decimalEnclosedCircle" が含まれるかチェック
-                // 通常はセクションプロパティ（w:sectPr）内の w:footnotePr に格納される
                 var footnotePrMatch = System.Text.RegularExpressions.Regex.Match(xml, @"<w:footnotePr\b[^>]*>.*?</w:footnotePr>", System.Text.RegularExpressions.RegexOptions.Singleline);
                 if (!footnotePrMatch.Success) return false;
 
                 string footnotePrXml = footnotePrMatch.Value;
-                bool isCircularNumberStyle = System.Text.RegularExpressions.Regex.IsMatch(footnotePrXml, @"<w:numFmt\b[^>]*w:val=""decimalEnclosedCircle""");
+                if (!System.Text.RegularExpressions.Regex.IsMatch(footnotePrXml, @"<w:numFmt\b[^>]*w:val=""decimalEnclosedCircle"""))
+                    return false;
 
-                return isCircularNumberStyle;
+                // 2. 脚注参照は 8-2 で挿入した 1 個のみ（「挿入」で余分な参照が増えた場合は不合格）
+                int refCount = WordFindHelper.CountFootnoteReferencesInXml(xml);
+                if (refCount != 1)
+                    return false;
+
+                // 3. 脚注定義も 1 個（separator 等を除く）
+                return WordFindHelper.CountFootnoteDefinitionsInXml(xml) == 1;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }

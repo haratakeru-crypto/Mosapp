@@ -12,6 +12,7 @@ using Ui.ViewModels;
 using MOSExcelMogiApp.Views;
 using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 using ExcelWorkbook = Microsoft.Office.Interop.Excel.Workbook;
+using ExcelProtectedViewWindow = Microsoft.Office.Interop.Excel.ProtectedViewWindow;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Diagnostics;
@@ -40,6 +41,8 @@ namespace MOSExcelMogiApp
         private bool _fromResultWindow = false; // 結果画面から来たかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
         private DispatcherTimer _ratioRestoreTimer; // Office サイズ変更を検知して初期比率に戻す用
+        private DispatcherTimer _excelPositionRetryTimer;
+        private DateTime _excelPositionRetryDeadline;
         private bool _isNavigatingToTask = false; // 連続クリックで多重起動しないためのガード
 
         // Win32 API
@@ -72,6 +75,12 @@ namespace MOSExcelMogiApp
         [DllImport("user32.dll")]
         static extern IntPtr GetForegroundWindow();
 
+        [DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int nIndex);
+
+        private const int SM_CXSCREEN = 0;
+        private const int SM_CYSCREEN = 1;
+
         delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
         [StructLayout(LayoutKind.Sequential)]
@@ -83,12 +92,26 @@ namespace MOSExcelMogiApp
             public int bottom;
         }
 
-        // 解像度 1920×1080 前提の配置定数
-        private const int SCREEN_WIDTH = 1920;
-        private const int SCREEN_HEIGHT = 1080;
-        private const int APP_BAR_HEIGHT = 258;
-        private static readonly int EXCEL_HEIGHT = SCREEN_HEIGHT - APP_BAR_HEIGHT; // 822
-        private static readonly int APP_BAR_TOP = EXCEL_HEIGHT; // 822
+        // アプリバーの高さは 1920×1080 基準の設計値（物理ピクセル）。
+        // 実際の画面幅・高さは実行時に GetSystemMetrics で取得して使用する。
+        private const int APP_BAR_HEIGHT_BASE = 258;
+        private const int DESIGN_SCREEN_HEIGHT = 1080;
+
+        /// <summary>物理ピクセル単位の画面幅を返す。</summary>
+        private static int PhysicalScreenWidth => GetSystemMetrics(SM_CXSCREEN);
+
+        /// <summary>物理ピクセル単位の画面高さを返す。</summary>
+        private static int PhysicalScreenHeight => GetSystemMetrics(SM_CYSCREEN);
+
+        /// <summary>
+        /// 実際の画面高さに合わせてスケールしたアプリバー高さ（物理ピクセル）を返す。
+        /// 1080p 以外の解像度でも同一の画面占有比率を維持する。
+        /// </summary>
+        private static int AppBarHeightPhysical =>
+            (int)Math.Round(PhysicalScreenHeight * (double)APP_BAR_HEIGHT_BASE / DESIGN_SCREEN_HEIGHT);
+
+        /// <summary>Excel ウィンドウの高さ = 画面高さ − アプリバー高さ（物理ピクセル）。</summary>
+        private static int ExcelHeightPhysical => PhysicalScreenHeight - AppBarHeightPhysical;
 
         public AppBarWindow(MainViewModel viewModel)
         {
@@ -141,40 +164,43 @@ namespace MOSExcelMogiApp
                 // ignore
             }
 
+            int screenW = PhysicalScreenWidth;
+            int screenH = PhysicalScreenHeight;
+            int barH    = AppBarHeightPhysical;
+            int barTop  = screenH - barH;
+
             // ウィンドウハンドルを取得
             IntPtr hWnd = new WindowInteropHelper(this).Handle;
             if (hWnd == IntPtr.Zero)
             {
-                // ハンドルが取得できない場合はWPFプロパティで設定（1920×1080前提）
-                this.Width = SCREEN_WIDTH;
-                this.Height = APP_BAR_HEIGHT;
+                // ハンドルが取得できない場合は WPF プロパティで設定（物理ピクセルと DIP の差異を無視した近似値）
+                this.Width = screenW;
+                this.Height = barH;
                 this.Left = 0;
-                this.Top = APP_BAR_TOP;
+                this.Top = barTop;
                 this.Topmost = true;
                 return;
             }
 
-            // 現在のウィンドウサイズを取得して境界線のサイズを計算
+            // ウィンドウ境界線サイズを計算
             GetWindowRect(hWnd, out RECT windowRect);
             GetClientRect(hWnd, out RECT clientRect);
 
-            int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
+            int borderWidth  = (windowRect.right  - windowRect.left)  - clientRect.right;
             int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
 
-            // アプリバーを 1920×1080 前提で Excel の下に配置
+            // アプリバーを画面下部に配置（実際の解像度に対応）
             int x = -borderWidth / 2;
-            int y = APP_BAR_TOP - borderHeight / 2;
-            int width = SCREEN_WIDTH + borderWidth;
-            int height = APP_BAR_HEIGHT + borderHeight;
+            int y = barTop - borderHeight / 2;
+            int w = screenW + borderWidth;
+            int h = barH   + borderHeight;
 
-            MoveWindow(hWnd, x, y, width, height, true);
-            
-            // ウィンドウを最前面に表示
+            MoveWindow(hWnd, x, y, w, h, true);
             this.Topmost = true;
         }
 
         /// <summary>
-        /// 四角（□）ボタンクリック: Excel とアプリバーを 1920×1080 前提の定数位置に再配置する。
+        /// 四角（□）ボタンクリック: Excel とアプリバーを現在の画面解像度に合わせた位置に再配置する。
         /// 遅延実行でウィンドウ操作が確実に適用されるようにする。
         /// </summary>
         private void PositionWindowButton_Click(object sender, RoutedEventArgs e)
@@ -189,7 +215,8 @@ namespace MOSExcelMogiApp
         }
 
         /// <param name="bringToForeground">true のときのみ Excel を前面に出す。タイマーから呼ぶ場合は false にし、ダイアログ入力中のフォーカスを奪わない。</param>
-        private void PositionExcelWindow(bool bringToForeground = true)
+        /// <returns>XLMAIN ウィンドウを検出して MoveWindow できた場合 true。</returns>
+        private bool PositionExcelWindow(bool bringToForeground = true)
         {
             try
             {
@@ -222,7 +249,7 @@ namespace MOSExcelMogiApp
                 }
                 catch { }
                 // #endregion
-                if (excelHwnd == IntPtr.Zero && excelProcesses.Length == 0) return;
+                if (excelHwnd == IntPtr.Zero && excelProcesses.Length == 0) return false;
 
                 Process excelProcess = null;
                 if (excelHwnd == IntPtr.Zero)
@@ -230,7 +257,7 @@ namespace MOSExcelMogiApp
                     excelProcess = excelProcesses
                         .OrderByDescending(p => { try { return p.StartTime; } catch { return DateTime.MinValue; } })
                         .FirstOrDefault();
-                    if (excelProcess == null) return;
+                    if (excelProcess == null) return false;
                     processId = (uint)excelProcess.Id;
                 }
                 // #region agent log
@@ -305,11 +332,11 @@ namespace MOSExcelMogiApp
                     int excelBorderWidth = (excelWindowRect.right - excelWindowRect.left) - excelClientRect.right;
                     int excelBorderHeight = (excelWindowRect.bottom - excelWindowRect.top) - excelClientRect.bottom;
                     
-                    // Excelのウィンドウを 1920×1080 前提で左上 (0,0)、サイズ 1920×822 にリサイズ（1-1と同じ高さ）
+                    // Excelウィンドウを実際の画面解像度に合わせてリサイズ
                     int excelX = -excelBorderWidth / 2;
                     int excelY = -excelBorderHeight / 2;
-                    int excelWidth = SCREEN_WIDTH + excelBorderWidth;
-                    int excelHeight = EXCEL_HEIGHT + excelBorderHeight;
+                    int excelWidth  = PhysicalScreenWidth  + excelBorderWidth;
+                    int excelHeight = ExcelHeightPhysical  + excelBorderHeight;
                     // #region agent log
                     try
                     {
@@ -321,11 +348,52 @@ namespace MOSExcelMogiApp
                     // 最大化/最小化状態だと MoveWindow が効かず比率が崩れることがあるため、必ず復元してから移動/リサイズする
                     try { ShowWindow(excelHwnd, SW_RESTORE); } catch { }
                     MoveWindow(excelHwnd, excelX, excelY, excelWidth, excelHeight, true);
+                    return true;
                 }
+
+                return false;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error positioning Excel window: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void StartExcelPositionRetryTimer()
+        {
+            _excelPositionRetryTimer?.Stop();
+            _excelPositionRetryDeadline = DateTime.UtcNow.AddSeconds(15);
+            _excelPositionRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            _excelPositionRetryTimer.Tick += OnExcelPositionRetryTick;
+            _excelPositionRetryTimer.Start();
+            OnExcelPositionRetryTick(null, EventArgs.Empty);
+        }
+
+        private void OnExcelPositionRetryTick(object sender, EventArgs e)
+        {
+            if (DateTime.UtcNow >= _excelPositionRetryDeadline)
+            {
+                StopExcelPositionRetryTimer();
+                return;
+            }
+
+            SetWindowPosition();
+
+            if (_viewModel?.TryGetSharedExcelApplication() != null &&
+                PositionExcelWindow(bringToForeground: false))
+            {
+                StopExcelPositionRetryTimer();
+            }
+        }
+
+        private void StopExcelPositionRetryTimer()
+        {
+            if (_excelPositionRetryTimer != null)
+            {
+                _excelPositionRetryTimer.Tick -= OnExcelPositionRetryTick;
+                _excelPositionRetryTimer.Stop();
+                _excelPositionRetryTimer = null;
             }
         }
 
@@ -348,8 +416,11 @@ namespace MOSExcelMogiApp
             // ウィンドウハンドルが利用可能になるまで少し待機してから配置
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                LoadTasks();
+                UpdateTaskDisplay();
                 SetWindowPosition();
                 StartRatioRestoreTimer();
+                StartExcelPositionRetryTimer();
             }), DispatcherPriority.Loaded);
         }
 
@@ -702,7 +773,7 @@ namespace MOSExcelMogiApp
 
             // タスク説明の表示を更新
             var taskDescriptionTextBlock = FindName("TaskDescriptionTextBlock") as TextBlock;
-            if (taskDescriptionTextBlock != null && _tasks != null && _currentTaskId <= _tasks.Count)
+            if (taskDescriptionTextBlock != null && _tasks != null && _tasks.Any(t => t.TaskId == _currentTaskId))
             {
                 var currentTask = _tasks.Find(t => t.TaskId == _currentTaskId);
                 if (currentTask != null)
@@ -1031,12 +1102,10 @@ namespace MOSExcelMogiApp
             }
         }
 
-        private void ProjectResetButton_Click(object sender, RoutedEventArgs e)
+        private async void ProjectResetButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("========================================");
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] ProjectResetButton_Click called");
-            System.Diagnostics.Debug.WriteLine($"Sender: {sender?.GetType().Name}");
-            System.Diagnostics.Debug.WriteLine($"EventArgs: {e?.GetType().Name}");
             System.Diagnostics.Debug.WriteLine("========================================");
             try
             {
@@ -1045,52 +1114,99 @@ namespace MOSExcelMogiApp
                     var currentProject = _viewModel.CurrentProject;
                     int groupId = int.Parse(currentProject.Group.Replace("Group ", ""));
                     int projectId = currentProject.ProjectNumber;
-                    
+
                     System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Current project: Group{groupId}, Project{projectId}");
-                    System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Current project file path: {currentProject.FilePath}");
-                    
+
                     var result = MessageBox.Show(
-                        $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）", 
-                        "確認", 
-                        MessageBoxButton.YesNo, 
+                        $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）",
+                        "確認",
+                        MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
-                    
-                    System.Diagnostics.Debug.WriteLine($"[AppBarWindow] User response: {result}");
-                    
-                    if (result == MessageBoxResult.Yes)
+
+                    if (result != MessageBoxResult.Yes)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Starting reset process...");
-                        
-                        // MainWindowのResetProjectメソッドを呼び出す
-                        MainWindow mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
-                        if (mainWindow != null)
+                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Reset cancelled by user");
+                        return;
+                    }
+
+                    // 「リセット中です」オーバーレイを作成
+                    var waitWindow = new Window
+                    {
+                        Title = "リセット中",
+                        Width = 300,
+                        Height = 120,
+                        WindowStyle = WindowStyle.None,
+                        WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                        ShowInTaskbar = false,
+                        ResizeMode = ResizeMode.NoResize,
+                        Topmost = true,
+                        Background = System.Windows.Media.Brushes.White,
+                        BorderBrush = System.Windows.Media.Brushes.SteelBlue,
+                        BorderThickness = new Thickness(2)
+                    };
+                    var stack = new System.Windows.Controls.StackPanel
+                    {
+                        VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                        HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                        Margin = new Thickness(16)
+                    };
+                    var label = new System.Windows.Controls.TextBlock
+                    {
+                        Text = $"リセット中です...\nプロジェクト {groupId}-{projectId}",
+                        FontSize = 14,
+                        TextAlignment = System.Windows.TextAlignment.Center,
+                        Foreground = System.Windows.Media.Brushes.SteelBlue
+                    };
+                    stack.Children.Add(label);
+                    waitWindow.Content = stack;
+                    waitWindow.Show();
+
+                    MainWindow mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+                    if (mainWindow != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow found, calling ResetProject on UI thread");
+                        Exception resetError = null;
+                        // ResetProject は WPF オブジェクトにアクセスするため UI スレッド上で実行する。
+                        // DispatcherPriority.Background により先にオーバーレイの描画が完了してからリセット処理が開始される。
+                        await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
-                            System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow found, calling ResetProject");
-                            mainWindow.ResetProject(groupId, projectId);
+                            try { mainWindow.ResetProject(groupId, projectId, showMessage: false); }
+                            catch (Exception ex) { resetError = ex; }
+                        }, System.Windows.Threading.DispatcherPriority.Background);
+
+                        waitWindow.Close();
+
+                        if (resetError != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Reset error: {resetError.Message}");
+                            MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
+                                "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                         else
                         {
-                            System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow not found");
-                            MessageBox.Show("メインウィンドウが見つかりませんでした。", "エラー", 
-                                MessageBoxButton.OK, MessageBoxImage.Error);
+                            MessageBox.Show($"プロジェクト {groupId}-{projectId} をリセットしました。",
+                                "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Reset cancelled by user");
+                        waitWindow.Close();
+                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow not found");
+                        MessageBox.Show("メインウィンドウが見つかりませんでした。", "エラー",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
                 else
                 {
                     System.Diagnostics.Debug.WriteLine("[AppBarWindow] CurrentProject is null");
-                    MessageBox.Show("リセットするプロジェクトが選択されていません。", 
+                    MessageBox.Show("リセットするプロジェクトが選択されていません。",
                         "情報", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error in ProjectResetButton_Click: {ex.Message}\n{ex.StackTrace}");
-                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}", 
+                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
                     "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1238,6 +1354,14 @@ namespace MOSExcelMogiApp
                     try
                     {
                         excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                        // ROT に残った古いプロキシが無効でないか生存確認（0x800706BE 等が出れば死んでいる）
+                        try { var _ = excelApp.Hwnd; }
+                        catch
+                        {
+                            Marshal.ReleaseComObject(excelApp);
+                            excelApp = null;
+                            throw new COMException("Stale Excel proxy detected");
+                        }
                     }
                     catch (COMException)
                     {
@@ -1291,7 +1415,54 @@ namespace MOSExcelMogiApp
 
                     if (targetWorkbook == null)
                     {
-                        targetWorkbook = excelApp.Workbooks.Open(filePath, ReadOnly: false);
+                        // 保護ビューで既に開かれている場合は編集モードに切り替える
+                        bool openedFromProtectedView = false;
+                        try
+                        {
+                            string targetFileName = Path.GetFileName(filePath);
+                            foreach (ExcelProtectedViewWindow pvw in excelApp.ProtectedViewWindows)
+                            {
+                                try
+                                {
+                                    if (string.Equals(pvw.Caption, targetFileName, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Protected view detected, switching to edit mode: {filePath}");
+                                        targetWorkbook = pvw.Edit();
+                                        openedFromProtectedView = true;
+                                        break;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        catch { }
+
+                        if (!openedFromProtectedView)
+                        {
+                            targetWorkbook = excelApp.Workbooks.Open(filePath, ReadOnly: false);
+                        }
+                    }
+                    else
+                    {
+                        // 既に開いているブックが保護ビューになっていれば解除
+                        try
+                        {
+                            string targetFileName = Path.GetFileName(filePath);
+                            foreach (ExcelProtectedViewWindow pvw in excelApp.ProtectedViewWindows)
+                            {
+                                try
+                                {
+                                    if (string.Equals(pvw.Caption, targetFileName, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Existing workbook in protected view, switching to edit: {filePath}");
+                                        targetWorkbook = pvw.Edit();
+                                        break;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        catch { }
                     }
 
                     try { targetWorkbook.Activate(); } catch { }
@@ -1547,31 +1718,7 @@ namespace MOSExcelMogiApp
                     }
                     UpdateTaskDisplay();
 
-                    // 次のプロジェクトに移動した際も Excel とアプリバーをプロジェクト1-1と同じ高さ・位置（1920×1080前提）に再配置
-                    // 新しい Excel ウィンドウが完全に表示されるまで遅延してから実行（シートタブが見えるように）
-                    // #region agent log
-                    try
-                    {
-                        var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                        File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.OnCurrentProjectChanged", message = "delay 1200ms started", data = new { newProjectId }, sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-                    }
-                    catch { }
-                    // #endregion
-                    var delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
-                    delayTimer.Tick += (s, args) =>
-                    {
-                        delayTimer.Stop();
-                        // #region agent log
-                        try
-                        {
-                            var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                            File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.OnCurrentProjectChanged", message = "SetWindowPosition from delay", sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-                        }
-                        catch { }
-                        // #endregion
-                        SetWindowPosition();
-                    };
-                    delayTimer.Start();
+                    StartExcelPositionRetryTimer();
                 }
                 else
                 {
@@ -1606,7 +1753,7 @@ namespace MOSExcelMogiApp
             {
                 try
                 {
-                    SetWindowPosition();
+                    StartExcelPositionRetryTimer();
                 }
                 catch (Exception ex)
                 {
@@ -1618,6 +1765,7 @@ namespace MOSExcelMogiApp
         protected override void OnClosed(EventArgs e)
         {
             ClearCurrentTaskFile();
+            StopExcelPositionRetryTimer();
             _ratioRestoreTimer?.Stop();
             _ratioRestoreTimer = null;
             _timer?.Stop();
