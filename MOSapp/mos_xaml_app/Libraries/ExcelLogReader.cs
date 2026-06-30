@@ -199,6 +199,9 @@ namespace Libraries
                 if (ExcelTaskValidationConfig.IsOperationExempt(opType, exemptFlags))
                     continue;
 
+                if (IsSpuriousUsedRangeDimensionChangeForCellFormatTask(opType, op.Detail, exemptFlags))
+                    continue;
+
                 if (useRangeGate && allowedRanges != null && allowedRanges.Count > 0 && IsRangeEditType(op.Type))
                 {
                     if (!TryParseSheetAndAddress(op.Detail, out string sheetName, out string address))
@@ -227,6 +230,52 @@ namespace Libraries
             return string.Equals(operationType, "EditCellValue", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(operationType, "EditCellFormula", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(operationType, "EditCellFormat", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static readonly Regex UsedRowCountDriftRegex = new Regex(@"Rows:(\d+)->(\d+)", RegexOptions.Compiled);
+        private static readonly Regex UsedColCountDriftRegex = new Regex(@"Cols:(\d+)->(\d+)", RegexOptions.Compiled);
+
+        /// <summary>
+        /// 書式のみタスクで UsedRange 行数/列数の微小変化が InsertRows 等として記録された場合の誤検知を無視する。
+        /// </summary>
+        private static bool IsSpuriousUsedRangeDimensionChangeForCellFormatTask(
+            ExcelOperationType opType,
+            string detail,
+            ExcelValidationExemptFlags exemptFlags)
+        {
+            if (!exemptFlags.HasFlag(ExcelValidationExemptFlags.CellFormatOnly))
+                return false;
+
+            if (opType != ExcelOperationType.InsertRows
+                && opType != ExcelOperationType.DeleteRows
+                && opType != ExcelOperationType.InsertColumns
+                && opType != ExcelOperationType.DeleteColumns)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(detail))
+                return false;
+
+            Match rowMatch = UsedRowCountDriftRegex.Match(detail);
+            if (rowMatch.Success
+                && int.TryParse(rowMatch.Groups[1].Value, out int fromRow)
+                && int.TryParse(rowMatch.Groups[2].Value, out int toRow)
+                && Math.Abs(toRow - fromRow) <= 1)
+            {
+                return true;
+            }
+
+            Match colMatch = UsedColCountDriftRegex.Match(detail);
+            if (colMatch.Success
+                && int.TryParse(colMatch.Groups[1].Value, out int fromCol)
+                && int.TryParse(colMatch.Groups[2].Value, out int toCol)
+                && Math.Abs(toCol - fromCol) <= 1)
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryParseSheetAndAddress(string detail, out string sheetName, out string address)

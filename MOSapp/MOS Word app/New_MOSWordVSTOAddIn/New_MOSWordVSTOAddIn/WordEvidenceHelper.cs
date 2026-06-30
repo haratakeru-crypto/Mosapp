@@ -25,6 +25,7 @@ namespace New_MOSWordVSTOAddIn
             (4, 3, "ReviewDeleteComment"),
             (4, 3, "ReviewResolveComment"),
             (4, 4, "StyleSetLineSimple"),
+            (4, 4, "StyleSetLineStylish"),
             (4, 5, "Watermark"),
             (4, 5, "WatermarkMenu"),
             (4, 5, "GalleryWatermark"),

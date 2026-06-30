@@ -303,6 +303,8 @@ namespace MOS_Word_app.Views
             if (result != MessageBoxResult.Yes)
                 return;
             _timer?.Stop();
+            SaveAndCloseAllWordDocuments();
+            TryQuitWord();
             this.Close();
         }
         
@@ -322,7 +324,9 @@ namespace MOS_Word_app.Views
                     return;
                 }
 
-                // 通常モード: レビューページを開く
+                // 通常モード: レビューページを開く（編集内容をディスクに保存してから Word を閉じる）
+                LogReader.RequestCloseNavigationPaneIfOpen();
+                SaveAndCloseAllWordDocuments();
                 this.Hide();
 
                 // 現在のタイマー残り時間と状態情報を渡す（AppBarWindowのインスタンスとgroupIdも渡す）
@@ -332,6 +336,7 @@ namespace MOS_Word_app.Views
                 {
                     // レビューページが閉じられたらメインウィンドウを再表示
                     this.Show();
+                    ReopenCurrentProjectDocumentIfWordEmpty();
                 };
                 
                 // ShowDialog()ではなくShow()を使用
@@ -511,6 +516,8 @@ namespace MOS_Word_app.Views
             try
             {
                 // レビューページから戻ったときは該当する Word ドキュメントを起動する
+                LogReader.RequestCloseNavigationPaneIfOpen();
+                SaveAndCloseAllWordDocuments();
                 OpenProjectDocument(projectId, _groupId);
                 
                 // プロジェクトを変更
@@ -1532,18 +1539,7 @@ namespace MOS_Word_app.Views
         private void MoveToNextProject()
         {
             LogReader.RequestCloseNavigationPaneIfOpen();
-            // 次のプロジェクトに移る前に現在のプロジェクト（Wordドキュメント）を保存する
-            SaveAllWordDocuments();
-            // 前プロジェクトの文書を閉じ、ActiveDocument の取り違えを防ぐ（プロセス kill は行わない）
-            if (!CloseAllWordDocuments())
-            {
-                TryQuitWord();
-                Thread.Sleep(500);
-            }
-            else
-            {
-                Thread.Sleep(200);
-            }
+            SaveAndCloseAllWordDocuments();
 
             // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
@@ -1649,7 +1645,7 @@ namespace MOS_Word_app.Views
                 
                 if (wordApp == null) return;
                 
-                // 同じパスで既に開いているドキュメントがあれば保存せずに閉じる（初期化状態でも常にフォルダから開く）
+                // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、常にフォルダから開き直す
                 string pathLower = System.IO.Path.GetFullPath(filePath).ToLowerInvariant();
                 try
                 {
@@ -1663,6 +1659,8 @@ namespace MOS_Word_app.Views
                             try { docFullPath = System.IO.Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
                             if (fullName == pathLower || docFullPath == pathLower)
                             {
+                                if (!doc.Saved)
+                                    doc.Save();
                                 doc.Close(SaveChanges: false);
                                 break;
                             }
@@ -2016,9 +2014,9 @@ namespace MOS_Word_app.Views
         }
         
         /// <summary>
-        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じる。
+        /// プロジェクト切替・レビューページ表示前など、作業内容をディスクに残して Word 文書を閉じる。
         /// </summary>
-        private void CloseWordDocumentsBeforeReturnToResult()
+        private void SaveAndCloseAllWordDocuments()
         {
             SaveAllWordDocuments();
             if (!CloseAllWordDocuments())
@@ -2030,6 +2028,41 @@ namespace MOS_Word_app.Views
             {
                 Thread.Sleep(200);
             }
+        }
+
+        /// <summary>
+        /// レビューページを閉じただけのとき、Word に文書が無ければ現在プロジェクトを開き直す。
+        /// </summary>
+        private void ReopenCurrentProjectDocumentIfWordEmpty()
+        {
+            try
+            {
+                WordApp wordApp = null;
+                try
+                {
+                    wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                }
+                catch (COMException)
+                {
+                    OpenProjectDocument(_currentProjectId, _groupId);
+                    return;
+                }
+
+                if (wordApp == null || wordApp.Documents.Count == 0)
+                    OpenProjectDocument(_currentProjectId, _groupId);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ReopenCurrentProjectDocumentIfWordEmpty] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じる。
+        /// </summary>
+        private void CloseWordDocumentsBeforeReturnToResult()
+        {
+            SaveAndCloseAllWordDocuments();
         }
 
         /// <summary>

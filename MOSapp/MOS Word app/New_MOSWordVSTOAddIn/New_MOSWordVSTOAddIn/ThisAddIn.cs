@@ -37,6 +37,9 @@ namespace New_MOSWordVSTOAddIn
         private string _lastOrientationFingerprint;
         private string _lastPageBorderFingerprint;
         private bool? _lastHeading1LineSimple;
+        private bool? _lastLineStylish;
+        private string _lastStyleSetLineFingerprint;
+        private bool _styleSetLineSimpleLoggedThisDoc;
         /// <summary>4-5: 下書き1 透かしの有無（社外秘・至急は含めない）</summary>
         private bool? _lastDraft1WatermarkFound;
         /// <summary>透かし指紋（スナップショット比較・4-1 等の [Op] 補完用）</summary>
@@ -80,7 +83,7 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>7-2: 同一 Project7 文書で前ティック時点の Company が目標値だったか。</summary>
         private bool _p7LastCompanyMatched;
 
-        private const string P7CompanyTarget = "ラビット出版";
+        private const string P7CompanyTarget = WordP7CompanyValidation.TargetCompany;
 
         private string _p7IntegralTrackedFullName;
         private bool _p7IntegralLastDetected;
@@ -372,6 +375,9 @@ namespace New_MOSWordVSTOAddIn
                 _lastOrientationFingerprint = GetAllSectionsOrientationFingerprint(doc);
                 _lastPageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
                 _lastHeading1LineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
+                _lastLineStylish = WordWatermarkInspection.IsDocumentStyleSetLineStylish(doc);
+                _lastStyleSetLineFingerprint = WordWatermarkInspection.GetStyleSetLineFingerprint(doc);
+                _styleSetLineSimpleLoggedThisDoc = false;
                 _lastTask1_2_03ColorFingerprint = GetTask1_2_03ColorFingerprint(doc);
 
                 ApplyWatermarkPollingBaseline(doc);
@@ -395,7 +401,7 @@ namespace New_MOSWordVSTOAddIn
                     if (IsProject7DocumentPath(fn))
                     {
                         _p7LastCompanyDocFullName = fn;
-                        _p7LastCompanyMatched = string.Equals(TryGetDocumentCompany(doc), P7CompanyTarget, StringComparison.Ordinal);
+                        _p7LastCompanyMatched = WordP7CompanyValidation.IsProject7CompanyValid(doc);
                     }
                 }
                 catch
@@ -569,7 +575,7 @@ namespace New_MOSWordVSTOAddIn
             catch { /* ignore */ }
         }
 
-        /// <summary>採点アプリが mos_word_flush_evidence.txt を置いたとき、即座に ShowAll 状態を同期してログに反映する。</summary>
+        /// <summary>採点アプリが mos_word_flush_evidence.txt を置いたとき、ShowAll と 7-2 Company を即同期してログに反映する。</summary>
         private void ProcessEvidenceFlushRequest()
         {
             if (!File.Exists(EvidenceFlushFilePath))
@@ -577,7 +583,9 @@ namespace New_MOSWordVSTOAddIn
 
             try
             {
-                UpdateShowAllPolling(this.Application);
+                var app = this.Application;
+                UpdateShowAllPolling(app);
+                FlushP7CompanyEvidenceForScore(app);
             }
             catch { /* ignore */ }
             finally
@@ -700,6 +708,10 @@ namespace New_MOSWordVSTOAddIn
             // 4-3: コメントペイン操作中も未解決件数の遷移を追跡
             UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
 
+            // 7-2: ［ファイル］→［情報］の会社設定は編集ペイン外。フォーカス defer より前に軽量ポーリング。
+            try { UpdateP7CompanyPolling(doc, allowCatchUpLog: false); }
+            catch { }
+
             // ナビペイン・Ctrl+F 検索・コメントペイン操作中は heavy Find 等の侵入的 COM を止める
             if (ShouldDeferIntrusiveDocumentCom(app))
                 return;
@@ -708,13 +720,6 @@ namespace New_MOSWordVSTOAddIn
                 try
                 {
                     UpdateFileSaveAsPolling(doc);
-                }
-                catch { }
-
-                // 7-2: 「ファイルの情報」で会社を設定する操作は編集ペイン外のため、フォーカス判定より前にポーリングする。
-                try
-                {
-                    UpdateP7CompanyPolling(doc);
                 }
                 catch { }
 
@@ -772,14 +777,50 @@ namespace New_MOSWordVSTOAddIn
                     _lastPageBorderFingerprint = borderFp;
 
                     bool lineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(doc);
+                    string styleSetFp = WordWatermarkInspection.GetStyleSetLineFingerprint(doc);
                     if (_lastHeading1LineSimple.HasValue && lineSimple && !_lastHeading1LineSimple.Value)
                     {
                         if (_suppressStyleSetPollLogs > 0)
                             _suppressStyleSetPollLogs--;
                         else
+                        {
                             WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineSimple");
+                            _styleSetLineSimpleLoggedThisDoc = true;
+                            _lastStyleSetLineFingerprint = styleSetFp;
+                        }
+                    }
+                    else if (_lastHeading1LineSimple.HasValue && _lastHeading1LineSimple.Value && !lineSimple)
+                    {
+                        // シンプル適用後に別スタイルセットへ変更した場合（スタイリッシュ等）のフォールバック
+                        if (_suppressStyleSetPollLogs > 0)
+                            _suppressStyleSetPollLogs--;
+                        else
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineStylish");
+                    }
+                    else if (_styleSetLineSimpleLoggedThisDoc && lineSimple
+                        && !string.IsNullOrEmpty(_lastStyleSetLineFingerprint)
+                        && !string.IsNullOrEmpty(styleSetFp)
+                        && !string.Equals(styleSetFp, _lastStyleSetLineFingerprint, StringComparison.Ordinal))
+                    {
+                        // COM 上はシンプルのまま見えても OpenXML スタイル定義が変わった場合
+                        if (_suppressStyleSetPollLogs > 0)
+                            _suppressStyleSetPollLogs--;
+                        else
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineStylish");
                     }
                     _lastHeading1LineSimple = lineSimple;
+                    if (!string.IsNullOrEmpty(styleSetFp))
+                        _lastStyleSetLineFingerprint = styleSetFp;
+
+                    bool lineStylish = WordWatermarkInspection.IsDocumentStyleSetLineStylish(doc);
+                    if (_lastLineStylish.HasValue && lineStylish && !_lastLineStylish.Value)
+                    {
+                        if (_suppressStyleSetPollLogs > 0)
+                            _suppressStyleSetPollLogs--;
+                        else
+                            WordEvidenceHelper.LogCommandWithEvidence("StyleSetLineStylish");
+                    }
+                    _lastLineStylish = lineStylish;
 
                     // 2-3: リボンの色ギャラリーを直接フックできないため、対象文字の色状態変化だけで補完ログを出す
                     string colorFp = GetTask1_2_03ColorFingerprint(doc);
@@ -906,8 +947,37 @@ namespace New_MOSWordVSTOAddIn
                 }
         }
 
+        /// <summary>採点直前: 開いている Project7 を複数回ポーリングし Company 確定と証跡を取りこぼさない。</summary>
+        private void FlushP7CompanyEvidenceForScore(Word.Application app)
+        {
+            if (app?.Documents == null)
+                return;
+            const int attempts = 6;
+            for (int attempt = 0; attempt < attempts; attempt++)
+            {
+                try
+                {
+                    int count = app.Documents.Count;
+                    for (int i = 1; i <= count; i++)
+                    {
+                        Word.Document doc = null;
+                        try
+                        {
+                            doc = app.Documents[i];
+                            UpdateP7CompanyPolling(doc, allowCatchUpLog: true);
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+
+                if (attempt < attempts - 1)
+                    System.Threading.Thread.Sleep(80);
+            }
+        }
+
         /// <summary>7-2: Project7.doc 上で Company が目標値へ遷移したとき SetDocumentCompany をログする。</summary>
-        private void UpdateP7CompanyPolling(Word.Document doc)
+        private void UpdateP7CompanyPolling(Word.Document doc, bool allowCatchUpLog = false)
         {
             if (doc == null) return;
             string fullName;
@@ -915,8 +985,15 @@ namespace New_MOSWordVSTOAddIn
             catch { return; }
             if (!IsProject7DocumentPath(fullName)) return;
 
-            string company = TryGetDocumentCompany(doc) ?? "";
-            bool nowMatched = string.Equals(company, P7CompanyTarget, StringComparison.Ordinal);
+            bool nowMatched = WordP7CompanyValidation.IsProject7CompanyValid(doc);
+
+            if (allowCatchUpLog && nowMatched)
+            {
+                WordEvidenceHelper.LogCommandWithEvidence("SetDocumentCompany");
+                _p7LastCompanyDocFullName = fullName;
+                _p7LastCompanyMatched = true;
+                return;
+            }
 
             if (!string.Equals(fullName, _p7LastCompanyDocFullName, StringComparison.OrdinalIgnoreCase))
             {

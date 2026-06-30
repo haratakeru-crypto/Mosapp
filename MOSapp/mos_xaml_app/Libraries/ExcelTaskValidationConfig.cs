@@ -157,7 +157,8 @@ namespace Libraries
                 case 2:
                     switch (taskId)
                     {
-                        case 1: // 下半期売上・A2スタイル
+                        case 1: // 下半期売上・A11:G11集計スタイル（書式のみ → CellFormatOnly）
+                            return ExcelValidationExemptFlags.CellFormatOnly;
                         case 2: // 社員リスト・B5:B44インデント
                         case 3: // 社員リスト・A2:F2配置
                         case 5: // 業務予定・C5:C11取り消し線
@@ -533,7 +534,7 @@ namespace Libraries
                     switch (taskId)
                     {
                         case 1:
-                            return new List<string> { "下半期売上!A2" };
+                            return new List<string> { "下半期売上!A11:G11" };
                         case 2:
                             return new List<string> { "社員リスト!B5:B44" };
                         case 3:

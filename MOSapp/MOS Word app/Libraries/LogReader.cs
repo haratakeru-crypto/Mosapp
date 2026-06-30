@@ -444,7 +444,7 @@ namespace Libraries
         /// <summary>
         /// 採点直前に VSTO へ ShowAll 等のポーリング同期を依頼し、処理完了（ファイル削除）まで待機する。
         /// </summary>
-        public static void RequestVstoEvidenceFlush(int timeoutMs = 600)
+        public static void RequestVstoEvidenceFlush(int timeoutMs = 1200)
         {
             string path = GetEvidenceFlushFilePath();
             try

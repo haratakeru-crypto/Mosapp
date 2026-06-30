@@ -20,6 +20,15 @@ namespace Libraries.Group1
         public bool CheckTask_1_3_06() => RunCheck(CheckTask_1_3_06_Impl, "Task 3-6 (Unmerge)");
         public bool CheckTask_1_3_07() => RunCheck(CheckTask_1_3_07_Impl, "Task 3-7 (Delete Row)");
 
+        // config tabs["1"] project 2 用エイリアス（採点は CheckTask_1_{projectId}_{task} を参照）
+        public bool CheckTask_1_2_01() => CheckTask_1_3_01();
+        public bool CheckTask_1_2_02() => CheckTask_1_3_02();
+        public bool CheckTask_1_2_03() => CheckTask_1_3_03();
+        public bool CheckTask_1_2_04() => CheckTask_1_3_04();
+        public bool CheckTask_1_2_05() => CheckTask_1_3_05();
+        public bool CheckTask_1_2_06() => CheckTask_1_3_06();
+        public bool CheckTask_1_2_07() => CheckTask_1_3_07();
+
         // 共通エラーハンドリング
         private bool RunCheck(Func<string, bool> checkImpl, string taskName)
         {
@@ -41,19 +50,32 @@ namespace Libraries.Group1
         // 実装メソッド
         // ==========================================
 
-        // タスク3-1: セルスタイルの適用 (A2 に「集計」スタイル)
+        // タスク3-1: セルスタイルの適用 (A11:G11 に「集計」スタイル)
         private bool CheckTask_1_3_01_Impl(string filePath)
         {
             return CheckTaskBasic(filePath, "下半期売上", (worksheet) =>
             {
-                Range targetCell = worksheet.Range["A2"];
-                try
+                Range targetRange = worksheet.Range["A11:G11"];
+
+                foreach (Range cell in targetRange.Cells)
                 {
-                    dynamic style = targetCell.Style;
-                    string styleName = (string)(style.NameLocal ?? "(null)");
-                    return styleName == "集計" || styleName == "Total";
+                    if (!IsTotalStyle(cell))
+                        return false;
                 }
-                catch { return false; }
+
+                foreach (Range cell in worksheet.Range["A10:G10"].Cells)
+                {
+                    if (IsTotalStyle(cell))
+                        return false;
+                }
+
+                foreach (Range cell in worksheet.Range["A12:G12"].Cells)
+                {
+                    if (IsTotalStyle(cell))
+                        return false;
+                }
+
+                return true;
             });
         }
 
@@ -305,6 +327,20 @@ namespace Libraries.Group1
         // ==========================================
         // ヘルパーメソッド
         // ==========================================
+
+        private static bool IsTotalStyle(Range cell)
+        {
+            try
+            {
+                dynamic style = cell.Style;
+                string styleName = (string)(style.NameLocal ?? string.Empty);
+                return styleName == "集計" || styleName == "Total";
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         private bool CheckTaskBasic(string filePath, string sheetName, Func<Worksheet, bool> checkLogic)
         {
