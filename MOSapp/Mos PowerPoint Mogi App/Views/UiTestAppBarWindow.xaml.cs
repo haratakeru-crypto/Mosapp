@@ -77,7 +77,6 @@ namespace MOS_PowerPoint_app.Views
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
         private readonly Action _onScoreClick; // 採点ボタン押下時（プロジェクト一覧の採点と同じ処理を実行）
-        private DispatcherTimer _slideMonitorTimer; // Task 4 用: スライド ID 監視（1秒間隔）
         private bool _fromResultWindow = false; // 結果画面からタスクに飛んできたかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
         private readonly HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -99,7 +98,7 @@ namespace MOS_PowerPoint_app.Views
                 pauseBtn.Visibility = showPauseButton ? Visibility.Visible : Visibility.Collapsed;
             InitializeTimer();
             InitializeProjectTimer();
-            InitializeSlideMonitor();
+            PowerPointChecker1_1.ResetTask4SlideDeletionState();
             LoadClipboardTargets(); // クリップボード対象を先に読み込む
             LoadTasks();
             UpdateTaskDisplay();
@@ -303,7 +302,6 @@ namespace MOS_PowerPoint_app.Views
             _isScoring = true;
             _timer?.Stop();
             _projectTimer?.Stop();
-            _slideMonitorTimer?.Stop();
             System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] BeginScoringSession");
         }
 
@@ -323,86 +321,11 @@ namespace MOS_PowerPoint_app.Views
             {
                 _timer?.Start();
                 _projectTimer?.Start();
-                _slideMonitorTimer?.Start();
             }
 
             System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] EndScoringSession restartTimers={restartTimers}");
         }
 
-        private void InitializeSlideMonitor()
-        {
-            PowerPointChecker1_1.ResetTask4SlideDeletionState();
-            _slideMonitorTimer = new DispatcherTimer();
-            _slideMonitorTimer.Interval = TimeSpan.FromSeconds(1);
-            _slideMonitorTimer.Tick += SlideMonitor_Tick;
-            _slideMonitorTimer.Start();
-        }
-
-        private void SlideMonitor_Tick(object sender, EventArgs e)
-        {
-            PowerPointApp pptApp = null;
-            try
-            {
-                pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
-            }
-            catch (COMException)
-            {
-                return;
-            }
-            if (pptApp == null) return;
-            PowerPointPresentation pres = null;
-            try
-            {
-                pres = pptApp.ActivePresentation;
-            }
-            catch
-            {
-                return;
-            }
-            if (pres == null) return;
-            Slides slides = null;
-            try
-            {
-                slides = pres.Slides;
-                if (slides == null) return;
-                int count = slides.Count;
-                var currentSlideIds = new List<int>();
-                for (int i = 1; i <= count; i++)
-                {
-                    Slide slide = null;
-                    try
-                    {
-                        slide = slides[i];
-                        currentSlideIds.Add(slide.SlideID);
-                    }
-                    catch (COMException)
-                    {
-                        // スライド削除などでオブジェクトが無効になった場合はスキップ（強制終了を防ぐ）
-                    }
-                    finally
-                    {
-                        if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
-                    }
-                }
-                string presName = "";
-                try { presName = pres.Name ?? ""; } catch { }
-                string presKey = presName;
-                try
-                {
-                    // 保存済みなら FullName がより一意で安定（無い場合は Name にフォールバック）
-                    presKey = string.IsNullOrEmpty(pres.FullName) ? presName : pres.FullName;
-                }
-                catch { }
-                PowerPointChecker1_1.CheckSlideDeletion(currentSlideIds, presKey);
-            }
-            finally
-            {
-                if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } }
-                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
-                if (pptApp != null) { try { Marshal.ReleaseComObject(pptApp); } catch { } }
-            }
-        }
-        
         private void Timer_Tick(object sender, EventArgs e)
         {
             // タイマーが無効化されている場合は何もしない
@@ -2734,7 +2657,6 @@ namespace MOS_PowerPoint_app.Views
         {
             _timer?.Stop();
             _projectTimer?.Stop();
-            _slideMonitorTimer?.Stop();
             // ウィンドウを閉じる際にタスク情報をクリアし、次回起動時に古い情報でチェックが走るのを防ぐ
             Libraries.PPLogReader.ClearCurrentTaskFile();
             base.OnClosed(e);
