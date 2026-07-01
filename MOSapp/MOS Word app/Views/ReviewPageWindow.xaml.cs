@@ -12,7 +12,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Threading;
 using WordApp = Microsoft.Office.Interop.Word.Application;
+using WordDoc = Microsoft.Office.Interop.Word.Document;
 using Libraries;
 
 namespace MOS_Word_app.Views
@@ -576,43 +578,127 @@ namespace MOS_Word_app.Views
                 {
                     wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
                 }
-                catch (System.Runtime.InteropServices.COMException)
+                catch (COMException)
                 {
                     System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Word application not found");
                     return;
                 }
-                if (wordApp != null)
+
+                bool quitSucceeded = false;
+                try
                 {
+                    CloseAllWordDocumentsResilient(wordApp);
                     try
                     {
-                        while (wordApp.Documents.Count > 0)
-                        {
-                            try
-                            {
-                                wordApp.Documents[1].Close(SaveChanges: false);
-                            }
-                            catch { break; }
-                        }
-                        wordApp.Quit();
-                        Marshal.ReleaseComObject(wordApp);
+                        wordApp.Quit(SaveChanges: false);
+                        quitSucceeded = true;
+                        System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Word Quit succeeded");
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error quitting Word: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Word Quit failed: {ex.Message}");
                     }
                 }
-                try
+                finally
                 {
-                    foreach (var process in Process.GetProcessesByName("WINWORD"))
+                    if (wordApp != null)
                     {
-                        try { process.Kill(); } catch { }
+                        try { Marshal.ReleaseComObject(wordApp); } catch { }
                     }
                 }
-                catch { }
+
+                Thread.Sleep(quitSucceeded ? 200 : 500);
+
+                if (!quitSucceeded || Process.GetProcessesByName("WINWORD").Length > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Killing WINWORD process(es) as last resort");
+                    KillWinWordProcesses();
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in CloseWordApplication: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 試験終了時: 1件の Close 失敗で中断せず、進捗が止まったときだけループを抜ける。
+        /// </summary>
+        private static void CloseAllWordDocumentsResilient(WordApp wordApp)
+        {
+            if (wordApp == null)
+                return;
+
+            try
+            {
+                wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone;
+            }
+            catch { }
+
+            const int maxAttempts = 50;
+            for (int attempt = 0; attempt < maxAttempts && wordApp.Documents.Count > 0; attempt++)
+            {
+                int countBefore = wordApp.Documents.Count;
+                if (!TryCloseWordDocumentAt(wordApp, countBefore, "[ReviewPageWindow]"))
+                {
+                    if (countBefore > 1 && TryCloseWordDocumentAt(wordApp, 1, "[ReviewPageWindow]"))
+                    {
+                        continue;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[ReviewPageWindow] Document close made no progress (remaining={wordApp.Documents.Count})");
+                    break;
+                }
+            }
+        }
+
+        private static bool TryCloseWordDocumentAt(WordApp wordApp, int index, string logPrefix)
+        {
+            if (wordApp == null || index < 1 || index > wordApp.Documents.Count)
+                return false;
+
+            int countBefore = wordApp.Documents.Count;
+            WordDoc doc = null;
+            try
+            {
+                doc = wordApp.Documents[index];
+                string name = "";
+                try { name = doc.Name ?? ""; } catch { }
+                doc.Close(SaveChanges: false);
+                System.Diagnostics.Debug.WriteLine($"{logPrefix} Closed document: {name}");
+            }
+            catch (COMException comEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"{logPrefix} COM error closing document: {comEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"{logPrefix} Error closing document: {ex.Message}");
+            }
+            finally
+            {
+                if (doc != null)
+                {
+                    try { Marshal.ReleaseComObject(doc); } catch { }
+                }
+            }
+
+            return wordApp.Documents.Count < countBefore;
+        }
+
+        private static void KillWinWordProcesses()
+        {
+            try
+            {
+                foreach (var process in Process.GetProcessesByName("WINWORD"))
+                {
+                    try { process.Kill(); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] KillWinWordProcesses error: {ex.Message}");
             }
         }
     }

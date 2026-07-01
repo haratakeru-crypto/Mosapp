@@ -228,7 +228,7 @@ namespace MOS_PowerPoint_app.Views
         }
 
         /// <summary>
-        /// 通し順（1-1, 1-2, … 11-7）で最初に未閲覧のタスクの (ProjectId, TaskId) を返す。いなければ (0, 0)。
+        /// 通し順（1-1, 1-2, … 10-8）で最初に未閲覧のタスクの (ProjectId, TaskId) を返す。いなければ (0, 0)。
         /// </summary>
         private void GetFirstUnviewedTask(ProjectData projectData, out int firstProjectId, out int firstTaskId)
         {
@@ -365,8 +365,8 @@ namespace MOS_PowerPoint_app.Views
             else
             {
                 lines.Add("教材用プロジェクト,,採点１回目,採点２回目");
-                int[] taskCounts = { 7, 7, 4, 6, 5, 4, 4, 5, 7, 7, 7 }; // プロジェクト1～11のタスク数
-                for (int p = 1; p <= 11; p++)
+                int[] taskCounts = { 8, 8, 7, 8, 7, 7, 5, 5, 5, 8 }; // プロジェクト1～10のタスク数
+                for (int p = 1; p <= 10; p++)
                 {
                     int taskCount = taskCounts[p - 1];
                     for (int t = 1; t <= taskCount; t++)

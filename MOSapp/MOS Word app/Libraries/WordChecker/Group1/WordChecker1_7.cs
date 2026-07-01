@@ -53,7 +53,7 @@ namespace Libraries.Group1
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        private const string P7CompanyTarget = "ラビット出版";
+        private const string P7CompanyTarget = WordP7CompanyValidation.TargetCompany;
         private const string P7RdTxtFileName = "朗読会.txt";
         private const string P7RdDocmFileName = "朗読会.docm";
         private const string P7ReadPassword = "abc";
@@ -63,36 +63,91 @@ namespace Libraries.Group1
             try
             {
                 if (string.IsNullOrEmpty(filePath)) return false;
-                if (!LogReader.HasTaskEvidence(7, 2, "SetDocumentCompany"))
-                    return false;
 
-                // 主判定: VSTO が Project7 上で Company が目標値へ遷移したとき記録した SetDocumentCompany のみ（7-3/7-4/7-5 と同型の証跡中心）。
-                // 7-5 パスワード誤り等で docm/txt から Company が取れなくても 7-2 を巻き添えにしない。
-                LogCompanyStateDiagnosticsIfNeeded(filePath);
-                return true;
+                bool logOk = LogReader.HasTaskEvidence(7, 2, "SetDocumentCompany");
+                Document project7 = null;
+                try
+                {
+                    if (TryGetProject7OpenDocument(out project7))
+                    {
+                        bool stateOk = WordP7CompanyValidation.IsProject7CompanyValid(project7);
+                        string company = WordP7CompanyValidation.TryGetCompanyFromCom(project7) ?? "";
+                        LogCompanyStateDiagnosticsIfNeeded(filePath, logOk, stateOk, company);
+
+                        // 半角カナのみ veto（問題1）。読取不可・空は 7-4/7-5 後にログで救済する。
+                        if (WordP7CompanyValidation.HasHalfWidthKatakanaCompany(project7))
+                            return false;
+
+                        bool saveAsFollowUp = LogReader.HasTaskEvidence(7, 4, "FileSaveAsTxt")
+                            || LogReader.HasTaskEvidence(7, 5, "FileSaveAsDocm");
+                        if (logOk && saveAsFollowUp)
+                            return true;
+
+                        return logOk || stateOk;
+                    }
+
+                    LogCompanyStateDiagnosticsIfNeeded(filePath, logOk, false, "");
+                    return logOk;
+                }
+                finally
+                {
+                    if (project7 != null)
+                        Marshal.ReleaseComObject(project7);
+                }
             }
             catch { return false; }
         }
 
-        /// <summary>
-        /// 7-2 補助: 成果物から Company を読めるか監視用。採点結果には影響しない（非ブロッキング）。
-        /// </summary>
-        private void LogCompanyStateDiagnosticsIfNeeded(string filePath)
+        /// <summary>7-2 採点: 開いている Project7.doc を取得。</summary>
+        private static bool TryGetProject7OpenDocument(out Document project7)
+        {
+            project7 = null;
+            Application wordApp = null;
+            try
+            {
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
+                catch { return false; }
+
+                foreach (Document doc in wordApp.Documents)
+                {
+                    try
+                    {
+                        string fn = doc.FullName;
+                        if (string.IsNullOrEmpty(fn)) continue;
+                        string name = Path.GetFileNameWithoutExtension(fn);
+                        if (!Regex.IsMatch(name ?? "", @"^project\s*7$", RegexOptions.IgnoreCase))
+                            continue;
+                        project7 = doc;
+                        return true;
+                    }
+                    catch { }
+                }
+                return false;
+            }
+            catch { return false; }
+            finally
+            {
+                if (wordApp != null) Marshal.ReleaseComObject(wordApp);
+            }
+        }
+
+        /// <summary>7-2 補助: 成果物から Company を読めるか監視用（採点結果には影響しない）。</summary>
+        private void LogCompanyStateDiagnosticsIfNeeded(string filePath, bool logOk, bool stateOk, string project7Company)
         {
             try
             {
+                if (logOk || stateOk)
+                    return;
+
                 if (!TryGetCompanyForTask7_02(filePath, out string company))
                 {
                     System.Diagnostics.Debug.WriteLine(
-                        "[WordChecker1_7] 7-2: SetDocumentCompany あり。状態読取不可（採点は○のまま）");
+                        "[WordChecker1_7] 7-2: log/state 不一致。Company 読取不可");
                     return;
                 }
 
-                if (company != P7CompanyTarget)
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[WordChecker1_7] 7-2: SetDocumentCompany あり。状態 Company=\"{company}\"（目標と不一致・採点は○のまま）");
-                }
+                System.Diagnostics.Debug.WriteLine(
+                    $"[WordChecker1_7] 7-2: logOk={logOk} stateOk={stateOk} Project7Company=\"{project7Company ?? ""}\" derivedCompany=\"{company}\"");
             }
             catch { }
         }

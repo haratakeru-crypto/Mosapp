@@ -20,6 +20,8 @@ namespace Libraries
     /// </summary>
     public static class WordBatchScoring
     {
+        private const int BatchPostOpenDelayMs = 350;
+
         private class BatchProjectData
         {
             [JsonProperty("projects")]
@@ -73,6 +75,7 @@ namespace Libraries
                     try { wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone; } catch { }
                     try { wordApp.Visible = true; } catch { }
                     WordWindowLayoutHelper.PositionWordForBatchScoring(wordApp);
+                    SaveAllOpenDocuments(wordApp);
                 }
 
                 foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
@@ -83,20 +86,29 @@ namespace Libraries
 
                     System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Scoring project {project.ProjectId} ({taskCount} tasks)");
 
-                    if (!OpenProjectDocument(wordApp, project.ProjectId, groupId))
+                    try
                     {
-                        for (int t = 1; t <= taskCount; t++)
-                            ScoreResultStore.RecordResult(groupId, project.ProjectId, t, false);
-                        continue;
+                        CloseAllOpenDocumentsForBatch(wordApp);
+
+                        if (!OpenProjectDocument(wordApp, project.ProjectId, groupId))
+                        {
+                            for (int t = 1; t <= taskCount; t++)
+                                ScoreResultStore.RecordResult(groupId, project.ProjectId, t, false);
+                            continue;
+                        }
+
+                        Thread.Sleep(BatchPostOpenDelayMs);
+
+                        var results = ScoreProject(groupId, project.ProjectId, taskCount, batchMode: true);
+                        for (int i = 0; i < taskCount; i++)
+                        {
+                            bool passed = i < results.Count && results[i];
+                            ScoreResultStore.RecordResult(groupId, project.ProjectId, i + 1, passed);
+                        }
                     }
-
-                    Thread.Sleep(800);
-
-                    var results = ScoreProject(groupId, project.ProjectId, taskCount);
-                    for (int i = 0; i < taskCount; i++)
+                    finally
                     {
-                        bool passed = i < results.Count && results[i];
-                        ScoreResultStore.RecordResult(groupId, project.ProjectId, i + 1, passed);
+                        CloseAllOpenDocumentsForBatch(wordApp);
                     }
                 }
             }
@@ -227,7 +239,13 @@ namespace Libraries
             }
         }
 
-        private static List<bool> ScoreProject(int groupId, int projectId, int taskCount)
+        private static void RequestVstoEvidenceFlushIfNeeded(int groupId, int projectId, int taskNum, bool batchMode)
+        {
+            if (!batchMode || VSTOCheckerHelper.RequiresVstoEvidenceFlush(groupId, projectId, taskNum))
+                LogReader.RequestVstoEvidenceFlush();
+        }
+
+        private static List<bool> ScoreProject(int groupId, int projectId, int taskCount, bool batchMode = false)
         {
             var results = new List<bool>();
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -277,7 +295,7 @@ namespace Libraries
                             System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: fail (grading gate)");
                             continue;
                         }
-                        LogReader.RequestVstoEvidenceFlush();
+                        RequestVstoEvidenceFlushIfNeeded(groupId, projectId, taskNum, batchMode);
                         bool taskResult = (bool)method.Invoke(checkerInstance, null);
                         results.Add(taskResult);
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: {(taskResult ? "pass" : "fail")}");
@@ -297,6 +315,66 @@ namespace Libraries
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// 一括採点: 開いている文書をすべて閉じる（1プロジェクト1文書の安定運用）。
+        /// </summary>
+        private static void CloseAllOpenDocumentsForBatch(WordApp wordApp)
+        {
+            if (wordApp == null)
+                return;
+
+            try
+            {
+                if (wordApp.Documents.Count == 0)
+                    return;
+
+                wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone;
+            }
+            catch { }
+
+            const int maxAttempts = 50;
+            for (int attempt = 0; attempt < maxAttempts && wordApp.Documents.Count > 0; attempt++)
+            {
+                int countBefore = wordApp.Documents.Count;
+                if (!TryCloseBatchDocumentAt(wordApp, countBefore))
+                {
+                    if (countBefore > 1 && TryCloseBatchDocumentAt(wordApp, 1))
+                        continue;
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WordBatchScoring] Document close made no progress (remaining={wordApp.Documents.Count})");
+                    break;
+                }
+            }
+        }
+
+        private static bool TryCloseBatchDocumentAt(WordApp wordApp, int index)
+        {
+            if (wordApp == null || index < 1 || index > wordApp.Documents.Count)
+                return false;
+
+            int countBefore = wordApp.Documents.Count;
+            WordDoc doc = null;
+            try
+            {
+                doc = wordApp.Documents[index];
+                doc.Close(SaveChanges: false);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] TryCloseBatchDocumentAt: {ex.Message}");
+            }
+            finally
+            {
+                if (doc != null)
+                {
+                    try { Marshal.ReleaseComObject(doc); } catch { }
+                }
+            }
+
+            return wordApp.Documents.Count < countBefore;
         }
 
         /// <summary>

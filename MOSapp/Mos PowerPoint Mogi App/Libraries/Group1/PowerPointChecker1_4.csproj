@@ -52,6 +52,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\PptxGlowOpenXmlReader.cs" Link="PptxGlowOpenXmlReader.cs" />
+    <Compile Include="..\PptxTask4_7StyleOpenXmlReader.cs" Link="PptxTask4_7StyleOpenXmlReader.cs" />
     <Compile Include="PowerPointChecker1_4.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

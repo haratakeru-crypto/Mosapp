@@ -7,6 +7,7 @@ namespace Libraries.Group1
 {
     public class WordChecker1_8
     {
+        private const string FootnoteTargetText803 = "電子機器に悪影響を与えるプログラム";
         public bool CheckTask_1_8_01() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_8_01(filePath); } catch { return false; } }
         public bool CheckTask_1_8_02() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_8_02(filePath); } catch { return false; } }
         public bool CheckTask_1_8_03() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_8_03(filePath); } catch { return false; } }
@@ -144,10 +145,70 @@ namespace Libraries.Group1
                     return false;
 
                 // 3. 脚注定義も 1 個（separator 等を除く）
-                return WordFindHelper.CountFootnoteDefinitionsInXml(xml) == 1;
+                if (WordFindHelper.CountFootnoteDefinitionsInXml(xml) != 1)
+                    return false;
+
+                // 4. 脚注本文が 8-2 正解状態のまま（番号書式ダイアログの「挿入」誤操作で ① が本文に入るケースを除外）
+                return IsFootnoteBodyValidForTask803(xml);
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
+        }
+
+        /// <summary>
+        /// 8-3: 脚注定義本文に w:footnoteRef が 1 個のみで、丸数字リテラルや余分な記号がなく、
+        /// 期待テキストだけが残ることを検証する。
+        /// </summary>
+        private static bool IsFootnoteBodyValidForTask803(string wordOpenXml)
+        {
+            var footnotesPartMatch = System.Text.RegularExpressions.Regex.Match(
+                wordOpenXml,
+                @"<pkg:part pkg:name=""/word/footnotes\.xml""[^>]*>.*?</pkg:part>",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (!footnotesPartMatch.Success)
+                return false;
+
+            string footnotesXml = footnotesPartMatch.Value;
+            var footnoteMatches = System.Text.RegularExpressions.Regex.Matches(
+                footnotesXml,
+                @"<w:footnote\b[^>]*w:id=""([^""]+)""[^>]*>.*?</w:footnote>",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+
+            string targetFootnoteXml = null;
+            foreach (System.Text.RegularExpressions.Match fn in footnoteMatches)
+            {
+                string openTag = System.Text.RegularExpressions.Regex.Match(fn.Value, @"<w:footnote\b[^>]*>").Value;
+                if (openTag.IndexOf("w:type=\"separator\"", StringComparison.Ordinal) >= 0
+                    || openTag.IndexOf("w:type=\"continuationSeparator\"", StringComparison.Ordinal) >= 0
+                    || openTag.IndexOf("w:type=\"continuationNotice\"", StringComparison.Ordinal) >= 0)
+                    continue;
+
+                string fnText = System.Text.RegularExpressions.Regex.Replace(fn.Value, @"<[^>]+>", "");
+                if (fnText.Contains(FootnoteTargetText803))
+                {
+                    targetFootnoteXml = fn.Value;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(targetFootnoteXml))
+                return false;
+
+            if (System.Text.RegularExpressions.Regex.Matches(targetFootnoteXml, @"<w:footnoteRef\b").Count != 1)
+                return false;
+
+            // 番号は footnoteRef のみ。w:t 内の丸数字（「挿入」誤操作）を拒否
+            if (System.Text.RegularExpressions.Regex.IsMatch(
+                targetFootnoteXml,
+                @"<w:t\b[^>]*>[^<]*[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳\u2460-\u2473\u3251-\u325F]"))
+                return false;
+
+            string bodyText = System.Text.RegularExpressions.Regex.Replace(
+                targetFootnoteXml, @"<w:footnoteRef\b[^>]*/>", "");
+            bodyText = System.Text.RegularExpressions.Regex.Replace(
+                bodyText, @"<w:footnoteRef\b[^>]*>.*?</w:footnoteRef>", "");
+            bodyText = System.Text.RegularExpressions.Regex.Replace(bodyText, @"<[^>]+>", "");
+            return string.Equals(bodyText.Trim(), FootnoteTargetText803, StringComparison.Ordinal);
         }
 
         private bool CheckTask_1_8_04(string filePath)

@@ -29,48 +29,60 @@ namespace Libraries
             {
                 switch (taskId)
                 {
-                    case 1: // 1-1 スライド追加（4枚目に挿入）
-                        // SlidesCount / 図形・位置に加え、TextLength も免除する。
-                        // 挿入により 4 枚目以降のスライド番号がずれ、スナップショットの「スライド i の文字数」と一致しなくなるため。
+                    case 1: // 1-1 スライド追加（論理4枚目に挿入）
+                        // SlidesCount は COM 採点で検証。挿入スライドのみ緩和、他スライドは GetAllowed*Delta で 0 固定。
                         flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
-                    case 2: // 1-2 スライド複製
-                    case 4: // 1-4 スライド削除
-                        // スライドの構成が大きく変わるため、SlidesCount, ShapesCount, TextLength, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
+                    case 2: // 1-2 スライド非表示
+                        // 非表示設定のみのため免除不要
                         break;
-                    case 3: // 1-3 スライド非表示
-                        // 非表示設定のみで物理的な変化はないため免除不要
+                    case 3: // 1-3 スライド5のレイアウト変更＋テキスト入力
+                        // 対象スライド（論理5）のみ緩和。他スライドは GetAllowed*Delta で 0 固定し厳格化する。
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
-                    case 5: // 1-5 レイアウト変更
-                        // プレースホルダーの再配置が発生するため、ShapesCount, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                    case 4: // 1-4 スライド6の箇条書き2段組み
+                        // 2段組みによりテキストフレーム等のサイズ・位置が変化するため、ShapePositionを免除
+                        flags |= PPValidationExemptFlags.ShapePosition;
                         break;
-                    case 6: // 1-6 箇条書きを2段組みに設定
+                    case 5: // 1-5 文字間隔を広げる
                         // 書式変更のみでオブジェクト数は不変のため免除不要
                         break;
-                    case 7: // 1-7 吹き出しへのテキスト入力
-                        // 図形内に文字を書き込むため、TextLength免除が必要
-                        flags |= PPValidationExemptFlags.TextLength;
+                    case 6: // 1-6 スライド8にセクション追加
+                        // セクション追加のみのため免除不要
+                        break;
+                    case 7: // 1-7 スライド1のセクション名変更
+                        // セクション名変更のみのため免除不要
+                        break;
+                    case 8: // 1-8 サマリーズーム挿入（スライド2に1枚追加）
+                        // 挿入スライド（2）のみ緩和。他スライドはマッピング後デルタ0。枚数は+1のみ許可。
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
                         break;
                 }
             }
             else if (projectId == 2)
             {
-                // セクション操作や画面切り替えのため免除不要
+                // P2: taskId 1〜8 = P2-1〜P2-8。現行 CheckTask_1_2_01〜08（Legacy は旧2-x 番号のまま）
+                // 画面切り替え・アニメーション中心のため、プロジェクト全体で免除フラグは未設定
             }
             else if (projectId == 3)
             {
                 switch (taskId)
                 {
-                    case 1: // 3-1 SmartArt挿入
-                    case 3: // 3-3 SmartArt変換
-                        // オブジェクトの新規追加または置換が発生するため、ShapesCount, TextLength, ShapePosition免除が必要
+                    case 1: // P3-1 SmartArt挿入（スライド7）
+                    case 3: // P3-3 SmartArt変換（スライド6）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
                         break;
-                    case 4: // 3-4 スライドズーム挿入
-                        // スライドズームオブジェクトが追加されるため、ShapesCount, ShapePosition免除が必要
+                    case 4: // P3-4 3Dモデル挿入（スライド1）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 5: // P3-5 3Dモデルサイズ・ビュー変更（スライド10）
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 6: // P3-6 スライドズーム挿入（3件）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 7: // P3-7 セクションズーム挿入（スライド2）— セクション操作の副作用で文字数・他スライド図形が変わる
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
                         break;
                 }
             }
@@ -78,10 +90,12 @@ namespace Libraries
             {
                 switch (taskId)
                 {
-                    case 4: // 4-4 画像のトリミング
-                    case 5: // 4-5 画像の配置
-                    case 6: // 4-6 順序入れ替え
-                        // 画像のサイズや重なり順、座標が変化するため、ShapePosition免除が必要
+                    case 1: // P4-1 テキスト入力（教育者必見）
+                        flags |= PPValidationExemptFlags.TextLength;
+                        break;
+                    case 5: // P4-5 画像の配置
+                    case 6: // P4-6 画像のトリミング
+                    case 8: // P4-8 テキストボックス垂直中央配置
                         flags |= PPValidationExemptFlags.ShapePosition;
                         break;
                 }
@@ -90,82 +104,123 @@ namespace Libraries
             {
                 switch (taskId)
                 {
-                    case 3: // 5-3 図形変更
-                    case 4: // 5-4 図形のサイズ変更
-                    case 5: // 5-5 図形のグループ化
-                        // 図形の結合や変形、リサイズが発生するため、ShapesCount, ShapePosition免除が必要
+                    case 1: // P5-1 丸4個右端揃え（旧4-5）
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 2: // P5-2 四角幅揃え（旧5-4）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 3: // P5-3 星→スマイル（旧5-3）— 図形変更は図形数不変のため ShapesCount 免除なし
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 4: // P5-4 重なり順変更（旧4-6）
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 5: // P5-5 グループ化（旧5-5）— グループ化後は子図形テキストの集計方法が変わる
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 7: // P5-7 アイコン塗りつぶし（スライド2）— 塗りつぶしで境界ボックスが微変動し得る
+                        flags |= PPValidationExemptFlags.ShapePosition;
                         break;
                 }
             }
             else if (projectId == 6)
             {
+                // P6: taskId 1〜7 = P6-1〜P6-7。Phase A: 旧6-3/6-4（→ P3-4/5）を削除。免除は Phase B でタスク単位に追記。
                 switch (taskId)
                 {
-                    case 3: // 6-3 3Dモデル挿入
-                        // 3Dモデルが追加および配置されるため、ShapesCount, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
-                        break;
-                    case 4: // 6-4 3Dモデルのサイズ変更
-                        // オブジェクトの寸法が変化するため、ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapePosition;
+                    case 1: // P6-1 ドキュメント検査
+                    case 2: // P6-2 読み取り専用
+                    case 3: // P6-3 キオスク
+                    case 4: // P6-4 目的別スライドショー
+                    case 5: // P6-5 アウトライン印刷6部
+                    case 6: // P6-6 ノート印刷3部
+                    case 7: // P6-7 グレースケール配布資料4部
                         break;
                 }
             }
             else if (projectId == 7)
             {
+                // P7: taskId 1〜5 = P7-1〜P7-5。旧7-1/7-2/7-4 は新P7に含まれない。免除は旧タスクから移植。
                 switch (taskId)
                 {
-                    case 2: // 7-2 スライド再利用
-                    case 3: // 7-3 アウトラインからスライド
-                        // 大量のスライドやコンテンツが外部から流入するため、SlidesCount, ShapesCount, TextLength, ShapePosition免除が必要
+                    case 1: // P7-1 コメント挿入（旧6-1）— 免除なし
+                        break;
+                    case 2: // P7-2 ハイパーリンク（既存文字列へのリンク設定のみ。免除なし）
+                        break;
+                    case 3: // P7-3 アウトラインからスライド（旧7-3）
                         flags |= PPValidationExemptFlags.SlidesCount | PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 4: // P7-4 フッター（旧9-4）
+                    case 5: // P7-5 フッター（旧9-5）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
                         break;
                 }
             }
             else if (projectId == 8)
             {
+                // P8: taskId 1〜5 = P8-1〜P8-5。旧8-1〜5（動画/音声/読み取り専用）は新P8に含まれない。免除は旧タスクから移植。
                 switch (taskId)
                 {
-                    case 1: // 8-1 ビデオ挿入
-                    case 2: // 8-2 ビデオ挿入
-                        // ビデオオブジェクトが追加されるため、ShapesCount免除が必要
-                        flags |= PPValidationExemptFlags.ShapesCount;
+                    case 1: // P8-1 表スタイル（旧9-2）— 免除なし
+                        break;
+                    case 2: // P8-2 背景（旧6-2）— 免除なし
+                        break;
+                    case 3: // P8-3 スライドサイズ16:9（旧11-1）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 4: // P8-4 スライド寸法（旧9-7）
+                        flags |= PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 5: // P8-5 グレースケール表示（旧10-4）— Phase B で VSTO 要否を確認
                         break;
                 }
             }
             else if (projectId == 9)
             {
+                // P9: taskId 1〜5 = P9-1〜P9-5。旧9-4/5/6/7（フッター・ハイパーリンク・サイズ）は新P7/P8へ移行済み。
                 switch (taskId)
                 {
-                    case 1: // 9-1 表を元にグラフ作成
-                        // グラフオブジェクトが新規作成されるため、ShapesCount, ShapePosition免除が必要
+                    case 1: // P9-1 ビデオ挿入（旧8-1）
+                        flags |= PPValidationExemptFlags.ShapesCount;
+                        break;
+                    case 2: // P9-2 ビデオトリム（旧8-3）— 免除なし
+                        break;
+                    case 3: // P9-3 オーディオ（旧8-4）— 免除なし
+                        break;
+                    case 4: // P9-4 グラフ作成（旧9-1）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
                         break;
-                    case 4: // 9-4, 5 フッター
-                    case 5:
-                        // フッターやスライド番号を有効にすると、各スライドにプレースホルダー（図形）が実体化して追加されるため、
-                        // ShapesCountおよびShapePositionの免除が必要。またテキスト入力のためTextLengthも免除。
-                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
-                        break;
-                    case 6: // 9-6 ハイパーリンク
-                        // リンク設定によりテキスト内容と配置が変わるため、TextLength, ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.TextLength | PPValidationExemptFlags.ShapePosition;
-                        break;
-                    case 7: // 9-7 サイズ変更
-                        // レイアウト全体の再計算が発生するため、ShapePosition免除が必要
-                        flags |= PPValidationExemptFlags.ShapePosition;
+                    case 5: // P9-5 データテーブル（旧9-3）— 免除なし
                         break;
                 }
             }
             else if (projectId == 10)
             {
+                // P10: taskId 1〜8 = P10-1〜P10-8。旧10-1〜4等は新P6/P8等へ移行済み。
                 switch (taskId)
                 {
-                    case 5: // 10-5 テーマ変更
-                    case 7: // 10-7 プレースホルダー追加
-                        // レイアウト変更やオブジェクト追加が発生するため、ShapesCount, ShapePosition免除が必要
+                    case 1: // P10-1 テーマ（旧10-5）
                         flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 2: // P10-2 スライドマスターにスライド番号
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
+                        break;
+                    case 3: // P10-3 タイトルスライドレイアウトのスライド番号非表示
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
+                        break;
+                    case 4: // P10-4 背景デザイン非表示（旧10-6）
+                        break;
+                    case 5: // P10-5 フッターPH削除
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition | PPValidationExemptFlags.TextLength;
+                        break;
+                    case 6: // P10-6 レイアウト複製（旧10-7）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.ShapePosition;
+                        break;
+                    case 7: // P10-7 配布資料日付削除（旧11-4）
+                        break;
+                    case 8: // P10-8 配布資料フッター（旧11-4）
+                        flags |= PPValidationExemptFlags.ShapesCount | PPValidationExemptFlags.TextLength;
                         break;
                 }
             }
@@ -185,12 +240,256 @@ namespace Libraries
             }
 
             // 従属フラグの自動付与（スライド数や図形数が変化すると、付随するアニメーションも削除/ズレるため除外する）
-            if (flags.HasFlag(PPValidationExemptFlags.SlidesCount) || flags.HasFlag(PPValidationExemptFlags.ShapesCount))
+            // 1-1 / 1-3 / 1-8 は対象スライド以外のアニメーション削除を検知したいため除外しない。
+            if ((flags.HasFlag(PPValidationExemptFlags.SlidesCount) || flags.HasFlag(PPValidationExemptFlags.ShapesCount))
+                && !(projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8)))
             {
                 flags |= PPValidationExemptFlags.AnimationRemoved;
             }
 
             return flags;
+        }
+
+        /// <summary>プロジェクト1の論理スライド番号を、1-8 挿入後の物理番号に補正する。</summary>
+        public static int GetProject1AdjustedSlideNumber(int logicalSlideNumber)
+        {
+            if (logicalSlideNumber > 1 && PPLogReader.HasTask1_8SummaryZoomExecutedGlobally())
+                return logicalSlideNumber + 1;
+            return logicalSlideNumber;
+        }
+
+        /// <summary>1-8 サマリーズーム挿入位置（物理スライド番号）。</summary>
+        public const int Project1Task1_8InsertSlideIndex = 2;
+
+        /// <summary>1-1 スライド挿入位置（論理スライド番号）。</summary>
+        public const int Project1Task1_1InsertAtLogical = 4;
+
+        /// <summary>1-1 挿入時の 1-8 オフセット（スライド2以降に +1）。</summary>
+        public static int GetProject1Task1_1OffsetAfterSlide1()
+        {
+            return PPLogReader.HasTask1_8SummaryZoomExecutedGlobally() ? 1 : 0;
+        }
+
+        /// <summary>1-1 の操作対象スライド（新規挿入スライド、物理番号）。</summary>
+        public static int GetProject1Task1_1InsertSlideIndex()
+        {
+            return Project1Task1_1InsertAtLogical + GetProject1Task1_1OffsetAfterSlide1();
+        }
+
+        /// <summary>1-1 の操作対象スライド（新規挿入スライド）か。</summary>
+        public static bool IsProject1Task1_1TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == GetProject1Task1_1InsertSlideIndex();
+        }
+
+        /// <summary>1-1: スナップショットが挿入前（枚数+1）か。</summary>
+        public static bool IsProject1Task1_1InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        /// <summary>1-1: スナップショット取得時点ですでに挿入済み（一括採点など）。</summary>
+        public static bool IsProject1Task1_1SnapshotPostInsert(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        /// <summary>1-3 の操作対象スライド（論理5）か。</summary>
+        public static bool IsProject1Task1_3TargetSlide(int slideIndex)
+        {
+            return slideIndex == GetProject1AdjustedSlideNumber(5);
+        }
+
+        /// <summary>1-8 の操作対象スライド（新規挿入スライド2）か。</summary>
+        public static bool IsProject1Task1_8TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == Project1Task1_8InsertSlideIndex;
+        }
+
+        /// <summary>スライド挿入によりスナップショット番号と現在番号の対応付けが必要か。</summary>
+        public static bool UsesSlideIndexMapping(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 8);
+        }
+
+        /// <summary>1-8: スナップショットが挿入前（枚数+1）か挿入後（同数）か。</summary>
+        public static bool IsProject1Task1_8InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        /// <summary>1-8: スナップショット取得時点ですでに挿入済み（一括採点など）。</summary>
+        public static bool IsProject1Task1_8SnapshotPostInsert(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        /// <summary>スライド枚数がタスク操作として許容されるか。</summary>
+        public static bool IsSlidesCountValidForTask(int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
+        {
+            if (projectId == 1 && (taskId == 1 || taskId == 8))
+            {
+                if (taskId == 1)
+                {
+                    return IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount)
+                        || IsProject1Task1_1SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount);
+                }
+                return IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount)
+                    || IsProject1Task1_8SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount);
+            }
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        private static int MapProject1Task1_1SnapshotToCurrent(int snapshotSlideIndex)
+        {
+            int offset = GetProject1Task1_1OffsetAfterSlide1();
+            if (snapshotSlideIndex < Project1Task1_1InsertAtLogical)
+                return snapshotSlideIndex + (snapshotSlideIndex >= 2 ? offset : 0);
+            return snapshotSlideIndex + 1 + offset;
+        }
+
+        private static bool TryMapProject1Task1_1CurrentToSnapshot(
+            int currentSlideIndex,
+            out int snapshotSlideIndex,
+            out bool isInsertedSlide)
+        {
+            int offset = GetProject1Task1_1OffsetAfterSlide1();
+            int insertedSlideNum = GetProject1Task1_1InsertSlideIndex();
+
+            if (currentSlideIndex == insertedSlideNum)
+            {
+                snapshotSlideIndex = 0;
+                isInsertedSlide = true;
+                return true;
+            }
+
+            isInsertedSlide = false;
+            if (currentSlideIndex < insertedSlideNum)
+            {
+                if (currentSlideIndex == 1)
+                    snapshotSlideIndex = 1;
+                else if (offset == 1)
+                    snapshotSlideIndex = currentSlideIndex - 1;
+                else
+                    snapshotSlideIndex = currentSlideIndex;
+                return true;
+            }
+
+            snapshotSlideIndex = currentSlideIndex - 1 - offset;
+            return true;
+        }
+
+        /// <summary>現在スライド番号をスナップショット側番号に対応付ける（1-1: 論理4 / 1-8: スライド2に挿入）。</summary>
+        public static bool TryMapCurrentSlideToSnapshot(
+            int projectId,
+            int taskId,
+            int snapshotSlidesCount,
+            int currentSlidesCount,
+            int currentSlideIndex,
+            out int snapshotSlideIndex,
+            out bool isInsertedSlide)
+        {
+            snapshotSlideIndex = currentSlideIndex;
+            isInsertedSlide = false;
+            if (projectId == 1 && taskId == 1)
+            {
+                if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                    return TryMapProject1Task1_1CurrentToSnapshot(currentSlideIndex, out snapshotSlideIndex, out isInsertedSlide);
+
+                if (IsProject1Task1_1SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount))
+                {
+                    snapshotSlideIndex = currentSlideIndex;
+                    isInsertedSlide = IsProject1Task1_1TargetSlide(currentSlideIndex);
+                    return true;
+                }
+
+                return false;
+            }
+            if (projectId == 1 && taskId == 8)
+            {
+                if (IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                {
+                    if (currentSlideIndex == Project1Task1_8InsertSlideIndex)
+                    {
+                        isInsertedSlide = true;
+                        return true;
+                    }
+                    if (currentSlideIndex < Project1Task1_8InsertSlideIndex)
+                    {
+                        snapshotSlideIndex = currentSlideIndex;
+                        return true;
+                    }
+                    snapshotSlideIndex = currentSlideIndex - 1;
+                    return true;
+                }
+
+                if (IsProject1Task1_8SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount))
+                {
+                    snapshotSlideIndex = currentSlideIndex;
+                    isInsertedSlide = currentSlideIndex == Project1Task1_8InsertSlideIndex;
+                    return true;
+                }
+
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>スナップショット側番号を現在スライド番号に対応付ける（ShapePositions 逆引き用）。</summary>
+        public static int MapSnapshotSlideToCurrent(
+            int projectId,
+            int taskId,
+            int snapshotSlideIndex,
+            int snapshotSlidesCount,
+            int currentSlidesCount)
+        {
+            if (projectId == 1 && taskId == 1)
+            {
+                if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                    return MapProject1Task1_1SnapshotToCurrent(snapshotSlideIndex);
+                return snapshotSlideIndex;
+            }
+            if (projectId == 1 && taskId == 8)
+            {
+                if (IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                {
+                    if (snapshotSlideIndex >= Project1Task1_8InsertSlideIndex)
+                        return snapshotSlideIndex + 1;
+                    return snapshotSlideIndex;
+                }
+                return snapshotSlideIndex;
+            }
+            return snapshotSlideIndex;
+        }
+
+        /// <summary>ShapePosition 免除をスライド単位で適用するタスクか。</summary>
+        public static bool UsesPerSlideShapePositionExempt(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8);
+        }
+
+        /// <summary>指定スライドで ShapePosition チェックを免除するか。</summary>
+        public static bool IsShapePositionExemptForSlide(int projectId, int taskId, int slideIndex)
+        {
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex);
+            return false;
+        }
+
+        /// <summary>対象スライドはレイアウト/挿入でアニメーションが変わるため AnimationRemoved を緩和する。</summary>
+        public static bool IsAnimationRemovedCheckExemptForSlide(int projectId, int taskId, int slideIndex)
+        {
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex);
+            return false;
         }
 
         /// <summary>
@@ -202,13 +501,25 @@ namespace Libraries
         {
             // 厳格に図形数の増減を管理するタスク
             // 目的のスライド以外からの呼び出しに対しては「0（増減禁止）」を返すことで、他スライドへの変更をブロックします。
-            if (projectId == 3 && taskId == 1) return slideIndex == 5 ? 0 : 0; // 3-1 SmartArt挿入
-            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // 3-3 SmartArt変換
-            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 2 : 0; // 3-4 スライドズーム
-            if (projectId == 5 && taskId == 3) return 0;                       // 5-3 図形変更 (全スライド不変)
-            if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5 グループ化
-            if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3 3Dモデル挿入
-            if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1 グラフ作成 (プレースホルダー内挿入のため不変)
+            if (projectId == 3 && taskId == 1) return slideIndex == 7 ? 0 : 0; // P3-1 SmartArt挿入
+            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // P3-3 SmartArt変換
+            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 1 : 0; // P3-4 3Dモデル挿入
+            if (projectId == 3 && taskId == 6) return 0;                       // P3-6 スライドズーム（タイトル指定スライド）
+            if (projectId == 3 && taskId == 7)
+            {
+                if (slideIndex == 2) return 2; // セクションズーム2件
+                if (slideIndex == 1) return 1; // セクション操作の副作用（図形+1）
+                return 0;
+            }
+            if (projectId == 5 && taskId == 3) return 0;                       // P5-3 図形変更 (全スライド不変)
+            if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5 グループ化
+            if (projectId == 9 && taskId == 4) return slideIndex == 2 ? 0 : 0; // P9-4 グラフ作成 (プレースホルダー内挿入のため不変)
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
 
             // フッター関連やレイアウト変更、スライド追加等のタスクは複雑に変動するため無制限
             return int.MaxValue;
@@ -221,27 +532,37 @@ namespace Libraries
         /// スライド1に限り 0 または +1 を許容する（削除や大量追加は引き続き不許可）。
         /// 3-4（スライドズーム挿入）は結果表示時にスナップショットが挿入後状態で取られると actualDelta が 0 になるため、
         /// スライド1では 0 または +2 を許容する。
-        /// 5-5（グループ化）は結果表示時にスナップショットがグループ化後状態で取られると actualDelta が 0 になるため、
-        /// スライド3では 0 または -2 を許容する。
+        /// P5-5（グループ化）は結果表示時にスナップショットがグループ化後状態で取られると actualDelta が 0 になるため、
+        /// スライド6では 0 または -2 を許容する。
         /// </summary>
         public static bool IsAllowedShapesCountDelta(int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
         {
             if (allowedDelta == int.MaxValue) return true;
 
-            // 6-3: Slide 1 only: allow 0 or +1. Disallow deletions (<0) and bulk additions (>1).
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            // P3-4: Slide 1 only: allow 0 or +1 (3Dモデル挿入)。
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
             {
                 return actualDelta == 0 || actualDelta == 1;
             }
 
-            // 3-4: Slide 1 only: allow 0 or +2 (snapshot may be taken after zooms are already inserted during result grading).
-            if (projectId == 3 && taskId == 4 && slideIndex == 1)
+            // P3-6: allow 0 or +3 on any slide（ズーム追加スライドはタイトル指定のため番号固定不可）。
+            if (projectId == 3 && taskId == 6)
+            {
+                return actualDelta == 0 || actualDelta == 3;
+            }
+
+            // P3-7: Slide 2: allow 0 or +2。Slide 1: allow 0 or +1（セクション操作の副作用）。
+            if (projectId == 3 && taskId == 7 && slideIndex == 2)
             {
                 return actualDelta == 0 || actualDelta == 2;
             }
+            if (projectId == 3 && taskId == 7 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 1;
+            }
 
-            // 5-5: Slide 3 only: allow 0 or -2 (snapshot may be taken after group is already created during result grading).
-            if (projectId == 5 && taskId == 5 && slideIndex == 3)
+            // P5-5: Slide 6 only: allow 0 or -2 (snapshot may be taken after group is already created during result grading).
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
             {
                 return actualDelta == 0 || actualDelta == -2;
             }
@@ -255,10 +576,14 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
-            // 1-7: 吹き出しへのテキスト入力 (スライド1に「教育者必見」の5文字が追加される)
-            if (projectId == 1 && taskId == 7) return slideIndex == 1 ? 5 : 0;
-            // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
-            if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 4 && taskId == 1)
+                return slideIndex == 1 ? int.MaxValue : 0; // P4-1 スライド1へのテキスト入力
 
             // 変換、削除、インポートなど文字数が可変なものはチェックを省略
             return int.MaxValue;
@@ -268,55 +593,43 @@ namespace Libraries
         /// TextLength 免除時のスライド別デルタ判定。既定は allowedDelta と actualDelta の厳密一致。
         /// 9-6（ハイパーリンク）スライド1は、スナップショット時点で既に置換済みの場合 actualDelta が 0 となるため、
         /// 0 または -57（想定の URL→お問い合わせ）のみ許容する。
-        /// 1-7（吹き出し「教育者必見」）スライド1は、結果表示時にスナップショットが入力後状態で取られると actualDelta が 0 になるため、
-        /// 0 または +5 を許容する。
         /// </summary>
         public static bool IsAllowedTextLengthDelta(int projectId, int taskId, int slideIndex, int allowedDelta, long actualDelta)
         {
             if (allowedDelta == int.MaxValue) return true;
 
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == -57;
-            }
-
-            if (projectId == 1 && taskId == 7 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == 5;
-            }
-
             return actualDelta == allowedDelta;
         }
 
-        /// <summary>破壊的操作ログ用。6-3は「0 または +1」、3-4 スライド1は「0 または +2」、5-5 スライド3は「0 または -2」、それ以外は従来の期待値表記。</summary>
+        /// <summary>破壊的操作ログ用。P3-4 スライド1は「0 または +1」、P3-6 は「0 または +3」、P5-5 スライド6は「0 または -2」、それ以外は従来の期待値表記。</summary>
         public static string FormatDestructiveShapesCountMessage(int slideIndex, int projectId, int taskId, int allowedDelta, int actualDelta)
         {
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
             }
-            if (projectId == 3 && taskId == 4 && slideIndex == 1)
+            if (projectId == 3 && taskId == 6)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +3、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 7 && slideIndex == 2)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +2、実際の変化: {actualDelta}）";
             }
-            if (projectId == 5 && taskId == 5 && slideIndex == 3)
+            if (projectId == 3 && taskId == 7 && slideIndex == 1)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または -2、実際の変化: {actualDelta}）";
             }
             return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
         }
 
-        /// <summary>破壊的操作ログ用。9-6 スライド1は「0 または -57」、1-7 スライド1は「0 または +5」、それ以外は従来表記。</summary>
+        /// <summary>破壊的操作ログ用。</summary>
         public static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
         {
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または -57、実際の変化: {actualDelta}）";
-            }
-            if (projectId == 1 && taskId == 7 && slideIndex == 1)
-            {
-                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または +5、実際の変化: {actualDelta}）";
-            }
             return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
         }
 
@@ -325,12 +638,10 @@ namespace Libraries
         /// </summary>
         public static bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
-            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4)) return true; // 3-1, 3-3 SmartArt関連, 3-4 スライドズーム
-            if (projectId == 4 && taskId == 6) return true; // 4-6 順序入れ替え (座標は不変)
-            if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3 図形変更, 5-5 グループ化
-            if (projectId == 6 && taskId == 3) return true; // 6-3 3Dモデル挿入
-            if (projectId == 9 && taskId == 1) return true; // 9-1 グラフ作成
-            if (projectId == 10 && taskId == 7) return true; // 10-7 プレースホルダー追加
+            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
+            if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3 図形変更, P5-4 z-order, P5-5 グループ化
+            if (projectId == 9 && taskId == 4) return true; // P9-4 グラフ作成
+            if (projectId == 10 && taskId == 6) return true; // P10-6 レイアウト複製
             return false;
         }
 
@@ -340,11 +651,13 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
         {
-            if (projectId == 4 && taskId == 4) return 1; // 4-4 画像のトリミング
-            if (projectId == 4 && taskId == 5) return 1; // 4-5 画像の配置
-            if (projectId == 5 && taskId == 4) return 1; // 5-4 図形のサイズ変更
-            if (projectId == 6 && taskId == 4) return 1; // 6-4 3Dモデルのサイズ変更
-            if (projectId == 9 && taskId == 6) return 1; // 9-6 ハイパーリンク (書き換えによるサイズ変化を許容)
+            if (projectId == 4 && taskId == 5) return 1; // P4-5 画像の配置
+            if (projectId == 4 && taskId == 6) return 1; // P4-6 画像のトリミング
+            if (projectId == 4 && taskId == 8) return 1; // P4-8 垂直中央配置
+            if (projectId == 5 && taskId == 1) return 4; // P5-1 丸4個右端揃え（旧4-5）
+            if (projectId == 5 && taskId == 2) return 1; // P5-2 四角幅揃え（旧5-4）
+            if (projectId == 3 && taskId == 5) return 1; // P3-5 3Dモデルのサイズ変更
+            // P3-7: セクションズームの副作用で複数スライドの既存図形がずれるため上限なし（-1）。図形数は GetAllowedShapesCountDelta で厳格化。
             if (projectId == 11 && taskId == 6) return 1; // 11-6 整列
             return -1;
         }

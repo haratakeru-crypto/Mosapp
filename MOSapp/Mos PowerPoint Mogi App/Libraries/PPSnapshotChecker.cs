@@ -17,6 +17,11 @@ namespace Libraries
 
         public static List<string> CompareAndGetErrors(int projectId, int taskId, PPValidationExemptFlags exemptFlags)
         {
+            return CompareAndGetErrors(projectId, taskId, 1, exemptFlags);
+        }
+
+        public static List<string> CompareAndGetErrors(int projectId, int taskId, int attemptNo, PPValidationExemptFlags exemptFlags)
+        {
             List<string> errors = new List<string>();
             var swTotal = Stopwatch.StartNew();
 
@@ -44,6 +49,12 @@ namespace Libraries
                 PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors", swTotal.ElapsedMilliseconds, $"skipped id mismatch snap={snapshot.ProjectId}-{snapshot.TaskId}");
                 return errors;
             }
+            if (attemptNo >= 1 && snapshot.AttemptNo >= 1 && snapshot.AttemptNo != attemptNo)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Validation] Attempt Mismatch (Skipping): Snapshot={snapshot.ProjectId}-{snapshot.TaskId}-{snapshot.AttemptNo}, Grading={projectId}-{taskId}-{attemptNo}");
+                PPGradingPerf.Log("PPSnapshotChecker.CompareAndGetErrors", swTotal.ElapsedMilliseconds, $"skipped attempt mismatch snapA={snapshot.AttemptNo}");
+                return errors;
+            }
             System.Diagnostics.Debug.WriteLine($"[Validation] Starting Check for Project{projectId} Task{taskId}");
 
             // 現在の状態の取得（CloseAllPowerPointPresentations / OpenProjectDocument と採点スレッドの競合を防ぐ）
@@ -63,9 +74,41 @@ namespace Libraries
                     pres = pptApp.ActivePresentation;
                     if (pres == null) return errors;
                     try { perfSlideCount = pres.Slides.Count; } catch { }
+                    int currentSlideCount = pres.Slides.Count;
 
                     // 1. スライド数の比較
-                    if (!exemptFlags.HasFlag(PPValidationExemptFlags.SlidesCount))
+                    if (PPTaskValidationConfig.UsesSlideIndexMapping(projectId, taskId))
+                    {
+                        if (!PPTaskValidationConfig.IsSlidesCountValidForTask(projectId, taskId, snapshot.SlidesCount, currentSlideCount))
+                        {
+                            errors.Add($"SlidesCount changed: expected {snapshot.SlidesCount} or {snapshot.SlidesCount + 1}, but is {currentSlideCount}");
+                        }
+                        else
+                        {
+                            for (int i = 1; i <= currentSlideCount; i++)
+                            {
+                                if (!PPTaskValidationConfig.TryMapCurrentSlideToSnapshot(
+                                    projectId, taskId, snapshot.SlidesCount, currentSlideCount, i,
+                                    out int snapshotSlideIndex, out bool isInsertedSlide))
+                                    continue;
+                                if (isInsertedSlide) continue;
+
+                                PowerPoint.Slide slide = null;
+                                try
+                                {
+                                    slide = pres.Slides[i];
+                                    if (snapshotSlideIndex <= snapshot.SlideNames.Count
+                                        && slide.Name != snapshot.SlideNames[snapshotSlideIndex - 1])
+                                    {
+                                        errors.Add($"Slide name mismatch at position {i}: expected {snapshot.SlideNames[snapshotSlideIndex - 1]}, but is {slide.Name}");
+                                    }
+                                }
+                                catch { }
+                                finally { if (slide != null) Marshal.ReleaseComObject(slide); }
+                            }
+                        }
+                    }
+                    else if (!exemptFlags.HasFlag(PPValidationExemptFlags.SlidesCount))
                     {
                         if (pres.Slides.Count != snapshot.SlidesCount)
                         {
@@ -93,7 +136,7 @@ namespace Libraries
 
                     // 2. 図形数・テキスト・アニメーションの比較（スライドごと）
                     long currentTotalTextLength = 0;
-                    for (int i = 1; i <= pres.Slides.Count; i++)
+                    for (int i = 1; i <= currentSlideCount; i++)
                     {
                         PowerPoint.Slide slide = null;
                         PowerPoint.Shapes shapes = null;
@@ -101,14 +144,19 @@ namespace Libraries
                         try
                         {
                             slide = pres.Slides[i];
-                            
+
+                            if (!PPTaskValidationConfig.TryMapCurrentSlideToSnapshot(
+                                projectId, taskId, snapshot.SlidesCount, currentSlideCount, i,
+                                out int snapshotSlideIndex, out bool isInsertedSlide))
+                                continue;
+
                             // 図形数
                             int allowedDelta = PPTaskValidationConfig.GetAllowedShapesCountDelta(projectId, taskId, i);
                             bool hasShapesExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.ShapesCount);
 
-                            if (!hasShapesExemptFlag || allowedDelta != int.MaxValue)
+                            if (!isInsertedSlide && (!hasShapesExemptFlag || allowedDelta != int.MaxValue))
                             {
-                                if (snapshot.ShapesCounts.TryGetValue(i, out int expectedShapesCount))
+                                if (snapshot.ShapesCounts.TryGetValue(snapshotSlideIndex, out int expectedShapesCount))
                                 {
                                     int actualCount = slide.Shapes.Count;
                                     int actualDelta = actualCount - expectedShapesCount;
@@ -136,9 +184,16 @@ namespace Libraries
 
                             // 図形座標・サイズの比較設定（図形走査はテキスト算出と同一ループで実施）
                             bool exemptFullShapePosition = exemptFlags.HasFlag(PPValidationExemptFlags.ShapePosition);
+                            bool perSlideShapePositionExempt = PPTaskValidationConfig.UsesPerSlideShapePositionExempt(projectId, taskId);
+                            bool slideShapePositionExempt = exemptFullShapePosition
+                                && (!perSlideShapePositionExempt
+                                    || PPTaskValidationConfig.IsShapePositionExemptForSlide(projectId, taskId, i));
                             bool onlyNewShapesExempt = PPTaskValidationConfig.IsShapePositionExemptForNewShapesOnly(projectId, taskId);
                             int allowedExistingChangesCount = PPTaskValidationConfig.GetAllowedExistingShapePositionChangeCount(projectId, taskId);
-                            bool needsShapePositionCheck = !exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0;
+                            bool needsShapePositionCheck = !exemptFullShapePosition
+                                || onlyNewShapesExempt
+                                || allowedExistingChangesCount >= 0
+                                || perSlideShapePositionExempt;
                             int changedExistingShapesCount = 0;
 
                             for (int j = 1; j <= shapesCount; j++)
@@ -162,9 +217,9 @@ namespace Libraries
                                     catch { }
 
                                     // 図形座標・サイズの比較
-                                    if (needsShapePositionCheck)
+                                    if (needsShapePositionCheck && !isInsertedSlide)
                                     {
-                                        string key = i + "_" + shape.Id;
+                                        string key = snapshotSlideIndex + "_" + shape.Id;
                                         if (snapshot.ShapePositions.TryGetValue(key, out var old))
                                         {
                                             float left = (float)shape.Left;
@@ -175,7 +230,7 @@ namespace Libraries
                                             if (Math.Abs(old.Item1 - left) > 0.5f || Math.Abs(old.Item2 - top) > 0.5f ||
                                                 Math.Abs(old.Item3 - w) > 0.5f || Math.Abs(old.Item4 - h) > 0.5f)
                                             {
-                                                if (exemptFullShapePosition)
+                                                if (slideShapePositionExempt)
                                                 {
                                                     if (onlyNewShapesExempt)
                                                     {
@@ -211,9 +266,9 @@ namespace Libraries
                             int allowedTextDelta = PPTaskValidationConfig.GetAllowedTextLengthDelta(projectId, taskId, i);
                             bool hasTextExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.TextLength);
 
-                            if (!hasTextExemptFlag || allowedTextDelta != int.MaxValue)
+                            if (!isInsertedSlide && (!hasTextExemptFlag || allowedTextDelta != int.MaxValue))
                             {
-                                if (snapshot.SlideTextLengths.TryGetValue(i, out long expectedSlideTextLength))
+                                if (snapshot.SlideTextLengths.TryGetValue(snapshotSlideIndex, out long expectedSlideTextLength))
                                 {
                                     long actualTextDelta = slideTextLength - expectedSlideTextLength;
                                     bool textOk = !hasTextExemptFlag
@@ -236,9 +291,11 @@ namespace Libraries
                             }
 
                             // アニメーション数（減少のみ不合格）
-                            if (!exemptFlags.HasFlag(PPValidationExemptFlags.AnimationRemoved))
+                            bool skipAnimationRemovedCheck = exemptFlags.HasFlag(PPValidationExemptFlags.AnimationRemoved)
+                                || PPTaskValidationConfig.IsAnimationRemovedCheckExemptForSlide(projectId, taskId, i);
+                            if (!skipAnimationRemovedCheck && !isInsertedSlide)
                             {
-                                if (snapshot.AnimationCounts.TryGetValue(i, out int expectedAnimCount))
+                                if (snapshot.AnimationCounts.TryGetValue(snapshotSlideIndex, out int expectedAnimCount))
                                 {
                                     int currentAnimCount = slide.TimeLine.MainSequence.Count;
                                     if (currentAnimCount < expectedAnimCount)
@@ -283,6 +340,7 @@ namespace Libraries
         {
             public int ProjectId;
             public int TaskId;
+            public int AttemptNo = 1;
             public int SlidesCount;
             public List<string> SlideNames = new List<string>();
             public Dictionary<int, int> ShapesCounts = new Dictionary<int, int>();
@@ -316,6 +374,10 @@ namespace Libraries
                                 int.TryParse(ids[0], out data.ProjectId);
                                 int.TryParse(ids[1], out data.TaskId);
                             }
+                            break;
+                        case "AttemptNo":
+                            int.TryParse(value, out data.AttemptNo);
+                            if (data.AttemptNo < 1) data.AttemptNo = 1;
                             break;
                         case "SlidesCount":
                             int.TryParse(value, out data.SlidesCount);

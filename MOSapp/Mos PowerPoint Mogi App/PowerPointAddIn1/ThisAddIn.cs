@@ -6,6 +6,8 @@ using System.Text;
 using System.Xml.Linq;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using Libraries;
+using Libraries.Group1;
 using PowerPoint = Microsoft.Office.Interop.PowerPoint;
 using Office = Microsoft.Office.Core;
 
@@ -14,11 +16,61 @@ namespace PowerPointAddIn1
     public partial class ThisAddIn
     {
         private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
+        private const int CurrentTaskFieldCount = 5;
+
+        /// <summary>
+        /// current_task を読み取る（PPLogReader と同一条件: 5項目固定・途中書き込みは無視）。
+        /// </summary>
+        private static bool TryReadCurrentTaskFromFile(string path, out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen)
+        {
+            projectId = taskId = exemptFlags = attemptNo = snapshotGen = 0;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return false;
+
+            string line;
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    line = sr.ReadToEnd().Trim();
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(line))
+                return false;
+
+            string[] parts = line.Split(',');
+            if (parts.Length != CurrentTaskFieldCount)
+                return false;
+
+            if (!int.TryParse(parts[0].Trim(), out projectId)) return false;
+            if (!int.TryParse(parts[1].Trim(), out taskId)) return false;
+            if (!int.TryParse(parts[2].Trim(), out exemptFlags)) return false;
+            if (!int.TryParse(parts[3].Trim(), out attemptNo)) return false;
+            if (!int.TryParse(parts[4].Trim(), out snapshotGen)) return false;
+            if (attemptNo < 1) attemptNo = 1;
+            if (snapshotGen < 0) snapshotGen = 0;
+            return true;
+        }
 
         private Timer _grayscalePollTimer;
         private bool _lastBlackAndWhite;
-        private Timer _audio8_4PollTimer;
-        private bool _task8_4Logged;
+        private Timer _slideSize8_3PollTimer;
+        private bool _task8_3SlideSizeLogged;
+        private const float SlideSize8_3CmToPt = 72f / 2.54f;
+        private const float SlideSize8_3ExpectedWidthCm = 25.4f;
+        private const float SlideSize8_3ExpectedHeightCm = 14.288f;
+        private const float SlideSize8_3DimensionTolerancePt = 1.5f;
+        private const float SlideSize8_3AspectRatioTarget = 16f / 9f;
+        private const float SlideSize8_3AspectRatioTolerance = 0.02f;
+        private Timer _audio9_3PollTimer;
+        private bool _task9_3PlayAcrossLogged;
+        private bool _task9_3FadeOutLogged;
+        private Timer _glow4_3PollTimer;
+        private bool _task4_3GlowLogged;
         private Timer _layout10_7PollTimer;
         private bool _task10_7Logged;
         private Timer _printOptionsPollTimer;
@@ -26,8 +78,12 @@ namespace PowerPointAddIn1
         private int _lastPrintOutputType = -1;
         private int _lastPrintCopies = -1;
         private int _lastPrintCollate = -1;
+        private int _lastPrintColorType = -1;
         private bool _printOptionsInitialized;
         private bool _task5_1PrintLogged;
+        private bool _task6_5PrintLogged;
+        private bool _task6_6PrintLogged;
+        private bool _task6_7PrintLogged;
         private bool _task11_7PrintLogged;
 
         private Timer _kiosk7_4PollTimer;
@@ -36,13 +92,26 @@ namespace PowerPointAddIn1
         private bool _task1_2Logged;
         private bool _task1_3Logged;
         private bool _task1_4Logged;
+        private bool _task1_8Logged;
         private List<int> _task1_4PrevSlideIds = new List<int>();
         private string _task1_4PrevPresentationKey;
+
+        private Timer _task2_1PollTimer;
+        private bool _task2_1Logged;
+        private const int P2_1EffectSplitHorizontalOut = 3585;
+
+        private Timer _task2_2PollTimer;
+        private bool _task2_2Logged;
+
+        private Timer _task2_3PollTimer;
+        private bool _task2_3Logged;
+        private const int P2_3EffectSwitchRight = 3903;
 
         private Timer _taskFilePollTimer;
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
         private int _currentTaskAttemptNo = 1;
+        private int _currentSnapshotGen = 0;
 
         private const float PositionTolerancePt = 0.5f;
 
@@ -63,18 +132,34 @@ namespace PowerPointAddIn1
             _grayscalePollTimer.Tick += GrayscalePollTimer_Tick;
             _grayscalePollTimer.Start();
 
+            _task8_3SlideSizeLogged = false;
+            _slideSize8_3PollTimer = new Timer();
+            _slideSize8_3PollTimer.Interval = 500;
+            _slideSize8_3PollTimer.Tick += SlideSize8_3PollTimer_Tick;
+            _slideSize8_3PollTimer.Start();
+
             _task5_1PrintLogged = false;
+            _task6_5PrintLogged = false;
+            _task6_6PrintLogged = false;
+            _task6_7PrintLogged = false;
             _task11_7PrintLogged = false;
             _printOptionsPollTimer = new Timer();
             _printOptionsPollTimer.Interval = 1000;
             _printOptionsPollTimer.Tick += PrintOptionsPollTimer_Tick;
             _printOptionsPollTimer.Start();
 
-            _task8_4Logged = false;
-            _audio8_4PollTimer = new Timer();
-            _audio8_4PollTimer.Interval = 1000;
-            _audio8_4PollTimer.Tick += Audio8_4PollTimer_Tick;
-            _audio8_4PollTimer.Start();
+            _task9_3PlayAcrossLogged = false;
+            _task9_3FadeOutLogged = false;
+            _audio9_3PollTimer = new Timer();
+            _audio9_3PollTimer.Interval = 1000;
+            _audio9_3PollTimer.Tick += Audio9_3PollTimer_Tick;
+            _audio9_3PollTimer.Start();
+
+            _task4_3GlowLogged = false;
+            _glow4_3PollTimer = new Timer();
+            _glow4_3PollTimer.Interval = 1000;
+            _glow4_3PollTimer.Tick += Glow4_3PollTimer_Tick;
+            _glow4_3PollTimer.Start();
 
             _task10_7Logged = false;
             _layout10_7PollTimer = new Timer();
@@ -88,6 +173,7 @@ namespace PowerPointAddIn1
             _kiosk7_4PollTimer.Tick += Kiosk7_4PollTimer_Tick;
             _kiosk7_4PollTimer.Start();
 
+            _task1_8Logged = false;
             _task1_2Logged = false;
             _task1_3Logged = false;
             _task1_4Logged = false;
@@ -97,6 +183,24 @@ namespace PowerPointAddIn1
             _task1_2To1_4PollTimer.Interval = 700;
             _task1_2To1_4PollTimer.Tick += Task1_2To1_4PollTimer_Tick;
             _task1_2To1_4PollTimer.Start();
+
+            _task2_1Logged = false;
+            _task2_1PollTimer = new Timer();
+            _task2_1PollTimer.Interval = 700;
+            _task2_1PollTimer.Tick += Task2_1PollTimer_Tick;
+            _task2_1PollTimer.Start();
+
+            _task2_2Logged = false;
+            _task2_2PollTimer = new Timer();
+            _task2_2PollTimer.Interval = 700;
+            _task2_2PollTimer.Tick += Task2_2PollTimer_Tick;
+            _task2_2PollTimer.Start();
+
+            _task2_3Logged = false;
+            _task2_3PollTimer = new Timer();
+            _task2_3PollTimer.Interval = 700;
+            _task2_3PollTimer.Tick += Task2_3PollTimer_Tick;
+            _task2_3PollTimer.Start();
 
             _taskFilePollTimer = new Timer();
             _taskFilePollTimer.Interval = 500;
@@ -110,63 +214,102 @@ namespace PowerPointAddIn1
             {
                 if (!File.Exists(CurrentTaskFilePath))
                 {
-                    // 最終タスク（11-7）でレビュー遷移時に current_task が消えるケースでも、
+                    // 最終タスク（11-7 / P6-7）でレビュー遷移時に current_task が消えるケースでも、
                     // 離脱直前の印刷設定を1回だけ再評価して証跡を確定する。
                     if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
                     {
                         TryLogTask11_7PrintOnTaskBoundary();
                     }
+                    if (_currentTaskProjectId == 6 && _currentTaskTaskId == 7)
+                    {
+                        TryLogTask6_7PrintOnTaskBoundary();
+                    }
                     _currentTaskProjectId = -1;
                     _currentTaskTaskId = -1;
                     _currentTaskAttemptNo = 1;
+                    _currentSnapshotGen = 0;
                     return;
                 }
-                string line = null;
-                try
-                {
-                    line = File.ReadAllText(CurrentTaskFilePath).Trim();
-                    if (string.IsNullOrEmpty(line)) return;
-                }
-                catch { return; }
-                var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 2) return;
-                if (!int.TryParse(parts[0].Trim(), out int projectId) || !int.TryParse(parts[1].Trim(), out int taskId))
+                if (!TryReadCurrentTaskFromFile(CurrentTaskFilePath, out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen))
                     return;
 
                 bool forceSnapshot = !File.Exists(SnapshotFilePath);
 
-                if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId && !forceSnapshot)
+                bool taskIdentityChanged = projectId != _currentTaskProjectId
+                    || taskId != _currentTaskTaskId
+                    || attemptNo != _currentTaskAttemptNo;
+
+                if (!taskIdentityChanged
+                    && snapshotGen == _currentSnapshotGen
+                    && !forceSnapshot)
                     return;
 
                 // --- タスク切り替え時の処理 ---
-                // 5-1 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
-                if (_currentTaskProjectId == 5 && _currentTaskTaskId == 1)
-                {
-                    TryLogTask5_1PrintOnTaskBoundary();
-                }
-                // 11-7 も同様に、タスク離脱直前の即時再評価で証跡を確定する。
-                if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
+                // 11-7 / P6-5 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 11 && _currentTaskTaskId == 7)
                 {
                     TryLogTask11_7PrintOnTaskBoundary();
                 }
+                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 5)
+                {
+                    TryLogTask6_5PrintOnTaskBoundary();
+                }
+                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 6)
+                {
+                    TryLogTask6_6PrintOnTaskBoundary();
+                }
+                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 7)
+                {
+                    TryLogTask6_7PrintOnTaskBoundary();
+                }
+                // 4-3 は光彩が 4-4 で外れるため、離脱直前に COM/OpenXML で証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 4 && _currentTaskTaskId == 3)
+                {
+                    TryLogTask4_3GlowOnTaskBoundary();
+                }
+                // P8-3 は P8-4 で寸法が上書きされるため、離脱直前に 16:9 を証跡確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 8 && _currentTaskTaskId == 3)
+                {
+                    TryLogTask8_3SlideSize16x9OnTaskBoundary();
+                }
+                // P2-1 は P2-4 で画面切り替えが上書きされるため、離脱直前に証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 1)
+                {
+                    TryLogTask2_1SplitHorizontalOutOnTaskBoundary();
+                }
+                // P2-2 も P2-4 で継続時間が上書きされるため、離脱直前に証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 2)
+                {
+                    TryLogTask2_2TransitionDuration3SecOnTaskBoundary();
+                }
+                // P2-3 も P2-4 で画面切り替えが上書きされるため、離脱直前に証跡を確定する。
+                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 3)
+                {
+                    TryLogTask2_3SwitchRightOnTaskBoundary();
+                }
 
                 // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
+                // ※ project-task-attempt が変わったときのみ（SnapshotGen だけの再取得では比較しない）
+                // ※ SnapshotGen が 0→0 の通常 UI 遷移のみ（採点中/採点直後の gen>0 混線では比較しない）
                 // ※ プロジェクトIDが変わる場合は、比較対象のプレゼンテーションが異なるためスキップする
-                if (_currentTaskProjectId != -1 && !forceSnapshot && projectId == _currentTaskProjectId)
+                if (taskIdentityChanged
+                    && _currentTaskProjectId != -1
+                    && !forceSnapshot
+                    && projectId == _currentTaskProjectId
+                    && _currentSnapshotGen == 0
+                    && snapshotGen == 0)
                 {
-                    CheckAndLogDestructiveOperations(_currentTaskProjectId, _currentTaskTaskId, _currentTaskExemptFlags);
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[DestructiveBoundary] prev={_currentTaskProjectId},{_currentTaskTaskId},{_currentTaskAttemptNo},gen={_currentSnapshotGen} " +
+                        $"new={projectId},{taskId},{attemptNo},gen={snapshotGen}");
+                    CheckAndLogDestructiveOperations(_currentTaskProjectId, _currentTaskTaskId, _currentTaskAttemptNo, _currentTaskExemptFlags);
                 }
 
                 _currentTaskProjectId = projectId;
                 _currentTaskTaskId = taskId;
-                _currentTaskExemptFlags = parts.Length >= 3 ? int.Parse(parts[2].Trim()) : 0;
-                int attemptNo = 1;
-                if (parts.Length >= 4)
-                {
-                    int.TryParse(parts[3].Trim(), out attemptNo);
-                    if (attemptNo < 1) attemptNo = 1;
-                }
+                _currentTaskExemptFlags = exemptFlags;
                 _currentTaskAttemptNo = attemptNo;
+                _currentSnapshotGen = snapshotGen;
                 if (!(projectId == 1 && taskId == 2)) _task1_2Logged = false;
                 if (!(projectId == 1 && taskId == 3)) _task1_3Logged = false;
                 if (!(projectId == 1 && taskId == 4))
@@ -174,6 +317,21 @@ namespace PowerPointAddIn1
                     _task1_4Logged = false;
                     _task1_4PrevSlideIds.Clear();
                     _task1_4PrevPresentationKey = null;
+                }
+                if (!(projectId == 1 && taskId == 8)) _task1_8Logged = false;
+                if (!(projectId == 4 && taskId == 3)) _task4_3GlowLogged = false;
+                if (!(projectId == 7 && taskId == 4) && !(projectId == 6 && taskId == 3)) _task7_4KioskLogged = false;
+                if (!(projectId == 6 && taskId == 5)) _task6_5PrintLogged = false;
+                if (!(projectId == 6 && taskId == 6)) _task6_6PrintLogged = false;
+                if (!(projectId == 6 && taskId == 7)) _task6_7PrintLogged = false;
+                if (!(projectId == 8 && taskId == 3)) _task8_3SlideSizeLogged = false;
+                if (!(projectId == 2 && taskId == 1)) _task2_1Logged = false;
+                if (!(projectId == 2 && taskId == 2)) _task2_2Logged = false;
+                if (!(projectId == 2 && taskId == 3)) _task2_3Logged = false;
+                if (!(projectId == 9 && taskId == 3))
+                {
+                    _task9_3PlayAcrossLogged = false;
+                    _task9_3FadeOutLogged = false;
                 }
 
                 CurrentTaskProjectId = projectId;
@@ -214,7 +372,7 @@ namespace PowerPointAddIn1
                 try { pres = Application.ActivePresentation; } catch { }
                 if (pres == null) return null;
 
-                var data = new SnapshotData { ProjectId = pid, TaskId = tid };
+                var data = new SnapshotData { ProjectId = pid, TaskId = tid, AttemptNo = _currentTaskAttemptNo, SnapshotGen = _currentSnapshotGen };
                 var slides = pres.Slides;
                 if (slides != null)
                 {
@@ -273,7 +431,12 @@ namespace PowerPointAddIn1
             var errors = new List<string>();
             var flags = (PPValidationExemptFlags)exemptFlagsInt;
 
-            if (!flags.HasFlag(PPValidationExemptFlags.SlidesCount))
+            if (UsesSlideIndexMapping(start.ProjectId, start.TaskId))
+            {
+                if (!IsSlidesCountValidForTask(start.ProjectId, start.TaskId, start.SlidesCount, current.SlidesCount))
+                    errors.Add("SlidesCount changed");
+            }
+            else if (!flags.HasFlag(PPValidationExemptFlags.SlidesCount))
             {
                 if (current.SlidesCount != start.SlidesCount) errors.Add("SlidesCount changed");
             }
@@ -282,24 +445,26 @@ namespace PowerPointAddIn1
             {
                 foreach (var kvp in start.ShapesCounts)
                 {
-                    if (current.ShapesCounts.ContainsKey(kvp.Key) && current.ShapesCounts[kvp.Key] != kvp.Value)
-                        errors.Add($"ShapesCount on Slide {kvp.Key} changed");
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, kvp.Key, start.SlidesCount, current.SlidesCount);
+                    if (current.ShapesCounts.ContainsKey(currentSlide) && current.ShapesCounts[currentSlide] != kvp.Value)
+                        errors.Add($"ShapesCount on Slide {currentSlide} changed");
                 }
             }
             else
             {
-                // 免除されているが、厳密なデルタチェックを適用
                 foreach (var kvp in start.ShapesCounts)
                 {
-                    int allowedDelta = GetAllowedShapesCountDelta(start.ProjectId, start.TaskId, kvp.Key);
+                    int snapshotSlide = kvp.Key;
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, snapshotSlide, start.SlidesCount, current.SlidesCount);
+                    int allowedDelta = GetAllowedShapesCountDelta(start.ProjectId, start.TaskId, currentSlide);
                     if (allowedDelta != int.MaxValue)
                     {
-                        if (current.ShapesCounts.ContainsKey(kvp.Key))
+                        if (current.ShapesCounts.ContainsKey(currentSlide))
                         {
-                            int actualDelta = current.ShapesCounts[kvp.Key] - kvp.Value;
-                            if (!IsAllowedShapesCountDelta(start.ProjectId, start.TaskId, kvp.Key, allowedDelta, actualDelta))
+                            int actualDelta = current.ShapesCounts[currentSlide] - kvp.Value;
+                            if (!IsAllowedShapesCountDelta(start.ProjectId, start.TaskId, currentSlide, allowedDelta, actualDelta))
                             {
-                                errors.Add(FormatDestructiveShapesCountMessage(kvp.Key, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
+                                errors.Add(FormatDestructiveShapesCountMessage(currentSlide, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
                             }
                         }
                     }
@@ -314,15 +479,17 @@ namespace PowerPointAddIn1
             {
                 foreach (var kvp in start.SlideTextLengths)
                 {
-                    int allowedDelta = GetAllowedTextLengthDelta(start.ProjectId, start.TaskId, kvp.Key);
+                    int snapshotSlide = kvp.Key;
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, snapshotSlide, start.SlidesCount, current.SlidesCount);
+                    int allowedDelta = GetAllowedTextLengthDelta(start.ProjectId, start.TaskId, currentSlide);
                     if (allowedDelta != int.MaxValue)
                     {
-                        if (current.SlideTextLengths.ContainsKey(kvp.Key))
+                        if (current.SlideTextLengths.ContainsKey(currentSlide))
                         {
-                            long actualDelta = current.SlideTextLengths[kvp.Key] - kvp.Value;
-                            if (!IsAllowedTextLengthDelta(start.ProjectId, start.TaskId, kvp.Key, allowedDelta, actualDelta))
+                            long actualDelta = current.SlideTextLengths[currentSlide] - kvp.Value;
+                            if (!IsAllowedTextLengthDelta(start.ProjectId, start.TaskId, currentSlide, allowedDelta, actualDelta))
                             {
-                                errors.Add(FormatDestructiveTextLengthMessage(kvp.Key, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
+                                errors.Add(FormatDestructiveTextLengthMessage(currentSlide, start.ProjectId, start.TaskId, allowedDelta, actualDelta));
                             }
                         }
                     }
@@ -331,42 +498,57 @@ namespace PowerPointAddIn1
 
             // 図形座標・サイズの比較
             bool exemptFullShapePosition = flags.HasFlag(PPValidationExemptFlags.ShapePosition);
+            bool perSlideShapePositionExempt = UsesPerSlideShapePositionExempt(start.ProjectId, start.TaskId);
             bool onlyNewShapesExempt = IsShapePositionExemptForNewShapesOnly(start.ProjectId, start.TaskId);
             int allowedExistingChangesCount = GetAllowedExistingShapePositionChangeCount(start.ProjectId, start.TaskId);
 
-            if (!exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0)
+            if (!exemptFullShapePosition || onlyNewShapesExempt || allowedExistingChangesCount >= 0 || perSlideShapePositionExempt)
             {
                 int changedExistingShapesCount = 0;
                 foreach (var kvp in start.ShapePositions)
                 {
-                    if (current.ShapePositions.ContainsKey(kvp.Key))
+                    int snapshotSlide = 0;
+                    var slideParts = kvp.Key.Split('_');
+                    if (slideParts.Length > 0)
+                        int.TryParse(slideParts[0], out snapshotSlide);
+
+                    int currentSlide = MapSnapshotSlideToCurrent(start.ProjectId, start.TaskId, snapshotSlide, start.SlidesCount, current.SlidesCount);
+                    string currentKey = slideParts.Length > 1
+                        ? currentSlide + "_" + slideParts[1]
+                        : kvp.Key;
+
+                    if (!current.ShapePositions.ContainsKey(currentKey))
+                        continue;
+
+                    var cPos = current.ShapePositions[currentKey];
+                    var sPos = kvp.Value;
+                    if (Math.Abs(cPos.Item1 - sPos.Item1) > PositionTolerancePt ||
+                        Math.Abs(cPos.Item2 - sPos.Item2) > PositionTolerancePt ||
+                        Math.Abs(cPos.Item3 - sPos.Item3) > PositionTolerancePt ||
+                        Math.Abs(cPos.Item4 - sPos.Item4) > PositionTolerancePt)
                     {
-                        var cPos = current.ShapePositions[kvp.Key];
-                        var sPos = kvp.Value;
-                        if (Math.Abs(cPos.Item1 - sPos.Item1) > PositionTolerancePt ||
-                            Math.Abs(cPos.Item2 - sPos.Item2) > PositionTolerancePt ||
-                            Math.Abs(cPos.Item3 - sPos.Item3) > PositionTolerancePt ||
-                            Math.Abs(cPos.Item4 - sPos.Item4) > PositionTolerancePt)
+                        bool slideShapePositionExempt = exemptFullShapePosition
+                            && (!perSlideShapePositionExempt
+                                || IsShapePositionExemptForSlide(start.ProjectId, start.TaskId, currentSlide));
+
+                        if (slideShapePositionExempt)
                         {
-                            if (exemptFullShapePosition)
+                            if (onlyNewShapesExempt)
                             {
-                                if (onlyNewShapesExempt)
+                                errors.Add($"不正な図形変更: 指示外の既存図形(ID:{currentKey})の位置・サイズが変更されています。");
+                            }
+                            else if (allowedExistingChangesCount >= 0)
+                            {
+                                changedExistingShapesCount++;
+                                if (changedExistingShapesCount > allowedExistingChangesCount)
                                 {
-                                    errors.Add($"不正な図形変更: 指示外の既存図形(ID:{kvp.Key})の位置・サイズが変更されています。");
-                                }
-                                else if (allowedExistingChangesCount >= 0)
-                                {
-                                    changedExistingShapesCount++;
-                                    if (changedExistingShapesCount > allowedExistingChangesCount)
-                                    {
-                                        errors.Add($"上限超過の図形変更: 許可された数以上の既存図形(ID:{kvp.Key})が変更されています。");
-                                    }
+                                    errors.Add($"上限超過の図形変更: 許可された数以上の既存図形(ID:{currentKey})が変更されています。");
                                 }
                             }
-                            else
-                            {
-                                errors.Add($"Shape position/size changed on Slide {kvp.Key.Split('_')[0]} (ID:{kvp.Key})");
-                            }
+                        }
+                        else
+                        {
+                            errors.Add($"Shape position/size changed on Slide {currentSlide} (ID:{currentKey})");
                         }
                     }
                 }
@@ -378,10 +560,32 @@ namespace PowerPointAddIn1
         {
             if (allowedDelta == int.MaxValue) return true;
 
-            // 6-3: Slide 1 only: allow 0 or +1. Disallow deletions (<0) and bulk additions (>1).
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            // P3-4: Slide 1 only: allow 0 or +1.
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
             {
                 return actualDelta == 0 || actualDelta == 1;
+            }
+
+            // P3-6: allow 0 or +3.
+            if (projectId == 3 && taskId == 6)
+            {
+                return actualDelta == 0 || actualDelta == 3;
+            }
+
+            // P3-7: Slide 2: allow 0 or +2. Slide 1: allow 0 or +1 (section zoom side effect).
+            if (projectId == 3 && taskId == 7 && slideIndex == 2)
+            {
+                return actualDelta == 0 || actualDelta == 2;
+            }
+            if (projectId == 3 && taskId == 7 && slideIndex == 1)
+            {
+                return actualDelta == 0 || actualDelta == 1;
+            }
+
+            // P5-5: Slide 6 only: allow 0 or -2.
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
+            {
+                return actualDelta == 0 || actualDelta == -2;
             }
 
             return actualDelta == allowedDelta;
@@ -391,75 +595,241 @@ namespace PowerPointAddIn1
         {
             if (allowedDelta == int.MaxValue) return true;
 
-            // 9-6 slide 1: allow 0 (already replaced at snapshot) or -57 (expected URL→お問い合わせ).
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return actualDelta == 0 || actualDelta == -57;
-            }
-
             return actualDelta == allowedDelta;
         }
 
         private static string FormatDestructiveShapesCountMessage(int slideIndex, int projectId, int taskId, int allowedDelta, int actualDelta)
         {
-            if (projectId == 6 && taskId == 3 && slideIndex == 1)
+            if (projectId == 3 && taskId == 4 && slideIndex == 1)
             {
                 return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 6)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +3、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 7 && slideIndex == 2)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +2、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 3 && taskId == 7 && slideIndex == 1)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または +1、実際の変化: {actualDelta}）";
+            }
+            if (projectId == 5 && taskId == 5 && slideIndex == 6)
+            {
+                return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（許容: 図形数の変化は 0 または -2、実際の変化: {actualDelta}）";
             }
             return $"不正な図形操作: スライド {slideIndex} で指示外の図形の増減が検知されました（期待される変化数: {allowedDelta}、実際: {actualDelta}）";
         }
 
         private static string FormatDestructiveTextLengthMessage(int slideIndex, int projectId, int taskId, int allowedDelta, long actualDelta)
+
         {
-            if (projectId == 9 && taskId == 6 && slideIndex == 1)
-            {
-                return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（許容: 文字数の変化は 0 または -57、実際の変化: {actualDelta}）";
-            }
+
             return $"不正なテキスト変更: スライド {slideIndex} で指示外のテキスト変更が検知されました（期待される文字数変化: {allowedDelta}、実際: {actualDelta}）";
+
+        }
+
+        private static bool HasTask1_8SummaryZoomExecutedGlobally()
+        {
+            string evidencePath = Path.Combine(Path.GetTempPath(), "mos_ppt_task_evidence.txt");
+            string logPath = Path.Combine(Path.GetTempPath(), "mos_ppt_log.txt");
+            return FileContainsMarker(evidencePath, "[Task1-8] SummaryZoom")
+                || FileContainsMarker(logPath, "[Task1-8] SummaryZoom");
+        }
+
+        private static bool FileContainsMarker(string path, string marker)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(marker) || !File.Exists(path))
+                return false;
+            try
+            {
+                return File.ReadAllLines(path).Any(line =>
+                    line != null && line.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static int GetProject1AdjustedSlideNumber(int logicalSlideNumber)
+        {
+            if (logicalSlideNumber > 1 && HasTask1_8SummaryZoomExecutedGlobally())
+                return logicalSlideNumber + 1;
+            return logicalSlideNumber;
+        }
+
+        private static bool IsProject1Task1_3TargetSlide(int slideIndex)
+        {
+            return slideIndex == GetProject1AdjustedSlideNumber(5);
+        }
+
+        private const int Project1Task1_8InsertSlideIndex = 2;
+        private const int Project1Task1_1InsertAtLogical = 4;
+
+        private static int GetProject1Task1_1OffsetAfterSlide1()
+        {
+            return HasTask1_8SummaryZoomExecutedGlobally() ? 1 : 0;
+        }
+
+        private static int GetProject1Task1_1InsertSlideIndex()
+        {
+            return Project1Task1_1InsertAtLogical + GetProject1Task1_1OffsetAfterSlide1();
+        }
+
+        private static bool IsProject1Task1_1TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == GetProject1Task1_1InsertSlideIndex();
+        }
+
+        private static bool IsProject1Task1_1InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        private static bool IsProject1Task1_1SnapshotPostInsert(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        private static bool UsesSlideIndexMapping(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 8);
+        }
+
+        private static bool IsSlidesCountValidForTask(int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
+        {
+            if (projectId == 1 && (taskId == 1 || taskId == 8))
+            {
+                if (taskId == 1)
+                {
+                    return IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount)
+                        || IsProject1Task1_1SnapshotPostInsert(snapshotSlidesCount, currentSlidesCount);
+                }
+                return currentSlidesCount == snapshotSlidesCount || currentSlidesCount == snapshotSlidesCount + 1;
+            }
+            return currentSlidesCount == snapshotSlidesCount;
+        }
+
+        private static bool IsProject1Task1_8InsertApplied(int snapshotSlidesCount, int currentSlidesCount)
+        {
+            return currentSlidesCount == snapshotSlidesCount + 1;
+        }
+
+        private static int MapProject1Task1_1SnapshotToCurrent(int snapshotSlideIndex)
+        {
+            int offset = GetProject1Task1_1OffsetAfterSlide1();
+            if (snapshotSlideIndex < Project1Task1_1InsertAtLogical)
+                return snapshotSlideIndex + (snapshotSlideIndex >= 2 ? offset : 0);
+            return snapshotSlideIndex + 1 + offset;
+        }
+
+        private static int MapSnapshotSlideToCurrent(
+            int projectId,
+            int taskId,
+            int snapshotSlideIndex,
+            int snapshotSlidesCount,
+            int currentSlidesCount)
+        {
+            if (projectId == 1 && taskId == 1)
+            {
+                if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                    return MapProject1Task1_1SnapshotToCurrent(snapshotSlideIndex);
+                return snapshotSlideIndex;
+            }
+            if (projectId == 1 && taskId == 8)
+            {
+                if (IsProject1Task1_8InsertApplied(snapshotSlidesCount, currentSlidesCount))
+                {
+                    if (snapshotSlideIndex >= Project1Task1_8InsertSlideIndex)
+                        return snapshotSlideIndex + 1;
+                    return snapshotSlideIndex;
+                }
+                return snapshotSlideIndex;
+            }
+            return snapshotSlideIndex;
+        }
+
+        private static bool IsProject1Task1_8TargetSlide(int currentSlideIndex)
+        {
+            return currentSlideIndex == Project1Task1_8InsertSlideIndex;
+        }
+
+        private static bool UsesPerSlideShapePositionExempt(int projectId, int taskId)
+        {
+            return projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8);
+        }
+
+        private static bool IsShapePositionExemptForSlide(int projectId, int taskId, int slideIndex)
+        {
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex);
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex);
+            return false;
         }
 
         private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
-            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4)) return true; // 3-1, 3-3, 3-4
-            if (projectId == 4 && taskId == 6) return true; // 4-6
-            if (projectId == 5 && (taskId == 3 || taskId == 5)) return true; // 5-3, 5-5
-            if (projectId == 6 && taskId == 3) return true; // 6-3
-            if (projectId == 9 && taskId == 1) return true; // 9-1
-            if (projectId == 10 && taskId == 7) return true; // 10-7
+            if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
+            if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3, P5-4, P5-5
+            if (projectId == 9 && taskId == 4) return true; // P9-4
+            if (projectId == 10 && taskId == 6) return true; // P10-6
             return false;
         }
 
         private int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
         {
-            if (projectId == 4 && taskId == 4) return 1; // 4-4
-            if (projectId == 4 && taskId == 5) return 1; // 4-5
-            if (projectId == 5 && taskId == 4) return 1; // 5-4
-            if (projectId == 6 && taskId == 4) return 1; // 6-4
-            if (projectId == 9 && taskId == 1) return -1; // デフォルトへ (deltaで制御)
-            if (projectId == 9 && taskId == 6) return 1; // 9-6
+            if (projectId == 4 && taskId == 5) return 1; // P4-5
+            if (projectId == 4 && taskId == 6) return 1; // P4-6
+            if (projectId == 4 && taskId == 8) return 1; // P4-8
+            if (projectId == 5 && taskId == 1) return 4; // P5-1 丸4個右端揃え
+            if (projectId == 5 && taskId == 2) return 1; // P5-2
+            if (projectId == 3 && taskId == 5) return 1; // P3-5
+            // P3-7: section zoom side effects on multiple slides — no cap (-1). ShapesCount still strict per slide.
             if (projectId == 11 && taskId == 6) return 1; // 11-6
             return -1;
         }
 
         private int GetAllowedShapesCountDelta(int projectId, int taskId, int slideIndex)
         {
-            if (projectId == 3 && taskId == 1) return slideIndex == 5 ? 0 : 0; // 3-1
-            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // 3-3
-            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 2 : 0; // 3-4
-            if (projectId == 5 && taskId == 3) return 0;                       // 5-3
-            if (projectId == 5 && taskId == 5) return slideIndex == 3 ? -2 : 0; // 5-5
-            if (projectId == 6 && taskId == 3) return slideIndex == 1 ? 1 : 0; // 6-3
-            if (projectId == 9 && taskId == 1) return slideIndex == 2 ? 0 : 0; // 9-1
+            if (projectId == 3 && taskId == 1) return slideIndex == 7 ? 0 : 0; // P3-1
+            if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // P3-3
+            if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 1 : 0; // P3-4
+            if (projectId == 3 && taskId == 6) return 0;                       // P3-6
+            if (projectId == 3 && taskId == 7)
+            {
+                if (slideIndex == 2) return 2; // P3-7 section zoom x2
+                if (slideIndex == 1) return 1; // P3-7 section side effect
+                return 0;
+            }
+            if (projectId == 5 && taskId == 3) return 0;                       // P5-3
+            if (projectId == 5 && taskId == 5) return slideIndex == 6 ? -2 : 0; // P5-5
+            if (projectId == 9 && taskId == 4) return slideIndex == 2 ? 0 : 0; // P9-4
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
 
             return int.MaxValue;
         }
 
         private int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
-            // 1-7: 吹き出しへのテキスト入力 (スライド1に「教育者必見」の5文字が追加される)
-            if (projectId == 1 && taskId == 7) return slideIndex == 1 ? 5 : 0;
-            // 9-6: URLを「お問い合わせ」に変更 (スライド1の63文字のURLが6文字の「お問い合わせ」に置き換わるため -57文字)
-            if (projectId == 9 && taskId == 6) return slideIndex == 1 ? -57 : 0;
+            if (projectId == 1 && taskId == 1)
+                return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 3)
+                return IsProject1Task1_3TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 1 && taskId == 8)
+                return IsProject1Task1_8TargetSlide(slideIndex) ? int.MaxValue : 0;
+            if (projectId == 4 && taskId == 1)
+                return slideIndex == 1 ? int.MaxValue : 0; // P4-1
 
             // 変換、削除、インポートなど文字数が可変なものはチェックを省略
             return int.MaxValue;
@@ -471,6 +841,9 @@ namespace PowerPointAddIn1
             {
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine($"TaskId:{data.ProjectId},{data.TaskId}");
+                sb.AppendLine($"AttemptNo:{data.AttemptNo}");
+                if (data.SnapshotGen > 0)
+                    sb.AppendLine($"SnapshotGen:{data.SnapshotGen}");
                 sb.AppendLine($"SlidesCount:{data.SlidesCount}");
                 sb.AppendLine($"TotalTextLength:{data.TotalTextLength}");
                 
@@ -508,6 +881,13 @@ namespace PowerPointAddIn1
                             data.ProjectId = int.Parse(ids[0]);
                             data.TaskId = int.Parse(ids[1]);
                             break;
+                        case "SnapshotGen":
+                            data.SnapshotGen = int.Parse(val);
+                            break;
+                        case "AttemptNo":
+                            data.AttemptNo = int.Parse(val);
+                            if (data.AttemptNo < 1) data.AttemptNo = 1;
+                            break;
                         case "SlidesCount": data.SlidesCount = int.Parse(val); break;
                         case "TotalTextLength": data.TotalTextLength = long.Parse(val); break;
                         case "ShapesCounts":
@@ -540,7 +920,7 @@ namespace PowerPointAddIn1
 
         private class SnapshotData
         {
-            public int ProjectId; public int TaskId; public int SlidesCount;
+            public int ProjectId; public int TaskId; public int AttemptNo = 1; public int SnapshotGen; public int SlidesCount;
             public List<string> SlideNames = new List<string>();
             public Dictionary<int, int> ShapesCounts = new Dictionary<int, int>();
             public long TotalTextLength;
@@ -555,13 +935,17 @@ namespace PowerPointAddIn1
             None = 0, ShapesCount = 1, TextLength = 2, SlidesCount = 4, AnimationRemoved = 8, ShapePosition = 16, All = 31
         }
 
-        private void CheckAndLogDestructiveOperations(int projectId, int taskId, int exemptFlagsInt)
+        private void CheckAndLogDestructiveOperations(int projectId, int taskId, int attemptNo, int exemptFlagsInt)
         {
             try
             {
                 // 現在のスナップショット（開始時のデータ）をロード
                 var startSnapshot = LoadSnapshot();
-                if (startSnapshot == null || startSnapshot.ProjectId != projectId || startSnapshot.TaskId != taskId) return;
+                if (startSnapshot == null
+                    || startSnapshot.ProjectId != projectId
+                    || startSnapshot.TaskId != taskId
+                    || startSnapshot.AttemptNo != attemptNo)
+                    return;
 
                 // 現在のリアルタイムな状態を取得
                 var currentStatus = CaptureCurrentStatus(projectId, taskId);
@@ -571,15 +955,30 @@ namespace PowerPointAddIn1
                 List<string> errors = CompareSnapshots(startSnapshot, currentStatus, exemptFlagsInt);
                 if (errors.Count > 0)
                 {
-                    // ログに記録
+                    AppendDestructiveErrors(projectId, taskId, attemptNo, errors);
                     string errorMsg = string.Join(" | ", errors);
-                    File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId},{_currentTaskAttemptNo}:{errorMsg}{Environment.NewLine}");
-                    System.Diagnostics.Debug.WriteLine($"[DestructiveCheck] Task {projectId}-{taskId} FAILED: {errorMsg}");
+                    System.Diagnostics.Debug.WriteLine($"[DestructiveCheck] Task {projectId}-{taskId}-{attemptNo} FAILED: {errorMsg}");
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[CheckAndLog] " + ex.Message);
+            }
+        }
+
+        /// <summary>PPLogReader.AppendDestructiveErrors と同一フォーマット（VSTO は Libraries 未参照のためローカル実装）。</summary>
+        private static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, List<string> errors)
+        {
+            if (errors == null || errors.Count == 0) return;
+            try
+            {
+                string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
+                if (string.IsNullOrWhiteSpace(body)) return;
+                File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId},{attemptNo}:{body}{Environment.NewLine}", Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[AppendDestructiveErrors] " + ex.Message);
             }
         }
 
@@ -656,9 +1055,11 @@ namespace PowerPointAddIn1
         {
             try
             {
-                bool isTask5_1 = IsCurrentTask(5, 1);
+                bool isTask6_5 = IsCurrentTask(6, 5);
+                bool isTask6_6 = IsCurrentTask(6, 6);
+                bool isTask6_7 = IsCurrentTask(6, 7);
                 bool isTask11_7 = IsCurrentTask(11, 7);
-                if (!isTask5_1 && !isTask11_7) return;
+                if (!isTask6_5 && !isTask6_6 && !isTask6_7 && !isTask11_7) return;
                 if (Application == null || Application.Presentations == null) return;
                 PowerPoint.Presentation pres = null;
                 try
@@ -676,6 +1077,7 @@ namespace PowerPointAddIn1
                         _lastPrintOutputType = -1;
                         _lastPrintCopies = -1;
                         _lastPrintCollate = -1;
+                        _lastPrintColorType = -1;
                     _task7_4KioskLogged = false;
                     }
 
@@ -688,6 +1090,8 @@ namespace PowerPointAddIn1
                         int copies = po.NumberOfCopies;
                         int collateInt = Convert.ToInt32(po.Collate);
                         bool collate = (collateInt == (int)Office.MsoTriState.msoTrue);
+                        int printColorType = -1;
+                        try { printColorType = (int)po.PrintColorType; } catch { }
 
                         if (!_printOptionsInitialized)
                         {
@@ -695,23 +1099,38 @@ namespace PowerPointAddIn1
                             _lastPrintOutputType = outputType;
                             _lastPrintCopies = copies;
                             _lastPrintCollate = collateInt;
+                            _lastPrintColorType = printColorType;
                             _printOptionsInitialized = true;
                             return;
                         }
 
-                        bool changed = (_lastPrintOutputType != outputType || _lastPrintCopies != copies || _lastPrintCollate != collateInt);
+                        bool changed = (_lastPrintOutputType != outputType || _lastPrintCopies != copies
+                            || _lastPrintCollate != collateInt || _lastPrintColorType != printColorType);
                         _lastPrintOutputType = outputType;
                         _lastPrintCopies = copies;
                         _lastPrintCollate = collateInt;
+                        _lastPrintColorType = printColorType;
 
                         if (changed)
                         {
-                            if (isTask5_1 && !_task5_1PrintLogged &&
-                                outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputThreeSlideHandouts &&
-                                copies == 4 && collate)
+                            if (isTask6_5 && !_task6_5PrintLogged &&
+                                outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputOutline &&
+                                copies == 6 && collate)
                             {
-                                Logger.LogTask5_1Print();
-                                _task5_1PrintLogged = true;
+                                Logger.LogTask6_5Print();
+                                _task6_5PrintLogged = true;
+                            }
+                            if (isTask6_6 && !_task6_6PrintLogged &&
+                                outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages &&
+                                copies == 3 && !collate)
+                            {
+                                Logger.LogTask6_6Print();
+                                _task6_6PrintLogged = true;
+                            }
+                            if (isTask6_7 && !_task6_7PrintLogged && MatchesTask6_7PrintOptions(po))
+                            {
+                                Logger.LogTask6_7Print();
+                                _task6_7PrintLogged = true;
                             }
                             if (isTask11_7 && !_task11_7PrintLogged &&
                                 outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages &&
@@ -772,6 +1191,136 @@ namespace PowerPointAddIn1
         }
 
         /// <summary>
+        /// P6-5 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// </summary>
+        private void TryLogTask6_5PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task6_5PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        int outputType = (int)po.OutputType;
+                        int copies = po.NumberOfCopies;
+                        bool collate = (Convert.ToInt32(po.Collate) == (int)Office.MsoTriState.msoTrue);
+
+                        if (outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputOutline
+                            && copies == 6
+                            && collate)
+                        {
+                            Logger.LogTask6_5Print();
+                            _task6_5PrintLogged = true;
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// P6-6 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// </summary>
+        private void TryLogTask6_6PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task6_6PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        int outputType = (int)po.OutputType;
+                        int copies = po.NumberOfCopies;
+                        bool collate = (Convert.ToInt32(po.Collate) == (int)Office.MsoTriState.msoTrue);
+
+                        if (outputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputNotesPages
+                            && copies == 3
+                            && !collate)
+                        {
+                            Logger.LogTask6_6Print();
+                            _task6_6PrintLogged = true;
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        private static bool MatchesTask6_7PrintOptions(PowerPoint.PrintOptions po)
+        {
+            if (po == null) return false;
+            try
+            {
+                return (int)po.OutputType == (int)PowerPoint.PpPrintOutputType.ppPrintOutputThreeSlideHandouts
+                    && po.NumberOfCopies == 4
+                    && po.PrintColorType == PowerPoint.PpPrintColorType.ppPrintBlackAndWhite;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// P6-7 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
+        /// プロジェクト6最終タスクで current_task が消える経路の取りこぼしも補完する。
+        /// </summary>
+        private void TryLogTask6_7PrintOnTaskBoundary()
+        {
+            try
+            {
+                if (_task6_7PrintLogged) return;
+                if (Application == null || Application.Presentations == null) return;
+
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    PowerPoint.PrintOptions po = null;
+                    try
+                    {
+                        po = pres.PrintOptions;
+                        if (po == null) return;
+
+                        if (MatchesTask6_7PrintOptions(po))
+                        {
+                            Logger.LogTask6_7Print();
+                            _task6_7PrintLogged = true;
+                        }
+                    }
+                    finally { if (po != null) try { Marshal.ReleaseComObject(po); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        /// <summary>
         /// 11-7 から離脱する直前に印刷設定を即時確認し、条件一致なら証跡ログを確定する。
         /// 最終タスクでレビュー遷移時に current_task が消える経路の取りこぼしも補完する。
         /// </summary>
@@ -813,10 +1362,10 @@ namespace PowerPointAddIn1
             catch { }
         }
 
-        private void Audio8_4PollTimer_Tick(object sender, EventArgs e)
+        private void Audio9_3PollTimer_Tick(object sender, EventArgs e)
         {
-            if (_task8_4Logged) return;
-            if (!IsCurrentTask(8, 4)) return;
+            if (_task9_3PlayAcrossLogged && _task9_3FadeOutLogged) return;
+            if (!IsCurrentTask(9, 3)) return;
             try
             {
                 if (Application == null || Application.Presentations == null) return;
@@ -840,25 +1389,25 @@ namespace PowerPointAddIn1
                             try
                             {
                                 sh = shapes[i];
-                                try
+                                if (!PptAudioMediaHelper.TryIsSoundShape(sh))
+                                    continue;
+
+                                if (!_task9_3PlayAcrossLogged
+                                    && PptAudioMediaHelper.IsAudioPlayAcrossSlides(sh, pres))
                                 {
-                                    if (sh.MediaType != PowerPoint.PpMediaType.ppMediaTypeSound) continue;
+                                    Logger.LogTask9_3PlayAcrossSlides();
+                                    _task9_3PlayAcrossLogged = true;
                                 }
-                                catch { continue; }
-                                PowerPoint.MediaFormat mf = null;
-                                try
+
+                                if (!_task9_3FadeOutLogged
+                                    && PptAudioMediaHelper.IsAudioFadeOutAbout3Seconds(sh))
                                 {
-                                    mf = sh.MediaFormat;
-                                    if (mf == null) continue;
-                                    float fadeIn = (float)mf.FadeInDuration;
-                                    if (Math.Abs(fadeIn - 4000f) < 500f)
-                                    {
-                                        Logger.LogTask8_4Audio();
-                                        _task8_4Logged = true;
-                                        return;
-                                    }
+                                    Logger.LogTask9_3FadeOut3000();
+                                    _task9_3FadeOutLogged = true;
                                 }
-                                finally { if (mf != null) try { Marshal.ReleaseComObject(mf); } catch { } }
+
+                                if (_task9_3PlayAcrossLogged && _task9_3FadeOutLogged)
+                                    return;
                             }
                             finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
                         }
@@ -870,9 +1419,541 @@ namespace PowerPointAddIn1
             catch { }
         }
 
+        private void Glow4_3PollTimer_Tick(object sender, EventArgs e)
+        {
+            if (_task4_3GlowLogged) return;
+            if (!IsCurrentTask(4, 3)) return;
+            try
+            {
+                TryDetectAndLogTask4_3Glow();
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 4-3 から離脱する直前に光彩を即時確認し、条件一致なら証跡ログを確定する。
+        /// </summary>
+        private void TryLogTask4_3GlowOnTaskBoundary()
+        {
+            try
+            {
+                TryDetectAndLogTask4_3Glow();
+            }
+            catch { }
+        }
+
+        private bool TryDetectAndLogTask4_3Glow()
+        {
+            if (_task4_3GlowLogged) return true;
+            if (!TryDetectTask4_3GlowOnActivePresentation())
+                return false;
+
+            Logger.LogTask4_3Glow();
+            _task4_3GlowLogged = true;
+            return true;
+        }
+
+        private bool TryDetectTask4_3GlowOnActivePresentation()
+        {
+            if (Application == null || Application.Presentations == null) return false;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return false;
+
+                PowerPoint.Slides slides = null;
+                PowerPoint.Slide slide = null;
+                PowerPoint.Shapes shapes = null;
+                try
+                {
+                    slides = pres.Slides;
+                    if (slides == null || slides.Count < 1) return false;
+                    slide = slides[1];
+                    if (slide == null) return false;
+                    shapes = slide.Shapes;
+                    if (shapes != null && HasTask4_3Glow18Accent6Com(shapes))
+                        return true;
+                }
+                finally
+                {
+                    if (shapes != null) try { Marshal.ReleaseComObject(shapes); } catch { }
+                    if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+                }
+
+                string tempPath = Path.Combine(Path.GetTempPath(), "mos_4_3_vsto_" + Guid.NewGuid().ToString("N") + ".pptx");
+                try
+                {
+                    pres.SaveCopyAs(tempPath);
+                    return PptxGlowOpenXmlReader.ContainsGlow18ptAccent6OnSlide(tempPath, 1);
+                }
+                finally
+                {
+                    if (File.Exists(tempPath))
+                    {
+                        try { File.Delete(tempPath); } catch { }
+                    }
+                }
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool HasTask4_3Glow18Accent6Com(PowerPoint.Shapes shapes)
+        {
+            if (shapes == null) return false;
+            int count = 0;
+            try { count = shapes.Count; } catch { return false; }
+            for (int i = 1; i <= count; i++)
+            {
+                PowerPoint.Shape sh = null;
+                try
+                {
+                    sh = shapes[i];
+                    if (HasTask4_3Glow18Accent6Com(sh))
+                        return true;
+                }
+                finally
+                {
+                    if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { }
+                }
+            }
+            return false;
+        }
+
+        private static bool HasTask4_3Glow18Accent6Com(PowerPoint.GroupShapes group)
+        {
+            if (group == null) return false;
+            int count = 0;
+            try { count = group.Count; } catch { return false; }
+            for (int i = 1; i <= count; i++)
+            {
+                PowerPoint.Shape sh = null;
+                try
+                {
+                    sh = group[i];
+                    if (HasTask4_3Glow18Accent6Com(sh))
+                        return true;
+                }
+                finally
+                {
+                    if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { }
+                }
+            }
+            return false;
+        }
+
+        private static bool HasTask4_3Glow18Accent6Com(PowerPoint.Shape sh)
+        {
+            if (sh == null) return false;
+
+            try
+            {
+                if (sh.Type == Office.MsoShapeType.msoGroup)
+                {
+                    PowerPoint.GroupShapes group = null;
+                    try
+                    {
+                        group = sh.GroupItems;
+                        return HasTask4_3Glow18Accent6Com(group);
+                    }
+                    finally
+                    {
+                        if (group != null) try { Marshal.ReleaseComObject(group); } catch { }
+                    }
+                }
+            }
+            catch { }
+
+            if (!IsTask4_3PictureCandidate(sh))
+                return false;
+
+            dynamic glow = null;
+            try
+            {
+                glow = sh.Glow;
+                if (glow == null) return false;
+
+                float radius = 0f;
+                try { radius = (float)glow.Radius; } catch { }
+                if (radius < 14f || radius > 22f) return false;
+
+                PowerPoint.ColorFormat cf = null;
+                try
+                {
+                    cf = glow.Color;
+                    if (cf == null) return false;
+                    try
+                    {
+                        if (cf.ObjectThemeColor == Office.MsoThemeColorIndex.msoThemeColorAccent6)
+                            return true;
+                    }
+                    catch { }
+
+                    try
+                    {
+                        int rgb = (int)cf.RGB;
+                        int r = rgb & 0xFF;
+                        int g = (rgb >> 8) & 0xFF;
+                        int b = (rgb >> 16) & 0xFF;
+                        if (r >= 60 && r <= 140 && g >= 140 && g <= 210 && b >= 40 && b <= 120)
+                            return true;
+                    }
+                    catch { }
+                }
+                finally
+                {
+                    if (cf != null) try { Marshal.ReleaseComObject(cf); } catch { }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (glow != null) try { Marshal.ReleaseComObject(glow); } catch { }
+            }
+
+            return false;
+        }
+
+        private static bool IsTask4_3PictureCandidate(PowerPoint.Shape sh)
+        {
+            if (sh == null) return false;
+            try
+            {
+                int t = (int)sh.Type;
+                if (t == (int)Office.MsoShapeType.msoPicture || t == 11)
+                    return true;
+                if (sh.Type != Office.MsoShapeType.msoPlaceholder)
+                    return false;
+
+                PowerPoint.PlaceholderFormat pf = null;
+                try
+                {
+                    pf = sh.PlaceholderFormat;
+                    if (pf != null && pf.ContainedType == Office.MsoShapeType.msoPicture)
+                        return true;
+                }
+                catch { }
+                finally
+                {
+                    if (pf != null) try { Marshal.ReleaseComObject(pf); } catch { }
+                }
+
+                string name = null;
+                try { name = sh.Name; } catch { }
+                name = (name ?? string.Empty).ToLowerInvariant();
+                return name.Contains("picture") || name.Contains("画像") || name.Contains("図");
+            }
+            catch { return false; }
+        }
+
+        private void SlideSize8_3PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(8, 3)) return;
+                TryLogTask8_3SlideSize16x9IfPageSetupMatches();
+            }
+            catch { }
+        }
+
+        private static bool PageSetupMatchesP8_3FitToScreen16x9(PowerPoint.PageSetup pageSetup)
+        {
+            if (pageSetup == null) return false;
+            float w = (float)pageSetup.SlideWidth;
+            float h = (float)pageSetup.SlideHeight;
+            if (h <= 0f) return false;
+
+            float expectedW = SlideSize8_3ExpectedWidthCm * SlideSize8_3CmToPt;
+            float expectedH = SlideSize8_3ExpectedHeightCm * SlideSize8_3CmToPt;
+            bool sizeOk = Math.Abs(w - expectedW) <= SlideSize8_3DimensionTolerancePt
+                && Math.Abs(h - expectedH) <= SlideSize8_3DimensionTolerancePt;
+
+            float ratio = w / h;
+            bool ratioOk = Math.Abs(ratio - SlideSize8_3AspectRatioTarget) <= SlideSize8_3AspectRatioTolerance;
+
+            return sizeOk && ratioOk;
+        }
+
+        private void TryLogTask8_3SlideSize16x9IfPageSetupMatches()
+        {
+            if (_task8_3SlideSizeLogged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+
+                PowerPoint.PageSetup pageSetup = null;
+                try
+                {
+                    pageSetup = pres.PageSetup;
+                    if (pageSetup == null) return;
+                    if (!PageSetupMatchesP8_3FitToScreen16x9(pageSetup)) return;
+
+                    Logger.LogTask8_3SlideSize16x9();
+                    _task8_3SlideSizeLogged = true;
+                }
+                finally
+                {
+                    if (pageSetup != null) try { Marshal.ReleaseComObject(pageSetup); } catch { }
+                }
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        /// <summary>P8-3 離脱直前に 16:9 を再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask8_3SlideSize16x9OnTaskBoundary()
+        {
+            TryLogTask8_3SlideSize16x9IfPageSetupMatches();
+        }
+
+        private void Task2_1PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(2, 1)) return;
+                TryLogTask2_1SplitHorizontalOutIfMatches();
+            }
+            catch { }
+        }
+
+        /// <summary>P2-1 離脱直前に画面切り替えを再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask2_1SplitHorizontalOutOnTaskBoundary()
+        {
+            TryLogTask2_1SplitHorizontalOutIfMatches();
+        }
+
+        private void TryLogTask2_1SplitHorizontalOutIfMatches()
+        {
+            if (_task2_1Logged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+                if (!PresentationMatchesP2_1SplitHorizontalOut(pres)) return;
+
+                Logger.LogTask2_1SplitHorizontalOut();
+                _task2_1Logged = true;
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool PresentationMatchesP2_1SplitHorizontalOut(PowerPoint.Presentation pres)
+        {
+            if (pres == null) return false;
+            PowerPoint.Slides slides = null;
+            try
+            {
+                slides = pres.Slides;
+                if (slides == null) return false;
+                int count = slides.Count;
+                if (count < 2) return false;
+                int[] indicesToCheck = count >= 6 ? new[] { 1, 2, 6 } : new[] { 1, 2 };
+                foreach (int i in indicesToCheck)
+                {
+                    PowerPoint.Slide slide = null;
+                    try
+                    {
+                        slide = slides[i];
+                        if (slide == null) return false;
+                        int effectVal;
+                        try { effectVal = (int)slide.SlideShowTransition.EntryEffect; }
+                        catch { return false; }
+                        if (effectVal != P2_1EffectSplitHorizontalOut) return false;
+                    }
+                    finally
+                    {
+                        if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
+            finally
+            {
+                if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+            }
+        }
+
+        private void Task2_2PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(2, 2)) return;
+                TryLogTask2_2TransitionDuration3SecIfMatches();
+            }
+            catch { }
+        }
+
+        /// <summary>P2-2 離脱直前に継続時間を再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask2_2TransitionDuration3SecOnTaskBoundary()
+        {
+            TryLogTask2_2TransitionDuration3SecIfMatches();
+        }
+
+        private void TryLogTask2_2TransitionDuration3SecIfMatches()
+        {
+            if (_task2_2Logged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+                if (!PresentationMatchesP2_2TransitionDuration3Sec(pres)) return;
+
+                Logger.LogTask2_2TransitionDuration3Sec();
+                _task2_2Logged = true;
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool PresentationMatchesP2_2TransitionDuration3Sec(PowerPoint.Presentation pres)
+        {
+            if (pres == null) return false;
+            PowerPoint.Slides slides = null;
+            try
+            {
+                slides = pres.Slides;
+                if (slides == null) return false;
+                int count = slides.Count;
+                if (count <= 0) return false;
+                for (int i = 1; i <= count; i++)
+                {
+                    PowerPoint.Slide slide = null;
+                    try
+                    {
+                        slide = slides[i];
+                        if (slide == null) return false;
+                        float dur;
+                        try { dur = slide.SlideShowTransition.Duration; }
+                        catch { return false; }
+                        bool isSlide345 = (i == 3 || i == 4 || i == 5);
+                        bool ok = isSlide345
+                            ? IsP2TransitionDurationThreeSeconds(dur) || IsP2TransitionDurationSwitchDefault(dur)
+                            : IsP2TransitionDurationThreeSeconds(dur);
+                        if (!ok) return false;
+                    }
+                    finally
+                    {
+                        if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
+            finally
+            {
+                if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+            }
+        }
+
+        private static bool IsP2TransitionDurationThreeSeconds(float duration)
+        {
+            return duration >= 2.9f && duration <= 3.1f;
+        }
+
+        private static bool IsP2TransitionDurationSwitchDefault(float duration)
+        {
+            return duration >= 1.15f && duration <= 1.35f;
+        }
+
+        private void Task2_3PollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!IsCurrentTask(2, 3)) return;
+                TryLogTask2_3SwitchRightIfMatches();
+            }
+            catch { }
+        }
+
+        /// <summary>P2-3 離脱直前に切り替え効果を再確認し、ポーリング取りこぼしを補完する。</summary>
+        private void TryLogTask2_3SwitchRightOnTaskBoundary()
+        {
+            TryLogTask2_3SwitchRightIfMatches();
+        }
+
+        private void TryLogTask2_3SwitchRightIfMatches()
+        {
+            if (_task2_3Logged) return;
+            if (Application == null || Application.Presentations == null) return;
+
+            PowerPoint.Presentation pres = null;
+            try
+            {
+                pres = Application.ActivePresentation;
+                if (pres == null) return;
+                if (!PresentationMatchesP2_3SwitchRight(pres)) return;
+
+                Logger.LogTask2_3SwitchRight();
+                _task2_3Logged = true;
+            }
+            finally
+            {
+                if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { }
+            }
+        }
+
+        private static bool PresentationMatchesP2_3SwitchRight(PowerPoint.Presentation pres)
+        {
+            if (pres == null) return false;
+            PowerPoint.Slides slides = null;
+            try
+            {
+                slides = pres.Slides;
+                if (slides == null || slides.Count < 5) return false;
+                for (int slideNum = 3; slideNum <= 5; slideNum++)
+                {
+                    PowerPoint.Slide slide = null;
+                    try
+                    {
+                        slide = slides[slideNum];
+                        if (slide == null) return false;
+                        int effectVal;
+                        try { effectVal = (int)slide.SlideShowTransition.EntryEffect; }
+                        catch { return false; }
+                        if (effectVal != P2_3EffectSwitchRight) return false;
+                    }
+                    finally
+                    {
+                        if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { }
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
+            finally
+            {
+                if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+            }
+        }
+
         private void GrayscalePollTimer_Tick(object sender, EventArgs e)
         {
-            if (!IsCurrentTask(10, 4))
+            bool isTask10_4 = IsCurrentTask(10, 4);
+            bool isTask8_5 = IsCurrentTask(8, 5);
+            if (!isTask10_4 && !isTask8_5)
             {
                 _lastBlackAndWhite = false;
                 return;
@@ -897,7 +1978,10 @@ namespace PowerPointAddIn1
 
                 if (current && !_lastBlackAndWhite)
                 {
-                    Logger.LogTask10_4Grayscale();
+                    if (isTask8_5)
+                        Logger.LogTask8_5Grayscale();
+                    else if (isTask10_4)
+                        Logger.LogTask10_4Grayscale();
                 }
                 _lastBlackAndWhite = current;
             }
@@ -910,7 +1994,9 @@ namespace PowerPointAddIn1
         private void Kiosk7_4PollTimer_Tick(object sender, EventArgs e)
         {
             if (_task7_4KioskLogged) return;
-            if (!IsCurrentTask(7, 4)) return;
+            bool isTask7_4 = IsCurrentTask(7, 4);
+            bool isTask6_3 = IsCurrentTask(6, 3);
+            if (!isTask7_4 && !isTask6_3) return;
             try
             {
                 if (Application == null || Application.Presentations == null) return;
@@ -926,7 +2012,10 @@ namespace PowerPointAddIn1
                         if (ss == null) return;
                         if (ss.ShowType == PowerPoint.PpSlideShowType.ppShowTypeKiosk)
                         {
-                            Logger.LogTask7_4Kiosk();
+                            if (isTask6_3)
+                                Logger.LogTask6_3Kiosk();
+                            else if (isTask7_4)
+                                Logger.LogTask7_4Kiosk();
                             _task7_4KioskLogged = true;
                         }
                     }
@@ -942,7 +2031,7 @@ namespace PowerPointAddIn1
             try
             {
                 if (Application == null || Application.Presentations == null) return;
-                if (!IsCurrentTask(1, 2) && !IsCurrentTask(1, 3) && !IsCurrentTask(1, 4)) return;
+                if (!IsCurrentTask(1, 2) && !IsCurrentTask(1, 3) && !IsCurrentTask(1, 4) && !IsCurrentTask(1, 8)) return;
 
                 PowerPoint.Presentation pres = null;
                 try
@@ -1053,6 +2142,75 @@ namespace PowerPointAddIn1
                         }
                         finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
                     }
+
+                    if (IsCurrentTask(1, 8) && !_task1_8Logged)
+                    {
+                        PowerPoint.Slides slides = null;
+                        PowerPoint.Slide slide2 = null;
+                        try
+                        {
+                            slides = pres.Slides;
+                            if (slides != null && slides.Count >= 2)
+                            {
+                                slide2 = slides[2];
+                                if (slide2 != null)
+                                {
+                                    PowerPoint.Shapes shapes = slide2.Shapes;
+                                    if (shapes != null)
+                                    {
+                                        for (int i = 1; i <= shapes.Count; i++)
+                                        {
+                                            PowerPoint.Shape sh = null;
+                                            try
+                                            {
+                                                sh = shapes[i];
+                                                if (sh.HasTextFrame == Office.MsoTriState.msoTrue)
+                                                {
+                                                    var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
+                                                    string text = tf?.TextRange?.Text ?? "";
+                                                    if (text.IndexOf("ご提案のポイント", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                    {
+                                                        // ズームオブジェクト (Shape.Type == msoZoom (21)) が存在することを確認
+                                                        bool hasZoom = false;
+                                                        for (int j = 1; j <= shapes.Count; j++)
+                                                        {
+                                                            PowerPoint.Shape shZoom = null;
+                                                            try
+                                                            {
+                                                                shZoom = shapes[j];
+                                                                if ((int)shZoom.Type == 21 || shZoom.Name.Contains("Zoom") || shZoom.Name.Contains("ズーム"))
+                                                                {
+                                                                    hasZoom = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                            catch { }
+                                                            finally { if (shZoom != null) try { Marshal.ReleaseComObject(shZoom); } catch { } }
+                                                        }
+
+                                                        if (hasZoom)
+                                                        {
+                                                            Logger.LogTask1_8SummaryZoom();
+                                                            _task1_8Logged = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            catch { }
+                                            finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
+                                        }
+                                        try { Marshal.ReleaseComObject(shapes); } catch { }
+                                    }
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            if (slide2 != null) try { Marshal.ReleaseComObject(slide2); } catch { }
+                            if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
+                        }
+                    }
                 }
                 finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
             }
@@ -1079,17 +2237,35 @@ namespace PowerPointAddIn1
                 _task1_2To1_4PollTimer.Dispose();
                 _task1_2To1_4PollTimer = null;
             }
+            if (_task2_1PollTimer != null)
+            {
+                _task2_1PollTimer.Stop();
+                _task2_1PollTimer.Dispose();
+                _task2_1PollTimer = null;
+            }
+            if (_task2_2PollTimer != null)
+            {
+                _task2_2PollTimer.Stop();
+                _task2_2PollTimer.Dispose();
+                _task2_2PollTimer = null;
+            }
+            if (_task2_3PollTimer != null)
+            {
+                _task2_3PollTimer.Stop();
+                _task2_3PollTimer.Dispose();
+                _task2_3PollTimer = null;
+            }
             if (_printOptionsPollTimer != null)
             {
                 _printOptionsPollTimer.Stop();
                 _printOptionsPollTimer.Dispose();
                 _printOptionsPollTimer = null;
             }
-            if (_audio8_4PollTimer != null)
+            if (_audio9_3PollTimer != null)
             {
-                _audio8_4PollTimer.Stop();
-                _audio8_4PollTimer.Dispose();
-                _audio8_4PollTimer = null;
+                _audio9_3PollTimer.Stop();
+                _audio9_3PollTimer.Dispose();
+                _audio9_3PollTimer = null;
             }
             if (_layout10_7PollTimer != null)
             {
@@ -1097,11 +2273,23 @@ namespace PowerPointAddIn1
                 _layout10_7PollTimer.Dispose();
                 _layout10_7PollTimer = null;
             }
+            if (_glow4_3PollTimer != null)
+            {
+                _glow4_3PollTimer.Stop();
+                _glow4_3PollTimer.Dispose();
+                _glow4_3PollTimer = null;
+            }
             if (_grayscalePollTimer != null)
             {
                 _grayscalePollTimer.Stop();
                 _grayscalePollTimer.Dispose();
                 _grayscalePollTimer = null;
+            }
+            if (_slideSize8_3PollTimer != null)
+            {
+                _slideSize8_3PollTimer.Stop();
+                _slideSize8_3PollTimer.Dispose();
+                _slideSize8_3PollTimer = null;
             }
             System.Diagnostics.Debug.WriteLine("[PowerPointAddIn1] Add-in shutdown");
         }

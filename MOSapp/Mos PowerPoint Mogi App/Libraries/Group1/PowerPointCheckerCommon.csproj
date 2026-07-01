@@ -47,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\PPLogReader.cs" Link="PPLogReader.cs" />
+    <Compile Include="..\PptAudioMediaHelper.cs" Link="PptAudioMediaHelper.cs" />
     <Compile Include="PowerPointCheckerCommon.cs" />
     <Compile Include="PptxSlideZoomLinkReader.cs" />
   </ItemGroup>

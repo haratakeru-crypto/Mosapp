@@ -9,7 +9,7 @@ namespace Libraries
 {
     /// <summary>
     /// PowerPoint VSTO アドインで生成されたログファイルを読み込むユーティリティ。
-    /// メインログ（mos_ppt_log.txt）に加え、5-1/10-4/11-7 用の採点証跡（mos_ppt_task_evidence.txt）を扱う。
+    /// メインログ（mos_ppt_log.txt）に加え、1-2/1-3/1-4/1-8/4-3/5-1/10-4/11-7 用の採点証跡（mos_ppt_task_evidence.txt）を扱う。
     /// </summary>
     public static class PPLogReader
     {
@@ -41,7 +41,7 @@ namespace Libraries
 
         /// <summary>
         /// 採点用証跡ログのパス（%TEMP%\mos_ppt_task_evidence.txt）。
-        /// 5-1・10-4・11-7 など、単体プロジェクトリセット後も採点に必要な行だけを VSTO が追記する。
+        /// 1-2/1-3/1-4/1-8/4-3/5-1/10-4/11-7 など、単体プロジェクトリセット後も採点に必要な行だけを VSTO が追記する。
         /// <see cref="ClearLog"/> では消えない。全プロジェクトリセット時に <see cref="ClearTaskEvidence"/> で消す。
         /// </summary>
         public static string GetTaskEvidenceLogPath()
@@ -56,6 +56,93 @@ namespace Libraries
         public static string GetCurrentTaskFilePath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
+        }
+
+        /// <summary>current_task ファイルの固定フィールド数（ProjectId,TaskId,ExemptFlags,AttemptNo,SnapshotGen）。</summary>
+        public const int CurrentTaskFieldCount = 5;
+
+        /// <summary>
+        /// 現在タスク共有ファイルを原子的に書き込む。
+        /// 形式: ProjectId,TaskId,ExemptFlags,AttemptNo,SnapshotGen（5項目固定）。
+        /// UI 遷移は SnapshotGen=0、採点時は &gt;0。
+        /// </summary>
+        public static void WriteCurrentTaskFile(int projectId, int taskId, int exemptFlags, int attemptNo, int snapshotGen = 0)
+        {
+            try
+            {
+                if (attemptNo < 1) attemptNo = 1;
+                if (snapshotGen < 0) snapshotGen = 0;
+                string content = $"{projectId},{taskId},{exemptFlags},{attemptNo},{snapshotGen}";
+                AtomicWriteAllText(GetCurrentTaskFilePath(), content);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] WriteCurrentTaskFile: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// current_task を読み取る。5項目固定かつ全フィールドが数値として解釈できる場合のみ true。
+        /// 途中書き込み（フィールド数不足）や空行は無視する。
+        /// </summary>
+        public static bool TryReadCurrentTaskFile(out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen)
+        {
+            return TryReadCurrentTaskFile(GetCurrentTaskFilePath(), out projectId, out taskId, out exemptFlags, out attemptNo, out snapshotGen);
+        }
+
+        /// <summary>指定パスの current_task を読み取る（<see cref="TryReadCurrentTaskFile(out int, out int, out int, out int, out int)"/> と同条件）。</summary>
+        public static bool TryReadCurrentTaskFile(string path, out int projectId, out int taskId, out int exemptFlags, out int attemptNo, out int snapshotGen)
+        {
+            projectId = taskId = exemptFlags = attemptNo = snapshotGen = 0;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return false;
+
+            string line;
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    line = sr.ReadToEnd().Trim();
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(line))
+                return false;
+
+            string[] parts = line.Split(',');
+            if (parts.Length != CurrentTaskFieldCount)
+                return false;
+
+            if (!int.TryParse(parts[0].Trim(), out projectId)) return false;
+            if (!int.TryParse(parts[1].Trim(), out taskId)) return false;
+            if (!int.TryParse(parts[2].Trim(), out exemptFlags)) return false;
+            if (!int.TryParse(parts[3].Trim(), out attemptNo)) return false;
+            if (!int.TryParse(parts[4].Trim(), out snapshotGen)) return false;
+            if (attemptNo < 1) attemptNo = 1;
+            if (snapshotGen < 0) snapshotGen = 0;
+            return true;
+        }
+
+        private static void AtomicWriteAllText(string path, string content)
+        {
+            string tempPath = path + ".tmp";
+            var encoding = new UTF8Encoding(false);
+            File.WriteAllText(tempPath, content, encoding);
+            try
+            {
+                if (File.Exists(path))
+                    File.Replace(tempPath, path, null);
+                else
+                    File.Move(tempPath, path);
+            }
+            catch
+            {
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                throw;
+            }
         }
 
         /// <summary>破壊的操作ログのパスを取得（%TEMP%\mos_ppt_destructive_errors.log）</summary>
@@ -122,7 +209,7 @@ namespace Libraries
 
         /// <summary>
         /// 単体プロジェクトリセット時、そのプロジェクトのログ依存採点タスクに対応する証跡行だけを削除する。
-        /// 5→5-1 印刷、10→10-4 グレースケール、11→11-7 印刷。他プロジェクトでは何もしない。
+        /// 1→1-2/1-3/1-4/1-8、4→4-3、5→5-1、10→10-4、11→11-7。他プロジェクトでは何もしない。
         /// </summary>
         public static void ClearTaskEvidenceForProject(int projectId)
         {
@@ -176,12 +263,28 @@ namespace Libraries
                     {
                         "[Task1-2] Duplicate",
                         "[Task1-3] HideSlide3",
-                        "[Task1-4] DeleteThirdSlide"
+                        "[Task1-4] DeleteThirdSlide",
+                        "[Task1-8] SummaryZoom"
+                    };
+                case 2:
+                    return new[]
+                    {
+                        "[Task2-1] SplitHorizontalOut",
+                        "[Task2-2] TransitionDuration3Sec",
+                        "[Task2-3] SwitchRight"
                     };
                 case 5:
                     return new[] { "[Task5-1] Print" };
+                case 4:
+                    return new[] { "[Task4-3] Glow18Accent6" };
+                case 8:
+                    return new[] { "[Task8-3] SlideSize16x9", "[Task8-5] Grayscale" };
+                case 9:
+                    return new[] { "[Task9-3] PlayAcrossSlides", "[Task9-3] FadeOut3000" };
                 case 10:
                     return new[] { "[Task10-4] Grayscale" };
+                case 6:
+                    return new[] { "[Task6-5] Print", "[Task6-6] Print", "[Task6-7] Print" };
                 case 11:
                     return new[] { "[Task11-7] Print" };
                 default:
@@ -204,6 +307,44 @@ namespace Libraries
             }
         }
 
+        /// <summary>破壊的操作ログに同一 project-task-attempt の記録があるか。</summary>
+        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
+        {
+            try
+            {
+                string path = GetDestructiveLogPath();
+                if (!File.Exists(path)) return false;
+                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                foreach (string line in File.ReadAllLines(path))
+                {
+                    if (line != null && line.StartsWith(prefix, StringComparison.Ordinal))
+                        return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] HasLoggedDestructiveError: " + ex.Message);
+            }
+            return false;
+        }
+
+        /// <summary>破壊的操作ログへ追記（Word の AppendDestructiveErrors 相当）。</summary>
+        public static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, IList<string> errors)
+        {
+            if (errors == null || errors.Count == 0) return;
+            try
+            {
+                string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
+                if (string.IsNullOrWhiteSpace(body)) return;
+                string key = $"{projectId},{taskId},{attemptNo}:";
+                File.AppendAllText(GetDestructiveLogPath(), key + body + Environment.NewLine, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] AppendDestructiveErrors: " + ex.Message);
+            }
+        }
+
         /// <summary>スナップショットファイルをクリアする。</summary>
         public static void ClearSnapshot()
         {
@@ -219,6 +360,58 @@ namespace Libraries
             }
         }
 
+        private static int _snapshotGenerationCounter;
+
+        /// <summary>採点直前のスナップショット再取得用に、単調増加の世代番号を払い出す。</summary>
+        public static int AllocateSnapshotGeneration()
+        {
+            return Interlocked.Increment(ref _snapshotGenerationCounter);
+        }
+
+        /// <summary>スナップショットファイルから TaskId / AttemptNo / SnapshotGen を読み取る。</summary>
+        public static bool TryReadSnapshotMeta(string snapshotPath, out int projectId, out int taskId, out int attemptNo, out int snapshotGen)
+        {
+            projectId = -1;
+            taskId = -1;
+            attemptNo = 1;
+            snapshotGen = 0;
+            if (string.IsNullOrWhiteSpace(snapshotPath) || !File.Exists(snapshotPath))
+                return false;
+
+            bool hasTaskId = false;
+            foreach (string line in File.ReadAllLines(snapshotPath))
+            {
+                if (string.IsNullOrEmpty(line)) continue;
+                int colonIndex = line.IndexOf(':');
+                if (colonIndex < 0) continue;
+                string key = line.Substring(0, colonIndex);
+                string value = line.Substring(colonIndex + 1);
+                if (string.Equals(key, "TaskId", StringComparison.Ordinal))
+                {
+                    var ids = value.Split(',');
+                    if (ids.Length != 2) return false;
+                    hasTaskId = int.TryParse(ids[0], out projectId) && int.TryParse(ids[1], out taskId);
+                }
+                else if (string.Equals(key, "SnapshotGen", StringComparison.Ordinal))
+                {
+                    int.TryParse(value, out snapshotGen);
+                }
+                else if (string.Equals(key, "AttemptNo", StringComparison.Ordinal))
+                {
+                    int.TryParse(value, out attemptNo);
+                    if (attemptNo < 1) attemptNo = 1;
+                }
+            }
+            return hasTaskId;
+        }
+
+        /// <summary>後方互換: AttemptNo を返さないオーバーロード。</summary>
+        public static bool TryReadSnapshotMeta(string snapshotPath, out int projectId, out int taskId, out int snapshotGen)
+        {
+            bool ok = TryReadSnapshotMeta(snapshotPath, out projectId, out taskId, out int attemptNo, out snapshotGen);
+            return ok;
+        }
+
         /// <summary>
         /// 証跡ログまたはメインログに [Task10-4] Grayscale が含まれるか（移行前のセッションはメインログのみの可能性あり）。
         /// </summary>
@@ -227,34 +420,80 @@ namespace Libraries
             return HasGradingEvidenceMarker("[Task10-4] Grayscale");
         }
 
+        /// <summary>証跡ログまたはメインログに [Task8-5] Grayscale が含まれるか。</summary>
+        public static bool HasTask8_5GrayscaleExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task8-5] Grayscale");
+        }
+
+        /// <summary>証跡ログまたはメインログに [Task8-3] SlideSize16x9 が含まれるか（P8-4で寸法上書き後の一括採点用）。</summary>
+        public static bool HasTask8_3SlideSize16x9Executed()
+        {
+            return HasGradingEvidenceMarker("[Task8-3] SlideSize16x9");
+        }
+
+        /// <summary>証跡またはメインログに 4-3 光彩設定記録（[Task4-3] Glow18Accent6）が含まれるか。</summary>
+        public static bool HasTask4_3GlowExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task4-3] Glow18Accent6");
+        }
+
+        /// <summary>証跡またはメインログに P2-1 の画面切り替え記録（[Task2-1] SplitHorizontalOut）が含まれるか。</summary>
+        public static bool HasTask2_1SplitHorizontalOutExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task2-1] SplitHorizontalOut");
+        }
+
+        /// <summary>証跡またはメインログに P2-2 の継続時間記録（[Task2-2] TransitionDuration3Sec）が含まれるか。</summary>
+        public static bool HasTask2_2TransitionDuration3SecExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task2-2] TransitionDuration3Sec");
+        }
+
+        /// <summary>証跡またはメインログに P2-3 の切り替え記録（[Task2-3] SwitchRight）が含まれるか。</summary>
+        public static bool HasTask2_3SwitchRightExecuted()
+        {
+            return HasGradingEvidenceMarker("[Task2-3] SwitchRight");
+        }
+
         /// <summary>証跡またはメインログに 5-1 の印刷記録（[Task5-1] Print）が含まれるか。</summary>
         public static bool HasTask5_1PrintExecuted()
         {
             return HasGradingEvidenceMarker("[Task5-1] Print");
         }
 
-        /// <summary>証跡またはメインログに 11-7 の印刷記録（[Task11-7] Print）が含まれるか。</summary>
-        public static bool HasTask11_7PrintExecuted()
+        /// <summary>証跡またはメインログに P6-5 の印刷記録（[Task6-5] Print）が含まれるか。</summary>
+        public static bool HasTask6_5PrintExecuted()
         {
-            return HasGradingEvidenceMarker("[Task11-7] Print");
+            return HasGradingEvidenceMarker("[Task6-5] Print");
         }
 
-        /// <summary>証跡またはメインログに 1-2 複製記録（[Task1-2] Duplicate）が含まれるか。</summary>
-        public static bool HasTask1_2DuplicateExecuted()
+        /// <summary>証跡またはメインログに P6-6 の印刷記録（[Task6-6] Print）が含まれるか。</summary>
+        public static bool HasTask6_6PrintExecuted()
         {
-            return HasGradingEvidenceMarker("[Task1-2] Duplicate");
+            return HasGradingEvidenceMarker("[Task6-6] Print");
         }
 
-        /// <summary>証跡またはメインログに 1-3 非表示記録（[Task1-3] HideSlide3）が含まれるか。</summary>
-        public static bool HasTask1_3HideSlide3Executed()
+        /// <summary>証跡またはメインログに P6-7 の印刷記録（[Task6-7] Print）が含まれるか。</summary>
+        public static bool HasTask6_7PrintExecuted()
         {
-            return HasGradingEvidenceMarker("[Task1-3] HideSlide3");
+            return HasGradingEvidenceMarker("[Task6-7] Print");
         }
 
-        /// <summary>証跡またはメインログに 1-4 削除記録（[Task1-4] DeleteThirdSlide）が含まれるか。</summary>
-        public static bool HasTask1_4DeleteThirdSlideExecuted()
+        /// <summary>証跡またはメインログに 1-8 サマリーズーム挿入記録（[Task1-8] SummaryZoom）が含まれるか。</summary>
+        public static bool HasTask1_8SummaryZoomExecuted()
         {
-            return HasGradingEvidenceMarker("[Task1-4] DeleteThirdSlide");
+            return HasGradingEvidenceMarker("[Task1-8] SummaryZoom");
+        }
+
+        /// <summary>
+        /// セッション内で 1-8 サマリーズームが実行済みか（採点コンテキストに依存しない）。
+        /// タスク1-6のスライド番号補正に使用する。
+        /// </summary>
+        public static bool HasTask1_8SummaryZoomExecutedGlobally()
+        {
+            return FileContainsMarker(GetTaskEvidenceLogPath(), "[Task1-8] SummaryZoom")
+                || FileContainsMarker(GetLogFilePath(), "[Task1-8] SummaryZoom");
         }
 
         /// <summary>採点用証跡を優先し、無ければ従来の mos_ppt_log.txt を検索する。</summary>
@@ -363,6 +602,12 @@ namespace Libraries
         public static bool HasTask7_4KioskExecuted()
         {
             return HasLogLineContaining("[Task7-4] Kiosk");
+        }
+
+        /// <summary>ログに P6-3 Kiosk 設定記録（[Task6-3] Kiosk）が含まれるか。</summary>
+        public static bool HasTask6_3KioskExecuted()
+        {
+            return HasLogLineContaining("[Task6-3] Kiosk");
         }
 
         /// <summary>ログに 10-1 ドキュメント検査記録（[Task10-1] DocumentInspector）が含まれるか。</summary>
@@ -523,6 +768,74 @@ namespace Libraries
             if (string.IsNullOrWhiteSpace(opLine)) return "";
             int space = opLine.IndexOf(' ');
             return space > 0 ? opLine.Substring(0, space).Trim() : opLine.Trim();
+        }
+
+        /// <summary>タスク開始時スナップショットの読み取り結果（スライド構成検証用）。</summary>
+        public sealed class PPTaskSnapshotData
+        {
+            public int ProjectId { get; set; }
+            public int TaskId { get; set; }
+            public int SlidesCount { get; set; }
+            public List<string> SlideNames { get; set; } = new List<string>();
+        }
+
+        /// <summary>
+        /// %TEMP%\mos_ppt_snapshot.txt から、指定タスクの開始時スナップショットを読み込む。
+        /// ProjectId / TaskId が一致しない場合は false を返す。
+        /// </summary>
+        public static bool TryLoadTaskSnapshot(int projectId, int taskId, out PPTaskSnapshotData snapshot)
+        {
+            snapshot = null;
+            string path = GetSnapshotPath();
+            if (!File.Exists(path))
+                return false;
+
+            try
+            {
+                var data = new PPTaskSnapshotData();
+                foreach (string line in File.ReadAllLines(path))
+                {
+                    if (string.IsNullOrEmpty(line)) continue;
+                    int colonIndex = line.IndexOf(':');
+                    if (colonIndex < 0) continue;
+
+                    string key = line.Substring(0, colonIndex);
+                    string value = line.Substring(colonIndex + 1);
+
+                    switch (key)
+                    {
+                        case "TaskId":
+                            var ids = value.Split(',');
+                            if (ids.Length == 2)
+                            {
+                                int.TryParse(ids[0], out int pid);
+                                int.TryParse(ids[1], out int tid);
+                                data.ProjectId = pid;
+                                data.TaskId = tid;
+                            }
+                            break;
+                        case "SlidesCount":
+                            int.TryParse(value, out int slidesCount);
+                            data.SlidesCount = slidesCount;
+                            break;
+                        case "SlideNames":
+                            data.SlideNames = value.Split(new[] { '|' }, StringSplitOptions.None).ToList();
+                            break;
+                    }
+                }
+
+                if (data.ProjectId != projectId || data.TaskId != taskId)
+                    return false;
+                if (data.SlidesCount < 1 || data.SlideNames == null || data.SlideNames.Count != data.SlidesCount)
+                    return false;
+
+                snapshot = data;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

@@ -6,7 +6,7 @@ namespace PowerPointAddIn1
 {
     /// <summary>
     /// PowerPoint 操作ログを記録するクラス。
-    /// mos_ppt_log.txt に全般を記録するほか、5-1/10-4/11-7 の採点根拠は mos_ppt_task_evidence.txt にも追記する（単体リセットでメインログが消されても採点可能にする）。
+    /// mos_ppt_log.txt に全般を記録するほか、4-3/5-1/10-4/11-7 の採点根拠は mos_ppt_task_evidence.txt にも追記する（単体リセットでメインログが消されても採点可能にする）。
     /// </summary>
     public static class Logger
     {
@@ -71,6 +71,36 @@ namespace PowerPointAddIn1
             LogTaskTag("Task10-4", "Grayscale");
         }
 
+        /// <summary>P8-5: 表示グレースケール操作をログに記録。</summary>
+        public static void LogTask8_5Grayscale()
+        {
+            LogTaskTag("Task8-5", "Grayscale");
+        }
+
+        /// <summary>P8-3: スライドサイズ16:9設定をログに記録（P8-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask8_3SlideSize16x9()
+        {
+            LogTaskTag("Task8-3", "SlideSize16x9");
+        }
+
+        /// <summary>P2-1: スプリット＋ワイプアウト（横）の画面切り替えを記録（P2-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask2_1SplitHorizontalOut()
+        {
+            LogTaskTag("Task2-1", "SplitHorizontalOut");
+        }
+
+        /// <summary>P2-2: 全スライド画面切り替え継続時間3秒を記録（P2-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask2_2TransitionDuration3Sec()
+        {
+            LogTaskTag("Task2-2", "TransitionDuration3Sec");
+        }
+
+        /// <summary>P2-3: スライド3〜5に「切り替え」を記録（P2-4で上書きされるため一括採点用）。</summary>
+        public static void LogTask2_3SwitchRight()
+        {
+            LogTaskTag("Task2-3", "SwitchRight");
+        }
+
         /// <summary>5-1: 配布資料3スライド・部単位4部で印刷したことを記録。</summary>
         public static void LogTask5_1Print()
         {
@@ -81,6 +111,30 @@ namespace PowerPointAddIn1
         public static void LogTask11_7Print()
         {
             LogTaskTag("Task11-7", "Print");
+        }
+
+        /// <summary>P6-5: アウトライン・6部・部単位で印刷設定したことを記録。</summary>
+        public static void LogTask6_5Print()
+        {
+            LogTaskTag("Task6-5", "Print");
+        }
+
+        /// <summary>P6-6: ノート・3部・ページ単位（Collate OFF）で印刷設定したことを記録。</summary>
+        public static void LogTask6_6Print()
+        {
+            LogTaskTag("Task6-6", "Print");
+        }
+
+        /// <summary>P6-7: グレースケール配布資料3スライド/頁・4部で印刷設定したことを記録。</summary>
+        public static void LogTask6_7Print()
+        {
+            LogTaskTag("Task6-7", "Print");
+        }
+
+        /// <summary>4-3: スライド1画像に光彩18pt・アクセント6を適用したことを記録。</summary>
+        public static void LogTask4_3Glow()
+        {
+            LogTaskTag("Task4-3", "Glow18Accent6");
         }
 
         /// <summary>1-2: スライド2の複製状態（2,3枚目同レイアウト）を検出したことを記録。</summary>
@@ -101,10 +155,28 @@ namespace PowerPointAddIn1
             LogTaskTag("Task1-4", "DeleteThirdSlide");
         }
 
-        /// <summary>8-4: オーディオ再生設定（フェードイン4秒等）を記録。</summary>
+        /// <summary>1-8: サマリーズームスライドが挿入されたことを記録。</summary>
+        public static void LogTask1_8SummaryZoom()
+        {
+            LogTaskTag("Task1-8", "SummaryZoom");
+        }
+
+        /// <summary>8-4: オーディオ再生設定（フェードイン4秒等）を記録。Legacy 参照用。</summary>
         public static void LogTask8_4Audio()
         {
             LogTaskTag("Task8-4", "Audio");
+        }
+
+        /// <summary>P9-3: スライド切替後も再生を記録（旧8-4）。</summary>
+        public static void LogTask9_3PlayAcrossSlides()
+        {
+            LogTaskTag("Task9-3", "PlayAcrossSlides");
+        }
+
+        /// <summary>P9-3: フェードアウト3秒を記録（旧8-4）。</summary>
+        public static void LogTask9_3FadeOut3000()
+        {
+            LogTaskTag("Task9-3", "FadeOut3000");
         }
 
         /// <summary>7-2: スライドの再利用を記録。</summary>
@@ -123,6 +195,12 @@ namespace PowerPointAddIn1
         public static void LogTask7_4Kiosk()
         {
             LogTaskTag("Task7-4", "Kiosk");
+        }
+
+        /// <summary>P6-3: スライドショーを自動プレゼンテーション（Kiosk）に設定したことを記録。</summary>
+        public static void LogTask6_3Kiosk()
+        {
+            LogTaskTag("Task6-3", "Kiosk");
         }
 
         /// <summary>10-1: ドキュメント検査実行を記録。</summary>
@@ -205,9 +283,20 @@ namespace PowerPointAddIn1
                     if (string.Equals(taskTag, "Task1-2", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task1-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task1-4", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task1-8", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task4-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task5-1", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task6-5", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task6-6", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task6-7", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task11-7", StringComparison.Ordinal)
-                        || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal))
+                        || string.Equals(taskTag, "Task10-4", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task8-5", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task8-3", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task9-3", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task2-1", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task2-2", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task2-3", StringComparison.Ordinal))
                     {
                         AppendToFile(TaskEvidenceFilePath, logEntry);
                     }

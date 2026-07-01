@@ -1,17 +1,31 @@
 using System;
 using System.Runtime.InteropServices;
-using Microsoft.Office.Interop.PowerPoint;
+using System.Threading;
+using Libraries;
 using Microsoft.Office.Core;
+using Microsoft.Office.Interop.PowerPoint;
 using PptShape = Microsoft.Office.Interop.PowerPoint.Shape;
 using PptShapes = Microsoft.Office.Interop.PowerPoint.Shapes;
 
 namespace Libraries.Group1
 {
+    /// <summary>プロジェクト9（P9-1〜P9-5）。Phase B でタスク単位に Legacy 移植。</summary>
     public class PowerPointChecker1_9
     {
-        private const int XlBarClustered = 57;
-        private const string ExpectedHyperlinkAddressTask9_6 = "https://www.jica.go.jp/activities/issues/natural_env/index.html";
+        private const string ExpectedSlideTitleP9_1 = "スクールの様子";
+        private const int P9_2TargetSlideNumber = 5;
+        private const float P9_2ExpectedStartMs = 4000f;
+        private const float P9_2ExpectedEndMs = 9000f;
+        private const float P9_2TrimToleranceMs = 500f;
+        private const int P9_3TargetSlideNumber = 1;
+        private const string P9_3PlayAcrossMarker = "[Task9-3] PlayAcrossSlides";
+        private const string P9_3FadeOutMarker = "[Task9-3] FadeOut3000";
+        private const int P9_4TargetSlideNumber = 2;
+        /// <summary>Excel XlChartType.xlColumnClustered（集合縦棒）。</summary>
+        private const int XlColumnClustered = 51;
+        private const int P9_5TargetSlideNumber = 2;
 
+        /// <summary>P9-1: スライド「スクールの様子」に動画挿入（旧8-1）。アイコン表示は COM では区別せず動画存在で判定。</summary>
         public bool CheckTask_1_9_01()
         {
             Presentation pres = null;
@@ -22,14 +36,195 @@ namespace Libraries.Group1
                 Slide slide = null;
                 try
                 {
-                    slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 2);
+                    slide = PowerPointCheckerCommon.GetSlideByTitle(pres, ExpectedSlideTitleP9_1);
+                    if (slide == null) return false;
+                    PptShape videoShape = null;
+                    try
+                    {
+                        for (int attempt = 1; attempt <= 5 && videoShape == null; attempt++)
+                        {
+                            videoShape = PowerPointCheckerCommon.FindFirstVideoShape(slide);
+                            if (videoShape == null)
+                                Thread.Sleep(400);
+                        }
+                        return videoShape != null;
+                    }
+                    finally
+                    {
+                        if (videoShape != null) { try { Marshal.ReleaseComObject(videoShape); } catch { } }
+                    }
+                }
+                finally
+                {
+                    if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
+                }
+            }
+            catch { return false; }
+            finally
+            {
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+        }
+
+        /// <summary>P9-2: スライド5のビデオを開始4秒・終了9秒にトリム（旧8-3、5秒/10秒→4秒/9秒）。</summary>
+        public bool CheckTask_1_9_02()
+        {
+            Presentation pres = null;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres == null) return false;
+                Slide slide = null;
+                try
+                {
+                    slide = PowerPointCheckerCommon.GetSlideByNumber(pres, P9_2TargetSlideNumber);
+                    if (slide == null) return false;
+                    PptShape videoShape = null;
+                    try
+                    {
+                        for (int attempt = 1; attempt <= 5 && videoShape == null; attempt++)
+                        {
+                            videoShape = PowerPointCheckerCommon.FindFirstVideoShape(slide);
+                            if (videoShape == null)
+                                Thread.Sleep(400);
+                        }
+                        if (videoShape == null) return false;
+
+                        MediaFormat mf = null;
+                        try
+                        {
+                            mf = videoShape.MediaFormat;
+                            if (mf == null) return false;
+                            float startPt = (float)mf.StartPoint;
+                            float endPt = (float)mf.EndPoint;
+                            return Math.Abs(startPt - P9_2ExpectedStartMs) < P9_2TrimToleranceMs
+                                && Math.Abs(endPt - P9_2ExpectedEndMs) < P9_2TrimToleranceMs;
+                        }
+                        catch { return false; }
+                        finally
+                        {
+                            if (mf != null) { try { Marshal.ReleaseComObject(mf); } catch { } }
+                        }
+                    }
+                    finally
+                    {
+                        if (videoShape != null) { try { Marshal.ReleaseComObject(videoShape); } catch { } }
+                    }
+                }
+                finally
+                {
+                    if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
+                }
+            }
+            catch { return false; }
+            finally
+            {
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+        }
+
+        /// <summary>P9-3: スライド1オーディオ・スライド切替後も再生＋フェードアウト3秒（旧8-4）。両条件 AND。</summary>
+        public bool CheckTask_1_9_03()
+        {
+            if (TrySlide1AudioP9_3ViaCom())
+                return true;
+
+            bool playAcross = PPLogReader.HasMarkerWithinTask(9, 3, P9_3PlayAcrossMarker);
+            if (!playAcross)
+                return false;
+            return PPLogReader.HasMarkerWithinTask(9, 3, P9_3FadeOutMarker);
+        }
+
+        private static bool TrySlide1AudioP9_3ViaCom()
+        {
+            Presentation pres = null;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres == null) return false;
+                for (int attempt = 1; attempt <= 5; attempt++)
+                {
+                    Slide slide = null;
+                    try
+                    {
+                        slide = PowerPointCheckerCommon.GetSlideByNumber(pres, P9_3TargetSlideNumber);
+                        if (slide != null && SlideHasAudioMatchingP9_3(slide, pres))
+                            return true;
+                    }
+                    finally
+                    {
+                        if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
+                    }
+                    Thread.Sleep(400);
+                }
+                return false;
+            }
+            catch { return false; }
+            finally
+            {
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+        }
+
+        private static bool SlideHasAudioMatchingP9_3(Slide slide, Presentation pres)
+        {
+            if (slide == null) return false;
+            PptShapes shapes = null;
+            try
+            {
+                shapes = slide.Shapes;
+                if (shapes == null) return false;
+                int shapeCount;
+                try { shapeCount = shapes.Count; }
+                catch { return false; }
+
+                for (int i = 1; i <= shapeCount; i++)
+                {
+                    PptShape sh = null;
+                    try
+                    {
+                        try { sh = shapes[i]; }
+                        catch { continue; }
+
+                        if (PptAudioMediaHelper.ShapeMatchesP9_3AudioSettings(sh, pres))
+                            return true;
+                    }
+                    finally
+                    {
+                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
+                    }
+                }
+                return false;
+            }
+            catch { return false; }
+            finally
+            {
+                if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
+            }
+        }
+
+        /// <summary>P9-4: スライド2に集合縦棒グラフ（旧9-1）。ChartType = xlColumnClustered のみ。</summary>
+        public bool CheckTask_1_9_04()
+        {
+            Presentation pres = null;
+            try
+            {
+                pres = PowerPointCheckerCommon.GetActivePresentation();
+                if (pres == null) return false;
+                Slide slide = null;
+                try
+                {
+                    slide = PowerPointCheckerCommon.GetSlideByNumber(pres, P9_4TargetSlideNumber);
                     if (slide == null) return false;
                     PptShapes shapes = null;
                     try
                     {
                         shapes = slide.Shapes;
                         if (shapes == null) return false;
-                        int count = shapes.Count;
+                        int count;
+                        try { count = shapes.Count; }
+                        catch { return false; }
+
                         for (int i = 1; i <= count; i++)
                         {
                             PptShape sh = null;
@@ -42,17 +237,17 @@ namespace Libraries.Group1
                                 {
                                     chart = sh.Chart;
                                     if (chart == null) continue;
-                                    try
-                                    {
-                                        int ct = (int)chart.ChartType;
-                                        return ct == XlBarClustered;
-                                    }
-                                    finally
-                                    {
-                                        if (chart != null) { try { Marshal.ReleaseComObject(chart); } catch { } }
-                                    }
+                                    int ct;
+                                    try { ct = (int)chart.ChartType; }
+                                    catch { continue; }
+                                    if (ct == XlColumnClustered)
+                                        return true;
                                 }
                                 catch { continue; }
+                                finally
+                                {
+                                    if (chart != null) { try { Marshal.ReleaseComObject(chart); } catch { } }
+                                }
                             }
                             finally
                             {
@@ -72,218 +267,13 @@ namespace Libraries.Group1
                 }
             }
             catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
-        }
-
-        /// <summary>9-2: スライド4の表を「中間スタイル1-アクセント4」に変更し、1行ずつ色が変わらないように（縞模様行OFF）。</summary>
-        public bool CheckTask_1_9_02()
-        {
-            Presentation pres = null;
-            try
+            finally
             {
-                pres = PowerPointCheckerCommon.GetActivePresentation();
-                if (pres == null) return false;
-                Slide slide = null;
-                try
-                {
-                    slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 4);
-                    if (slide == null) return false;
-                    PptShapes shapes = null;
-                    try
-                    {
-                        shapes = slide.Shapes;
-                        if (shapes == null) return false;
-                        for (int i = 1; i <= shapes.Count; i++)
-                        {
-                            PptShape sh = null;
-                            try
-                            {
-                                sh = shapes[i];
-                                if (sh.HasTable != MsoTriState.msoTrue) continue;
-                                Table table = null;
-                                try
-                                {
-                                    table = sh.Table;
-                                    if (table == null) continue;
-                                    TableStyle ts = null;
-                                    try
-                                    {
-                                        ts = table.Style;
-                                        if (ts == null) continue;
-                                        string styleName = "";
-                                        try { styleName = ts.Name ?? ""; } catch { }
-                                        // スペースあり・なしの両方に対応します
-                                        bool hasAccent4 = styleName.Contains("アクセント 4") || styleName.Contains("Accent 4") || styleName.Contains("アクセント4");
-                                        bool isBandedOff = !table.HorizBanding;
-                                        return hasAccent4 && isBandedOff;
-                                    }
-                                    finally { if (ts != null) { try { Marshal.ReleaseComObject(ts); } catch { } } }
-                                }
-                                finally { if (table != null) { try { Marshal.ReleaseComObject(table); } catch { } } }
-                            }
-                            finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
-                        }
-                        return false;
-                    }
-                    finally { if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } } }
-                }
-                finally { if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } } }
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
             }
-            catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
-        }
-        private const int XlLabelPositionOutsideEnd = 2;
-
-        /// <summary>9-3: スライド2のグラフのデータラベルを外側に追加。</summary>
-        public bool CheckTask_1_9_03()
-        {
-            Presentation pres = null;
-            try
-            {
-                pres = PowerPointCheckerCommon.GetActivePresentation();
-                if (pres == null) return false;
-                Slide slide = null;
-                try
-                {
-                    slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 2);
-                    if (slide == null) return false;
-                    PptShapes shapes = null;
-                    try
-                    {
-                        shapes = slide.Shapes;
-                        if (shapes == null) return false;
-                        for (int i = 1; i <= shapes.Count; i++)
-                        {
-                            PptShape sh = null;
-                            try
-                            {
-                                sh = shapes[i];
-                                if (sh.HasChart != MsoTriState.msoTrue) continue;
-                                Chart chart = null;
-                                try
-                                {
-                                    chart = sh.Chart;
-                                    if (chart == null) continue;
-                                    try
-                                    {
-                                        var seriesColl = chart.SeriesCollection();
-                                        if (seriesColl == null || seriesColl.Count < 1) continue;
-                                        try
-                                        {
-                                            Series series = seriesColl.Item(1);
-                                            if (series == null) continue;
-                                            try
-                                            {
-                                                if (!series.HasDataLabels) continue;
-                                                DataLabels dataLabels = series.DataLabels();
-                                                if (dataLabels == null) continue;
-                                                try
-                                                {
-                                                    int pos = (int)dataLabels.Position;
-                                                    return pos == XlLabelPositionOutsideEnd;
-                                                }
-                                                finally { if (dataLabels != null) { try { Marshal.ReleaseComObject(dataLabels); } catch { } } }
-                                            }
-                                            finally { if (series != null) { try { Marshal.ReleaseComObject(series); } catch { } } }
-                                        }
-                                        finally { if (seriesColl != null) { try { Marshal.ReleaseComObject(seriesColl); } catch { } } }
-                                    }
-                                    finally { if (chart != null) { try { Marshal.ReleaseComObject(chart); } catch { } } }
-                                }
-                                catch { continue; }
-                            }
-                            finally { if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } } }
-                        }
-                        return false;
-                    }
-                    finally { if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } } }
-                }
-                finally { if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } } }
-            }
-            catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
-        }
-        /// <summary>9-4: フッターに「www.MOS.jp」とページ番号を、タイトルスライド以外に追加。</summary>
-        public bool CheckTask_1_9_04()
-        {
-            Presentation pres = null;
-            try
-            {
-                pres = PowerPointCheckerCommon.GetActivePresentation();
-                if (pres == null) return false;
-                Slides slides = null;
-                try
-                {
-                    slides = pres.Slides;
-                    if (slides == null || slides.Count < 2) return false;
-
-                    // 1. 「タイトルスライドに表示しない」設定の確認
-                    // マスター設定、または個別のスライド設定のいずれかでオプションが有効かを確認します。
-                    bool isSkipOnTitleEnabled = false;
-                    try {
-                        if (pres.SlideMaster.HeadersFooters.DisplayOnTitleSlide == MsoTriState.msoFalse) isSkipOnTitleEnabled = true;
-                    } catch { }
-
-                    // 2. スライドの内容をチェック
-                    bool isOtherSlidesOk = false;
-                    for (int i = 1; i <= slides.Count; i++)
-                    {
-                        Slide slide = null;
-                        try
-                        {
-                            slide = slides[i];
-                            HeadersFooters hf = null;
-                            try
-                            {
-                                hf = slide.HeadersFooters;
-                                if (hf == null) continue;
-
-                                bool displayOnTitleIsFalse = false;
-                                try { displayOnTitleIsFalse = (hf.DisplayOnTitleSlide == MsoTriState.msoFalse); } catch { }
-
-                                bool footerVis = false;
-                                try { footerVis = (hf.Footer.Visible == MsoTriState.msoTrue); } catch { }
-                                
-                                bool snVis = false;
-                                try { snVis = (hf.SlideNumber.Visible == MsoTriState.msoTrue); } catch { }
-
-                                // どこかのスライドで設定が確認できれば有効とみなす
-                                if (displayOnTitleIsFalse) isSkipOnTitleEnabled = true;
-                                // もしスライド1のフッターが非表示なら、設定は効いていると判断
-                                if (i == 1 && !footerVis) isSkipOnTitleEnabled = true;
-
-                                // スライド2以降でフッターが表示されている箇所があれば内容をチェック
-                                if (i > 1 && footerVis)
-                                {
-                                    string text = "";
-                                    try { text = hf.Footer.Text ?? ""; } catch { }
-                                    bool isCorrectText = text.IndexOf("www.MOS.jp", StringComparison.OrdinalIgnoreCase) >= 0;
-                                    
-                                    // 9-5（5枚目）の変更が行われていても許容する
-                                    if (i == 5 && text.IndexOf("集中的に", StringComparison.OrdinalIgnoreCase) >= 0) isCorrectText = true;
-
-                                    if (isCorrectText && snVis)
-                                    {
-                                        isOtherSlidesOk = true;
-                                    }
-                                }
-                            }
-                            catch { }
-                            finally { if (hf != null) { try { Marshal.ReleaseComObject(hf); } catch { } } }
-                        }
-                        finally { if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } } }
-                    }
-
-                    // 設定が有効（またはスライド1で非表示）であり、かつ通常スライドの内容が正しければ合格
-                    return isSkipOnTitleEnabled && isOtherSlidesOk;
-                }
-                finally { if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } } }
-            }
-            catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
         }
 
-        /// <summary>9-5: 5枚目のスライドのフッターにのみ「集中的に」を挿入。</summary>
+        /// <summary>P9-5: スライド2グラフにデータテーブル（凡例マーカーなし）・タイトル/凡例削除（旧9-3）。</summary>
         public bool CheckTask_1_9_05()
         {
             Presentation pres = null;
@@ -291,187 +281,12 @@ namespace Libraries.Group1
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
-                Slide slide5 = null;
-                try
-                {
-                    slide5 = PowerPointCheckerCommon.GetSlideByNumber(pres, 5);
-                    if (slide5 == null) return false;
-                    HeadersFooters hf5 = null;
-                    try
-                    {
-                        hf5 = slide5.HeadersFooters;
-                        if (hf5 == null) return false;
-                        string footer5 = "";
-                        try { footer5 = hf5.Footer?.Text ?? ""; } catch { }
-                        if (footer5.IndexOf("集中的に", StringComparison.OrdinalIgnoreCase) < 0) return false;
-                    }
-                    finally { if (hf5 != null) { try { Marshal.ReleaseComObject(hf5); } catch { } } }
-                }
-                finally { if (slide5 != null) { try { Marshal.ReleaseComObject(slide5); } catch { } } }
-                Slides slides = null;
-                try
-                {
-                    slides = pres.Slides;
-                    if (slides == null) return true;
-                    for (int i = 1; i <= slides.Count; i++)
-                    {
-                        if (i == 5) continue;
-                        Slide slide = null;
-                        try
-                        {
-                            slide = slides[i];
-                            HeadersFooters hf = null;
-                            try
-                            {
-                                hf = slide.HeadersFooters;
-                                if (hf == null) continue;
-                                string footer = "";
-                                try { footer = hf.Footer?.Text ?? ""; } catch { }
-                                if (footer.IndexOf("集中的に", StringComparison.OrdinalIgnoreCase) >= 0) return false;
-                            }
-                            finally { if (hf != null) { try { Marshal.ReleaseComObject(hf); } catch { } } }
-                        }
-                        finally { if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } } }
-                    }
-                    return true;
-                }
-                finally { if (slides != null) { try { Marshal.ReleaseComObject(slides); } catch { } } }
-            }
-            catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
-        }
-
-        public bool CheckTask_1_9_06()
-        {
-            Presentation pres = null;
-            try
-            {
-                pres = PowerPointCheckerCommon.GetActivePresentation();
-                if (pres == null) return false;
                 Slide slide = null;
                 try
                 {
-                    slide = PowerPointCheckerCommon.GetSlideByNumber(pres, 1);
+                    slide = PowerPointCheckerCommon.GetSlideByNumber(pres, P9_5TargetSlideNumber);
                     if (slide == null) return false;
-                    PptShape shape = null;
-                    try
-                    {
-                        shape = PowerPointCheckerCommon.FindShapeWithText(slide, "お問い合わせ");
-                        if (shape == null) return false;
-                        try
-                        {
-                            Microsoft.Office.Interop.PowerPoint.TextFrame tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)shape.TextFrame;
-                            if (tf == null) return false;
-                            TextRange tr = null;
-                            try
-                            {
-                                tr = tf.TextRange;
-                                if (tr == null) return false;
-                                ActionSettings acts = null;
-                                try
-                                {
-                                    acts = tr.ActionSettings;
-                                    if (acts == null) return false;
-                                    ActionSetting act = null;
-                                    try
-                                    {
-                                        act = acts[PpMouseActivation.ppMouseClick];
-                                        if (act == null) return false;
-                                        if (act.Action != PpActionType.ppActionHyperlink) return false;
-                                        Hyperlink hyp = null;
-                                        try
-                                        {
-                                            hyp = act.Hyperlink;
-                                            if (hyp != null)
-                                            {
-                                                string addr = (hyp.Address ?? "").Trim();
-                                                if (string.Equals(addr, ExpectedHyperlinkAddressTask9_6, StringComparison.OrdinalIgnoreCase))
-                                                    return true;
-                                            }
-                                        }
-                                        finally
-                                        {
-                                            if (hyp != null) { try { Marshal.ReleaseComObject(hyp); } catch { } }
-                                        }
-                                    }
-                                    finally
-                                    {
-                                        if (act != null) { try { Marshal.ReleaseComObject(act); } catch { } }
-                                    }
-                                }
-                                finally
-                                {
-                                    if (acts != null) { try { Marshal.ReleaseComObject(acts); } catch { } }
-                                }
-                                try
-                                {
-                                    int r = 1;
-                                    while (true)
-                                    {
-                                        TextRange run = null;
-                                        try
-                                        {
-                                            run = tr.Runs(r, 1);
-                                            if (run == null) break;
-                                            ActionSettings runActs = null;
-                                            try
-                                            {
-                                                runActs = run.ActionSettings;
-                                                if (runActs == null) { r++; continue; }
-                                                ActionSetting runAct = null;
-                                                try
-                                                {
-                                                    runAct = runActs[PpMouseActivation.ppMouseClick];
-                                                    if (runAct != null && runAct.Action == PpActionType.ppActionHyperlink)
-                                                    {
-                                                        Hyperlink runHyp = null;
-                                                        try
-                                                        {
-                                                            runHyp = runAct.Hyperlink;
-                                                            if (runHyp != null)
-                                                            {
-                                                                string addr = (runHyp.Address ?? "").Trim();
-                                                                if (string.Equals(addr, ExpectedHyperlinkAddressTask9_6, StringComparison.OrdinalIgnoreCase))
-                                                                    return true;
-                                                            }
-                                                        }
-                                                        finally
-                                                        {
-                                                            if (runHyp != null) { try { Marshal.ReleaseComObject(runHyp); } catch { } }
-                                                        }
-                                                    }
-                                                }
-                                                finally
-                                                {
-                                                    if (runAct != null) { try { Marshal.ReleaseComObject(runAct); } catch { } }
-                                                }
-                                            }
-                                            finally
-                                            {
-                                                if (runActs != null) { try { Marshal.ReleaseComObject(runActs); } catch { } }
-                                            }
-                                        }
-                                        finally
-                                        {
-                                            if (run != null) { try { Marshal.ReleaseComObject(run); } catch { } }
-                                        }
-                                        r++;
-                                    }
-                                }
-                                catch { }
-                                return false;
-                            }
-                            finally
-                            {
-                                if (tr != null) { try { Marshal.ReleaseComObject(tr); } catch { } }
-                            }
-                        }
-                        finally
-                        {
-                            if (shape != null) { try { Marshal.ReleaseComObject(shape); } catch { } }
-                        }
-                    }
-                    catch { return false; }
+                    return SlideHasChartMatchingP9_5(slide);
                 }
                 finally
                 {
@@ -479,39 +294,82 @@ namespace Libraries.Group1
                 }
             }
             catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+            finally
+            {
+                if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
         }
 
-        /// <summary>9-7: スライドの大きさを縦25.04、横33.12に変更し、スライドは画面に合わせる。</summary>
-        public bool CheckTask_1_9_07()
+        private static bool SlideHasChartMatchingP9_5(Slide slide)
         {
-            Presentation pres = null;
+            if (slide == null) return false;
+            PptShapes shapes = null;
             try
             {
-                pres = PowerPointCheckerCommon.GetActivePresentation();
-                if (pres == null) return false;
-                PageSetup pageSetup = null;
-                try
+                shapes = slide.Shapes;
+                if (shapes == null) return false;
+                int count;
+                try { count = shapes.Count; }
+                catch { return false; }
+
+                for (int i = 1; i <= count; i++)
                 {
-                    pageSetup = pres.PageSetup;
-                    if (pageSetup == null) return false;
+                    PptShape sh = null;
                     try
                     {
-                        // PowerPointの内部単位はポイント(pt)のため、cmから変換して比較します (1cm = 72/2.54 = 約28.346pt)
-                        const float cmToPt = 72 / 2.54f;
-                        float w = (float)pageSetup.SlideWidth;
-                        float h = (float)pageSetup.SlideHeight;
-                        const float expectedWidthPt = 33.12f * cmToPt;
-                        const float expectedHeightPt = 25.04f * cmToPt;
-                        const float tolerance = 1.0f; // 約0.35mm程度の許容範囲
-                        return Math.Abs(w - expectedWidthPt) < tolerance && Math.Abs(h - expectedHeightPt) < tolerance;
+                        sh = shapes[i];
+                        if (sh.HasChart != MsoTriState.msoTrue) continue;
+                        Chart chart = null;
+                        try
+                        {
+                            chart = sh.Chart;
+                            if (chart != null && IsChartMatchingP9_5(chart))
+                                return true;
+                        }
+                        catch { continue; }
+                        finally
+                        {
+                            if (chart != null) { try { Marshal.ReleaseComObject(chart); } catch { } }
+                        }
                     }
-                    catch { return false; }
+                    finally
+                    {
+                        if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
+                    }
                 }
-                finally { if (pageSetup != null) { try { Marshal.ReleaseComObject(pageSetup); } catch { } } }
+                return false;
             }
             catch { return false; }
-            finally { if (pres != null) { try { Marshal.ReleaseComObject(pres); } catch { } } }
+            finally
+            {
+                if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
+            }
+        }
+
+        private static bool IsChartMatchingP9_5(Chart chart)
+        {
+            if (chart == null) return false;
+            try
+            {
+                if (!chart.HasDataTable) return false;
+                if (chart.HasTitle) return false;
+                if (chart.HasLegend) return false;
+
+                object dataTable = null;
+                try
+                {
+                    dataTable = chart.DataTable;
+                    if (dataTable == null) return false;
+                    dynamic dt = dataTable;
+                    return !(bool)dt.ShowLegendKey;
+                }
+                catch { return false; }
+                finally
+                {
+                    if (dataTable != null) { try { Marshal.ReleaseComObject(dataTable); } catch { } }
+                }
+            }
+            catch { return false; }
         }
     }
 }
