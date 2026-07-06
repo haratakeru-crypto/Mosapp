@@ -1,0 +1,295 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。4-1=コメント挿入、4-2=コメント返信、4-3=コメント解決削除、4-4=スタイルセット、4-5=透かし、4-6=ページ罫線、4-7=ドキュメント検査の操作種別を維持。",
+    "forbiddenParagraphTexts": [
+      "1.生活の中でできるエコ活動",
+      "その他",
+      "エコと節約",
+      "前田先生に最終確認",
+      "最新の情報を確認",
+      "サンプル２",
+      "エコ活動"
+    ],
+    "perSetMustVary": [
+      "導入文と本文テーマ",
+      "コメント挿入箇所（見出し／本文／見出し下段落／画像左段落／画像）",
+      "返信対象見出し・返信本文（最終確認を含まない）",
+      "4-3操作種別（解決のみ／削除のみ／複数解決削除）",
+      "スタイルセット名（線（シンプル）以外）",
+      "透かし文字列",
+      "罫線色・太さ（太さはセット間で一意）",
+      "4-7検査削除項目（透かし+ヘッダーフッター一括以外）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "4-1挿入箇所種別",
+      "4-1コメント本文",
+      "4-2見出し",
+      "4-2返信本文",
+      "4-3対象文字列",
+      "透かし文字列",
+      "スタイルセット名",
+      "罫線太さ"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "見出し・コメント・透かしを完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "insertComment": "校閲 → 新しいコメント",
+    "replyComment": "校閲 → 返信",
+    "resolveComment": "校閲 → 解決",
+    "deleteComment": "校閲 → 削除",
+    "styleSet": "デザイン → スタイルセット",
+    "watermark": "デザイン → 透かし",
+    "pageBorder": "デザイン → ページ罫線",
+    "documentInspector": "ファイル → 情報 → 問題のチェック"
+  },
+  "sourceFile": "Project4.docx",
+  "projectId": 4,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project4_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたはカフェ経営の研究レポートを作成しています。",
+      "tasks": [
+        "タスク4-1　見出し「1.豆の選定」に「\"焙煎日の記載を追加\"」とコメントを挿入します。",
+        "タスク4-2　見出し「備考」に挿入されているコメントに「\"店長に承認依頼\"」と返信します。",
+        "タスク4-3　本文内の「コストと品質」に対するコメントを解決してください。その後、コメントを削除します。",
+        "タスク4-4　文書にスタイルセット「モダン」を設定します。",
+        "タスク4-5　ページの背景に透かし文字「ドラフト１」を挿入します。",
+        "タスク4-6　文書の周囲を罫線で囲みます。線の色「茶色、アクセント１」、線の太さを「1pt」に設定します。",
+        "タスク4-7　ドキュメント検査を行い、コメントを削除します。上記以外の項目は削除しません。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["1.豆の選定", "2.焙煎管理", "備考"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 24,
+        "prefilledHeader": "カフェ経営レポート",
+        "prefilledFooter": "社外秘",
+        "prefilledAuthor": "焙煎担当 山田"
+      },
+      "taskParams": {
+        "task4_1": {
+          "anchorType": "heading",
+          "heading": "1.豆の選定",
+          "commentText": "焙煎日の記載を追加"
+        },
+        "task4_2": {"heading": "備考", "replyText": "店長に承認依頼", "prefilledComment": "承認待ち"},
+        "task4_3": {"targetText": "コストと品質", "operation": "resolveAndDelete"},
+        "task4_4": {"styleSet": "モダン"},
+        "task4_5": {"watermarkText": "ドラフト１"},
+        "task4_6": {"borderColor": "茶色、アクセント１", "borderWidth": "1pt"},
+        "task4_7": {
+          "inspectorRemove": ["コメント"],
+          "keepOtherInspectorItems": true
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project4_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは院内感染対策の研究レポートを作成しています。",
+      "tasks": [
+        "タスク4-1　本文内の「飛沫感染が主な経路の一つです。」に「\"感染経路図を差し替え\"」とコメントを挿入します。",
+        "タスク4-2　見出し「補足」に挿入されているコメントに「\"主任医師に照会\"」と返信します。",
+        "タスク4-3　本文内の「予防と費用」に対するコメントを解決してください。",
+        "タスク4-4　文書にスタイルセット「基本（シンプル）」を設定します。",
+        "タスク4-5　ページの背景に透かし文字「下書きＡ」を挿入します。",
+        "タスク4-6　文書の周囲を罫線で囲みます。線の色「緑、アクセント２」、線の太さを「1.75pt」に設定します。",
+        "タスク4-7　ドキュメント検査を行い、ドキュメントのプロパティと個人情報を削除します。上記以外の項目は削除しません。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["1.感染経路", "2.予防策", "補足"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント（緑）",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 26,
+        "prefilledHeader": "感染対策レポート",
+        "prefilledFooter": "内部資料",
+        "prefilledDocumentProperties": {"title": "院内感染対策草案", "author": "感染管理室"}
+      },
+      "taskParams": {
+        "task4_1": {
+          "anchorType": "bodyText",
+          "targetText": "飛沫感染が主な経路の一つです。",
+          "commentText": "感染経路図を差し替え"
+        },
+        "task4_2": {"heading": "補足", "replyText": "主任医師に照会", "prefilledComment": "部門レビュー依頼"},
+        "task4_3": {"targetText": "予防と費用", "operation": "resolveOnly"},
+        "task4_4": {"styleSet": "基本（シンプル）"},
+        "task4_5": {"watermarkText": "下書きＡ"},
+        "task4_6": {"borderColor": "緑、アクセント２", "borderWidth": "1.75pt"},
+        "task4_7": {
+          "inspectorRemove": ["ドキュメントのプロパティと個人情報"],
+          "keepOtherInspectorItems": true
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project4_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは品質管理の研究レポートを作成しています。",
+      "tasks": [
+        "タスク4-1　見出し「1.検査工程」の下の段落「抜取検査はAQL基準に従います。」に「\"規格番号を明記\"」とコメントを挿入します。",
+        "タスク4-2　見出し「注記」に挿入されているコメントに「\"品質部長に提出\"」と返信します。",
+        "タスク4-3　本文内の「品質と効率」に対するコメントを削除します。",
+        "タスク4-4　文書にスタイルセット「伝統」を設定します。",
+        "タスク4-5　ページの背景に透かし文字「レビュー用」を挿入します。",
+        "タスク4-6　文書の周囲を罫線で囲みます。線の色「青灰、アクセント３」、線の太さを「2.25pt」に設定します。",
+        "タスク4-7　ドキュメント検査を行い、非表示テキストを削除します。上記以外の項目は削除しません。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["1.検査工程", "2.不良対策", "注記"],
+        "marginPreset": "広い",
+        "orientation": "縦",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞",
+        "imagePlacement": "本文左寄せ（検査ライン）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 28,
+        "prefilledHeader": "品質管理レポート",
+        "prefilledFooter": "第3版",
+        "prefilledHiddenText": "社内限り（非表示）"
+      },
+      "taskParams": {
+        "task4_1": {
+          "anchorType": "paragraphUnderHeading",
+          "heading": "1.検査工程",
+          "targetParagraph": "抜取検査はAQL基準に従います。",
+          "commentText": "規格番号を明記"
+        },
+        "task4_2": {"heading": "注記", "replyText": "品質部長に提出", "prefilledComment": "レビュー待ち"},
+        "task4_3": {"targetText": "品質と効率", "operation": "deleteOnly"},
+        "task4_4": {"styleSet": "伝統"},
+        "task4_5": {"watermarkText": "レビュー用"},
+        "task4_6": {"borderColor": "青灰、アクセント３", "borderWidth": "2.25pt"},
+        "task4_7": {
+          "inspectorRemove": ["非表示テキスト"],
+          "keepOtherInspectorItems": true
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project4_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは旅行商品企画の研究レポートを作成しています。",
+      "tasks": [
+        "タスク4-1　画像「スーツケース」の左の段落に「\"旅程表を更新\"」とコメントを挿入します。",
+        "タスク4-2　見出し「メモ」に挿入されているコメントに「\"統括へ連絡\"」と返信します。",
+        "タスク4-3　本文内の「安全と快適」と「送迎と保険」に対するコメントを解決してください。その後、コメントを削除します。",
+        "タスク4-4　文書にスタイルセット「オフィス」を設定します。",
+        "タスク4-5　ページの背景に透かし文字「仮版２」を挿入します。",
+        "タスク4-6　文書の周囲を罫線で囲みます。線の色「橙、アクセント４」、線の太さを「2pt」に設定します。",
+        "タスク4-7　ドキュメント検査を行い、コメントとドキュメントのプロパティと個人情報を削除します。上記以外の項目は削除しません。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["1.行程管理", "2.顧客対応", "メモ"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "見出し下二重罫線",
+        "imagePlacement": "本文右下（スーツケース）",
+        "commentAnchorImage": "スーツケース",
+        "commentAnchorParagraph": "海外旅行では現地の慣習を尊重することが重要です。",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 25,
+        "prefilledHeader": "旅行企画レポート",
+        "prefilledFooter": "草案",
+        "prefilledDocumentProperties": {"title": "旅行商品企画案", "company": "企画部"}
+      },
+      "taskParams": {
+        "task4_1": {
+          "anchorType": "imageLeftParagraph",
+          "imageName": "スーツケース",
+          "targetParagraph": "海外旅行では現地の慣習を尊重することが重要です。",
+          "commentText": "旅程表を更新"
+        },
+        "task4_2": {"heading": "メモ", "replyText": "統括へ連絡", "prefilledComment": "照会依頼"},
+        "task4_3": {
+          "targetTexts": ["安全と快適", "送迎と保険"],
+          "operation": "resolveAndDeleteMultiple"
+        },
+        "task4_4": {"styleSet": "オフィス"},
+        "task4_5": {"watermarkText": "仮版２"},
+        "task4_6": {"borderColor": "橙、アクセント４", "borderWidth": "2pt"},
+        "task4_7": {
+          "inspectorRemove": ["コメント", "ドキュメントのプロパティと個人情報"],
+          "keepOtherInspectorItems": true
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project4_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは学習指導法の研究レポートを作成しています。",
+      "tasks": [
+        "タスク4-1　見出し「1.学習計画」の下の画像「ノートPC」に「\"教材リストを添付\"」とコメントを挿入します。",
+        "タスク4-2　見出し「追記」に挿入されているコメントに「\"教室長へ共有\"」と返信します。",
+        "タスク4-3　本文内の「成果と負担」に対するコメントを解決してください。その後、コメントを削除します。",
+        "タスク4-4　文書にスタイルセット「フォーマル」を設定します。",
+        "タスク4-5　ページの背景に透かし文字「案内用」を挿入します。",
+        "タスク4-6　文書の周囲を罫線で囲みます。線の色「紫、アクセント５」、線の太さを「3pt」に設定します。",
+        "タスク4-7　ドキュメント検査を行い、ヘッダー・フッターを削除します。上記以外の項目は削除しません。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["1.学習計画", "2.指導手法", "追記"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め",
+        "imagePlacement": "見出し直下（ノートPC）",
+        "commentAnchorImage": "ノートPC",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 23,
+        "prefilledHeader": "学習指導レポート",
+        "prefilledFooter": "2026年度"
+      },
+      "taskParams": {
+        "task4_1": {
+          "anchorType": "image",
+          "heading": "1.学習計画",
+          "imageName": "ノートPC",
+          "commentText": "教材リストを添付"
+        },
+        "task4_2": {"heading": "追記", "replyText": "教室長へ共有", "prefilledComment": "照会中"},
+        "task4_3": {"targetText": "成果と負担", "operation": "resolveAndDelete"},
+        "task4_4": {"styleSet": "フォーマル"},
+        "task4_5": {"watermarkText": "案内用"},
+        "task4_6": {"borderColor": "紫、アクセント５", "borderWidth": "3pt"},
+        "task4_7": {
+          "inspectorRemove": ["ヘッダー・フッター"],
+          "keepOtherInspectorItems": true
+        }
+      }
+    }
+  ]
+}

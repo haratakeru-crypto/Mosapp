@@ -107,6 +107,31 @@
                     <!-- 右側: ボタンとアイコン -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="20,0,10,0">
 
+                        <Button Name="VariantButton"
+                                Content="{Binding VariantButtonLabel}"
+                                Command="{Binding SwitchVariantModeCommand}"
+                                Visibility="{Binding ShowVariantButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Background="White"
+                                Foreground="#1E40AF"
+                                Padding="24,10"
+                                Margin="0,0,10,0"
+                                BorderThickness="0"
+                                FontWeight="Medium"
+                                FontSize="16">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#F3F4F6"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Background" Value="#E5E7EB"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <Button Name="ScoreButton" Content="採点" 
                                 Command="{Binding ScoreCommand}"
                                 Visibility="{Binding ShowScoreButton, Converter={StaticResource BooleanToVisibilityConverter}}"

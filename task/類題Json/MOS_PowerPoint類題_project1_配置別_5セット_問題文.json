@@ -1,0 +1,840 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project1の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "英語教育",
+      "UP Rabbit",
+      "教育理念",
+      "募集要項",
+      "ご提案のポイント",
+      "テーブルスライド",
+      "テキスト１スライド",
+      "テキスト1スライド"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "spacingPt": 4,
+      "layoutInsert": "テーブルスライド",
+      "layoutChange": "テキスト1スライド"
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project1.pptx",
+  "projectId": 1,
+  "variantType": "layout",
+  "taskCount": 8,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project1_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたは駅前カフェの新店舗提案資料を作成しています。",
+      "tasks": [
+        "タスク1-1　スライド４に、レイアウト「比較」のスライドを挿入します。",
+        "タスク1-2　スライド４を非表示にします。",
+        "タスク1-3　スライド５のレイアウトを「1枚目の項目とテキスト」に変更します。上側の［マスターテキストのスタイルを編集する］のプレースホルダーに「\"オープン直後の来客層\"」と入力します。",
+        "タスク1-4　スライド６の箇条書きを2段組みに変更します。",
+        "タスク1-5　スライド８の箇条書きのプレースホルダーの文字の間隔を広げます。幅を「\"3\"pt」にします。",
+        "タスク1-6　スライド８にセクションを追加します。セクション名は「\"売上振り返り\"」にします。",
+        "タスク1-7　スライド１のセクション名を「\"店舗概要\"」とします。",
+        "タスク1-8　スライド１の後ろにサマリーズームスライドを挿入し［1.メニュー方針］、［4.開店日程］の各スライドへのリンクを作成します。スライド１と８へのリンクは含めません。タイトルに「\"提案の要点\"」と入力します。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "（タイトルなしのセクション・名称未設定）"
+          },
+          {
+            "startSlide": 8,
+            "name": "（1-6実施前はセクション未追加）"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "駅前カフェ 春の集客プラン",
+            "subtitle": "地域密着型メニュー刷新",
+            "notes": "1-7: セクション名は未設定（タイトルなしのセクション）"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.メニュー方針"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "2.来客分析"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "補足データ",
+            "notes": "1-1: ここに新規スライド挿入前の既存スライド / 1-2: 挿入後に非表示（事前は表示）"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "3.オペレーション",
+            "notes": "1-3: レイアウト変更・プレースホルダ入力は未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.スタッフ配置",
+            "bullets": [
+              "朝班と夕班の役割分担",
+              "ピーク時の動線確保",
+              "清掃チェックリストの運用"
+            ],
+            "notes": "1-4: 2段組み未設定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "5.販促施策"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.開店日程",
+            "bullets": [
+              "試験営業の実施日",
+              "本開店までの準備項目",
+              "地域告知のタイミング"
+            ],
+            "notes": "1-5: 文字間隔未変更 / 1-6: セクション未追加"
+          }
+        ],
+        "objects": {},
+        "preTaskState": {
+          "hiddenSlides": [],
+          "slide4Inserted": false,
+          "slide4Hidden": false,
+          "summaryZoomInserted": false,
+          "twoColumnsOnSlide6": false,
+          "characterSpacingOnSlide8": false
+        }
+      },
+      "taskParams": {
+        "task1_1": {
+          "insertAfterSlide": 3,
+          "newSlidePosition": 4,
+          "layoutUi": "比較",
+          "operation": "insertSlideWithLayout"
+        },
+        "task1_2": {
+          "slideNo": 4,
+          "operation": "hideSlide"
+        },
+        "task1_3": {
+          "slideNo": 5,
+          "layoutUi": "1枚目の項目とテキスト",
+          "placeholderText": "オープン直後の来客層",
+          "placeholderRole": "マスターテキストのスタイルを編集する",
+          "operation": "changeLayoutAndText"
+        },
+        "task1_4": {
+          "slideNo": 6,
+          "columns": 2,
+          "operation": "twoColumns"
+        },
+        "task1_5": {
+          "slideNo": 8,
+          "spacingPt": 3,
+          "spacingMode": "文字間隔を広げる",
+          "operation": "characterSpacing"
+        },
+        "task1_6": {
+          "slideNo": 8,
+          "sectionName": "売上振り返り",
+          "operation": "addSection"
+        },
+        "task1_7": {
+          "slideNo": 1,
+          "sectionName": "店舗概要",
+          "operation": "renameSection"
+        },
+        "task1_8": {
+          "afterSlide": 1,
+          "linkTitles": [
+            "1.メニュー方針",
+            "4.開店日程"
+          ],
+          "excludeSlideNos": [
+            1,
+            8
+          ],
+          "zoomTitle": "提案の要点",
+          "operation": "summaryZoom"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project1_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは本院の健診案内プレゼン資料を作成しています。",
+      "tasks": [
+        "タスク1-1　スライド４に、レイアウト「コンテンツとキャプション」のスライドを挿入します。",
+        "タスク1-2　スライド４を非表示にします。",
+        "タスク1-3　スライド５のレイアウトを「1枚目の項目とテキスト」に変更します。上側の［マスターテキストのスタイルを編集する］のプレースホルダーに「\"初めて受診する方の流れ\"」と入力します。",
+        "タスク1-4　スライド６の箇条書きを2段組みに変更します。",
+        "タスク1-5　スライド８の箇条書きのプレースホルダーの文字の間隔を広げます。幅を「\"5\"pt」にします。",
+        "タスク1-6　スライド８にセクションを追加します。セクション名は「\"運用確認\"」にします。",
+        "タスク1-7　スライド１のセクション名を「\"診療体制\"」とします。",
+        "タスク1-8　スライド１の後ろにサマリーズームスライドを挿入し［1.健診メニュー］、［4.予約方法］の各スライドへのリンクを作成します。スライド１と８へのリンクは含めません。タイトルに「\"案内のポイント\"」と入力します。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "（タイトルなしのセクション・名称未設定）"
+          },
+          {
+            "startSlide": 8,
+            "name": "（1-6実施前はセクション未追加）"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "本院 健診案内",
+            "subtitle": "生活習慣病の早期発見",
+            "notes": "1-7: セクション名は未設定（タイトルなしのセクション）"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.健診メニュー"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "2.受診の流れ"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "参考資料",
+            "notes": "1-1: ここに新規スライド挿入前の既存スライド / 1-2: 挿入後に非表示（事前は表示）"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "3.注意事項",
+            "notes": "1-3: レイアウト変更・プレースホルダ入力は未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.問診の準備",
+            "bullets": [
+              "前日の食事制限",
+              "服薬の確認事項",
+              "検査結果の受け取り"
+            ],
+            "notes": "1-4: 2段組み未設定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "5.費用補助"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.予約方法",
+            "bullets": [
+              "Web予約の手順",
+              "電話予約の受付時間",
+              "キャンセルポリシー"
+            ],
+            "notes": "1-5: 文字間隔未変更 / 1-6: セクション未追加"
+          }
+        ],
+        "objects": {},
+        "preTaskState": {
+          "hiddenSlides": [],
+          "slide4Inserted": false,
+          "slide4Hidden": false,
+          "summaryZoomInserted": false,
+          "twoColumnsOnSlide6": false,
+          "characterSpacingOnSlide8": false
+        }
+      },
+      "taskParams": {
+        "task1_1": {
+          "insertAfterSlide": 3,
+          "newSlidePosition": 4,
+          "layoutUi": "コンテンツとキャプション",
+          "operation": "insertSlideWithLayout"
+        },
+        "task1_2": {
+          "slideNo": 4,
+          "operation": "hideSlide"
+        },
+        "task1_3": {
+          "slideNo": 5,
+          "layoutUi": "1枚目の項目とテキスト",
+          "placeholderText": "初めて受診する方の流れ",
+          "placeholderRole": "マスターテキストのスタイルを編集する",
+          "operation": "changeLayoutAndText"
+        },
+        "task1_4": {
+          "slideNo": 6,
+          "columns": 2,
+          "operation": "twoColumns"
+        },
+        "task1_5": {
+          "slideNo": 8,
+          "spacingPt": 5,
+          "spacingMode": "文字間隔を広げる",
+          "operation": "characterSpacing"
+        },
+        "task1_6": {
+          "slideNo": 8,
+          "sectionName": "運用確認",
+          "operation": "addSection"
+        },
+        "task1_7": {
+          "slideNo": 1,
+          "sectionName": "診療体制",
+          "operation": "renameSection"
+        },
+        "task1_8": {
+          "afterSlide": 1,
+          "linkTitles": [
+            "1.健診メニュー",
+            "4.予約方法"
+          ],
+          "excludeSlideNos": [
+            1,
+            8
+          ],
+          "zoomTitle": "案内のポイント",
+          "operation": "summaryZoom"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project1_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは工場の安全啓発プレゼン資料を作成しています。",
+      "tasks": [
+        "タスク1-1　スライド４に、レイアウト「2つのコンテンツ」のスライドを挿入します。",
+        "タスク1-2　スライド４を非表示にします。",
+        "タスク1-3　スライド５のレイアウトを「1枚目の項目とテキスト」に変更します。上側の［マスターテキストのスタイルを編集する］のプレースホルダーに「\"ライン起動前の確認手順\"」と入力します。",
+        "タスク1-4　スライド６の箇条書きを2段組みに変更します。",
+        "タスク1-5　スライド８の箇条書きのプレースホルダーの文字の間隔を広げます。幅を「\"6\"pt」にします。",
+        "タスク1-6　スライド８にセクションを追加します。セクション名は「\"改善計画\"」にします。",
+        "タスク1-7　スライド１のセクション名を「\"工場概要\"」とします。",
+        "タスク1-8　スライド１の後ろにサマリーズームスライドを挿入し［1.安全基準］、［4.点検日程］の各スライドへのリンクを作成します。スライド１と８へのリンクは含めません。タイトルに「\"啓発の要点\"」と入力します。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "（タイトルなしのセクション・名称未設定）"
+          },
+          {
+            "startSlide": 8,
+            "name": "（1-6実施前はセクション未追加）"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "第一工場 安全啓発",
+            "subtitle": "ライン作業の基本ルール",
+            "notes": "1-7: セクション名は未設定（タイトルなしのセクション）"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.安全基準"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "2.危険予知"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "作業記録",
+            "notes": "1-1: ここに新規スライド挿入前の既存スライド / 1-2: 挿入後に非表示（事前は表示）"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "3.保護具",
+            "notes": "1-3: レイアウト変更・プレースホルダ入力は未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.作業手順",
+            "bullets": [
+              "ロックアウトの実施",
+              "異物混入の防止",
+              "終業時の清掃確認"
+            ],
+            "notes": "1-4: 2段組み未設定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "5.教育計画"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.点検日程",
+            "bullets": [
+              "週次点検の担当",
+              "月次演習の内容",
+              "記録の保管場所"
+            ],
+            "notes": "1-5: 文字間隔未変更 / 1-6: セクション未追加"
+          }
+        ],
+        "objects": {},
+        "preTaskState": {
+          "hiddenSlides": [],
+          "slide4Inserted": false,
+          "slide4Hidden": false,
+          "summaryZoomInserted": false,
+          "twoColumnsOnSlide6": false,
+          "characterSpacingOnSlide8": false
+        }
+      },
+      "taskParams": {
+        "task1_1": {
+          "insertAfterSlide": 3,
+          "newSlidePosition": 4,
+          "layoutUi": "2つのコンテンツ",
+          "operation": "insertSlideWithLayout"
+        },
+        "task1_2": {
+          "slideNo": 4,
+          "operation": "hideSlide"
+        },
+        "task1_3": {
+          "slideNo": 5,
+          "layoutUi": "1枚目の項目とテキスト",
+          "placeholderText": "ライン起動前の確認手順",
+          "placeholderRole": "マスターテキストのスタイルを編集する",
+          "operation": "changeLayoutAndText"
+        },
+        "task1_4": {
+          "slideNo": 6,
+          "columns": 2,
+          "operation": "twoColumns"
+        },
+        "task1_5": {
+          "slideNo": 8,
+          "spacingPt": 6,
+          "spacingMode": "文字間隔を広げる",
+          "operation": "characterSpacing"
+        },
+        "task1_6": {
+          "slideNo": 8,
+          "sectionName": "改善計画",
+          "operation": "addSection"
+        },
+        "task1_7": {
+          "slideNo": 1,
+          "sectionName": "工場概要",
+          "operation": "renameSection"
+        },
+        "task1_8": {
+          "afterSlide": 1,
+          "linkTitles": [
+            "1.安全基準",
+            "4.点検日程"
+          ],
+          "excludeSlideNos": [
+            1,
+            8
+          ],
+          "zoomTitle": "啓発の要点",
+          "operation": "summaryZoom"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project1_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは国内ツアー企画の提案資料を作成しています。",
+      "tasks": [
+        "タスク1-1　スライド４に、レイアウト「比較」のスライドを挿入します。",
+        "タスク1-2　スライド４を非表示にします。",
+        "タスク1-3　スライド５のレイアウトを「1枚目の項目とテキスト」に変更します。上側の［マスターテキストのスタイルを編集する］のプレースホルダーに「\"初参加のお客様向け案内\"」と入力します。",
+        "タスク1-4　スライド６の箇条書きを2段組みに変更します。",
+        "タスク1-5　スライド８の箇条書きのプレースホルダーの文字の間隔を広げます。幅を「\"2\"pt」にします。",
+        "タスク1-6　スライド８にセクションを追加します。セクション名は「\"収益振り返り\"」にします。",
+        "タスク1-7　スライド１のセクション名を「\"旅行企画\"」とします。",
+        "タスク1-8　スライド１の後ろにサマリーズームスライドを挿入し［1.ツアー概要］、［4.申込手順］の各スライドへのリンクを作成します。スライド１と８へのリンクは含めません。タイトルに「\"企画の要点\"」と入力します。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "（タイトルなしのセクション・名称未設定）"
+          },
+          {
+            "startSlide": 8,
+            "name": "（1-6実施前はセクション未追加）"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "国内線ツアー 夏企画",
+            "subtitle": "家族向け3日間コース",
+            "notes": "1-7: セクション名は未設定（タイトルなしのセクション）"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.ツアー概要"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "2.行程表"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "添乗員メモ",
+            "notes": "1-1: ここに新規スライド挿入前の既存スライド / 1-2: 挿入後に非表示（事前は表示）"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "3.宿泊施設",
+            "notes": "1-3: レイアウト変更・プレースホルダ入力は未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.移動手段",
+            "bullets": [
+              "バス座席の割当",
+              "荷物預かりの案内",
+              "集合時間の周知"
+            ],
+            "notes": "1-4: 2段組み未設定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "5.特典内容"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.申込手順",
+            "bullets": [
+              "Web申込の流れ",
+              "支払い期限",
+              "変更手数料"
+            ],
+            "notes": "1-5: 文字間隔未変更 / 1-6: セクション未追加"
+          }
+        ],
+        "objects": {},
+        "preTaskState": {
+          "hiddenSlides": [],
+          "slide4Inserted": false,
+          "slide4Hidden": false,
+          "summaryZoomInserted": false,
+          "twoColumnsOnSlide6": false,
+          "characterSpacingOnSlide8": false
+        }
+      },
+      "taskParams": {
+        "task1_1": {
+          "insertAfterSlide": 3,
+          "newSlidePosition": 4,
+          "layoutUi": "比較",
+          "operation": "insertSlideWithLayout"
+        },
+        "task1_2": {
+          "slideNo": 4,
+          "operation": "hideSlide"
+        },
+        "task1_3": {
+          "slideNo": 5,
+          "layoutUi": "1枚目の項目とテキスト",
+          "placeholderText": "初参加のお客様向け案内",
+          "placeholderRole": "マスターテキストのスタイルを編集する",
+          "operation": "changeLayoutAndText"
+        },
+        "task1_4": {
+          "slideNo": 6,
+          "columns": 2,
+          "operation": "twoColumns"
+        },
+        "task1_5": {
+          "slideNo": 8,
+          "spacingPt": 2,
+          "spacingMode": "文字間隔を広げる",
+          "operation": "characterSpacing"
+        },
+        "task1_6": {
+          "slideNo": 8,
+          "sectionName": "収益振り返り",
+          "operation": "addSection"
+        },
+        "task1_7": {
+          "slideNo": 1,
+          "sectionName": "旅行企画",
+          "operation": "renameSection"
+        },
+        "task1_8": {
+          "afterSlide": 1,
+          "linkTitles": [
+            "1.ツアー概要",
+            "4.申込手順"
+          ],
+          "excludeSlideNos": [
+            1,
+            8
+          ],
+          "zoomTitle": "企画の要点",
+          "operation": "summaryZoom"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project1_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは秋期講座のご案内プレゼン資料を作成しています。",
+      "tasks": [
+        "タスク1-1　スライド４に、レイアウト「コンテンツとキャプション」のスライドを挿入します。",
+        "タスク1-2　スライド４を非表示にします。",
+        "タスク1-3　スライド５のレイアウトを「1枚目の項目とテキスト」に変更します。上側の［マスターテキストのスタイルを編集する］のプレースホルダーに「\"新入生向けの学習習慣\"」と入力します。",
+        "タスク1-4　スライド６の箇条書きを2段組みに変更します。",
+        "タスク1-5　スライド８の箇条書きのプレースホルダーの文字の間隔を広げます。幅を「\"7\"pt」にします。",
+        "タスク1-6　スライド８にセクションを追加します。セクション名は「\"振り返り\"」にします。",
+        "タスク1-7　スライド１のセクション名を「\"塾概要\"」とします。",
+        "タスク1-8　スライド１の後ろにサマリーズームスライドを挿入し［1.講座構成］、［4.申込案内］の各スライドへのリンクを作成します。スライド１と８へのリンクは含めません。タイトルに「\"講座の要点\"」と入力します。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "（タイトルなしのセクション・名称未設定）"
+          },
+          {
+            "startSlide": 8,
+            "name": "（1-6実施前はセクション未追加）"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "秋期講座 ご案内",
+            "subtitle": "高校2年生向け特訓",
+            "notes": "1-7: セクション名は未設定（タイトルなしのセクション）"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.講座構成"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "2.カリキュラム"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "進度表",
+            "notes": "1-1: ここに新規スライド挿入前の既存スライド / 1-2: 挿入後に非表示（事前は表示）"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "3.講師紹介",
+            "notes": "1-3: レイアウト変更・プレースホルダ入力は未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.学習法",
+            "bullets": [
+              "週次テストの活用",
+              "質問対応の時間",
+              "自習室の利用ルール"
+            ],
+            "notes": "1-4: 2段組み未設定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "5.合格実績"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "4.申込案内",
+            "bullets": [
+              "説明会の日程",
+              "早期申込特典",
+              "兄弟姉妹割引"
+            ],
+            "notes": "1-5: 文字間隔未変更 / 1-6: セクション未追加"
+          }
+        ],
+        "objects": {},
+        "preTaskState": {
+          "hiddenSlides": [],
+          "slide4Inserted": false,
+          "slide4Hidden": false,
+          "summaryZoomInserted": false,
+          "twoColumnsOnSlide6": false,
+          "characterSpacingOnSlide8": false
+        }
+      },
+      "taskParams": {
+        "task1_1": {
+          "insertAfterSlide": 3,
+          "newSlidePosition": 4,
+          "layoutUi": "コンテンツとキャプション",
+          "operation": "insertSlideWithLayout"
+        },
+        "task1_2": {
+          "slideNo": 4,
+          "operation": "hideSlide"
+        },
+        "task1_3": {
+          "slideNo": 5,
+          "layoutUi": "1枚目の項目とテキスト",
+          "placeholderText": "新入生向けの学習習慣",
+          "placeholderRole": "マスターテキストのスタイルを編集する",
+          "operation": "changeLayoutAndText"
+        },
+        "task1_4": {
+          "slideNo": 6,
+          "columns": 2,
+          "operation": "twoColumns"
+        },
+        "task1_5": {
+          "slideNo": 8,
+          "spacingPt": 7,
+          "spacingMode": "文字間隔を広げる",
+          "operation": "characterSpacing"
+        },
+        "task1_6": {
+          "slideNo": 8,
+          "sectionName": "振り返り",
+          "operation": "addSection"
+        },
+        "task1_7": {
+          "slideNo": 1,
+          "sectionName": "塾概要",
+          "operation": "renameSection"
+        },
+        "task1_8": {
+          "afterSlide": 1,
+          "linkTitles": [
+            "1.講座構成",
+            "4.申込案内"
+          ],
+          "excludeSlideNos": [
+            1,
+            8
+          ],
+          "zoomTitle": "講座の要点",
+          "operation": "summaryZoom"
+        }
+      }
+    }
+  ]
+}

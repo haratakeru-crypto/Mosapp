@@ -1,0 +1,616 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project6の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "伝わる",
+      "書式のポイント",
+      "プレゼンテーションのテクニック"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "customShowName": "書式のポイント",
+      "outlineCopies": 6,
+      "notesCopies": 3,
+      "handoutCopies": 4
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project6.pptx",
+  "projectId": 6,
+  "variantType": "layout",
+  "taskCount": 7,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project6_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたは接客プレゼン技法資料を作成しています。",
+      "tasks": [
+        "タスク6-1　プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情報は削除しないでください。「ドキュメント検査の前にファイルを保存します。」のメッセージが表示された場合は「はい」をクリックします。",
+        "タスク6-2　プレゼンテーションを常に読み取り専用にします。",
+        "タスク6-3　スライドショーを自動プレゼンテーションとして設定します。",
+        "タスク6-4　スライド４，５，６を選択し、「\"デザインの要点\"」という名前の目的別スライドショーを作成します。スライドショーは実行しません。",
+        "タスク6-5　すべてのスライドをアウトラインで、部単位に\"4\"部印刷するように設定します。",
+        "タスク6-6　ノートですべてのスライドを\"2\"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。",
+        "タスク6-7　印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで\"2\"部印刷するように設定します。印刷は実行しないでください。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "接客プレゼンの基本"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "声の出し方"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "視線の配り方"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "デザインの考え方",
+            "notes": "6-4: 目的別スライドショー「デザインの要点」の対象"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "配色のポイント",
+            "notes": "6-4: 目的別スライドショー「デザインの要点」の対象"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "レイアウトの工夫",
+            "notes": "6-4: 目的別スライドショー「デザインの要点」の対象"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "documentInspected": false,
+          "readOnlySet": false,
+          "autoPresentationSet": false,
+          "customShowCreated": false,
+          "printSettingsApplied": false
+        }
+      },
+      "taskParams": {
+        "task6_1": {
+          "operation": "documentInspect",
+          "remove": [
+            "properties",
+            "personalInfo"
+          ]
+        },
+        "task6_2": {
+          "operation": "readOnly"
+        },
+        "task6_3": {
+          "operation": "autoPresentation"
+        },
+        "task6_4": {
+          "slideNos": [
+            4,
+            5,
+            6
+          ],
+          "customShowName": "デザインの要点",
+          "operation": "customSlideShow"
+        },
+        "task6_5": {
+          "outlineCopies": 4,
+          "collate": "部単位",
+          "operation": "printOutline"
+        },
+        "task6_6": {
+          "notesCopies": 2,
+          "collate": "ページ単位",
+          "operation": "printNotes"
+        },
+        "task6_7": {
+          "handoutCopies": 2,
+          "slidesPerPage": 3,
+          "grayscale": true,
+          "operation": "printHandout"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project6_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは院内説明会資料を作成しています。",
+      "tasks": [
+        "タスク6-1　プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情報は削除しないでください。「ドキュメント検査の前にファイルを保存します。」のメッセージが表示された場合は「はい」をクリックします。",
+        "タスク6-2　プレゼンテーションを常に読み取り専用にします。",
+        "タスク6-3　スライドショーを自動プレゼンテーションとして設定します。",
+        "タスク6-4　スライド４，５，６を選択し、「\"構成の要点\"」という名前の目的別スライドショーを作成します。スライドショーは実行しません。",
+        "タスク6-5　すべてのスライドをアウトラインで、部単位に\"5\"部印刷するように設定します。",
+        "タスク6-6　ノートですべてのスライドを\"4\"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。",
+        "タスク6-7　印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで\"3\"部印刷するように設定します。印刷は実行しないでください。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "院内説明会の進め方"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "資料の準備"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "質疑応答"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "構成の考え方",
+            "notes": "6-4: 目的別スライドショー「構成の要点」の対象"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "情報整理のコツ",
+            "notes": "6-4: 目的別スライドショー「構成の要点」の対象"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "伝え方の工夫",
+            "notes": "6-4: 目的別スライドショー「構成の要点」の対象"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "documentInspected": false,
+          "readOnlySet": false,
+          "autoPresentationSet": false,
+          "customShowCreated": false,
+          "printSettingsApplied": false
+        }
+      },
+      "taskParams": {
+        "task6_1": {
+          "operation": "documentInspect",
+          "remove": [
+            "properties",
+            "personalInfo"
+          ]
+        },
+        "task6_2": {
+          "operation": "readOnly"
+        },
+        "task6_3": {
+          "operation": "autoPresentation"
+        },
+        "task6_4": {
+          "slideNos": [
+            4,
+            5,
+            6
+          ],
+          "customShowName": "構成の要点",
+          "operation": "customSlideShow"
+        },
+        "task6_5": {
+          "outlineCopies": 5,
+          "collate": "部単位",
+          "operation": "printOutline"
+        },
+        "task6_6": {
+          "notesCopies": 4,
+          "collate": "ページ単位",
+          "operation": "printNotes"
+        },
+        "task6_7": {
+          "handoutCopies": 3,
+          "slidesPerPage": 3,
+          "grayscale": true,
+          "operation": "printHandout"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project6_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは安全啓発セミナー資料を作成しています。",
+      "tasks": [
+        "タスク6-1　プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情報は削除しないでください。「ドキュメント検査の前にファイルを保存します。」のメッセージが表示された場合は「はい」をクリックします。",
+        "タスク6-2　プレゼンテーションを常に読み取り専用にします。",
+        "タスク6-3　スライドショーを自動プレゼンテーションとして設定します。",
+        "タスク6-4　スライド４，５，６を選択し、「\"安全の要点\"」という名前の目的別スライドショーを作成します。スライドショーは実行しません。",
+        "タスク6-5　すべてのスライドをアウトラインで、部単位に\"7\"部印刷するように設定します。",
+        "タスク6-6　ノートですべてのスライドを\"5\"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。",
+        "タスク6-7　印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで\"5\"部印刷するように設定します。印刷は実行しないでください。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "安全啓発の基本"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "危険予知"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "保護具の着用"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "安全確認の手順",
+            "notes": "6-4: 目的別スライドショー「安全の要点」の対象"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "事故防止策",
+            "notes": "6-4: 目的別スライドショー「安全の要点」の対象"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "報告の流れ",
+            "notes": "6-4: 目的別スライドショー「安全の要点」の対象"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "documentInspected": false,
+          "readOnlySet": false,
+          "autoPresentationSet": false,
+          "customShowCreated": false,
+          "printSettingsApplied": false
+        }
+      },
+      "taskParams": {
+        "task6_1": {
+          "operation": "documentInspect",
+          "remove": [
+            "properties",
+            "personalInfo"
+          ]
+        },
+        "task6_2": {
+          "operation": "readOnly"
+        },
+        "task6_3": {
+          "operation": "autoPresentation"
+        },
+        "task6_4": {
+          "slideNos": [
+            4,
+            5,
+            6
+          ],
+          "customShowName": "安全の要点",
+          "operation": "customSlideShow"
+        },
+        "task6_5": {
+          "outlineCopies": 7,
+          "collate": "部単位",
+          "operation": "printOutline"
+        },
+        "task6_6": {
+          "notesCopies": 5,
+          "collate": "ページ単位",
+          "operation": "printNotes"
+        },
+        "task6_7": {
+          "handoutCopies": 5,
+          "slidesPerPage": 3,
+          "grayscale": true,
+          "operation": "printHandout"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project6_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは提案力向上セミナー資料を作成しています。",
+      "tasks": [
+        "タスク6-1　プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情報は削除しないでください。「ドキュメント検査の前にファイルを保存します。」のメッセージが表示された場合は「はい」をクリックします。",
+        "タスク6-2　プレゼンテーションを常に読み取り専用にします。",
+        "タスク6-3　スライドショーを自動プレゼンテーションとして設定します。",
+        "タスク6-4　スライド４，５，６を選択し、「\"提案の要点\"」という名前の目的別スライドショーを作成します。スライドショーは実行しません。",
+        "タスク6-5　すべてのスライドをアウトラインで、部単位に\"8\"部印刷するように設定します。",
+        "タスク6-6　ノートですべてのスライドを\"6\"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。",
+        "タスク6-7　印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで\"6\"部印刷するように設定します。印刷は実行しないでください。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "提案力向上の基本"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "顧客分析"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "商品選定"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "提案の流れ",
+            "notes": "6-4: 目的別スライドショー「提案の要点」の対象"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "訴求ポイント",
+            "notes": "6-4: 目的別スライドショー「提案の要点」の対象"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "クロージング",
+            "notes": "6-4: 目的別スライドショー「提案の要点」の対象"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "documentInspected": false,
+          "readOnlySet": false,
+          "autoPresentationSet": false,
+          "customShowCreated": false,
+          "printSettingsApplied": false
+        }
+      },
+      "taskParams": {
+        "task6_1": {
+          "operation": "documentInspect",
+          "remove": [
+            "properties",
+            "personalInfo"
+          ]
+        },
+        "task6_2": {
+          "operation": "readOnly"
+        },
+        "task6_3": {
+          "operation": "autoPresentation"
+        },
+        "task6_4": {
+          "slideNos": [
+            4,
+            5,
+            6
+          ],
+          "customShowName": "提案の要点",
+          "operation": "customSlideShow"
+        },
+        "task6_5": {
+          "outlineCopies": 8,
+          "collate": "部単位",
+          "operation": "printOutline"
+        },
+        "task6_6": {
+          "notesCopies": 6,
+          "collate": "ページ単位",
+          "operation": "printNotes"
+        },
+        "task6_7": {
+          "handoutCopies": 6,
+          "slidesPerPage": 3,
+          "grayscale": true,
+          "operation": "printHandout"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project6_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは授業運営セミナー資料を作成しています。",
+      "tasks": [
+        "タスク6-1　プレゼンテーションからドキュメントのプロパティと個人情報を削除します。他の情報は削除しないでください。「ドキュメント検査の前にファイルを保存します。」のメッセージが表示された場合は「はい」をクリックします。",
+        "タスク6-2　プレゼンテーションを常に読み取り専用にします。",
+        "タスク6-3　スライドショーを自動プレゼンテーションとして設定します。",
+        "タスク6-4　スライド４，５，６を選択し、「\"運営の要点\"」という名前の目的別スライドショーを作成します。スライドショーは実行しません。",
+        "タスク6-5　すべてのスライドをアウトラインで、部単位に\"10\"部印刷するように設定します。",
+        "タスク6-6　ノートですべてのスライドを\"8\"部印刷しなさい。ただし、1ページ目を全て印刷したあとに2ページ目を印刷するようにします。",
+        "タスク6-7　印刷オプションで、グレースケールの配布資料を、１ページに3スライドのレイアウトで\"8\"部印刷するように設定します。印刷は実行しないでください。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "授業運営の基本"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "時間配分"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "教材準備"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "運営の手順",
+            "notes": "6-4: 目的別スライドショー「運営の要点」の対象"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "進度管理",
+            "notes": "6-4: 目的別スライドショー「運営の要点」の対象"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "振り返り",
+            "notes": "6-4: 目的別スライドショー「運営の要点」の対象"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "documentInspected": false,
+          "readOnlySet": false,
+          "autoPresentationSet": false,
+          "customShowCreated": false,
+          "printSettingsApplied": false
+        }
+      },
+      "taskParams": {
+        "task6_1": {
+          "operation": "documentInspect",
+          "remove": [
+            "properties",
+            "personalInfo"
+          ]
+        },
+        "task6_2": {
+          "operation": "readOnly"
+        },
+        "task6_3": {
+          "operation": "autoPresentation"
+        },
+        "task6_4": {
+          "slideNos": [
+            4,
+            5,
+            6
+          ],
+          "customShowName": "運営の要点",
+          "operation": "customSlideShow"
+        },
+        "task6_5": {
+          "outlineCopies": 10,
+          "collate": "部単位",
+          "operation": "printOutline"
+        },
+        "task6_6": {
+          "notesCopies": 8,
+          "collate": "ページ単位",
+          "operation": "printNotes"
+        },
+        "task6_7": {
+          "handoutCopies": 8,
+          "slidesPerPage": 3,
+          "grayscale": true,
+          "operation": "printHandout"
+        }
+      }
+    }
+  ]
+}

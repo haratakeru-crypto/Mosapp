@@ -1,0 +1,376 @@
+{
+  "sourceFile": "project3.xlsx",
+  "projectId": 3,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project3_配置別_セット1_カフェ.xlsx",
+      "problemStatement": "あなたはカフェの注文・月次実績を管理しています。",
+      "tasks": [
+        "タスク3-1　シート［メニュー注文一覧］の印刷の向きを横向きに設定します。",
+        "タスク3-2　シート［メニュー注文一覧］のドリンク・軽食注文一覧のタイトルを除く「単価」の列の最終セルまでが印刷されるように設定します。",
+        "タスク3-3　シート［メニュー注文一覧］を印刷したときに、3～5行目が、すべてのページに印刷されるように設定します。",
+        "タスク3-4　シート［店舗月次実績］の余白を「広い」にします。",
+        "タスク3-5　シート［店舗月次実績］の改ページ位置を調整し、表の6月までが1ページ目、7月から2ページ目に印刷されるようにします。",
+        "タスク3-6　シート［バリスタ検定結果］の表の１行目の文字の配置をセル内で折り返して表示されるように設定します。",
+        "タスク3-7　シート［メニュー注文一覧］のセル【F5】にメモを挿入し「\"本日のおすすめメニュー\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["メニュー注文一覧", "店舗月次実績", "バリスタ検定結果", "日次売上補助"],
+        "tableStart": "A3",
+        "headerRow": 3,
+        "tableShape": "5列×25行（縦長）",
+        "colWidths": [6, 28, 14, 14, 12],
+        "rowHeights": {
+          "title": 30,
+          "header": 26,
+          "data": 20,
+          "summary": 28
+        },
+        "visual": "縦棒グラフ",
+        "format": "枠線なし＋交互薄ベージュ縞",
+        "tabColor": "8B5A2B",
+        "print": "全シート縦（3-1で対象シートのみ横）"
+      },
+      "taskParams": {
+        "task3_1": {
+          "targetSheet": "メニュー注文一覧",
+          "orientation": "landscape",
+          "orientationJa": "横向き",
+          "otherSheetsPortrait": true,
+          "initialTargetOrientation": "portrait"
+        },
+        "task3_2": {
+          "sheet": "メニュー注文一覧",
+          "printArea": "B5:G128",
+          "priceColumn": "単価",
+          "listTitle": "ドリンク・軽食注文一覧"
+        },
+        "task3_3": {
+          "sheet": "メニュー注文一覧",
+          "printTitleRows": "3:5"
+        },
+        "task3_4": {
+          "sheet": "店舗月次実績",
+          "marginPreset": "wide",
+          "marginPresetJa": "広い"
+        },
+        "task3_5": {
+          "sheet": "店舗月次実績",
+          "pageBreakColumn": 9,
+          "splitAtMonth": "7月",
+          "monthsPage1End": "6月"
+        },
+        "task3_6": {
+          "sheet": "バリスタ検定結果",
+          "wrapRange": "A5:L5",
+          "headerRowInTable": 1
+        },
+        "task3_7": {
+          "sheet": "メニュー注文一覧",
+          "cell": "F5",
+          "commentText": "本日のおすすめメニュー",
+          "onlyOneComment": true
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project3_配置別_セット2_医療.xlsx",
+      "problemStatement": "あなたは医療機関の受付・診療実績を管理しています。",
+      "tasks": [
+        "タスク3-1　シート［外来受付一覧］の印刷の向きを縦向きに設定します。",
+        "タスク3-2　シート［外来受付一覧］の外来受付記録のタイトルを除く「診療単価」の列の最終セルまでが印刷されるように設定します。",
+        "タスク3-3　シート［外来受付一覧］を印刷したときに、4～6行目が、すべてのページに印刷されるように設定します。",
+        "タスク3-4　シート［月次診療実績］の余白を「標準」にします。",
+        "タスク3-5　シート［月次診療実績］の改ページ位置を調整し、表の6月までが1ページ目、7月から2ページ目に印刷されるようにします。",
+        "タスク3-6　シート［技能検定結果］の表の１行目の文字の配置をセル内で折り返して表示されるように設定します。",
+        "タスク3-7　シート［外来受付一覧］のセル【E6】にメモを挿入し「\"本日の診療特記事項\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["外来受付一覧", "月次診療実績", "技能検定結果", "診療科別集計"],
+        "tableStart": "B4",
+        "headerRow": 4,
+        "tableShape": "10列×12行（横長）",
+        "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 12],
+        "rowHeights": {
+          "title": 40,
+          "header": 30,
+          "data": 24,
+          "summary": 34
+        },
+        "visual": "スパークライン",
+        "format": "上下太罫線＋ヘッダー濃緑白字",
+        "tabColor": "38761D",
+        "print": "全シート横（3-1で対象シートのみ縦）"
+      },
+      "taskParams": {
+        "task3_1": {
+          "targetSheet": "外来受付一覧",
+          "orientation": "portrait",
+          "orientationJa": "縦向き",
+          "otherSheetsLandscape": true,
+          "initialTargetOrientation": "landscape"
+        },
+        "task3_2": {
+          "sheet": "外来受付一覧",
+          "printArea": "C6:H145",
+          "priceColumn": "診療単価",
+          "listTitle": "外来受付記録"
+        },
+        "task3_3": {
+          "sheet": "外来受付一覧",
+          "printTitleRows": "4:6"
+        },
+        "task3_4": {
+          "sheet": "月次診療実績",
+          "marginPreset": "normal",
+          "marginPresetJa": "標準"
+        },
+        "task3_5": {
+          "sheet": "月次診療実績",
+          "pageBreakColumn": 10,
+          "splitAtMonth": "7月",
+          "monthsPage1End": "6月"
+        },
+        "task3_6": {
+          "sheet": "技能検定結果",
+          "wrapRange": "B6:M6",
+          "headerRowInTable": 1
+        },
+        "task3_7": {
+          "sheet": "外来受付一覧",
+          "cell": "E6",
+          "commentText": "本日の診療特記事項",
+          "onlyOneComment": true
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project3_配置別_セット3_製造.xlsx",
+      "problemStatement": "あなたは製造現場の受注・月次生産を管理しています。",
+      "tasks": [
+        "タスク3-1　シート［製造受注一覧］の印刷の向きを横向きに設定します。",
+        "タスク3-2　シート［製造受注一覧］の製造受注記録のタイトルを除く「製品単価」の列の最終セルまでが印刷されるように設定します。",
+        "タスク3-3　シート［製造受注一覧］を印刷したときに、5～7行目が、すべてのページに印刷されるように設定します。",
+        "タスク3-4　シート［工場月次実績］の余白を「狭い」にします。",
+        "タスク3-5　シート［工場月次実績］の改ページ位置を調整し、表の6月までが1ページ目、7月から2ページ目に印刷されるようにします。",
+        "タスク3-6　シート［技能査定結果］の表の１行目の文字の配置をセル内で折り返して表示されるように設定します。",
+        "タスク3-7　シート［製造受注一覧］のセル【G6】にメモを挿入し「\"最新の部品仕様\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["製造受注一覧", "工場月次実績", "技能査定結果", "ライン別集計", "部品在庫参照"],
+        "tableStart": "C5",
+        "headerRow": 5,
+        "tableShape": "8列×8行（正方）",
+        "colWidths": [2, 14, 10, 10, 10, 10, 10, 10, 12],
+        "rowHeights": {
+          "title": 36,
+          "header": 24,
+          "data": 18,
+          "summary": 28
+        },
+        "visual": "円グラフ装飾",
+        "format": "太罫線囲み＋ヘッダーオレンジ",
+        "tabColor": "595959",
+        "print": "全シート縦（3-1で対象シートのみ横）"
+      },
+      "taskParams": {
+        "task3_1": {
+          "targetSheet": "製造受注一覧",
+          "orientation": "landscape",
+          "orientationJa": "横向き",
+          "otherSheetsPortrait": true,
+          "initialTargetOrientation": "portrait"
+        },
+        "task3_2": {
+          "sheet": "製造受注一覧",
+          "printArea": "D7:J132",
+          "priceColumn": "製品単価",
+          "listTitle": "製造受注記録"
+        },
+        "task3_3": {
+          "sheet": "製造受注一覧",
+          "printTitleRows": "5:7"
+        },
+        "task3_4": {
+          "sheet": "工場月次実績",
+          "marginPreset": "narrow",
+          "marginPresetJa": "狭い"
+        },
+        "task3_5": {
+          "sheet": "工場月次実績",
+          "pageBreakColumn": 9,
+          "splitAtMonth": "7月",
+          "monthsPage1End": "6月"
+        },
+        "task3_6": {
+          "sheet": "技能査定結果",
+          "wrapRange": "C7:N7",
+          "headerRowInTable": 1
+        },
+        "task3_7": {
+          "sheet": "製造受注一覧",
+          "cell": "G6",
+          "commentText": "最新の部品仕様",
+          "onlyOneComment": true
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project3_配置別_セット4_旅行.xlsx",
+      "problemStatement": "あなたは旅行会社の予約・月次売上を管理しています。",
+      "tasks": [
+        "タスク3-1　シート［ツアー予約一覧］の印刷の向きを縦向きに設定します。",
+        "タスク3-2　シート［ツアー予約一覧］のツアー予約記録のタイトルを除く「旅行単価」の列の最終セルまでが印刷されるように設定します。",
+        "タスク3-3　シート［ツアー予約一覧］を印刷したときに、6～8行目が、すべてのページに印刷されるように設定します。",
+        "タスク3-4　シート［旅行月次実績］の余白を「広い」にします。",
+        "タスク3-5　シート［旅行月次実績］の改ページ位置を調整し、表の6月までが1ページ目、7月から2ページ目に印刷されるようにします。",
+        "タスク3-6　シート［語学検定結果］の表の１行目の文字の配置をセル内で折り返して表示されるように設定します。",
+        "タスク3-7　シート［ツアー予約一覧］のセル【H7】にメモを挿入し「\"今週のおすすめツアー\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["ツアー予約一覧", "旅行月次実績", "語学検定結果", "目的地別集計"],
+        "tableStart": "D6",
+        "headerRow": 6,
+        "tableShape": "主表5列×6行＋小表2つ（分割構造）",
+        "colWidths": [3, 12, 16, 12, 12, 12, 12],
+        "rowHeights": {
+          "title": 30,
+          "header": 22,
+          "data": 22
+        },
+        "visual": "シェイプ枠",
+        "format": "縦縞＋スカイブルー薄罫線",
+        "tabColor": "1F4E79",
+        "print": "全シート横（3-1で対象シートのみ縦）"
+      },
+      "taskParams": {
+        "task3_1": {
+          "targetSheet": "ツアー予約一覧",
+          "orientation": "portrait",
+          "orientationJa": "縦向き",
+          "otherSheetsLandscape": true,
+          "initialTargetOrientation": "landscape"
+        },
+        "task3_2": {
+          "sheet": "ツアー予約一覧",
+          "printArea": "E8:K118",
+          "priceColumn": "旅行単価",
+          "listTitle": "ツアー予約記録"
+        },
+        "task3_3": {
+          "sheet": "ツアー予約一覧",
+          "printTitleRows": "6:8"
+        },
+        "task3_4": {
+          "sheet": "旅行月次実績",
+          "marginPreset": "wide",
+          "marginPresetJa": "広い"
+        },
+        "task3_5": {
+          "sheet": "旅行月次実績",
+          "pageBreakColumn": 9,
+          "splitAtMonth": "7月",
+          "monthsPage1End": "6月"
+        },
+        "task3_6": {
+          "sheet": "語学検定結果",
+          "wrapRange": "D8:O8",
+          "headerRowInTable": 1
+        },
+        "task3_7": {
+          "sheet": "ツアー予約一覧",
+          "cell": "H7",
+          "commentText": "今週のおすすめツアー",
+          "onlyOneComment": true
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project3_配置別_セット5_学習塾.xlsx",
+      "problemStatement": "あなたは学習塾の受講・月次収益を管理しています。",
+      "tasks": [
+        "タスク3-1　シート［講座受講一覧］の印刷の向きを横向きに設定します。",
+        "タスク3-2　シート［講座受講一覧］の講座受講記録のタイトルを除く「受講単価」の列の最終セルまでが印刷されるように設定します。",
+        "タスク3-3　シート［講座受講一覧］を印刷したときに、7～9行目が、すべてのページに印刷されるように設定します。",
+        "タスク3-4　シート［塾月次実績］の余白を「標準」にします。",
+        "タスク3-5　シート［塾月次実績］の改ページ位置を調整し、表の6月までが1ページ目、7月から2ページ目に印刷されるようにします。",
+        "タスク3-6　シート［模擬試験結果］の表の１行目の文字の配置をセル内で折り返して表示されるように設定します。",
+        "タスク3-7　シート［講座受講一覧］のセル【G8】にメモを挿入し「\"今月の重点講座\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["講座受講一覧", "塾月次実績", "模擬試験結果", "教科別集計"],
+        "tableStart": "A7",
+        "headerRow": 7,
+        "tableShape": "12列×30行（大1表）",
+        "colWidths": [8, 18, 10, 10, 10, 10, 10, 10, 10, 10, 10, 14],
+        "rowHeights": {
+          "title": 44,
+          "header": 28,
+          "data": 22,
+          "summary": 32
+        },
+        "visual": "画像枠プレースホルダ",
+        "format": "交互縞＋下罫線＋ネイビー白字",
+        "tabColor": "BF9000",
+        "print": "全シート縦（3-1で対象シートのみ横）"
+      },
+      "taskParams": {
+        "task3_1": {
+          "targetSheet": "講座受講一覧",
+          "orientation": "landscape",
+          "orientationJa": "横向き",
+          "otherSheetsPortrait": true,
+          "initialTargetOrientation": "portrait"
+        },
+        "task3_2": {
+          "sheet": "講座受講一覧",
+          "printArea": "B9:H152",
+          "priceColumn": "受講単価",
+          "listTitle": "講座受講記録"
+        },
+        "task3_3": {
+          "sheet": "講座受講一覧",
+          "printTitleRows": "7:9"
+        },
+        "task3_4": {
+          "sheet": "塾月次実績",
+          "marginPreset": "normal",
+          "marginPresetJa": "標準"
+        },
+        "task3_5": {
+          "sheet": "塾月次実績",
+          "pageBreakColumn": 9,
+          "splitAtMonth": "7月",
+          "monthsPage1End": "6月"
+        },
+        "task3_6": {
+          "sheet": "模擬試験結果",
+          "wrapRange": "A9:L9",
+          "headerRowInTable": 1
+        },
+        "task3_7": {
+          "sheet": "講座受講一覧",
+          "cell": "G8",
+          "commentText": "今月の重点講座",
+          "onlyOneComment": true
+        }
+      }
+    }
+  ]
+}

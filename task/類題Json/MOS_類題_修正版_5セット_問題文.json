@@ -1,0 +1,162 @@
+[
+  {
+    "setNo": 1,
+    "workbook": "MOS_類題_修正版_セット1_配送管理.xlsx",
+    "sourceCsv": "MOS_類題_セット1_配送管理_テーブルスタイル全一覧.csv",
+    "targetTableStyle": {
+      "style_family": "淡色",
+      "internal_name": "TableStyleLight13",
+      "gallery_name_mos": "アクア、テーブルスタイル（淡色）13"
+    },
+    "task1_2": {
+      "before_first_column_highlight": false,
+      "instruction": "最初の列を強調します。"
+    },
+    "task1_4": {
+      "filter_column": "班",
+      "filter_value": "B班",
+      "table_range": "A3:G16"
+    },
+    "task1_5": {
+      "before": "A3:F14",
+      "after": "A3:H14",
+      "operationOnly": "テーブル範囲変更のみ"
+    },
+    "problemStatement": "あなたは業務データを管理・集計しています。",
+    "tasks": [
+      "タスク1-1　シート［配送記録］のテーブル範囲 A3:J21 で、テーブルの縞模様（網掛け）を設定し、1列おきに色が付くようにします。",
+      "タスク1-2　シート［配送記録］のテーブル範囲 A3:J21 の最初の列を強調します。",
+      "タスク1-3　シート［配送記録］のテーブル範囲 A3:J21 にテーブルスタイル「アクア、テーブルスタイル（淡色）13」を設定します。",
+      "タスク1-4　シート［担当一覧］のテーブル範囲 A3:G16 にフィルターを使用して［班］が「B班」の行をすべて表示（抽出）します。データは削除しません。",
+      "タスク1-5　シート［日別実績］のテーブル範囲 A3:F14 を、A3:H14 の範囲に変更します。"
+    ]
+  },
+  {
+    "setNo": 2,
+    "workbook": "MOS_類題_修正版_セット2_販売確認.xlsx",
+    "sourceCsv": "MOS_類題_セット1_配送管理_テーブルスタイル全一覧.csv",
+    "targetTableStyle": {
+      "style_family": "濃色",
+      "internal_name": "TableStyleDark5",
+      "gallery_name_mos": "紫、テーブルスタイル（濃色）5"
+    },
+    "task1_2": {
+      "before_first_column_highlight": true,
+      "instruction": "最初の列の強調を解除します。"
+    },
+    "task1_4": {
+      "filter_column": "勤務区分",
+      "filter_value": "午前",
+      "table_range": "A3:H18"
+    },
+    "task1_5": {
+      "before": "A3:G12",
+      "after": "A3:G15",
+      "operationOnly": "テーブル範囲変更のみ"
+    },
+    "problemStatement": "あなたは業務データを管理・集計しています。",
+    "tasks": [
+      "タスク1-1　シート［販売確認］のテーブル範囲 A3:K24 で、テーブルの行の縞模様（網掛け）を解除します。",
+      "タスク1-2　シート［販売確認］のテーブル範囲 A3:K24 の最初の列の強調を解除します。",
+      "タスク1-3　シート［販売確認］のテーブル範囲 A3:K24 にテーブルスタイル「紫、テーブルスタイル（濃色）5」を設定します。",
+      "タスク1-4　シート［係員台帳］のテーブル範囲 A3:H18 にフィルターを使用して［勤務区分］が「午前」の行をすべて表示（抽出）します。データは削除しません。",
+      "タスク1-5　シート［週次売上］のテーブル範囲 A3:G12 を、A3:G15 の範囲に変更します。"
+    ]
+  },
+  {
+    "setNo": 3,
+    "workbook": "MOS_類題_修正版_セット3_研修集計.xlsx",
+    "sourceCsv": "MOS_類題_セット1_配送管理_テーブルスタイル全一覧.csv",
+    "targetTableStyle": {
+      "style_family": "淡色",
+      "internal_name": "TableStyleLight14",
+      "gallery_name_mos": "オレンジ、テーブルスタイル（淡色）14"
+    },
+    "task1_2": {
+      "before_first_column_highlight": false,
+      "instruction": "最初の列を強調します。"
+    },
+    "task1_4": {
+      "filter_column": "研修回数",
+      "filter_value": "3",
+      "table_range": "A3:H20"
+    },
+    "task1_5": {
+      "before": "A3:F15",
+      "after": "A3:F12",
+      "operationOnly": "テーブル範囲変更のみ"
+    },
+    "problemStatement": "あなたは業務データを管理・集計しています。",
+    "tasks": [
+      "タスク1-1　シート［研修結果］のテーブル範囲 A3:J19 で、テーブルの縞模様（網掛け）を解除します。次に、1行おきに色が付くように縞模様（網掛け）を設定します。",
+      "タスク1-2　シート［研修結果］のテーブル範囲 A3:J19 の最初の列を強調します。",
+      "タスク1-3　シート［研修結果］のテーブル範囲 A3:J19 にテーブルスタイル「オレンジ、テーブルスタイル（淡色）14」を設定します。",
+      "タスク1-4　シート［連絡先名簿］のテーブル範囲 A3:H20 にフィルターを使用して［研修回数］が「3」の行をすべて表示（抽出）します。データは削除しません。",
+      "タスク1-5　シート［会場別収益］のテーブル範囲 A3:F15 を、A3:F12 の範囲に変更します。"
+    ]
+  },
+  {
+    "setNo": 4,
+    "workbook": "MOS_類題_修正版_セット4_受注分析.xlsx",
+    "sourceCsv": "MOS_類題_セット1_配送管理_テーブルスタイル全一覧.csv",
+    "targetTableStyle": {
+      "style_family": "濃色",
+      "internal_name": "TableStyleDark6",
+      "gallery_name_mos": "アクア、テーブルスタイル（濃色）6"
+    },
+    "task1_2": {
+      "before_first_column_highlight": true,
+      "instruction": "最初の列の強調を解除します。"
+    },
+    "task1_4": {
+      "filter_column": "資格",
+      "filter_value": "有",
+      "table_range": "A3:H15"
+    },
+    "task1_5": {
+      "before": "A3:F13",
+      "after": "A3:G15",
+      "operationOnly": "テーブル範囲変更のみ"
+    },
+    "problemStatement": "あなたは業務データを管理・集計しています。",
+    "tasks": [
+      "タスク1-1　シート［受注分析］のテーブル範囲 A3:K26 で、テーブルの行の縞模様（網掛け）を解除します。次に、1列おきに色が付くように縞模様（網掛け）を設定します。",
+      "タスク1-2　シート［受注分析］のテーブル範囲 A3:K26 の最初の列の強調を解除します。",
+      "タスク1-3　シート［受注分析］のテーブル範囲 A3:K26 にテーブルスタイル「アクア、テーブルスタイル（濃色）6」を設定します。",
+      "タスク1-4　シート［配置表］のテーブル範囲 A3:H15 にフィルターを使用して［資格］が「有」の行をすべて表示（抽出）します。データは削除しません。",
+      "タスク1-5　シート［月別入金］のテーブル範囲 A3:F13 を、A3:G15 の範囲に変更します。"
+    ]
+  },
+  {
+    "setNo": 5,
+    "workbook": "MOS_類題_修正版_セット5_講習整理.xlsx",
+    "sourceCsv": "MOS_類題_セット1_配送管理_テーブルスタイル全一覧.csv",
+    "targetTableStyle": {
+      "style_family": "濃色",
+      "internal_name": "TableStyleDark3",
+      "gallery_name_mos": "赤、テーブルスタイル（濃色）3"
+    },
+    "task1_2": {
+      "before_first_column_highlight": false,
+      "instruction": "最初の列を強調します。"
+    },
+    "task1_4": {
+      "filter_column": "係",
+      "filter_value": "記録",
+      "table_range": "A3:G17"
+    },
+    "task1_5": {
+      "before": "A3:G16",
+      "after": "A3:F14",
+      "operationOnly": "テーブル範囲変更のみ"
+    },
+    "problemStatement": "あなたは業務データを管理・集計しています。",
+    "tasks": [
+      "タスク1-1　シート［講習判定］のテーブル範囲 A3:L22 で、テーブルの縞模様（網掛け）を設定し、1行おきに色が付くようにします。",
+      "タスク1-2　シート［講習判定］のテーブル範囲 A3:L22 の最初の列を強調します。",
+      "タスク1-3　シート［講習判定］のテーブル範囲 A3:L22 にテーブルスタイル「赤、テーブルスタイル（濃色）3」を設定します。",
+      "タスク1-4　シート［補助員名簿］のテーブル範囲 A3:G17 にフィルターを使用して［係］が「記録」の行をすべて表示（抽出）します。データは削除しません。",
+      "タスク1-5　シート［催事収入］のテーブル範囲 A3:G16 を、A3:F14 の範囲に変更します。"
+    ]
+  }
+]

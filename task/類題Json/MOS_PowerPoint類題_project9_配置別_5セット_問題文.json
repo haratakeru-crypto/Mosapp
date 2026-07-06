@@ -1,0 +1,764 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project9の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "英語教育",
+      "スクールの様子",
+      "受講の様子.mp4"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "videoFile": "受講の様子.mp4",
+      "videoSlideTitle": "スクールの様子",
+      "trimStartSec": 4,
+      "trimEndSec": 9,
+      "fadeOutSec": 3,
+      "categoryColumn": "結果",
+      "dataColumn": "人数"
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project9.pptx",
+  "projectId": 9,
+  "variantType": "layout",
+  "taskCount": 5,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project9_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたはカフェスタッフ研修プログラムの提案資料を作成しています。",
+      "tasks": [
+        "タスク9-1　スライド「研修の様子」に、動画「接客研修.mp4」を挿入します。挿入にはアイコンを使います。",
+        "タスク9-2　スライド５のビデオを、開始を「\"3\"秒」、終了を「\"8\"秒」に設定します。",
+        "タスク9-3　スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は\"2\"秒かけてフェードアウトするようにします。",
+        "タスク9-4　スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「項目」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシートにコピーまたは手入力でもかまいません。",
+        "タスク9-5　スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "プログラム概要",
+            "objects": [
+              "オーディオ"
+            ],
+            "notes": "9-3: オーディオのスライド切替後再生・フェード2秒未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受講結果",
+            "objects": [
+              "表"
+            ],
+            "notes": "9-4/9-5: グラフ「項目」×「人数」未作成・データテーブル未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "カリキュラム"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "講師紹介"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "研修の様子",
+            "objects": [
+              "接客研修.mp4"
+            ],
+            "notes": "9-1: ビデオ「接客研修.mp4」未挿入 / 9-2: トリミング 3〜8秒未設定"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "お問い合わせ"
+          }
+        ],
+        "chartTableData": {
+          "headers": [
+            "項目",
+            "人数"
+          ],
+          "rows": [
+            [
+              "抽出",
+              12
+            ],
+            [
+              "ラテ",
+              18
+            ],
+            [
+              "接客",
+              15
+            ]
+          ]
+        },
+        "preTaskState": {
+          "videoInserted": false,
+          "videoTrimmed": false,
+          "audioConfigured": false,
+          "chartCreated": false,
+          "chartDataTable": false
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "slideTitle": "研修の様子",
+          "videoFile": "接客研修.mp4",
+          "operation": "insertVideo"
+        },
+        "task9_2": {
+          "slideNo": 5,
+          "trimStartSec": 3,
+          "trimEndSec": 8,
+          "operation": "trimVideo"
+        },
+        "task9_3": {
+          "slideNo": 1,
+          "playAcrossSlides": true,
+          "fadeOutSec": 2,
+          "operation": "audioSettings"
+        },
+        "task9_4": {
+          "slideNo": 2,
+          "chartType": "集合縦棒",
+          "categoryColumn": "項目",
+          "dataColumn": "人数",
+          "tableRows": [
+            [
+              "抽出",
+              12
+            ],
+            [
+              "ラテ",
+              18
+            ],
+            [
+              "接客",
+              15
+            ]
+          ],
+          "operation": "insertChart"
+        },
+        "task9_5": {
+          "slideNo": 2,
+          "dataTable": "凡例マーカーなし",
+          "removeTitle": true,
+          "removeLegend": true,
+          "operation": "chartDataTable"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project9_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは医療事務研修プログラムの提案資料を作成しています。",
+      "tasks": [
+        "タスク9-1　スライド「実習の様子」に、動画「受付実習.mp4」を挿入します。挿入にはアイコンを使います。",
+        "タスク9-2　スライド５のビデオを、開始を「\"5\"秒」、終了を「\"11\"秒」に設定します。",
+        "タスク9-3　スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は\"3\"秒かけてフェードアウトするようにします。",
+        "タスク9-4　スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「演習」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシートにコピーまたは手入力でもかまいません。",
+        "タスク9-5　スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "研修概要",
+            "objects": [
+              "オーディオ"
+            ],
+            "notes": "9-3: オーディオのスライド切替後再生・フェード3秒未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受講結果",
+            "objects": [
+              "表"
+            ],
+            "notes": "9-4/9-5: グラフ「演習」×「人数」未作成・データテーブル未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "演習項目"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "講師紹介"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "実習の様子",
+            "objects": [
+              "受付実習.mp4"
+            ],
+            "notes": "9-1: ビデオ「受付実習.mp4」未挿入 / 9-2: トリミング 5〜11秒未設定"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "お問い合わせ"
+          }
+        ],
+        "chartTableData": {
+          "headers": [
+            "演習",
+            "人数"
+          ],
+          "rows": [
+            [
+              "受付",
+              10
+            ],
+            [
+              "記録",
+              14
+            ],
+            [
+              "連絡",
+              11
+            ]
+          ]
+        },
+        "preTaskState": {
+          "videoInserted": false,
+          "videoTrimmed": false,
+          "audioConfigured": false,
+          "chartCreated": false,
+          "chartDataTable": false
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "slideTitle": "実習の様子",
+          "videoFile": "受付実習.mp4",
+          "operation": "insertVideo"
+        },
+        "task9_2": {
+          "slideNo": 5,
+          "trimStartSec": 5,
+          "trimEndSec": 11,
+          "operation": "trimVideo"
+        },
+        "task9_3": {
+          "slideNo": 1,
+          "playAcrossSlides": true,
+          "fadeOutSec": 3,
+          "operation": "audioSettings"
+        },
+        "task9_4": {
+          "slideNo": 2,
+          "chartType": "集合縦棒",
+          "categoryColumn": "演習",
+          "dataColumn": "人数",
+          "tableRows": [
+            [
+              "受付",
+              10
+            ],
+            [
+              "記録",
+              14
+            ],
+            [
+              "連絡",
+              11
+            ]
+          ],
+          "operation": "insertChart"
+        },
+        "task9_5": {
+          "slideNo": 2,
+          "dataTable": "凡例マーカーなし",
+          "removeTitle": true,
+          "removeLegend": true,
+          "operation": "chartDataTable"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project9_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは設備保全研修プログラムの提案資料を作成しています。",
+      "tasks": [
+        "タスク9-1　スライド「保全実習の様子」に、動画「点検実習.mp4」を挿入します。挿入にはアイコンを使います。",
+        "タスク9-2　スライド５のビデオを、開始を「\"5\"秒」、終了を「\"10\"秒」に設定します。",
+        "タスク9-3　スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は\"4\"秒かけてフェードアウトするようにします。",
+        "タスク9-4　スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「工程」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシートにコピーまたは手入力でもかまいません。",
+        "タスク9-5　スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "保全研修概要",
+            "objects": [
+              "オーディオ"
+            ],
+            "notes": "9-3: オーディオのスライド切替後再生・フェード4秒未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受講結果",
+            "objects": [
+              "表"
+            ],
+            "notes": "9-4/9-5: グラフ「工程」×「人数」未作成・データテーブル未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "実習内容"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "講師紹介"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "保全実習の様子",
+            "objects": [
+              "点検実習.mp4"
+            ],
+            "notes": "9-1: ビデオ「点検実習.mp4」未挿入 / 9-2: トリミング 5〜10秒未設定"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "お問い合わせ"
+          }
+        ],
+        "chartTableData": {
+          "headers": [
+            "工程",
+            "人数"
+          ],
+          "rows": [
+            [
+              "点検",
+              9
+            ],
+            [
+              "修理",
+              13
+            ],
+            [
+              "記録",
+              12
+            ]
+          ]
+        },
+        "preTaskState": {
+          "videoInserted": false,
+          "videoTrimmed": false,
+          "audioConfigured": false,
+          "chartCreated": false,
+          "chartDataTable": false
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "slideTitle": "保全実習の様子",
+          "videoFile": "点検実習.mp4",
+          "operation": "insertVideo"
+        },
+        "task9_2": {
+          "slideNo": 5,
+          "trimStartSec": 5,
+          "trimEndSec": 10,
+          "operation": "trimVideo"
+        },
+        "task9_3": {
+          "slideNo": 1,
+          "playAcrossSlides": true,
+          "fadeOutSec": 4,
+          "operation": "audioSettings"
+        },
+        "task9_4": {
+          "slideNo": 2,
+          "chartType": "集合縦棒",
+          "categoryColumn": "工程",
+          "dataColumn": "人数",
+          "tableRows": [
+            [
+              "点検",
+              9
+            ],
+            [
+              "修理",
+              13
+            ],
+            [
+              "記録",
+              12
+            ]
+          ],
+          "operation": "insertChart"
+        },
+        "task9_5": {
+          "slideNo": 2,
+          "dataTable": "凡例マーカーなし",
+          "removeTitle": true,
+          "removeLegend": true,
+          "operation": "chartDataTable"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project9_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは旅行代理店研修プログラムの提案資料を作成しています。",
+      "tasks": [
+        "タスク9-1　スライド「接客研修の様子」に、動画「予約対応.mp4」を挿入します。挿入にはアイコンを使います。",
+        "タスク9-2　スライド５のビデオを、開始を「\"2\"秒」、終了を「\"7\"秒」に設定します。",
+        "タスク9-3　スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は\"3\"秒かけてフェードアウトするようにします。",
+        "タスク9-4　スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「区分」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシートにコピーまたは手入力でもかまいません。",
+        "タスク9-5　スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "代理店研修概要",
+            "objects": [
+              "オーディオ"
+            ],
+            "notes": "9-3: オーディオのスライド切替後再生・フェード3秒未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受講結果",
+            "objects": [
+              "表"
+            ],
+            "notes": "9-4/9-5: グラフ「区分」×「人数」未作成・データテーブル未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "演習メニュー"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "講師紹介"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "接客研修の様子",
+            "objects": [
+              "予約対応.mp4"
+            ],
+            "notes": "9-1: ビデオ「予約対応.mp4」未挿入 / 9-2: トリミング 2〜7秒未設定"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "お問い合わせ"
+          }
+        ],
+        "chartTableData": {
+          "headers": [
+            "区分",
+            "人数"
+          ],
+          "rows": [
+            [
+              "予約",
+              11
+            ],
+            [
+              "変更",
+              9
+            ],
+            [
+              "案内",
+              16
+            ]
+          ]
+        },
+        "preTaskState": {
+          "videoInserted": false,
+          "videoTrimmed": false,
+          "audioConfigured": false,
+          "chartCreated": false,
+          "chartDataTable": false
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "slideTitle": "接客研修の様子",
+          "videoFile": "予約対応.mp4",
+          "operation": "insertVideo"
+        },
+        "task9_2": {
+          "slideNo": 5,
+          "trimStartSec": 2,
+          "trimEndSec": 7,
+          "operation": "trimVideo"
+        },
+        "task9_3": {
+          "slideNo": 1,
+          "playAcrossSlides": true,
+          "fadeOutSec": 3,
+          "operation": "audioSettings"
+        },
+        "task9_4": {
+          "slideNo": 2,
+          "chartType": "集合縦棒",
+          "categoryColumn": "区分",
+          "dataColumn": "人数",
+          "tableRows": [
+            [
+              "予約",
+              11
+            ],
+            [
+              "変更",
+              9
+            ],
+            [
+              "案内",
+              16
+            ]
+          ],
+          "operation": "insertChart"
+        },
+        "task9_5": {
+          "slideNo": 2,
+          "dataTable": "凡例マーカーなし",
+          "removeTitle": true,
+          "removeLegend": true,
+          "operation": "chartDataTable"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project9_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは講師研修プログラムの提案資料を作成しています。",
+      "tasks": [
+        "タスク9-1　スライド「授業実習の様子」に、動画「模擬授業.mp4」を挿入します。挿入にはアイコンを使います。",
+        "タスク9-2　スライド５のビデオを、開始を「\"6\"秒」、終了を「\"11\"秒」に設定します。",
+        "タスク9-3　スライド１のオーディオを、スライドを切り替えても1回だけ再生するように設定します。再生は\"5\"秒かけてフェードアウトするようにします。",
+        "タスク9-4　スライド２のプレースホルダーに表の内容を表す「集合縦棒」グラフを作成します。「科目」の列を項目、「人数」の列をデータ系列として使用します。表のデータはグラフシートにコピーまたは手入力でもかまいません。",
+        "タスク9-5　スライド２のグラフに［凡例マーカーなし］のデータテーブルを表示し、タイトルと凡例を削除します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "講師研修概要",
+            "objects": [
+              "オーディオ"
+            ],
+            "notes": "9-3: オーディオのスライド切替後再生・フェード5秒未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受講結果",
+            "objects": [
+              "表"
+            ],
+            "notes": "9-4/9-5: グラフ「科目」×「人数」未作成・データテーブル未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "演習計画"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "講師紹介"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "授業実習の様子",
+            "objects": [
+              "模擬授業.mp4"
+            ],
+            "notes": "9-1: ビデオ「模擬授業.mp4」未挿入 / 9-2: トリミング 6〜11秒未設定"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "お問い合わせ"
+          }
+        ],
+        "chartTableData": {
+          "headers": [
+            "科目",
+            "人数"
+          ],
+          "rows": [
+            [
+              "数学",
+              8
+            ],
+            [
+              "英語",
+              10
+            ],
+            [
+              "理科",
+              7
+            ]
+          ]
+        },
+        "preTaskState": {
+          "videoInserted": false,
+          "videoTrimmed": false,
+          "audioConfigured": false,
+          "chartCreated": false,
+          "chartDataTable": false
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "slideTitle": "授業実習の様子",
+          "videoFile": "模擬授業.mp4",
+          "operation": "insertVideo"
+        },
+        "task9_2": {
+          "slideNo": 5,
+          "trimStartSec": 6,
+          "trimEndSec": 11,
+          "operation": "trimVideo"
+        },
+        "task9_3": {
+          "slideNo": 1,
+          "playAcrossSlides": true,
+          "fadeOutSec": 5,
+          "operation": "audioSettings"
+        },
+        "task9_4": {
+          "slideNo": 2,
+          "chartType": "集合縦棒",
+          "categoryColumn": "科目",
+          "dataColumn": "人数",
+          "tableRows": [
+            [
+              "数学",
+              8
+            ],
+            [
+              "英語",
+              10
+            ],
+            [
+              "理科",
+              7
+            ]
+          ],
+          "operation": "insertChart"
+        },
+        "task9_5": {
+          "slideNo": 2,
+          "dataTable": "凡例マーカーなし",
+          "removeTitle": true,
+          "removeLegend": true,
+          "operation": "chartDataTable"
+        }
+      }
+    }
+  ]
+}

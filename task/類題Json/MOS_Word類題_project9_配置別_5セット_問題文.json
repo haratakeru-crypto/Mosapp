@@ -1,0 +1,1414 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。9-1=段落番号再開（1以外）、9-2=表を文字列変換（コンマは2セットのみ）、9-3=セル余白（右・4mm以外）、9-4=表並べ替え（合計列・降順以外も）、9-5=変更履歴操作（承認のみ/修正前に戻す/取り消し＋記録停止）、9-6=変更履歴ロックの操作種別を維持。",
+    "operationBoundary": "操作種別・UIパス・Checkerが検証する操作カテゴリは教材CSV準拠。数値・固有名詞・表セル値・脚注・置換語のみ差替。",
+    "contentPolicy": "docx事前配置は骨組み不可。テーマに沿った完全な本文・表データ・数値をセットごとに記載。",
+    "forbiddenPlaceholderPatterns": [
+      "xxx",
+      "...",
+      "ダミー",
+      "サンプル",
+      "テスト",
+      "Lorem",
+      "（ここに",
+      "空欄"
+    ],
+    "forbiddenParagraphTexts": [
+      "ゴールデンウィーク",
+      "月別催事内容",
+      "小豆島",
+      "654"
+    ],
+    "perSetMustVary": [
+      "段落番号の再開値",
+      "表の文字列変換区切り",
+      "セル余白の辺と数値",
+      "並べ替え列と順序",
+      "変更履歴の操作種別",
+      "変更履歴パスワード"
+    ],
+    "mustNotReuseAcrossSets": [
+      "numberedParagraph",
+      "table9_2Heading",
+      "table9_3Heading",
+      "sortColumn",
+      "trackChangesPassword",
+      "restartAt",
+      "separator",
+      "marginSide",
+      "marginMm",
+      "trackChangesOp"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "見出し・表データ・段落を完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "restartNumbering": "ホーム → 段落 → 段落番号 → 番号の再開",
+    "convertToText": "レイアウト → データツール → テキストに変換",
+    "cellMargin": "レイアウト → 配置 → セルの余白",
+    "sortTable": "レイアウト → データ → 並べ替え",
+    "trackChanges": "校閲 → 変更履歴",
+    "lockTracking": "校閲 → 変更履歴のロック"
+  },
+  "sourceFile": "Project9.docx",
+  "projectId": 9,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project9_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたは駅前店のフェア売上報告書を作成しています。",
+      "tasks": [
+        "タスク9-1　見出し「5月のフェア企画」の下にある「4. 秋の味覚フェア」の段落番号を「2」から開始するようにします。",
+        "タスク9-2　見出し「2. 月別販売実績」の下の表を、コンマ区切りの文字列に変更します。",
+        "タスク9-3　「3. 駅前店売上」の下の表のセルの左の余白を「\"3\"mm」にします。",
+        "タスク9-4　「3. 駅前店売上」の下の表を、「商品」のあいうえお順に並べ替えます。",
+        "タスク9-5　文書内の変更履歴をすべて承認してください。",
+        "タスク9-6　他のユーザーが変更履歴を編集できないようにロックします。パスワードは「\"821\"」にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "5月のフェア企画",
+          "2. 月別販売実績",
+          "3. 駅前店売上"
+        ],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景",
+        "trackChangesEnabled": true,
+        "paragraphCount": 14
+      },
+      "contentBlocks": {
+        "numberedSection": {
+          "heading": "5月のフェア企画",
+          "paragraphs": [
+            "1. 春の新メニュー",
+            "2. 母の日ギフト",
+            "3. 梅雨限定",
+            "4. 秋の味覚フェア",
+            "5. 冬のホットドリンク"
+          ]
+        },
+        "task9_2_table": {
+          "headers": [
+            "月",
+            "販売数",
+            "前年比"
+          ],
+          "rows": [
+            [
+              "1月",
+              "820",
+              "102%"
+            ],
+            [
+              "2月",
+              "760",
+              "98%"
+            ],
+            [
+              "3月",
+              "910",
+              "105%"
+            ],
+            [
+              "4月",
+              "880",
+              "101%"
+            ]
+          ]
+        },
+        "task9_3_table": {
+          "headers": [
+            "商品",
+            "4月",
+            "5月",
+            "売上合計"
+          ],
+          "rows": [
+            [
+              "ブレンドA",
+              "120",
+              "145",
+              "265"
+            ],
+            [
+              "ラテB",
+              "98",
+              "112",
+              "210"
+            ],
+            [
+              "スイーツC",
+              "76",
+              "89",
+              "165"
+            ],
+            [
+              "紅茶D",
+              "54",
+              "61",
+              "115"
+            ]
+          ]
+        },
+        "trackChangesSamples": [
+          {
+            "type": "insert",
+            "location": "見出し「5月のフェア企画」下",
+            "text": "秋フェアは10月第2週に実施予定です。"
+          },
+          {
+            "type": "delete",
+            "location": "表「駅前店売上」1行目",
+            "text": "試作メニュー"
+          },
+          {
+            "type": "insert",
+            "location": "本文末尾",
+            "text": "売上目標は前年比110%です。"
+          }
+        ],
+        "documentOutline": {
+          "title": "カフェ 催事売上報告書",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "5月のフェア企画",
+              "body": [
+                "5月のフェア企画の計画内容です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 企画概要",
+                  "body": [
+                    "季節イベントを企画しました。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 実施時期",
+                      "body": [
+                        "販促と連動して実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 担当部署",
+                          "body": [
+                            "営業部が主担当です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-1: 番号付き段落「4. 秋の味覚フェア」等を配置"
+            },
+            {
+              "level": 1,
+              "text": "2. 月別販売実績",
+              "body": [
+                "月別の実績データです。"
+              ],
+              "note": "9-2: 直下に表（コンマ区切り変換前）"
+            },
+            {
+              "level": 1,
+              "text": "3. 駅前店売上",
+              "body": [
+                "店舗別・拠点別の売上です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 分析メモ",
+                  "body": [
+                    "「商品」のあいうえお順で並べ替えます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 ソート前提",
+                      "body": [
+                        "セル左余白は未調整です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 集計単位",
+                          "body": [
+                            "単位は千円です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-3/9-4: 表はセル余白・並べ替え未実施 / 9-5: 変更履歴は未処理のまま"
+            },
+            {
+              "level": 1,
+              "text": "3. 駅前店売上",
+              "body": [
+                "今後の改善点を記載します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 次回施策",
+                  "body": [
+                    "次回は規模を拡大予定です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 予算",
+                      "body": [
+                        "予算案は上長確認中です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 承認状況",
+                          "body": [
+                            "承認後に周知します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "heading": "5月のフェア企画",
+          "numberedParagraph": "4. 秋の味覚フェア",
+          "restartAt": 2
+        },
+        "task9_2": {
+          "heading": "2. 月別販売実績",
+          "operation": "convertTableToCommaText",
+          "separator": "comma",
+          "separatorLabel": "コンマ区切り"
+        },
+        "task9_3": {
+          "tableHeading": "3. 駅前店売上",
+          "rightMarginMm": 4,
+          "marginSide": "left",
+          "marginSideLabel": "左",
+          "marginMm": 3
+        },
+        "task9_4": {
+          "tableHeading": "3. 駅前店売上",
+          "sortColumn": "商品",
+          "sortOrder": "alpha",
+          "sortOrderLabel": "あいうえお順"
+        },
+        "task9_5": {
+          "operation": "acceptAll"
+        },
+        "task9_6": {
+          "trackChangesPassword": "821"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project9_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは本院外来の診療実績報告書を作成しています。",
+      "tasks": [
+        "タスク9-1　見出し「6月の健診企画」の下にある「4. 健康週間」の段落番号を「3」から開始するようにします。",
+        "タスク9-2　見出し「2. 月別診療実績」の下の表を、タブ区切りの文字列に変更します。",
+        "タスク9-3　「3. 本院外来売上」の下の表のセルの上の余白を「\"5\"mm」にします。",
+        "タスク9-4　「3. 本院外来売上」の下の表を、「5月」の昇順に並べ替えます。",
+        "タスク9-5　文書内の変更履歴をすべて修正前の状態に戻してください。",
+        "タスク9-6　他のユーザーが変更履歴を編集できないようにロックします。パスワードは「\"529\"」にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "6月の健診企画",
+          "2. 月別診療実績",
+          "3. 本院外来売上"
+        ],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント",
+        "trackChangesEnabled": true,
+        "paragraphCount": 15
+      },
+      "contentBlocks": {
+        "numberedSection": {
+          "heading": "6月の健診企画",
+          "paragraphs": [
+            "1. 生活習慣病検診",
+            "2. がん検診キャンペーン",
+            "3. 歯科健診",
+            "4. 健康週間",
+            "5. 禁煙相談"
+          ]
+        },
+        "task9_2_table": {
+          "headers": [
+            "月",
+            "外来件数",
+            "前年比"
+          ],
+          "rows": [
+            [
+              "1月",
+              "1240",
+              "103%"
+            ],
+            [
+              "2月",
+              "1180",
+              "99%"
+            ],
+            [
+              "3月",
+              "1320",
+              "106%"
+            ],
+            [
+              "4月",
+              "1290",
+              "104%"
+            ]
+          ]
+        },
+        "task9_3_table": {
+          "headers": [
+            "診療科",
+            "4月",
+            "5月",
+            "総計"
+          ],
+          "rows": [
+            [
+              "内科",
+              "420",
+              "445",
+              "865"
+            ],
+            [
+              "外科",
+              "310",
+              "328",
+              "638"
+            ],
+            [
+              "小児科",
+              "280",
+              "295",
+              "575"
+            ],
+            [
+              "皮膚科",
+              "190",
+              "205",
+              "395"
+            ]
+          ]
+        },
+        "trackChangesSamples": [
+          {
+            "type": "insert",
+            "location": "見出し「6月の健診企画」下",
+            "text": "健康週間は6月第3週に実施します。"
+          },
+          {
+            "type": "delete",
+            "location": "表「本院外来売上」2行目",
+            "text": "予備枠"
+          },
+          {
+            "type": "insert",
+            "location": "本文末尾",
+            "text": "目標件数は前年比105%です。"
+          }
+        ],
+        "documentOutline": {
+          "title": "医療 催事売上報告書",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "6月の健診企画",
+              "body": [
+                "6月の健診企画の計画内容です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 企画概要",
+                  "body": [
+                    "季節イベントを企画しました。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 実施時期",
+                      "body": [
+                        "販促と連動して実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 担当部署",
+                          "body": [
+                            "営業部が主担当です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-1: 番号付き段落「4. 健康週間」等を配置"
+            },
+            {
+              "level": 1,
+              "text": "2. 月別診療実績",
+              "body": [
+                "月別の実績データです。"
+              ],
+              "note": "9-2: 直下に表（タブ区切り変換前）"
+            },
+            {
+              "level": 1,
+              "text": "3. 本院外来売上",
+              "body": [
+                "店舗別・拠点別の売上です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 分析メモ",
+                  "body": [
+                    "「5月」の昇順で並べ替えます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 ソート前提",
+                      "body": [
+                        "セル上余白は未調整です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 集計単位",
+                          "body": [
+                            "単位は千円です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-3/9-4: 表はセル余白・並べ替え未実施 / 9-5: 変更履歴は未処理のまま"
+            },
+            {
+              "level": 1,
+              "text": "3. 本院外来売上",
+              "body": [
+                "今後の改善点を記載します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 次回施策",
+                  "body": [
+                    "次回は規模を拡大予定です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 予算",
+                      "body": [
+                        "予算案は上長確認中です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 承認状況",
+                          "body": [
+                            "承認後に周知します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "heading": "6月の健診企画",
+          "numberedParagraph": "4. 健康週間",
+          "restartAt": 3
+        },
+        "task9_2": {
+          "heading": "2. 月別診療実績",
+          "operation": "convertTableToTabText",
+          "separator": "tab",
+          "separatorLabel": "タブ区切り"
+        },
+        "task9_3": {
+          "tableHeading": "3. 本院外来売上",
+          "rightMarginMm": 4,
+          "marginSide": "top",
+          "marginSideLabel": "上",
+          "marginMm": 5
+        },
+        "task9_4": {
+          "tableHeading": "3. 本院外来売上",
+          "sortColumn": "5月",
+          "sortOrder": "asc",
+          "sortOrderLabel": "昇順"
+        },
+        "task9_5": {
+          "operation": "revertAll"
+        },
+        "task9_6": {
+          "trackChangesPassword": "529"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project9_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは第一工場の出荷実績報告書を作成しています。",
+      "tasks": [
+        "タスク9-1　見出し「7月の展示企画」の下にある「4. 安全週間」の段落番号を「5」から開始するようにします。",
+        "タスク9-2　見出し「2. 月別出荷実績」の下の表を、段落区切りの文字列に変更します。",
+        "タスク9-3　「3. 第一工場売上」の下の表のセルの下の余白を「\"2\"mm」にします。",
+        "タスク9-4　「3. 第一工場売上」の下の表を、「製品」のあいうえお順に並べ替えます。",
+        "タスク9-5　文書内の変更履歴をすべて取り消して変更履歴の記録を停止します。",
+        "タスク9-6　他のユーザーが変更履歴を編集できないようにロックします。パスワードは「\"437\"」にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "7月の展示企画",
+          "2. 月別出荷実績",
+          "3. 第一工場売上"
+        ],
+        "marginPreset": "広い",
+        "orientation": "縦",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞",
+        "trackChangesEnabled": true,
+        "paragraphCount": 16
+      },
+      "contentBlocks": {
+        "numberedSection": {
+          "heading": "7月の展示企画",
+          "paragraphs": [
+            "1. 新製品展示",
+            "2. 品質見学会",
+            "3. 設備点検週間",
+            "4. 安全週間",
+            "5. 技能競技会"
+          ]
+        },
+        "task9_2_table": {
+          "headers": [
+            "月",
+            "出荷数",
+            "前年比"
+          ],
+          "rows": [
+            [
+              "1月",
+              "3200",
+              "101%"
+            ],
+            [
+              "2月",
+              "2980",
+              "97%"
+            ],
+            [
+              "3月",
+              "3450",
+              "108%"
+            ],
+            [
+              "4月",
+              "3310",
+              "104%"
+            ]
+          ]
+        },
+        "task9_3_table": {
+          "headers": [
+            "製品",
+            "4月",
+            "5月",
+            "出荷計"
+          ],
+          "rows": [
+            [
+              "部品X",
+              "820",
+              "890",
+              "1710"
+            ],
+            [
+              "部品Y",
+              "760",
+              "810",
+              "1570"
+            ],
+            [
+              "部品Z",
+              "640",
+              "695",
+              "1335"
+            ],
+            [
+              "部品W",
+              "520",
+              "548",
+              "1068"
+            ]
+          ]
+        },
+        "trackChangesSamples": [
+          {
+            "type": "insert",
+            "location": "見出し「7月の展示企画」下",
+            "text": "安全週間は7月第2週に実施します。"
+          },
+          {
+            "type": "delete",
+            "location": "表「第一工場売上」3行目",
+            "text": "試作品"
+          },
+          {
+            "type": "insert",
+            "location": "本文末尾",
+            "text": "出荷目標は前年比106%です。"
+          }
+        ],
+        "documentOutline": {
+          "title": "製造 催事売上報告書",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "7月の展示企画",
+              "body": [
+                "7月の展示企画の計画内容です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 企画概要",
+                  "body": [
+                    "季節イベントを企画しました。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 実施時期",
+                      "body": [
+                        "販促と連動して実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 担当部署",
+                          "body": [
+                            "営業部が主担当です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-1: 番号付き段落「4. 安全週間」等を配置"
+            },
+            {
+              "level": 1,
+              "text": "2. 月別出荷実績",
+              "body": [
+                "月別の実績データです。"
+              ],
+              "note": "9-2: 直下に表（段落区切り変換前）"
+            },
+            {
+              "level": 1,
+              "text": "3. 第一工場売上",
+              "body": [
+                "店舗別・拠点別の売上です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 分析メモ",
+                  "body": [
+                    "「製品」のあいうえお順で並べ替えます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 ソート前提",
+                      "body": [
+                        "セル下余白は未調整です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 集計単位",
+                          "body": [
+                            "単位は千円です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-3/9-4: 表はセル余白・並べ替え未実施 / 9-5: 変更履歴は未処理のまま"
+            },
+            {
+              "level": 1,
+              "text": "3. 第一工場売上",
+              "body": [
+                "今後の改善点を記載します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 次回施策",
+                  "body": [
+                    "次回は規模を拡大予定です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 予算",
+                      "body": [
+                        "予算案は上長確認中です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 承認状況",
+                          "body": [
+                            "承認後に周知します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "heading": "7月の展示企画",
+          "numberedParagraph": "4. 安全週間",
+          "restartAt": 5
+        },
+        "task9_2": {
+          "heading": "2. 月別出荷実績",
+          "operation": "convertTableToParagraphText",
+          "separator": "paragraph",
+          "separatorLabel": "段落区切り"
+        },
+        "task9_3": {
+          "tableHeading": "3. 第一工場売上",
+          "rightMarginMm": 4,
+          "marginSide": "bottom",
+          "marginSideLabel": "下",
+          "marginMm": 2
+        },
+        "task9_4": {
+          "tableHeading": "3. 第一工場売上",
+          "sortColumn": "製品",
+          "sortOrder": "alpha",
+          "sortOrderLabel": "あいうえお順"
+        },
+        "task9_5": {
+          "operation": "rejectAllAndStop"
+        },
+        "task9_6": {
+          "trackChangesPassword": "437"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project9_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは国内線ツアーの収益報告書を作成しています。",
+      "tasks": [
+        "タスク9-1　見出し「8月の企画ツアー」の下にある「4. 夏休み特集」の段落番号を「10」から開始するようにします。",
+        "タスク9-2　見出し「2. 月別収益実績」の下の表を、コンマ区切りの文字列に変更します。",
+        "タスク9-3　「3. 国内線売上」の下の表のセルの左の余白を「\"6\"mm」にします。",
+        "タスク9-4　「3. 国内線売上」の下の表を、「4月」の降順に並べ替えます。",
+        "タスク9-5　文書内の変更履歴をすべて承認してください。",
+        "タスク9-6　他のユーザーが変更履歴を編集できないようにロックします。パスワードは「\"615\"」にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "8月の企画ツアー",
+          "2. 月別収益実績",
+          "3. 国内線売上"
+        ],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "見出し下二重罫線",
+        "trackChangesEnabled": true,
+        "paragraphCount": 15
+      },
+      "contentBlocks": {
+        "numberedSection": {
+          "heading": "8月の企画ツアー",
+          "paragraphs": [
+            "1. 北海道周遊",
+            "2. 九州温泉",
+            "3. 北陸グルメ",
+            "4. 夏休み特集",
+            "5. 紅葉先行予約"
+          ]
+        },
+        "task9_2_table": {
+          "headers": [
+            "月",
+            "催行数",
+            "前年比"
+          ],
+          "rows": [
+            [
+              "1月",
+              "42",
+              "105%"
+            ],
+            [
+              "2月",
+              "38",
+              "98%"
+            ],
+            [
+              "3月",
+              "51",
+              "110%"
+            ],
+            [
+              "4月",
+              "47",
+              "103%"
+            ]
+          ]
+        },
+        "task9_3_table": {
+          "headers": [
+            "コース",
+            "4月",
+            "5月",
+            "売上計"
+          ],
+          "rows": [
+            [
+              "北海道3日",
+              "280",
+              "310",
+              "590"
+            ],
+            [
+              "九州4日",
+              "245",
+              "268",
+              "513"
+            ],
+            [
+              "北陸2日",
+              "198",
+              "215",
+              "413"
+            ],
+            [
+              "関西1日",
+              "156",
+              "172",
+              "328"
+            ]
+          ]
+        },
+        "trackChangesSamples": [
+          {
+            "type": "insert",
+            "location": "見出し「8月の企画ツアー」下",
+            "text": "夏休み特集は8月上旬に発売します。"
+          },
+          {
+            "type": "delete",
+            "location": "表「国内線売上」4行目",
+            "text": "検討中コース"
+          },
+          {
+            "type": "insert",
+            "location": "本文末尾",
+            "text": "収益目標は前年比108%です。"
+          }
+        ],
+        "documentOutline": {
+          "title": "旅行 催事売上報告書",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "8月の企画ツアー",
+              "body": [
+                "8月の企画ツアーの計画内容です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 企画概要",
+                  "body": [
+                    "季節イベントを企画しました。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 実施時期",
+                      "body": [
+                        "販促と連動して実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 担当部署",
+                          "body": [
+                            "営業部が主担当です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-1: 番号付き段落「4. 夏休み特集」等を配置"
+            },
+            {
+              "level": 1,
+              "text": "2. 月別収益実績",
+              "body": [
+                "月別の実績データです。"
+              ],
+              "note": "9-2: 直下に表（コンマ区切り変換前）"
+            },
+            {
+              "level": 1,
+              "text": "3. 国内線売上",
+              "body": [
+                "店舗別・拠点別の売上です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 分析メモ",
+                  "body": [
+                    "「4月」の降順で並べ替えます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 ソート前提",
+                      "body": [
+                        "セル左余白は未調整です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 集計単位",
+                          "body": [
+                            "単位は千円です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-3/9-4: 表はセル余白・並べ替え未実施 / 9-5: 変更履歴は未処理のまま"
+            },
+            {
+              "level": 1,
+              "text": "3. 国内線売上",
+              "body": [
+                "今後の改善点を記載します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 次回施策",
+                  "body": [
+                    "次回は規模を拡大予定です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 予算",
+                      "body": [
+                        "予算案は上長確認中です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 承認状況",
+                          "body": [
+                            "承認後に周知します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "heading": "8月の企画ツアー",
+          "numberedParagraph": "4. 夏休み特集",
+          "restartAt": 10
+        },
+        "task9_2": {
+          "heading": "2. 月別収益実績",
+          "operation": "convertTableToCommaText",
+          "separator": "comma",
+          "separatorLabel": "コンマ区切り"
+        },
+        "task9_3": {
+          "tableHeading": "3. 国内線売上",
+          "rightMarginMm": 4,
+          "marginSide": "left",
+          "marginSideLabel": "左",
+          "marginMm": 6
+        },
+        "task9_4": {
+          "tableHeading": "3. 国内線売上",
+          "sortColumn": "4月",
+          "sortOrder": "desc",
+          "sortOrderLabel": "降順"
+        },
+        "task9_5": {
+          "operation": "acceptAll"
+        },
+        "task9_6": {
+          "trackChangesPassword": "615"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project9_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは本校の受講実績報告書を作成しています。",
+      "tasks": [
+        "タスク9-1　見出し「9月の講座企画」の下にある「4. 秋期講習」の段落番号を「7」から開始するようにします。",
+        "タスク9-2　見出し「2. 月別受講実績」の下の表を、タブ区切りの文字列に変更します。",
+        "タスク9-3　「3. 本校売上」の下の表のセルの上の余白を「\"8\"mm」にします。",
+        "タスク9-4　「3. 本校売上」の下の表を、「講座」のあいうえお順に並べ替えます。",
+        "タスク9-5　文書内の変更履歴をすべて修正前の状態に戻してください。",
+        "タスク9-6　他のユーザーが変更履歴を編集できないようにロックします。パスワードは「\"903\"」にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "9月の講座企画",
+          "2. 月別受講実績",
+          "3. 本校売上"
+        ],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め",
+        "trackChangesEnabled": true,
+        "paragraphCount": 14
+      },
+      "contentBlocks": {
+        "numberedSection": {
+          "heading": "9月の講座企画",
+          "paragraphs": [
+            "1. 夏期復習",
+            "2. 定期試験対策",
+            "3. 入試説明会",
+            "4. 秋期講習",
+            "5. 冬期先行申込"
+          ]
+        },
+        "task9_2_table": {
+          "headers": [
+            "月",
+            "受講者数",
+            "前年比"
+          ],
+          "rows": [
+            [
+              "1月",
+              "186",
+              "102%"
+            ],
+            [
+              "2月",
+              "172",
+              "99%"
+            ],
+            [
+              "3月",
+              "198",
+              "106%"
+            ],
+            [
+              "4月",
+              "191",
+              "104%"
+            ]
+          ]
+        },
+        "task9_3_table": {
+          "headers": [
+            "講座",
+            "4月",
+            "5月",
+            "受講計"
+          ],
+          "rows": [
+            [
+              "数学A",
+              "62",
+              "68",
+              "130"
+            ],
+            [
+              "英語B",
+              "58",
+              "64",
+              "122"
+            ],
+            [
+              "国語C",
+              "45",
+              "49",
+              "94"
+            ],
+            [
+              "理科D",
+              "38",
+              "42",
+              "80"
+            ]
+          ]
+        },
+        "trackChangesSamples": [
+          {
+            "type": "insert",
+            "location": "見出し「9月の講座企画」下",
+            "text": "秋期講習は9月第2週から開始します。"
+          },
+          {
+            "type": "delete",
+            "location": "表「本校売上」1行目",
+            "text": "体験枠"
+          },
+          {
+            "type": "insert",
+            "location": "本文末尾",
+            "text": "受講目標は前年比107%です。"
+          }
+        ],
+        "documentOutline": {
+          "title": "学習塾 催事売上報告書",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "9月の講座企画",
+              "body": [
+                "9月の講座企画の計画内容です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 企画概要",
+                  "body": [
+                    "季節イベントを企画しました。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 実施時期",
+                      "body": [
+                        "販促と連動して実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 担当部署",
+                          "body": [
+                            "営業部が主担当です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-1: 番号付き段落「4. 秋期講習」等を配置"
+            },
+            {
+              "level": 1,
+              "text": "2. 月別受講実績",
+              "body": [
+                "月別の実績データです。"
+              ],
+              "note": "9-2: 直下に表（タブ区切り変換前）"
+            },
+            {
+              "level": 1,
+              "text": "3. 本校売上",
+              "body": [
+                "店舗別・拠点別の売上です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 分析メモ",
+                  "body": [
+                    "「講座」のあいうえお順で並べ替えます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 ソート前提",
+                      "body": [
+                        "セル上余白は未調整です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 集計単位",
+                          "body": [
+                            "単位は千円です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "9-3/9-4: 表はセル余白・並べ替え未実施 / 9-5: 変更履歴は未処理のまま"
+            },
+            {
+              "level": 1,
+              "text": "3. 本校売上",
+              "body": [
+                "今後の改善点を記載します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 次回施策",
+                  "body": [
+                    "次回は規模を拡大予定です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 予算",
+                      "body": [
+                        "予算案は上長確認中です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 承認状況",
+                          "body": [
+                            "承認後に周知します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task9_1": {
+          "heading": "9月の講座企画",
+          "numberedParagraph": "4. 秋期講習",
+          "restartAt": 7
+        },
+        "task9_2": {
+          "heading": "2. 月別受講実績",
+          "operation": "convertTableToTabText",
+          "separator": "tab",
+          "separatorLabel": "タブ区切り"
+        },
+        "task9_3": {
+          "tableHeading": "3. 本校売上",
+          "rightMarginMm": 4,
+          "marginSide": "top",
+          "marginSideLabel": "上",
+          "marginMm": 8
+        },
+        "task9_4": {
+          "tableHeading": "3. 本校売上",
+          "sortColumn": "講座",
+          "sortOrder": "alpha",
+          "sortOrderLabel": "あいうえお順"
+        },
+        "task9_5": {
+          "operation": "revertAll"
+        },
+        "task9_6": {
+          "trackChangesPassword": "903"
+        }
+      }
+    }
+  ]
+}

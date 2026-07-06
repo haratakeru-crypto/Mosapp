@@ -1,0 +1,217 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリストの内容の範疇内。各タスクの操作種別を変更しない。",
+    "dataPolicy": "シート名・データ内容は教材と似せず無作為に作成。実ブックと矛盾しないセル指定。",
+    "uiPolicy": "ビルド2508で利用可能なボタン・名称のみ使用（excelUiNames 参照）。",
+    "specificity": "シート名・グラフ種類・レイアウト/スタイル/配色名を曖昧にせず具体指定。",
+    "forbiddenSheetNames": ["売上実績", "商品別売上", "月別売上"],
+    "perSetMustVary": [
+      "表の開始セル位置", "ヘッダー行", "列幅セット", "視覚要素", "書式パターン",
+      "グラフレイアウト名", "グラフスタイル名", "グラフ配色名", "軸ラベル文言", "タスク5-3のグラフ要素", "タスク5-5のグラフ要素"
+    ],
+    "mustNotReuseAcrossSets": [
+      "列幅セット", "表開始セル", "ヘッダー行", "視覚要素", "書式パターン"
+    ]
+  },
+  "excelUiNames": {
+    "build": "2508",
+    "chartLayout": "グラフを選択 → グラフのデザイン → クイックレイアウト",
+    "chartStyle": "グラフを選択 → グラフのデザイン → グラフスタイル",
+    "chartColor": "グラフを選択 → グラフのデザイン → 色の変更",
+    "chartTitle": "グラフを選択 → グラフ要素 → グラフタイトル",
+    "dataLabels": "グラフを選択 → グラフ要素 → データラベル",
+    "dataTable": "グラフを選択 → グラフ要素 → データテーブル",
+    "gridlines": "グラフを選択 → グラフ要素 → グリッド線",
+    "axisTicks": "グラフを選択 → グラフ要素 → 軸 → 目盛り",
+    "legend": "グラフを選択 → グラフ要素 → 凡例",
+    "axisTitle": "グラフを選択 → グラフ要素 → 軸のタイトル",
+    "layouts": ["レイアウト1", "レイアウト2", "レイアウト3", "レイアウト4", "レイアウト5"],
+    "styles": ["スタイル8", "スタイル9", "スタイル11", "スタイル12", "スタイル15"],
+    "palettes": ["カラフルなパレット１", "カラフルなパレット２", "カラフルなパレット３", "モノクロなパレット３", "モノクロなパレット４"]
+  },
+  "sourceFile": "project5.xlsx",
+  "projectId": 5,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project5_配置別_セット1_カフェ.xlsx",
+      "problemStatement": "あなたはカフェのドリンク・メニューの売上構成を分析しています。",
+      "tasks": [
+        "タスク5-1　シート［ドリンク構成比］の円グラフのレイアウトを「レイアウト1」、グラフタイトルを「\"メニュー構成比\"」に変更します。",
+        "タスク5-2　シート［カテゴリ別売上］の円グラフのグラフスタイルを「スタイル12」、グラフの配色を「カラフルなパレット３」に変更します。",
+        "タスク5-3　シート［週次売上推移］の縦棒グラフのグラフタイトルを「\"週次売上\"」に変更します。",
+        "タスク5-4　シート［カテゴリ別売上］の円グラフに凡例を上に表示します。",
+        "タスク5-5　シート［週次売上推移］の縦棒グラフの主要縦軸の目盛り線を非表示にします。",
+        "タスク5-6　シート［週次売上推移］の縦棒グラフに第１横軸ラベルを表示して、「\"単位：杯\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["ドリンク構成比", "カテゴリ別売上", "週次売上推移", "日次来客"],
+        "tableStart": "A3",
+        "headerRow": 3,
+        "tableShape": "5列×20行（縦長）",
+        "colWidths": [6, 28, 14, 14, 12],
+        "rowHeights": {"title": 30, "header": 26, "data": 20, "summary": 28},
+        "visual": "縦棒グラフ",
+        "visualSheet": "週次売上推移",
+        "format": "枠線なし＋交互薄ベージュ縞",
+        "tabColor": "8B5A2B",
+        "print": "縦向き"
+      },
+      "taskParams": {
+        "task5_1": {"sheet": "ドリンク構成比", "chartType": "pie", "quickLayout": "レイアウト1", "chartTitle": "メニュー構成比"},
+        "task5_2": {"sheet": "カテゴリ別売上", "chartType": "pie", "chartStyle": "スタイル12", "chartColor": "カラフルなパレット３"},
+        "task5_3": {"sheet": "週次売上推移", "chartType": "column", "chartElement": "chartTitle", "chartElementUi": "グラフタイトル", "chartTitle": "週次売上"},
+        "task5_4": {"sheet": "カテゴリ別売上", "chartType": "pie", "legendPosition": "top"},
+        "task5_5": {"sheet": "週次売上推移", "chartType": "column", "chartElement": "majorTickMarks", "chartElementUi": "主要縦軸の目盛り線", "majorTickMarks": "none"},
+        "task5_6": {"sheet": "週次売上推移", "chartType": "column", "axisTitle": "単位：杯", "axis": "primaryHorizontal"}
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project5_配置別_セット2_医療.xlsx",
+      "problemStatement": "あなたは医療機関の診療科別の収益構成を分析しています。",
+      "tasks": [
+        "タスク5-1　シート［診療科構成］の円グラフのレイアウトを「レイアウト2」、グラフタイトルを「\"診療科別構成\"」に変更します。",
+        "タスク5-2　シート［処置別売上］の円グラフのグラフスタイルを「スタイル8」、グラフの配色を「カラフルなパレット２」に変更します。",
+        "タスク5-3　シート［月次収益推移］の折れ線グラフにデータテーブルを表示します。",
+        "タスク5-4　シート［処置別売上］の円グラフに凡例を上に表示します。",
+        "タスク5-5　シート［月次収益推移］の折れ線グラフの主要縦軸のグリッド線を表示しないようにします。",
+        "タスク5-6　シート［月次収益推移］の折れ線グラフに第１横軸ラベルを表示して、「\"単位：円\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["診療科構成", "処置別売上", "月次収益推移", "外来分析", "待機時間"],
+        "tableStart": "B5",
+        "headerRow": 5,
+        "tableShape": "12列×8行（横長）",
+        "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12],
+        "rowHeights": {"title": 40, "header": 30, "data": 24, "summary": 34},
+        "visual": "折れ線グラフ",
+        "visualSheet": "月次収益推移",
+        "format": "上下太罫線＋ヘッダー濃緑白字",
+        "tabColor": "38761D",
+        "print": "横向き"
+      },
+      "taskParams": {
+        "task5_1": {"sheet": "診療科構成", "chartType": "pie", "quickLayout": "レイアウト2", "chartTitle": "診療科別構成"},
+        "task5_2": {"sheet": "処置別売上", "chartType": "pie", "chartStyle": "スタイル8", "chartColor": "カラフルなパレット２"},
+        "task5_3": {"sheet": "月次収益推移", "chartType": "line", "chartElement": "dataTable", "chartElementUi": "データテーブル", "showDataTable": true},
+        "task5_4": {"sheet": "処置別売上", "chartType": "pie", "legendPosition": "top"},
+        "task5_5": {"sheet": "月次収益推移", "chartType": "line", "chartElement": "majorGridlines", "chartElementUi": "主要縦軸のグリッド線", "majorGridlines": false},
+        "task5_6": {"sheet": "月次収益推移", "chartType": "line", "axisTitle": "単位：円", "axis": "primaryHorizontal"}
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project5_配置別_セット3_製造.xlsx",
+      "problemStatement": "あなたは製造現場の製品別の出荷構成を分析しています。",
+      "tasks": [
+        "タスク5-1　シート［製品構成比］の円グラフのレイアウトを「レイアウト3」、グラフタイトルを「\"製品別構成\"」に変更します。",
+        "タスク5-2　シート［ライン別出荷］の円グラフのグラフスタイルを「スタイル15」、グラフの配色を「モノクロなパレット４」に変更します。",
+        "タスク5-3　シート［工場週次実績］の積み上げ縦棒グラフに凡例を右に表示します。",
+        "タスク5-4　シート［ライン別出荷］の円グラフに凡例を上に表示します。",
+        "タスク5-5　シート［工場週次実績］の積み上げ縦棒グラフの主要縦軸のグリッド線を表示しないようにします。",
+        "タスク5-6　シート［工場週次実績］の積み上げ縦棒グラフに第１横軸ラベルを表示して、「\"単位：件\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["製品構成比", "ライン別出荷", "工場週次実績", "品質検査"],
+        "tableStart": "C4",
+        "headerRow": 4,
+        "tableShape": "8列×8行（正方）",
+        "colWidths": [2, 14, 10, 10, 10, 10, 10, 12],
+        "rowHeights": {"title": 34, "header": 26, "data": 20, "summary": 30},
+        "visual": "積み上げ縦棒グラフ",
+        "visualSheet": "工場週次実績",
+        "format": "太罫線囲み＋ヘッダーオレンジ",
+        "tabColor": "595959",
+        "print": "縦向き・改ページ行14"
+      },
+      "taskParams": {
+        "task5_1": {"sheet": "製品構成比", "chartType": "pie", "quickLayout": "レイアウト3", "chartTitle": "製品別構成"},
+        "task5_2": {"sheet": "ライン別出荷", "chartType": "pie", "chartStyle": "スタイル15", "chartColor": "モノクロなパレット４"},
+        "task5_3": {"sheet": "工場週次実績", "chartType": "stackedColumn", "chartElement": "legend", "chartElementUi": "凡例", "legendPosition": "right"},
+        "task5_4": {"sheet": "ライン別出荷", "chartType": "pie", "legendPosition": "top"},
+        "task5_5": {"sheet": "工場週次実績", "chartType": "stackedColumn", "chartElement": "majorGridlines", "chartElementUi": "主要縦軸のグリッド線", "majorGridlines": false},
+        "task5_6": {"sheet": "工場週次実績", "chartType": "stackedColumn", "axisTitle": "単位：件", "axis": "primaryHorizontal"}
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project5_配置別_セット4_旅行.xlsx",
+      "problemStatement": "あなたは旅行会社のツアー別の予約構成を分析しています。",
+      "tasks": [
+        "タスク5-1　シート［ツアー構成］の円グラフのレイアウトを「レイアウト4」、グラフタイトルを「\"ツアー別構成\"」に変更します。",
+        "タスク5-2　シート［企画別予約］の円グラフのグラフスタイルを「スタイル11」、グラフの配色を「カラフルなパレット１」に変更します。",
+        "タスク5-3　シート［支店週次売上］の横棒グラフの主要縦軸の目盛り線を非表示にします。",
+        "タスク5-4　シート［企画別予約］の円グラフに凡例を上に表示します。",
+        "タスク5-5　シート［支店週次売上］の横棒グラフにデータテーブルを表示します。",
+        "タスク5-6　シート［支店週次売上］の横棒グラフに第１横軸ラベルを表示して、「\"単位：千円\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 6,
+        "sheets": ["ツアー構成", "企画別予約", "支店週次売上", "航空券補助", "宿泊分析", "観光地案内"],
+        "tableStart": "D6",
+        "headerRow": 6,
+        "tableShape": "4列×6行×3表（分割）",
+        "colWidths": [3, 12, 14, 12, 12, 12, 12],
+        "rowHeights": {"title": 30, "header": 22, "data": 20, "summary": 26},
+        "visual": "横棒グラフ",
+        "visualSheet": "支店週次売上",
+        "format": "縦縞＋スカイブルー薄罫線",
+        "tabColor": "1F4E79",
+        "print": "横向き"
+      },
+      "taskParams": {
+        "task5_1": {"sheet": "ツアー構成", "chartType": "pie", "quickLayout": "レイアウト4", "chartTitle": "ツアー別構成"},
+        "task5_2": {"sheet": "企画別予約", "chartType": "pie", "chartStyle": "スタイル11", "chartColor": "カラフルなパレット１"},
+        "task5_3": {"sheet": "支店週次売上", "chartType": "bar", "chartElement": "majorTickMarks", "chartElementUi": "主要縦軸の目盛り線", "majorTickMarks": "none"},
+        "task5_4": {"sheet": "企画別予約", "chartType": "pie", "legendPosition": "top"},
+        "task5_5": {"sheet": "支店週次売上", "chartType": "bar", "chartElement": "dataTable", "chartElementUi": "データテーブル", "showDataTable": true},
+        "task5_6": {"sheet": "支店週次売上", "chartType": "bar", "axisTitle": "単位：千円", "axis": "primaryHorizontal"}
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project5_配置別_セット5_学習塾.xlsx",
+      "problemStatement": "あなたは学習塾の講座別の受講構成を分析しています。",
+      "tasks": [
+        "タスク5-1　シート［講座構成比］の円グラフのレイアウトを「レイアウト5」、グラフタイトルを「\"講座別構成\"」に変更します。",
+        "タスク5-2　シート［科目別受講］の円グラフのグラフスタイルを「スタイル9」、グラフの配色を「モノクロなパレット３」に変更します。",
+        "タスク5-3　シート［教室週次実績］の面グラフに第１縦軸ラベルを表示して、「\"受講者数\"」と入力します。",
+        "タスク5-4　シート［科目別受講］の円グラフに凡例を上に表示します。",
+        "タスク5-5　シート［教室週次実績］の面グラフに凡例を右に表示します。",
+        "タスク5-6　シート［教室週次実績］の面グラフに第１横軸ラベルを表示して、「\"単位：人\"」と入力します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["講座構成比", "科目別受講", "教室週次実績", "模試分析", "講師配置"],
+        "tableStart": "A8",
+        "headerRow": 7,
+        "tableShape": "9列×12行",
+        "colWidths": [8, 16, 10, 10, 10, 10, 10, 10, 14],
+        "rowHeights": {"title": 40, "header": 28, "data": 22, "summary": 32},
+        "visual": "面グラフ",
+        "visualSheet": "教室週次実績",
+        "format": "交互縞＋下罫線＋ネイビー白字",
+        "tabColor": "BF9000",
+        "print": "縦向き・印刷タイトル行$7:$8"
+      },
+      "taskParams": {
+        "task5_1": {"sheet": "講座構成比", "chartType": "pie", "quickLayout": "レイアウト5", "chartTitle": "講座別構成"},
+        "task5_2": {"sheet": "科目別受講", "chartType": "pie", "chartStyle": "スタイル9", "chartColor": "モノクロなパレット３"},
+        "task5_3": {"sheet": "教室週次実績", "chartType": "area", "chartElement": "axisTitle", "chartElementUi": "第1縦軸ラベル", "axisTitle": "受講者数", "axis": "primaryVertical"},
+        "task5_4": {"sheet": "科目別受講", "chartType": "pie", "legendPosition": "top"},
+        "task5_5": {"sheet": "教室週次実績", "chartType": "area", "chartElement": "legend", "chartElementUi": "凡例", "legendPosition": "right"},
+        "task5_6": {"sheet": "教室週次実績", "chartType": "area", "axisTitle": "単位：人", "axis": "primaryHorizontal"}
+      }
+    }
+  ]
+}

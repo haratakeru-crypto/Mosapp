@@ -1,0 +1,392 @@
+{
+  "sourceFile": "project2.xlsx",
+  "projectId": 2,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project2_配置別_セット1_カフェ.xlsx",
+      "problemStatement": "あなたはカフェの売上・スタッフ情報を管理しています。",
+      "tasks": [
+        "タスク2-1　シート［メニュー売上］のセル【B24】に、セルのスタイル「良い」を設定します。",
+        "タスク2-2　シート［パート名簿］のセル範囲【B6:B29】に左インデントを2文字分設定します。",
+        "タスク2-3　シート［パート名簿］のセル【A2】の文字の配置をセル範囲【A2:H2】の中央にします。",
+        "タスク2-4　シート［店舗別経費］の「店舗別経費一覧」の表に、セル範囲【H4:K13】をコピーし、列幅を保持して貼り付けます。",
+        "タスク2-5　シート［仕入予定］のセル範囲【C5:C11】の時間に、取り消し線を設定します。",
+        "タスク2-6　シート［体験会名簿］の表のタイトル「体験会参加者名簿」のセルの結合と文字列の配置を解除します。",
+        "タスク2-7　シート［体験会名簿］の表から「氏名」が「黒田 美月」と「片岡 樹」の行を削除します。"
+      ],
+      "layout": {
+        "sheetCount": 6,
+        "sheets": ["メニュー売上", "パート名簿", "店舗別経費", "仕入予定", "体験会名簿", "日次売上推移"],
+        "tableStart": "A3",
+        "headerRow": 3,
+        "tableShape": "5列×20行（縦長）",
+        "colWidths": [6, 28, 14, 14, 12],
+        "rowHeights": {
+          "title": 30,
+          "header": 26,
+          "data": 20,
+          "summary": 28
+        },
+        "visual": "縦棒グラフ",
+        "format": "枠線なし＋交互薄ベージュ縞",
+        "tabColor": "8B5A2B",
+        "print": "縦（印刷の向き：縦）"
+      },
+      "taskParams": {
+        "task2_1": {
+          "sheet": "メニュー売上",
+          "range": "B24",
+          "cellStyle": "良い"
+        },
+        "task2_2": {
+          "sheet": "パート名簿",
+          "range": "B6:B29",
+          "indentLevel": 2,
+          "excludeAbove": "B5",
+          "excludeBelow": "B30"
+        },
+        "task2_3": {
+          "sheet": "パート名簿",
+          "cell": "A2",
+          "centerRange": "A2:H2"
+        },
+        "task2_4": {
+          "sheet": "店舗別経費",
+          "copyRange": "H4:K13",
+          "pasteTarget": "A4:D13",
+          "pasteKeepWidth": true,
+          "tableTitle": "店舗別経費一覧"
+        },
+        "task2_5": {
+          "sheet": "仕入予定",
+          "range": "C5:C11",
+          "context": "時間",
+          "excludeAbove": "C4",
+          "excludeBelow": "C12"
+        },
+        "task2_6": {
+          "sheet": "体験会名簿",
+          "titleText": "体験会参加者名簿"
+        },
+        "task2_7": {
+          "sheet": "体験会名簿",
+          "nameColumn": "氏名",
+          "deleteNames": ["黒田 美月", "片岡 樹"],
+          "expectedRowsBefore": 22,
+          "expectedRowsAfter": 20
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project2_配置別_セット2_医療.xlsx",
+      "problemStatement": "あなたは医療機関の診療・スタッフ情報を管理しています。",
+      "tasks": [
+        "タスク2-1　シート［診療科別収益］のセル範囲【C6:M9】に、「悪い」のセルのスタイルを設定します。",
+        "タスク2-2　シート［医療スタッフ］のセル範囲【E6:E33】に左インデントを2文字分設定します。",
+        "タスク2-3　シート［医療スタッフ］のセル【A2】の文字の配置をセル範囲【A2:H2】の中央にします。",
+        "タスク2-4　シート［医薬品マスタ］の「医薬品在庫表」の表に、セル範囲【P5:S15】をコピーし、列幅を保持して貼り付けます。",
+        "タスク2-5　シート［診療予定］のセル範囲【I5:I11】の時間に、取り消し線を設定します。",
+        "タスク2-6　シート［健診受診者］の表のタイトル「健診受診者一覧」のセルの結合と文字列の配置を解除します。",
+        "タスク2-7　シート［健診受診者］の表から「氏名」が「田島 悠斗」と「新井 恵」の行を削除します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["診療科別収益", "医療スタッフ", "医薬品マスタ", "健診受診者", "診療予定"],
+        "tableStart": "B5",
+        "headerRow": 5,
+        "tableShape": "12列×8行（横長）",
+        "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12],
+        "rowHeights": {
+          "title": 40,
+          "header": 30,
+          "data": 24,
+          "summary": 34
+        },
+        "visual": "スパークライン",
+        "format": "上下のみ太い罫線＋ヘッダー濃緑白字",
+        "tabColor": "38761D",
+        "print": "横（印刷タイトル行$4:$5）"
+      },
+      "taskParams": {
+        "task2_1": {
+          "sheet": "診療科別収益",
+          "range": "C6:M9",
+          "cellStyle": "悪い"
+        },
+        "task2_2": {
+          "sheet": "医療スタッフ",
+          "range": "E6:E33",
+          "indentLevel": 2,
+          "excludeAbove": "E5",
+          "excludeBelow": "E34"
+        },
+        "task2_3": {
+          "sheet": "医療スタッフ",
+          "cell": "A2",
+          "centerRange": "A2:H2"
+        },
+        "task2_4": {
+          "sheet": "医薬品マスタ",
+          "copyRange": "P5:S15",
+          "pasteTarget": "B5:E15",
+          "pasteKeepWidth": true,
+          "tableTitle": "医薬品在庫表"
+        },
+        "task2_5": {
+          "sheet": "診療予定",
+          "range": "I5:I11",
+          "context": "時間",
+          "excludeAbove": "I4",
+          "excludeBelow": "I12"
+        },
+        "task2_6": {
+          "sheet": "健診受診者",
+          "titleText": "健診受診者一覧"
+        },
+        "task2_7": {
+          "sheet": "健診受診者",
+          "nameColumn": "氏名",
+          "deleteNames": ["田島 悠斗", "新井 恵"],
+          "expectedRowsBefore": 22,
+          "expectedRowsAfter": 20
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project2_配置別_セット3_製造.xlsx",
+      "problemStatement": "あなたは製造現場の生産・在庫情報を管理しています。",
+      "tasks": [
+        "タスク2-1　シート［工場別生産実績］のセル範囲【C9:J9】に、「中立」のセルのスタイルを設定します。",
+        "タスク2-2　シート［作業員台帳］のセル範囲【C6:C40】に左インデントを2文字分設定します。",
+        "タスク2-3　シート［作業員台帳］のセル【A2】の文字の配置をセル範囲【A2:I2】の中央にします。",
+        "タスク2-4　シート［部品在庫］の「部品在庫一覧」の表に、セル範囲【L5:O14】をコピーし、列幅を保持して貼り付けます。",
+        "タスク2-5　シート［ライン稼働予定］のセル範囲【J5:J11】の時間に、取り消し線を設定します。",
+        "タスク2-6　シート［安全研修受講者］の表のタイトル「安全研修受講者一覧」のセルの結合と文字列の配置を解除します。",
+        "タスク2-7　シート［安全研修受講者］の表から「受講者氏名」が「真鍋 陽菜」と「若杉 奏」の行を削除します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["工場別生産実績", "作業員台帳", "部品在庫", "ライン稼働予定", "安全研修受講者"],
+        "tableStart": "C4",
+        "headerRow": 4,
+        "tableShape": "8列×8行（正方形寄り）",
+        "colWidths": [2, 14, 10, 10, 10, 10, 10, 10, 12],
+        "rowHeights": {
+          "title": 36,
+          "header": 24,
+          "data": 18,
+          "summary": 28
+        },
+        "visual": "円グラフ",
+        "format": "太罫線で全体を囲む＋ヘッダーオレンジ",
+        "tabColor": "595959",
+        "print": "縦（改ページ行15）"
+      },
+      "taskParams": {
+        "task2_1": {
+          "sheet": "工場別生産実績",
+          "range": "C9:J9",
+          "cellStyle": "中立",
+          "cellStyleAlt": "どちらでもない"
+        },
+        "task2_2": {
+          "sheet": "作業員台帳",
+          "range": "C6:C40",
+          "indentLevel": 2,
+          "excludeAbove": "C5",
+          "excludeBelow": "C41"
+        },
+        "task2_3": {
+          "sheet": "作業員台帳",
+          "cell": "A2",
+          "centerRange": "A2:I2"
+        },
+        "task2_4": {
+          "sheet": "部品在庫",
+          "copyRange": "L5:O14",
+          "pasteTarget": "C5:F14",
+          "pasteKeepWidth": true,
+          "tableTitle": "部品在庫一覧"
+        },
+        "task2_5": {
+          "sheet": "ライン稼働予定",
+          "range": "J5:J11",
+          "context": "時間",
+          "excludeAbove": "J4",
+          "excludeBelow": "J12"
+        },
+        "task2_6": {
+          "sheet": "安全研修受講者",
+          "titleText": "安全研修受講者一覧"
+        },
+        "task2_7": {
+          "sheet": "安全研修受講者",
+          "nameColumn": "受講者氏名",
+          "deleteNames": ["真鍋 陽菜", "若杉 奏"],
+          "expectedRowsBefore": 22,
+          "expectedRowsAfter": 20
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project2_配置別_セット4_旅行.xlsx",
+      "problemStatement": "あなたは旅行会社のツアー・参加者情報を管理しています。",
+      "tasks": [
+        "タスク2-1　シート［ツアー別売上］のセル【I14】に、セルのスタイル「計算」を設定します。",
+        "タスク2-2　シート［ガイド名簿］のセル範囲【D7:D36】に左インデントを2文字分設定します。",
+        "タスク2-3　シート［ガイド名簿］のセル【B2】の文字の配置をセル範囲【B2:H2】の中央にします。",
+        "タスク2-4　シート［ツアー別売上］の「ツアー別売上実績」の表に、セル範囲【P14:S23】をコピーし、列幅を保持して貼り付けます。",
+        "タスク2-5　シート［出発時刻表］のセル範囲【E6:E12】の時間に、取り消し線を設定します。",
+        "タスク2-6　シート［ツアー参加者］の表の小見出し「ツアー参加者一覧」のセルの結合と文字列の配置を解除します。",
+        "タスク2-7　シート［ツアー参加者］の表から「氏名」が「森本 葵」と「大野 翼」の行を削除します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["ツアー別売上", "ガイド名簿", "出発時刻表", "ツアー参加者"],
+        "tableStart": "D6",
+        "headerRow": 6,
+        "tableShape": "主表6列×8行＋小表2つ（分割構造）",
+        "colWidths": [3, 12, 16, 12, 12, 12, 12, 12],
+        "rowHeights": {
+          "title": 30,
+          "header": 22,
+          "data": 22
+        },
+        "visual": "シェイプ風枠（結合＋色塗り）",
+        "format": "縦縞＋スカイブルー＋薄罫線",
+        "tabColor": "1F4E79",
+        "print": "横"
+      },
+      "taskParams": {
+        "task2_1": {
+          "sheet": "ツアー別売上",
+          "range": "I14",
+          "cellStyle": "計算"
+        },
+        "task2_2": {
+          "sheet": "ガイド名簿",
+          "range": "D7:D36",
+          "indentLevel": 2,
+          "excludeAbove": "D6",
+          "excludeBelow": "D37"
+        },
+        "task2_3": {
+          "sheet": "ガイド名簿",
+          "cell": "B2",
+          "centerRange": "B2:H2"
+        },
+        "task2_4": {
+          "sheet": "ツアー別売上",
+          "copyRange": "P14:S23",
+          "pasteTarget": "D14:G23",
+          "pasteKeepWidth": true,
+          "tableTitle": "ツアー別売上実績"
+        },
+        "task2_5": {
+          "sheet": "出発時刻表",
+          "range": "E6:E12",
+          "context": "時間",
+          "excludeAbove": "E5",
+          "excludeBelow": "E13"
+        },
+        "task2_6": {
+          "sheet": "ツアー参加者",
+          "titleText": "ツアー参加者一覧"
+        },
+        "task2_7": {
+          "sheet": "ツアー参加者",
+          "nameColumn": "氏名",
+          "deleteNames": ["森本 葵", "大野 翼"],
+          "expectedRowsBefore": 22,
+          "expectedRowsAfter": 20
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project2_配置別_セット5_学習塾.xlsx",
+      "problemStatement": "あなたは学習塾の売上・講師情報を管理しています。",
+      "tasks": [
+        "タスク2-1　シート［教科別売上］のセル範囲【J9:J33】に、「入力」のセルのスタイルを設定します。",
+        "タスク2-2　シート［講師台帳］のセル範囲【F9:F33】に左インデントを2文字分設定します。",
+        "タスク2-3　シート［講師台帳］のセル【A2】の文字の配置をセル範囲【A2:F2】の中央にします。",
+        "タスク2-4　シート［教材在庫］の「教材在庫一覧」の表に、セル範囲【H8:I19】をコピーし、列幅を保持して貼り付けます。",
+        "タスク2-5　シート［授業予定］のセル範囲【C6:C12】の時間に、取り消し線を設定します。",
+        "タスク2-6　シート［模試受験者］の表のタイトル「模試受験者名簿」のセルの結合と文字列の配置を解除します。",
+        "タスク2-7　シート［模試受験者］の表から「氏名」が「浜崎 晴」と「吉岡 陸」の行を削除します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["教科別売上", "講師台帳", "教材在庫", "授業予定", "模試受験者"],
+        "tableStart": "A8",
+        "headerRow": 8,
+        "tableShape": "10列×25行（大1表）",
+        "colWidths": [8, 18, 10, 10, 10, 10, 10, 10, 10, 14],
+        "rowHeights": {
+          "title": 44,
+          "header": 28,
+          "data": 22,
+          "summary": 32
+        },
+        "visual": "画像枠プレースホルダ",
+        "format": "交互背景縞＋下罫線のみ＋ネイビー白字",
+        "tabColor": "BF9000",
+        "print": "縦"
+      },
+      "taskParams": {
+        "task2_1": {
+          "sheet": "教科別売上",
+          "range": "J9:J33",
+          "cellStyle": "入力"
+        },
+        "task2_2": {
+          "sheet": "講師台帳",
+          "range": "F9:F33",
+          "indentLevel": 2,
+          "excludeAbove": "F8",
+          "excludeBelow": "F34"
+        },
+        "task2_3": {
+          "sheet": "講師台帳",
+          "cell": "A2",
+          "centerRange": "A2:F2"
+        },
+        "task2_4": {
+          "sheet": "教材在庫",
+          "copyRange": "H8:I19",
+          "pasteTarget": "A8:B19",
+          "pasteKeepWidth": true,
+          "tableTitle": "教材在庫一覧"
+        },
+        "task2_5": {
+          "sheet": "授業予定",
+          "range": "C6:C12",
+          "context": "時間",
+          "excludeAbove": "C5",
+          "excludeBelow": "C13"
+        },
+        "task2_6": {
+          "sheet": "模試受験者",
+          "titleText": "模試受験者名簿"
+        },
+        "task2_7": {
+          "sheet": "模試受験者",
+          "nameColumn": "氏名",
+          "deleteNames": ["浜崎 晴", "吉岡 陸"],
+          "expectedRowsBefore": 22,
+          "expectedRowsAfter": 20
+        }
+      }
+    }
+  ]
+}

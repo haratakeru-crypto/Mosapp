@@ -1,0 +1,336 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。5-1=画像挿入・折り返し、5-2=折り返し変更、5-3=アート効果、5-4=ぼかし、5-5=面取り、5-6=代替テキスト／説明、5-7=装飾化／非表示、5-8=背景削除／前景マークの操作種別を維持。",
+    "forbiddenParagraphTexts": [
+      "5月21日より5日間",
+      "TOEICテスト対策セミナー",
+      "TOEIC",
+      "セミナー案内"
+    ],
+    "perSetMustVary": [
+      "導入文と本文テーマ",
+      "5-1挿入箇所・折り返し（上下以外）",
+      "5-2折り返し（狭く以外）",
+      "5-3アート効果（水彩：スポンジ以外）",
+      "5-4ぼかし（25ポイント以外）",
+      "5-5面取り（ハードエッジ以外）・画像位置",
+      "5-6画像位置・代替テキスト表現",
+      "5-7装飾化／スクリーンリーダー非表示の表現",
+      "5-8背景削除／前景領域追加"
+    ],
+    "mustNotReuseAcrossSets": [
+      "タイトル",
+      "段落先頭文",
+      "5-1画像名",
+      "5-5画像名",
+      "5-6画像名",
+      "代替テキスト本文",
+      "文末画像名"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "段落・画像名・説明文を完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "insertPicture": "挿入 → 画像",
+    "wrapText": "図の形式 → 文字列の折り返し",
+    "artEffects": "図の形式 → 図の効果 → アート効果",
+    "softEdges": "図の形式 → 図の効果 → ぼかし",
+    "bevel": "図の形式 → 図の効果 → 面取り",
+    "altText": "図の形式 → 代替テキスト",
+    "removeBackground": "図の形式 → 図の効果 → 背景の削除"
+  },
+  "sourceFile": "Project5.docx",
+  "projectId": 5,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project5_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたはバリスタ養成講座の案内文を作成しています。",
+      "tasks": [
+        "タスク5-1　「6月10日より3日間の集中講座を開催します。」の段落の先頭に、画像「エスプレッソマシン」を挿入します。文字列の折り返しは「四角形」にします。",
+        "タスク5-2　「6月10日より3日間の集中講座を開催します。」の段落の先頭の画像の文字列の折り返しを「貫通」に変更します。",
+        "タスク5-3　「6月10日より3日間の集中講座を開催します。」の段落の先頭の画像にアート効果「鉛筆：スケッチ」を設定します。",
+        "タスク5-4　「6月10日より3日間の集中講座を開催します。」の段落の先頭の画像に図の効果「ぼかし10ポイント」を設定します。",
+        "タスク5-5　「バリスタ養成講座のご案内」のタイトルの左側の画像に、図の効果「面取り 円」を設定します。",
+        "タスク5-6　「バリスタ養成講座のご案内」のタイトルの左側の画像がスクリーンリーダーに表示されるように、代替テキスト「\"バリスタ講座案内\"」を設定します。",
+        "タスク5-7　「6月10日より3日間の集中講座を開催します。」の段落の先頭の画像の代替テキストを装飾化します。",
+        "タスク5-8　文末の画像の背景を削除します。背景以外は削除しないようにします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["バリスタ養成講座のご案内", "講座概要", "申込方法"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景",
+        "imagePlacement": "タイトル左（コーヒー豆）＋段落先頭（エスプレッソマシン）＋文末（カップ）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 20
+      },
+      "taskParams": {
+        "task5_1": {
+          "anchorType": "paragraphStart",
+          "targetParagraph": "6月10日より3日間の集中講座を開催します。",
+          "imageName": "エスプレッソマシン",
+          "wrapType": "四角形",
+          "wrapTypeInternal": "wdWrapSquare",
+          "primaryImageAnchor": "paragraphStart"
+        },
+        "task5_2": {"sameImageAs": "task5_1", "wrapType": "貫通", "wrapTypeInternal": "wdWrapThrough"},
+        "task5_3": {"sameImageAs": "task5_1", "artEffect": "鉛筆：スケッチ", "artEffectInternal": "artisticPencilSketch"},
+        "task5_4": {"sameImageAs": "task5_1", "softEdgePt": 10, "softEdgeLabel": "ぼかし10ポイント"},
+        "task5_5": {
+          "titleText": "バリスタ養成講座のご案内",
+          "imageName": "コーヒー豆",
+          "imageAnchor": "titleLeft",
+          "bevelEffect": "面取り 円",
+          "bevelInternal": "bevelT+circle"
+        },
+        "task5_6": {
+          "sameImageAs": "task5_5",
+          "altText": "バリスタ講座案内",
+          "useAltTextWord": true
+        },
+        "task5_7": {"sameImageAs": "task5_1", "altTextDecorative": true, "wording": "装飾化"},
+        "task5_8": {"imageName": "カップ", "imageAnchor": "documentEnd", "operation": "removeBackgroundOnly"}
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project5_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは救急処置講習の案内文を作成しています。",
+      "tasks": [
+        "タスク5-1　「7月5日より2日間の実技講習を開催します。」の段落の末尾に、画像「聴診器」を挿入します。文字列の折り返しは「貫通」にします。",
+        "タスク5-2　「7月5日より2日間の実技講習を開催します。」の段落の末尾の画像の文字列の折り返しを「四角形」に変更します。",
+        "タスク5-3　「7月5日より2日間の実技講習を開催します。」の段落の末尾の画像にアート効果「マーカー」を設定します。",
+        "タスク5-4　「7月5日より2日間の実技講習を開催します。」の段落の末尾の画像に図の効果「ぼかし15ポイント」を設定します。",
+        "タスク5-5　「救急処置講習のご案内」のタイトルの下の画像に、図の効果「面取り 角度」を設定します。",
+        "タスク5-6　「救急処置講習のご案内」のタイトルの下の画像がスクリーンリーダーに表示されるように、代替テキスト「\"講習案内\"」を設定します。",
+        "タスク5-7　「7月5日より2日間の実技講習を開催します。」の段落の末尾の画像の代替テキストを装飾化します。",
+        "タスク5-8　文末の画像の背景を削除します。背景以外は削除しないようにします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["救急処置講習のご案内", "講習内容", "参加資格"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント（緑）",
+        "imagePlacement": "タイトル下（救急箱）＋段落末尾（聴診器）＋文末（救急車）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 22
+      },
+      "taskParams": {
+        "task5_1": {
+          "anchorType": "paragraphEnd",
+          "targetParagraph": "7月5日より2日間の実技講習を開催します。",
+          "imageName": "聴診器",
+          "wrapType": "貫通",
+          "wrapTypeInternal": "wdWrapThrough",
+          "primaryImageAnchor": "paragraphEnd"
+        },
+        "task5_2": {"sameImageAs": "task5_1", "wrapType": "四角形", "wrapTypeInternal": "wdWrapSquare"},
+        "task5_3": {"sameImageAs": "task5_1", "artEffect": "マーカー", "artEffectInternal": "artisticMarker"},
+        "task5_4": {"sameImageAs": "task5_1", "softEdgePt": 15, "softEdgeLabel": "ぼかし15ポイント"},
+        "task5_5": {
+          "titleText": "救急処置講習のご案内",
+          "imageName": "救急箱",
+          "imageAnchor": "underTitle",
+          "bevelEffect": "面取り 角度",
+          "bevelInternal": "bevelT+angle"
+        },
+        "task5_6": {
+          "sameImageAs": "task5_5",
+          "altText": "講習案内",
+          "useAltTextWord": true
+        },
+        "task5_7": {"sameImageAs": "task5_1", "altTextDecorative": true, "wording": "装飾化"},
+        "task5_8": {"imageName": "救急車", "imageAnchor": "documentEnd", "operation": "removeBackgroundOnly"}
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project5_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは品質検査研修の案内文を作成しています。",
+      "tasks": [
+        "タスク5-1　見出し「研修日程」の下に、画像「検査機器」を挿入します。文字列の折り返しは「狭く」にします。",
+        "タスク5-2　見出し「研修日程」の下の画像の文字列の折り返しを「背面」に変更します。",
+        "タスク5-3　見出し「研修日程」の下の画像にアート効果「セピア」を設定します。",
+        "タスク5-4　見出し「研修日程」の下の画像に図の効果「ぼかし20ポイント」を設定します。",
+        "タスク5-5　「品質検査研修のご案内」のタイトルの右側の画像に、図の効果「面取り ソフトラウンド」を設定します。",
+        "タスク5-6　見出し「受講対象」の下の画像がスクリーンリーダーに表示されるように、説明「\"研修案内\"」を設定します。",
+        "タスク5-7　見出し「研修日程」の下の画像がスクリーンリーダーに表示されないようにします。",
+        "タスク5-8　文末の画像で、前景として残す領域を一部追加でマークします。背景以外は削除しないようにします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["品質検査研修のご案内", "研修日程", "受講対象"],
+        "marginPreset": "広い",
+        "orientation": "縦",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞",
+        "imagePlacement": "見出し下（検査機器）＋タイトル右（安全帽）＋受講対象下（品質マーク）＋文末（工場）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 24
+      },
+      "taskParams": {
+        "task5_1": {
+          "anchorType": "underHeading",
+          "anchorHeading": "研修日程",
+          "targetParagraph": "8月1日より4日間の研修を開催します。",
+          "imageName": "検査機器",
+          "wrapType": "狭く",
+          "wrapTypeInternal": "wdWrapTight",
+          "primaryImageAnchor": "underHeading"
+        },
+        "task5_2": {"sameImageAs": "task5_1", "wrapType": "背面", "wrapTypeInternal": "wdWrapBehind"},
+        "task5_3": {"sameImageAs": "task5_1", "artEffect": "セピア", "artEffectInternal": "artisticSepia"},
+        "task5_4": {"sameImageAs": "task5_1", "softEdgePt": 20, "softEdgeLabel": "ぼかし20ポイント"},
+        "task5_5": {
+          "titleText": "品質検査研修のご案内",
+          "imageName": "安全帽",
+          "imageAnchor": "titleRight",
+          "bevelEffect": "面取り ソフトラウンド",
+          "bevelInternal": "bevelT+softRound"
+        },
+        "task5_6": {
+          "anchorHeading": "受講対象",
+          "imageName": "品質マーク",
+          "imageAnchor": "underHeading",
+          "altText": "研修案内",
+          "useAltTextWord": false
+        },
+        "task5_7": {"sameImageAs": "task5_1", "altTextDecorative": true, "wording": "screenReaderHidden"},
+        "task5_8": {"imageName": "工場", "imageAnchor": "documentEnd", "operation": "addForegroundMark"}
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project5_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは添乗員養成講座の案内文を作成しています。",
+      "tasks": [
+        "タスク5-1　見出し「カリキュラム」の下の段落「9月15日より5日間の講座を開催します。」の右に、画像「地球儀」を挿入します。文字列の折り返しは「前面」にします。",
+        "タスク5-2　見出し「カリキュラム」の下の段落「9月15日より5日間の講座を開催します。」の右の画像の文字列の折り返しを「上下」に変更します。",
+        "タスク5-3　見出し「カリキュラム」の下の段落「9月15日より5日間の講座を開催します。」の右の画像にアート効果「線画」を設定します。",
+        "タスク5-4　見出し「カリキュラム」の下の段落「9月15日より5日間の講座を開催します。」の右の画像に図の効果「ぼかし50ポイント」を設定します。",
+        "タスク5-5　見出し「費用」の右側の画像に、図の効果「面取り リラックスインセット」を設定します。",
+        "タスク5-6　見出し「カリキュラム」の下の段落「9月15日より5日間の講座を開催します。」の右の画像がスクリーンリーダーに表示されるように、スクリーンリーダー用の説明「\"添乗員講座案内\"」を設定します。",
+        "タスク5-7　見出し「カリキュラム」の下の段落「9月15日より5日間の講座を開催します。」の右の画像がスクリーンリーダーに表示されないようにします。",
+        "タスク5-8　文末の画像で、前景として残す領域を一部追加でマークします。背景以外は削除しないようにします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["添乗員養成講座のご案内", "カリキュラム", "費用"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "見出し下二重罫線",
+        "imagePlacement": "段落右（地球儀）＋費用横（スーツケース）＋文末（飛行機）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 21
+      },
+      "taskParams": {
+        "task5_1": {
+          "anchorType": "besideParagraph",
+          "anchorHeading": "カリキュラム",
+          "targetParagraph": "9月15日より5日間の講座を開催します。",
+          "imageName": "地球儀",
+          "wrapType": "前面",
+          "wrapTypeInternal": "wdWrapFront",
+          "primaryImageAnchor": "besideParagraph"
+        },
+        "task5_2": {"sameImageAs": "task5_1", "wrapType": "上下", "wrapTypeInternal": "wdWrapTopBottom"},
+        "task5_3": {"sameImageAs": "task5_1", "artEffect": "線画", "artEffectInternal": "artisticLineDrawing"},
+        "task5_4": {"sameImageAs": "task5_1", "softEdgePt": 50, "softEdgeLabel": "ぼかし50ポイント"},
+        "task5_5": {
+          "anchorHeading": "費用",
+          "imageName": "スーツケース",
+          "imageAnchor": "headingRight",
+          "bevelEffect": "面取り リラックスインセット",
+          "bevelInternal": "bevelT+relaxedInset"
+        },
+        "task5_6": {
+          "sameImageAs": "task5_1",
+          "altText": "添乗員講座案内",
+          "useAltTextWord": false,
+          "altTextLabel": "スクリーンリーダー用の説明"
+        },
+        "task5_7": {"sameImageAs": "task5_1", "altTextDecorative": true, "wording": "screenReaderHidden"},
+        "task5_8": {"imageName": "飛行機", "imageAnchor": "documentEnd", "operation": "addForegroundMark"}
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project5_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは夏期集中講座の案内文を作成しています。",
+      "tasks": [
+        "タスク5-1　「夏期集中講座のご案内」のタイトルの下に、画像「タブレット」を挿入します。文字列の折り返しは「背面」にします。",
+        "タスク5-2　「夏期集中講座のご案内」のタイトルの下の画像の文字列の折り返しを「前面」に変更します。",
+        "タスク5-3　「夏期集中講座のご案内」のタイトルの下の画像にアート効果「チョーク」を設定します。",
+        "タスク5-4　「夏期集中講座のご案内」のタイトルの下の画像に図の効果「ぼかし35ポイント」を設定します。",
+        "タスク5-5　「夏期集中講座のご案内」のタイトルの横の画像に、図の効果「面取り クールスラント」を設定します。",
+        "タスク5-6　見出し「時間割」の下の画像がスクリーンリーダーに表示されるように、説明「\"夏期講座案内\"」を設定します。",
+        "タスク5-7　「夏期集中講座のご案内」のタイトルの下の画像がスクリーンリーダーに表示されないようにします。",
+        "タスク5-8　文末の画像で、前景として残す領域を一部追加でマークします。背景以外は削除しないようにします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["夏期集中講座のご案内", "時間割", "料金"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め",
+        "imagePlacement": "タイトル下（タブレット）＋タイトル横（黒板）＋時間割下（学習アイコン）＋文末（鉛筆）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 19
+      },
+      "taskParams": {
+        "task5_1": {
+          "anchorType": "underTitle",
+          "titleText": "夏期集中講座のご案内",
+          "targetParagraph": "7月20日より10日間の講座を開催します。",
+          "imageName": "タブレット",
+          "wrapType": "背面",
+          "wrapTypeInternal": "wdWrapBehind",
+          "primaryImageAnchor": "underTitle"
+        },
+        "task5_2": {"sameImageAs": "task5_1", "wrapType": "前面", "wrapTypeInternal": "wdWrapFront"},
+        "task5_3": {"sameImageAs": "task5_1", "artEffect": "チョーク", "artEffectInternal": "artisticChalk"},
+        "task5_4": {"sameImageAs": "task5_1", "softEdgePt": 35, "softEdgeLabel": "ぼかし35ポイント"},
+        "task5_5": {
+          "titleText": "夏期集中講座のご案内",
+          "imageName": "黒板",
+          "imageAnchor": "besideTitle",
+          "bevelEffect": "面取り クールスラント",
+          "bevelInternal": "bevelT+coolSlant"
+        },
+        "task5_6": {
+          "anchorHeading": "時間割",
+          "imageName": "学習アイコン",
+          "imageAnchor": "underHeading",
+          "altText": "夏期講座案内",
+          "useAltTextWord": false
+        },
+        "task5_7": {"sameImageAs": "task5_1", "altTextDecorative": true, "wording": "screenReaderHidden"},
+        "task5_8": {"imageName": "鉛筆", "imageAnchor": "documentEnd", "operation": "addForegroundMark"}
+      }
+    }
+  ]
+}

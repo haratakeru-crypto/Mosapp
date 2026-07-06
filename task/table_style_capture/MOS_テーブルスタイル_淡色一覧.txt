@@ -1,0 +1,29 @@
+テーブルスタイル（淡色）ギャラリー表示名一覧（21件）
+========================================================
+
+No.  内部名                  ギャラリー表示名（MOS形式）
+---  ------------------  ----------------------------------
+  1.  TableStyleLight1    白、テーブルスタイル（淡色）1
+  2.  TableStyleLight2    薄い水色、テーブルスタイル（淡色）2
+  3.  TableStyleLight3    薄いオレンジ、テーブルスタイル（淡色）3
+  4.  TableStyleLight4    薄い緑、テーブルスタイル（淡色）4
+  5.  TableStyleLight5    薄い水色、テーブルスタイル（淡色）5
+  6.  TableStyleLight6    ピンク、テーブルスタイル（淡色）6
+  7.  TableStyleLight7    薄い緑、テーブルスタイル（淡色）7
+  8.  TableStyleLight8    白、テーブルスタイル（淡色）8
+  9.  TableStyleLight9    濃い青緑、テーブルスタイル（淡色）9
+ 10.  TableStyleLight10   オレンジ、テーブルスタイル（淡色）10
+ 11.  TableStyleLight11   濃い緑、テーブルスタイル（淡色）11
+ 12.  TableStyleLight12   水色、テーブルスタイル（淡色）12
+ 13.  TableStyleLight13   プラム、テーブルスタイル（淡色）13
+ 14.  TableStyleLight14   緑、テーブルスタイル（淡色）14
+ 15.  TableStyleLight15   白、テーブルスタイル（淡色）15
+ 16.  TableStyleLight16   薄い水色、テーブルスタイル（淡色）16
+ 17.  TableStyleLight17   薄いオレンジ、テーブルスタイル（淡色）17
+ 18.  TableStyleLight18   薄い緑、テーブルスタイル（淡色）18
+ 19.  TableStyleLight19   薄い水色、テーブルスタイル（淡色）19
+ 20.  TableStyleLight20   ピンク、テーブルスタイル（淡色）20
+ 21.  TableStyleLight21   薄い緑、テーブルスタイル（淡色）21
+
+個別スクショ: task/table_style_capture/screenshots/TableStyleLight1.png ～
+一覧合成画像: task/table_style_capture/screenshots/TableStyleLight_一覧.png

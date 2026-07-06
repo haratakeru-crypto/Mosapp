@@ -1,0 +1,1171 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。7-1=互換モード解除、7-2=文書プロパティ（会社名以外）、7-3=ヘッダー挿入、7-4=最初のページのヘッダー、7-5=フッターページ番号、7-6=フッターテキスト、7-7=txt保存、7-8=docm保存＋読み取りパスワードの操作種別を維持。",
+    "operationBoundary": "操作種別・UIパス・Checkerが検証する操作カテゴリは教材CSV準拠。数値・固有名詞・表セル値・脚注・置換語のみ差替。",
+    "contentPolicy": "docx事前配置は骨組み不可。テーマに沿った完全な本文・表データ・数値をセットごとに記載。",
+    "forbiddenPlaceholderPatterns": [
+      "xxx",
+      "...",
+      "ダミー",
+      "サンプル",
+      "テスト",
+      "Lorem",
+      "（ここに",
+      "空欄"
+    ],
+    "forbiddenParagraphTexts": [
+      "朗読会",
+      "ラビット出版",
+      "インテグラル",
+      "abc"
+    ],
+    "perSetMustVary": [
+      "導入文と本文テーマ",
+      "プロパティ項目と値",
+      "ヘッダー文字列",
+      "フッター文字列",
+      "保存ベース名",
+      "読み取りパスワード"
+    ],
+    "mustNotReuseAcrossSets": [
+      "propertyValue",
+      "headerText",
+      "firstPageHeaderText",
+      "footerText",
+      "txtBaseName",
+      "readPassword"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "プロパティ・ヘッダー・フッター・保存名・パスワードを完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "compatibilityMode": "ファイル → 情報 → 互換モードの使用をやめる",
+    "documentProperties": "ファイル → 情報 → プロパティ → 詳細プロパティの表示",
+    "header": "挿入 → ヘッダーとフッター → ヘッダー",
+    "saveAsTxt": "ファイル → 名前を付けて保存 → テキスト",
+    "saveAsDocm": "ファイル → 名前を付けて保存 → Word マクロ有効文書",
+    "footer": "挿入 → ヘッダーとフッター → フッター",
+    "documentPropertyFields": "ファイル → 情報 → プロパティ → 詳細プロパティの表示"
+  },
+  "sourceFile": "Project7.docx",
+  "projectId": 7,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project7_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたは焙煎体験会の案内文を作成しています。",
+      "tasks": [
+        "タスク7-1　文書の互換モードを解除します。メッセージが表示された場合は「OK」をクリックします。",
+        "タスク7-2　文章のプロパティの作成者に「\"焙煎カフェ係\"」と設定します。",
+        "タスク7-3　文書に「コーヒー焙煎」のヘッダーを挿入します。",
+        "タスク7-4　最初のページのみ、ヘッダーに「体験会案内」と入力します。",
+        "タスク7-5　フッターにページ番号を挿入します。",
+        "タスク7-6　フッターに「焙煎カフェ本店」と入力します。",
+        "タスク7-7　文書に「\"焙煎体験会\"」という名前を付けてテキストファイルとして保存します。ファイルの変換は既定値のままにします。",
+        "タスク7-8　この文書のコピーをマクロ有効文書として保存します。「名前を付けて保存」画面で読み取りパスワードを「\"cf26\"」に設定すること。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "焙煎体験会のご案内",
+          "開催概要",
+          "お申し込み"
+        ],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景",
+        "compatibilityMode": true,
+        "paragraphCount": 18
+      },
+      "contentBlocks": {
+        "introParagraphs": [
+          "当店では毎月第2土曜日に焙煎体験会を開催しています。",
+          "初心者の方でも安心してご参加いただけます。"
+        ],
+        "bodyParagraphs": [
+          "体験会では生豆の選び方から焙煎の基本までを学べます。",
+          "所要時間は約90分、定員は8名です。",
+          "申込は開催日の3日前までにお願いします。",
+          "会場は本店2階の焙煎室です。"
+        ],
+        "documentOutline": {
+          "title": "焙煎体験会 ご案内",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "焙煎体験会のご案内",
+              "body": [
+                "当店では毎月第2土曜日に焙煎体験会を開催しています。",
+                "初心者の方でも安心してご参加いただけます。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 開催趣旨",
+                  "body": [
+                    "体験会では生豆の選び方から焙煎の基本までを学べます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 対象者",
+                      "body": [
+                        "所要時間は約90分、定員は8名です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 参加資格",
+                          "body": [
+                            "申込は開催日の3日前までにお願いします。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "開催概要",
+              "body": [
+                "会場は本店2階の焙煎室です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 当日の流れ",
+                  "body": [
+                    "体験会では生豆の選び方から焙煎の基本までを学べます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 受付",
+                      "body": [
+                        "所要時間は約90分、定員は8名です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 開始時刻",
+                          "body": [
+                            "申込は開催日の3日前までにお願いします。",
+                            "会場は本店2階の焙煎室です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "お申し込み",
+              "body": [
+                "お申し込み方法をご確認ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 申込方法",
+                  "body": [
+                    "電話またはWebから申込可能です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 連絡先",
+                      "body": [
+                        "定員に達し次第締切ます。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 受付時間",
+                          "body": [
+                            "平日9時から17時まで受付。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "プロパティ・ヘッダー・フッターは未設定（7-2〜7-6は受験者操作）"
+            },
+            {
+              "level": 1,
+              "text": "お問い合わせ",
+              "body": [
+                "ご不明点は事務局までご連絡ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 担当窓口",
+                  "body": [
+                    "平日のみ対応いたします。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 電話番号",
+                      "body": [
+                        "メールでも受付可能です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 担当者",
+                          "body": [
+                            "担当：イベント係"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "operation": "upgradeDocument"
+        },
+        "task7_2": {
+          "propertyName": "作成者",
+          "propertyKey": "Author",
+          "propertyValue": "焙煎カフェ係"
+        },
+        "task7_3": {
+          "headerText": "コーヒー焙煎",
+          "headerType": "primary"
+        },
+        "task7_4": {
+          "headerText": "体験会案内",
+          "headerType": "firstPage"
+        },
+        "task7_5": {
+          "footerType": "pageNumber",
+          "operation": "insertPageNumber"
+        },
+        "task7_6": {
+          "footerText": "焙煎カフェ本店",
+          "footerType": "primary"
+        },
+        "task7_7": {
+          "txtBaseName": "焙煎体験会",
+          "saveFormat": "txt"
+        },
+        "task7_8": {
+          "docmBaseName": "焙煎体験会",
+          "readPassword": "cf26",
+          "saveFormat": "docm"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project7_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは健康講座の案内文を作成しています。",
+      "tasks": [
+        "タスク7-1　文書の互換モードを解除します。メッセージが表示された場合は「OK」をクリックします。",
+        "タスク7-2　文章のプロパティの件名に「\"健康講座のご案内\"」と設定します。",
+        "タスク7-3　文書に「健診案内」のヘッダーを挿入します。",
+        "タスク7-4　最初のページのみ、ヘッダーに「本院健診係」と入力します。",
+        "タスク7-5　フッターにページ番号を挿入します。",
+        "タスク7-6　フッターに「メディカルセンター本院」と入力します。",
+        "タスク7-7　文書に「\"健康講座案内\"」という名前を付けてテキストファイルとして保存します。ファイルの変換は既定値のままにします。",
+        "タスク7-8　この文書のコピーをマクロ有効文書として保存します。「名前を付けて保存」画面で読み取りパスワードを「\"hm26\"」に設定すること。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "健康講座のご案内",
+          "講座内容",
+          "参加方法"
+        ],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント",
+        "compatibilityMode": true,
+        "paragraphCount": 20
+      },
+      "contentBlocks": {
+        "introParagraphs": [
+          "本院では生活習慣病予防をテーマにした健康講座を開催します。",
+          "医師による解説と質疑応答の時間を設けています。"
+        ],
+        "bodyParagraphs": [
+          "第1部では食事と運動の基本、第2部では睡眠とストレス管理を扱います。",
+          "参加費は無料、定員30名です。",
+          "申込は受付またはWebフォームから受け付けます。",
+          "当日は筆記用具をご持参ください。"
+        ],
+        "documentOutline": {
+          "title": "健康講座 ご案内",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "健康講座のご案内",
+              "body": [
+                "本院では生活習慣病予防をテーマにした健康講座を開催します。",
+                "医師による解説と質疑応答の時間を設けています。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 開催趣旨",
+                  "body": [
+                    "第1部では食事と運動の基本、第2部では睡眠とストレス管理を扱います。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 対象者",
+                      "body": [
+                        "参加費は無料、定員30名です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 参加資格",
+                          "body": [
+                            "申込は受付またはWebフォームから受け付けます。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "講座内容",
+              "body": [
+                "当日は筆記用具をご持参ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 当日の流れ",
+                  "body": [
+                    "第1部では食事と運動の基本、第2部では睡眠とストレス管理を扱います。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 受付",
+                      "body": [
+                        "参加費は無料、定員30名です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 開始時刻",
+                          "body": [
+                            "申込は受付またはWebフォームから受け付けます。",
+                            "当日は筆記用具をご持参ください。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "参加方法",
+              "body": [
+                "お申し込み方法をご確認ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 申込方法",
+                  "body": [
+                    "電話またはWebから申込可能です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 連絡先",
+                      "body": [
+                        "定員に達し次第締切ます。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 受付時間",
+                          "body": [
+                            "平日9時から17時まで受付。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "プロパティ・ヘッダー・フッターは未設定（7-2〜7-6は受験者操作）"
+            },
+            {
+              "level": 1,
+              "text": "お問い合わせ",
+              "body": [
+                "ご不明点は事務局までご連絡ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 担当窓口",
+                  "body": [
+                    "平日のみ対応いたします。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 電話番号",
+                      "body": [
+                        "メールでも受付可能です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 担当者",
+                          "body": [
+                            "担当：イベント係"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "operation": "upgradeDocument"
+        },
+        "task7_2": {
+          "propertyName": "件名",
+          "propertyKey": "Subject",
+          "propertyValue": "健康講座のご案内"
+        },
+        "task7_3": {
+          "headerText": "健診案内",
+          "headerType": "primary"
+        },
+        "task7_4": {
+          "headerText": "本院健診係",
+          "headerType": "firstPage"
+        },
+        "task7_5": {
+          "footerType": "pageNumber",
+          "operation": "insertPageNumber"
+        },
+        "task7_6": {
+          "footerText": "メディカルセンター本院",
+          "footerType": "primary"
+        },
+        "task7_7": {
+          "txtBaseName": "健康講座案内",
+          "saveFormat": "txt"
+        },
+        "task7_8": {
+          "docmBaseName": "健康講座案内",
+          "readPassword": "hm26",
+          "saveFormat": "docm"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project7_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは安全講習会の案内文を作成しています。",
+      "tasks": [
+        "タスク7-1　文書の互換モードを解除します。メッセージが表示された場合は「OK」をクリックします。",
+        "タスク7-2　文章のプロパティの管理者に「\"第一工場安全係\"」と設定します。",
+        "タスク7-3　文書に「品質管理」のヘッダーを挿入します。",
+        "タスク7-4　最初のページのみ、ヘッダーに「安全講習係」と入力します。",
+        "タスク7-5　フッターにページ番号を挿入します。",
+        "タスク7-6　フッターに「第一工場 総務部」と入力します。",
+        "タスク7-7　文書に「\"安全講習会\"」という名前を付けてテキストファイルとして保存します。ファイルの変換は既定値のままにします。",
+        "タスク7-8　この文書のコピーをマクロ有効文書として保存します。「名前を付けて保存」画面で読み取りパスワードを「\"mf26\"」に設定すること。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "安全講習会のご案内",
+          "講習項目",
+          "受講手続き"
+        ],
+        "marginPreset": "広い",
+        "orientation": "縦",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞",
+        "compatibilityMode": true,
+        "paragraphCount": 19
+      },
+      "contentBlocks": {
+        "introParagraphs": [
+          "第一工場では年次の安全講習会を実施します。",
+          "全従業員の参加が義務付けられています。"
+        ],
+        "bodyParagraphs": [
+          "講習では機械操作時の注意点と緊急時の対応手順を確認します。",
+          "実技デモンストレーションを含む約2時間のプログラムです。",
+          "受講後は理解度チェックシートに記入してください。",
+          "未受講者は管理部門へ連絡が必要です。"
+        ],
+        "documentOutline": {
+          "title": "安全講習会 ご案内",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "安全講習会のご案内",
+              "body": [
+                "第一工場では年次の安全講習会を実施します。",
+                "全従業員の参加が義務付けられています。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 開催趣旨",
+                  "body": [
+                    "講習では機械操作時の注意点と緊急時の対応手順を確認します。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 対象者",
+                      "body": [
+                        "実技デモンストレーションを含む約2時間のプログラムです。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 参加資格",
+                          "body": [
+                            "受講後は理解度チェックシートに記入してください。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "講習項目",
+              "body": [
+                "未受講者は管理部門へ連絡が必要です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 当日の流れ",
+                  "body": [
+                    "講習では機械操作時の注意点と緊急時の対応手順を確認します。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 受付",
+                      "body": [
+                        "実技デモンストレーションを含む約2時間のプログラムです。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 開始時刻",
+                          "body": [
+                            "受講後は理解度チェックシートに記入してください。",
+                            "未受講者は管理部門へ連絡が必要です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "受講手続き",
+              "body": [
+                "お申し込み方法をご確認ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 申込方法",
+                  "body": [
+                    "電話またはWebから申込可能です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 連絡先",
+                      "body": [
+                        "定員に達し次第締切ます。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 受付時間",
+                          "body": [
+                            "平日9時から17時まで受付。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "プロパティ・ヘッダー・フッターは未設定（7-2〜7-6は受験者操作）"
+            },
+            {
+              "level": 1,
+              "text": "お問い合わせ",
+              "body": [
+                "ご不明点は事務局までご連絡ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 担当窓口",
+                  "body": [
+                    "平日のみ対応いたします。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 電話番号",
+                      "body": [
+                        "メールでも受付可能です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 担当者",
+                          "body": [
+                            "担当：イベント係"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "operation": "upgradeDocument"
+        },
+        "task7_2": {
+          "propertyName": "管理者",
+          "propertyKey": "Manager",
+          "propertyValue": "第一工場安全係"
+        },
+        "task7_3": {
+          "headerText": "品質管理",
+          "headerType": "primary"
+        },
+        "task7_4": {
+          "headerText": "安全講習係",
+          "headerType": "firstPage"
+        },
+        "task7_5": {
+          "footerType": "pageNumber",
+          "operation": "insertPageNumber"
+        },
+        "task7_6": {
+          "footerText": "第一工場 総務部",
+          "footerType": "primary"
+        },
+        "task7_7": {
+          "txtBaseName": "安全講習会",
+          "saveFormat": "txt"
+        },
+        "task7_8": {
+          "docmBaseName": "安全講習会",
+          "readPassword": "mf26",
+          "saveFormat": "docm"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project7_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは添乗員研修の案内文を作成しています。",
+      "tasks": [
+        "タスク7-1　文書の互換モードを解除します。メッセージが表示された場合は「OK」をクリックします。",
+        "タスク7-2　文章のプロパティのタイトルに「\"添乗員研修案内\"」と設定します。",
+        "タスク7-3　文書に「旅程案内」のヘッダーを挿入します。",
+        "タスク7-4　最初のページのみ、ヘッダーに「研修係」と入力します。",
+        "タスク7-5　フッターにページ番号を挿入します。",
+        "タスク7-6　フッターに「トラベル研修センター」と入力します。",
+        "タスク7-7　文書に「\"添乗員研修\"」という名前を付けてテキストファイルとして保存します。ファイルの変換は既定値のままにします。",
+        "タスク7-8　この文書のコピーをマクロ有効文書として保存します。「名前を付けて保存」画面で読み取りパスワードを「\"tr26\"」に設定すること。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "添乗員研修のご案内",
+          "研修日程",
+          "申込要項"
+        ],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "見出し下二重罫線",
+        "compatibilityMode": true,
+        "paragraphCount": 21
+      },
+      "contentBlocks": {
+        "introParagraphs": [
+          "旅行会社では新規添乗員向けの研修を実施します。",
+          "実務に必要な知識と接客マナーを習得します。"
+        ],
+        "bodyParagraphs": [
+          "研修は3日間の集中コースで、座学とロールプレイを組み合わせます。",
+          "宿泊施設での実地研修も含まれます。",
+          "修了後は添乗員資格認定試験を受験できます。",
+          "申込締切は開催日の2週間前です。"
+        ],
+        "documentOutline": {
+          "title": "添乗員研修 ご案内",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "添乗員研修のご案内",
+              "body": [
+                "旅行会社では新規添乗員向けの研修を実施します。",
+                "実務に必要な知識と接客マナーを習得します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 開催趣旨",
+                  "body": [
+                    "研修は3日間の集中コースで、座学とロールプレイを組み合わせます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 対象者",
+                      "body": [
+                        "宿泊施設での実地研修も含まれます。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 参加資格",
+                          "body": [
+                            "修了後は添乗員資格認定試験を受験できます。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "研修日程",
+              "body": [
+                "申込締切は開催日の2週間前です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 当日の流れ",
+                  "body": [
+                    "研修は3日間の集中コースで、座学とロールプレイを組み合わせます。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 受付",
+                      "body": [
+                        "宿泊施設での実地研修も含まれます。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 開始時刻",
+                          "body": [
+                            "修了後は添乗員資格認定試験を受験できます。",
+                            "申込締切は開催日の2週間前です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "申込要項",
+              "body": [
+                "お申し込み方法をご確認ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 申込方法",
+                  "body": [
+                    "電話またはWebから申込可能です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 連絡先",
+                      "body": [
+                        "定員に達し次第締切ます。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 受付時間",
+                          "body": [
+                            "平日9時から17時まで受付。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "プロパティ・ヘッダー・フッターは未設定（7-2〜7-6は受験者操作）"
+            },
+            {
+              "level": 1,
+              "text": "お問い合わせ",
+              "body": [
+                "ご不明点は事務局までご連絡ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 担当窓口",
+                  "body": [
+                    "平日のみ対応いたします。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 電話番号",
+                      "body": [
+                        "メールでも受付可能です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 担当者",
+                          "body": [
+                            "担当：イベント係"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "operation": "upgradeDocument"
+        },
+        "task7_2": {
+          "propertyName": "タイトル",
+          "propertyKey": "Title",
+          "propertyValue": "添乗員研修案内"
+        },
+        "task7_3": {
+          "headerText": "旅程案内",
+          "headerType": "primary"
+        },
+        "task7_4": {
+          "headerText": "研修係",
+          "headerType": "firstPage"
+        },
+        "task7_5": {
+          "footerType": "pageNumber",
+          "operation": "insertPageNumber"
+        },
+        "task7_6": {
+          "footerText": "トラベル研修センター",
+          "footerType": "primary"
+        },
+        "task7_7": {
+          "txtBaseName": "添乗員研修",
+          "saveFormat": "txt"
+        },
+        "task7_8": {
+          "docmBaseName": "添乗員研修",
+          "readPassword": "tr26",
+          "saveFormat": "docm"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project7_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは保護者説明会の案内文を作成しています。",
+      "tasks": [
+        "タスク7-1　文書の互換モードを解除します。メッセージが表示された場合は「OK」をクリックします。",
+        "タスク7-2　文章のプロパティの分類に「\"保護者説明資料\"」と設定します。",
+        "タスク7-3　文書に「学習計画」のヘッダーを挿入します。",
+        "タスク7-4　最初のページのみ、ヘッダーに「進路指導係」と入力します。",
+        "タスク7-5　フッターにページ番号を挿入します。",
+        "タスク7-6　フッターに「エデュ学習塾本部」と入力します。",
+        "タスク7-7　文書に「\"保護者説明会\"」という名前を付けてテキストファイルとして保存します。ファイルの変換は既定値のままにします。",
+        "タスク7-8　この文書のコピーをマクロ有効文書として保存します。「名前を付けて保存」画面で読み取りパスワードを「\"ed26\"」に設定すること。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "保護者説明会のご案内",
+          "説明会の内容",
+          "参加申込"
+        ],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め",
+        "compatibilityMode": true,
+        "paragraphCount": 17
+      },
+      "contentBlocks": {
+        "introParagraphs": [
+          "本校では秋期講習に先立ち保護者説明会を開催します。",
+          "学習方針と進路指導についてご説明します。"
+        ],
+        "bodyParagraphs": [
+          "説明会ではカリキュラムの変更点と模試日程をお伝えします。",
+          "個別相談の時間も設けています。",
+          "参加は保護者1名以上を推奨します。",
+          "資料は当日配布、事前資料の送付はありません。"
+        ],
+        "documentOutline": {
+          "title": "保護者説明会 ご案内",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "保護者説明会のご案内",
+              "body": [
+                "本校では秋期講習に先立ち保護者説明会を開催します。",
+                "学習方針と進路指導についてご説明します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 開催趣旨",
+                  "body": [
+                    "説明会ではカリキュラムの変更点と模試日程をお伝えします。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 対象者",
+                      "body": [
+                        "個別相談の時間も設けています。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 参加資格",
+                          "body": [
+                            "参加は保護者1名以上を推奨します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "説明会の内容",
+              "body": [
+                "資料は当日配布、事前資料の送付はありません。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 当日の流れ",
+                  "body": [
+                    "説明会ではカリキュラムの変更点と模試日程をお伝えします。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 受付",
+                      "body": [
+                        "個別相談の時間も設けています。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 開始時刻",
+                          "body": [
+                            "参加は保護者1名以上を推奨します。",
+                            "資料は当日配布、事前資料の送付はありません。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "参加申込",
+              "body": [
+                "お申し込み方法をご確認ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 申込方法",
+                  "body": [
+                    "電話またはWebから申込可能です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 連絡先",
+                      "body": [
+                        "定員に達し次第締切ます。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 受付時間",
+                          "body": [
+                            "平日9時から17時まで受付。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "プロパティ・ヘッダー・フッターは未設定（7-2〜7-6は受験者操作）"
+            },
+            {
+              "level": 1,
+              "text": "お問い合わせ",
+              "body": [
+                "ご不明点は事務局までご連絡ください。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 担当窓口",
+                  "body": [
+                    "平日のみ対応いたします。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 電話番号",
+                      "body": [
+                        "メールでも受付可能です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 担当者",
+                          "body": [
+                            "担当：イベント係"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "operation": "upgradeDocument"
+        },
+        "task7_2": {
+          "propertyName": "分類",
+          "propertyKey": "Category",
+          "propertyValue": "保護者説明資料"
+        },
+        "task7_3": {
+          "headerText": "学習計画",
+          "headerType": "primary"
+        },
+        "task7_4": {
+          "headerText": "進路指導係",
+          "headerType": "firstPage"
+        },
+        "task7_5": {
+          "footerType": "pageNumber",
+          "operation": "insertPageNumber"
+        },
+        "task7_6": {
+          "footerText": "エデュ学習塾本部",
+          "footerType": "primary"
+        },
+        "task7_7": {
+          "txtBaseName": "保護者説明会",
+          "saveFormat": "txt"
+        },
+        "task7_8": {
+          "docmBaseName": "保護者説明会",
+          "readPassword": "ed26",
+          "saveFormat": "docm"
+        }
+      }
+    }
+  ]
+}

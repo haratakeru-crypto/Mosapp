@@ -1,0 +1,586 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project10の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "木版活字",
+      "四季を楽しむ",
+      "タイトル付きの図と表",
+      "メトロポリタン"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "masterTheme": "木版活字",
+      "customLayoutName": "タイトル付きの図と表",
+      "handoutFooter": "四季を楽しむ"
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project10.pptx",
+  "projectId": 10,
+  "variantType": "layout",
+  "taskCount": 8,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project10_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたはカフェの季節メニュー紹介資料を作成しています。",
+      "tasks": [
+        "タスク10-1　スライドマスターにテーマ「イオン」を設定します。",
+        "タスク10-2　スライドマスターにスライド番号を挿入します。",
+        "タスク10-3　スライドマスターの［タイトルスライド］レイアウトのスライド番号を非表示にします。",
+        "タスク10-4　スライドマスターの［２つのコンテンツ］レイアウトのスライドの背景のデザインを非表示にします。",
+        "タスク10-5　スライドマスターで［フッター］のプレースホルダーを削除します。",
+        "タスク10-6　スライドマスターの［タイトルのみ］レイアウトをもとに「\"図表カスタム_カフェ\"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレースホルダーを右側に配置します。",
+        "タスク10-7　配布資料マスターの日付を削除します。",
+        "タスク10-8　配布資料マスターのフッターに「\"季節メニューを楽しむ\"」と表示します。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "春のメニュー"
+          },
+          {
+            "slideNo": 2,
+            "layout": "2 つのコンテンツ",
+            "title": "夏のドリンク",
+            "notes": "10-4: 2つのコンテンツの背景デザイン非表示未実施"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "秋の限定"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "冬の温かい一杯"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "豆の産地"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "焙煎の違い"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "masterThemeSet": false,
+          "masterSlideNumber": false,
+          "titleLayoutNumberHidden": false,
+          "twoContentBgHidden": false,
+          "masterFooterDeleted": false,
+          "customLayoutCreated": false,
+          "handoutDateDeleted": false,
+          "handoutFooterSet": false
+        }
+      },
+      "taskParams": {
+        "task10_1": {
+          "masterTheme": "イオン",
+          "operation": "masterTheme"
+        },
+        "task10_2": {
+          "operation": "masterSlideNumber"
+        },
+        "task10_3": {
+          "layout": "タイトルスライド",
+          "operation": "hideMasterSlideNumber"
+        },
+        "task10_4": {
+          "layout": "2 つのコンテンツ",
+          "operation": "hideMasterBackground"
+        },
+        "task10_5": {
+          "operation": "deleteMasterFooter"
+        },
+        "task10_6": {
+          "baseLayout": "タイトルのみ",
+          "customLayoutName": "図表カスタム_カフェ",
+          "operation": "customMasterLayout"
+        },
+        "task10_7": {
+          "operation": "deleteHandoutDate"
+        },
+        "task10_8": {
+          "handoutFooter": "季節メニューを楽しむ",
+          "operation": "handoutFooter"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project10_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは院内四季の健康案内資料を作成しています。",
+      "tasks": [
+        "タスク10-1　スライドマスターにテーマ「センチュリー」を設定します。",
+        "タスク10-2　スライドマスターにスライド番号を挿入します。",
+        "タスク10-3　スライドマスターの［タイトルスライド］レイアウトのスライド番号を非表示にします。",
+        "タスク10-4　スライドマスターの［２つのコンテンツ］レイアウトのスライドの背景のデザインを非表示にします。",
+        "タスク10-5　スライドマスターで［フッター］のプレースホルダーを削除します。",
+        "タスク10-6　スライドマスターの［タイトルのみ］レイアウトをもとに「\"図表カスタム_医療\"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレースホルダーを右側に配置します。",
+        "タスク10-7　配布資料マスターの日付を削除します。",
+        "タスク10-8　配布資料マスターのフッターに「\"健康な四季を送る\"」と表示します。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "春の健診"
+          },
+          {
+            "slideNo": 2,
+            "layout": "2 つのコンテンツ",
+            "title": "夏の熱中症",
+            "notes": "10-4: 2つのコンテンツの背景デザイン非表示未実施"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "秋の免疫"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "冬の感染症"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "食事の工夫"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "運動の習慣"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "masterThemeSet": false,
+          "masterSlideNumber": false,
+          "titleLayoutNumberHidden": false,
+          "twoContentBgHidden": false,
+          "masterFooterDeleted": false,
+          "customLayoutCreated": false,
+          "handoutDateDeleted": false,
+          "handoutFooterSet": false
+        }
+      },
+      "taskParams": {
+        "task10_1": {
+          "masterTheme": "センチュリー",
+          "operation": "masterTheme"
+        },
+        "task10_2": {
+          "operation": "masterSlideNumber"
+        },
+        "task10_3": {
+          "layout": "タイトルスライド",
+          "operation": "hideMasterSlideNumber"
+        },
+        "task10_4": {
+          "layout": "2 つのコンテンツ",
+          "operation": "hideMasterBackground"
+        },
+        "task10_5": {
+          "operation": "deleteMasterFooter"
+        },
+        "task10_6": {
+          "baseLayout": "タイトルのみ",
+          "customLayoutName": "図表カスタム_医療",
+          "operation": "customMasterLayout"
+        },
+        "task10_7": {
+          "operation": "deleteHandoutDate"
+        },
+        "task10_8": {
+          "handoutFooter": "健康な四季を送る",
+          "operation": "handoutFooter"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project10_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは工場の季節保全計画資料を作成しています。",
+      "tasks": [
+        "タスク10-1　スライドマスターにテーマ「バーチ」を設定します。",
+        "タスク10-2　スライドマスターにスライド番号を挿入します。",
+        "タスク10-3　スライドマスターの［タイトルスライド］レイアウトのスライド番号を非表示にします。",
+        "タスク10-4　スライドマスターの［２つのコンテンツ］レイアウトのスライドの背景のデザインを非表示にします。",
+        "タスク10-5　スライドマスターで［フッター］のプレースホルダーを削除します。",
+        "タスク10-6　スライドマスターの［タイトルのみ］レイアウトをもとに「\"図表カスタム_製造\"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレースホルダーを右側に配置します。",
+        "タスク10-7　配布資料マスターの日付を削除します。",
+        "タスク10-8　配布資料マスターのフッターに「\"安全な運転を続ける\"」と表示します。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "春の点検"
+          },
+          {
+            "slideNo": 2,
+            "layout": "2 つのコンテンツ",
+            "title": "夏の冷却",
+            "notes": "10-4: 2つのコンテンツの背景デザイン非表示未実施"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "秋の整備"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "冬の暖機"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "潤滑管理"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "異常記録"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "masterThemeSet": false,
+          "masterSlideNumber": false,
+          "titleLayoutNumberHidden": false,
+          "twoContentBgHidden": false,
+          "masterFooterDeleted": false,
+          "customLayoutCreated": false,
+          "handoutDateDeleted": false,
+          "handoutFooterSet": false
+        }
+      },
+      "taskParams": {
+        "task10_1": {
+          "masterTheme": "バーチ",
+          "operation": "masterTheme"
+        },
+        "task10_2": {
+          "operation": "masterSlideNumber"
+        },
+        "task10_3": {
+          "layout": "タイトルスライド",
+          "operation": "hideMasterSlideNumber"
+        },
+        "task10_4": {
+          "layout": "2 つのコンテンツ",
+          "operation": "hideMasterBackground"
+        },
+        "task10_5": {
+          "operation": "deleteMasterFooter"
+        },
+        "task10_6": {
+          "baseLayout": "タイトルのみ",
+          "customLayoutName": "図表カスタム_製造",
+          "operation": "customMasterLayout"
+        },
+        "task10_7": {
+          "operation": "deleteHandoutDate"
+        },
+        "task10_8": {
+          "handoutFooter": "安全な運転を続ける",
+          "operation": "handoutFooter"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project10_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは旅行の四季プラン紹介資料を作成しています。",
+      "tasks": [
+        "タスク10-1　スライドマスターにテーマ「ロード」を設定します。",
+        "タスク10-2　スライドマスターにスライド番号を挿入します。",
+        "タスク10-3　スライドマスターの［タイトルスライド］レイアウトのスライド番号を非表示にします。",
+        "タスク10-4　スライドマスターの［２つのコンテンツ］レイアウトのスライドの背景のデザインを非表示にします。",
+        "タスク10-5　スライドマスターで［フッター］のプレースホルダーを削除します。",
+        "タスク10-6　スライドマスターの［タイトルのみ］レイアウトをもとに「\"図表カスタム_旅行\"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレースホルダーを右側に配置します。",
+        "タスク10-7　配布資料マスターの日付を削除します。",
+        "タスク10-8　配布資料マスターのフッターに「\"旅の四季を味わう\"」と表示します。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "春の桜旅"
+          },
+          {
+            "slideNo": 2,
+            "layout": "2 つのコンテンツ",
+            "title": "夏の海旅",
+            "notes": "10-4: 2つのコンテンツの背景デザイン非表示未実施"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "秋の紅葉"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "冬の温泉"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "交通手段"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "宿泊の選び方"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "masterThemeSet": false,
+          "masterSlideNumber": false,
+          "titleLayoutNumberHidden": false,
+          "twoContentBgHidden": false,
+          "masterFooterDeleted": false,
+          "customLayoutCreated": false,
+          "handoutDateDeleted": false,
+          "handoutFooterSet": false
+        }
+      },
+      "taskParams": {
+        "task10_1": {
+          "masterTheme": "ロード",
+          "operation": "masterTheme"
+        },
+        "task10_2": {
+          "operation": "masterSlideNumber"
+        },
+        "task10_3": {
+          "layout": "タイトルスライド",
+          "operation": "hideMasterSlideNumber"
+        },
+        "task10_4": {
+          "layout": "2 つのコンテンツ",
+          "operation": "hideMasterBackground"
+        },
+        "task10_5": {
+          "operation": "deleteMasterFooter"
+        },
+        "task10_6": {
+          "baseLayout": "タイトルのみ",
+          "customLayoutName": "図表カスタム_旅行",
+          "operation": "customMasterLayout"
+        },
+        "task10_7": {
+          "operation": "deleteHandoutDate"
+        },
+        "task10_8": {
+          "handoutFooter": "旅の四季を味わう",
+          "operation": "handoutFooter"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project10_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは学習塾の四季講座案内資料を作成しています。",
+      "tasks": [
+        "タスク10-1　スライドマスターにテーマ「ダイナミック」を設定します。",
+        "タスク10-2　スライドマスターにスライド番号を挿入します。",
+        "タスク10-3　スライドマスターの［タイトルスライド］レイアウトのスライド番号を非表示にします。",
+        "タスク10-4　スライドマスターの［２つのコンテンツ］レイアウトのスライドの背景のデザインを非表示にします。",
+        "タスク10-5　スライドマスターで［フッター］のプレースホルダーを削除します。",
+        "タスク10-6　スライドマスターの［タイトルのみ］レイアウトをもとに「\"図表カスタム_学習塾\"」の名前でレイアウトを作成します。図のプレースホルダーをスライドの左側、表のプレースホルダーを右側に配置します。",
+        "タスク10-7　配布資料マスターの日付を削除します。",
+        "タスク10-8　配布資料マスターのフッターに「\"学びの四季を深める\"」と表示します。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "春期講座"
+          },
+          {
+            "slideNo": 2,
+            "layout": "2 つのコンテンツ",
+            "title": "夏期講座",
+            "notes": "10-4: 2つのコンテンツの背景デザイン非表示未実施"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "秋期講座"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "冬期講座"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "進度管理"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "自習支援"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "masterThemeSet": false,
+          "masterSlideNumber": false,
+          "titleLayoutNumberHidden": false,
+          "twoContentBgHidden": false,
+          "masterFooterDeleted": false,
+          "customLayoutCreated": false,
+          "handoutDateDeleted": false,
+          "handoutFooterSet": false
+        }
+      },
+      "taskParams": {
+        "task10_1": {
+          "masterTheme": "ダイナミック",
+          "operation": "masterTheme"
+        },
+        "task10_2": {
+          "operation": "masterSlideNumber"
+        },
+        "task10_3": {
+          "layout": "タイトルスライド",
+          "operation": "hideMasterSlideNumber"
+        },
+        "task10_4": {
+          "layout": "2 つのコンテンツ",
+          "operation": "hideMasterBackground"
+        },
+        "task10_5": {
+          "operation": "deleteMasterFooter"
+        },
+        "task10_6": {
+          "baseLayout": "タイトルのみ",
+          "customLayoutName": "図表カスタム_学習塾",
+          "operation": "customMasterLayout"
+        },
+        "task10_7": {
+          "operation": "deleteHandoutDate"
+        },
+        "task10_8": {
+          "handoutFooter": "学びの四季を深める",
+          "operation": "handoutFooter"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "sourceFile": "project6.xlsx",
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project6_配置別_セット1_カフェ.xlsx",
+      "projectId": 6,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたはカフェの注文・月次実績データを管理しています。\nシート［メニュー注文一覧］の1～6行目が、常に表示されるように設定します。"
+        },
+        {
+          "taskId": 2,
+          "description": "シート［メニュー注文一覧］の文字列「本日のおすすめブレンド」に、「\"https://cafe-example.jp/menu\"」のハイパーリンクを挿入します。"
+        },
+        {
+          "taskId": 3,
+          "description": "シート［店舗月次実績］のセル範囲【C6:H11】の数値の書式を「通貨」に変更します。小数点は表示されないようにします。"
+        },
+        {
+          "taskId": 4,
+          "description": "プロパティの状態に「\"確定版\"」と設定します。"
+        }
+      ]
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project6_配置別_セット2_医療.xlsx",
+      "projectId": 6,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは医療機関の外来・診療実績データを管理しています。\nシート［外来受付一覧］のA列からB列が、常に表示されるように設定します。"
+        },
+        {
+          "taskId": 2,
+          "description": "シート［外来受付一覧］の文字列「オンライン予約はこちら」に、「\"https://clinic-example.jp/reserve\"」のハイパーリンクを挿入します。"
+        },
+        {
+          "taskId": 3,
+          "description": "シート［月次診療実績］のセル範囲【D7:I12】の数値の書式を「通貨」に変更します。小数点以下1桁まで表示されるようにします。"
+        },
+        {
+          "taskId": 4,
+          "description": "プロパティの作成者に「\"診療事務課\"」と設定します。"
+        }
+      ]
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project6_配置別_セット3_製造.xlsx",
+      "projectId": 6,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは製造現場の受注・月次生産データを管理しています。\nシート［製造受注一覧］の1～3行目が、常に表示されるように設定します。"
+        },
+        {
+          "taskId": 2,
+          "description": "シート［製造受注一覧］の文字列「部品仕様データベース」に、「\"https://factory-example.jp/parts\"」のハイパーリンクを挿入します。"
+        },
+        {
+          "taskId": 3,
+          "description": "シート［工場月次実績］のセル範囲【E5:J10】の数値の書式を「通貨」に変更します。小数点以下2桁まで表示されるようにします。"
+        },
+        {
+          "taskId": 4,
+          "description": "プロパティの会社に「\"サンプル製造株式会社\"」と設定します。"
+        }
+      ]
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project6_配置別_セット4_旅行.xlsx",
+      "projectId": 6,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは旅行会社のツアー予約・月次売上データを管理しています。\nシート［ツアー予約一覧］のA列からC列が、常に表示されるように設定します。"
+        },
+        {
+          "taskId": 2,
+          "description": "シート［ツアー予約一覧］の文字列「公式ツアーサイト」に、「\"https://travel-example.jp/tours\"」のハイパーリンクを挿入します。"
+        },
+        {
+          "taskId": 3,
+          "description": "シート［旅行月次実績］のセル範囲【F8:K13】の数値の書式を「通貨」に変更します。小数点以下3桁まで表示されるようにします。"
+        },
+        {
+          "taskId": 4,
+          "description": "プロパティのカテゴリに「\"旅行予約管理\"」と設定します。"
+        }
+      ]
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project6_配置別_セット5_学習塾.xlsx",
+      "projectId": 6,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは学習塾の講座受講・月次収益データを管理しています。\nシート［講座受講一覧］のA列からE列が、常に表示されるように設定します。"
+        },
+        {
+          "taskId": 2,
+          "description": "シート［講座受講一覧］の文字列「受講申込フォーム」に、「\"https://juku-example.jp/apply\"」のハイパーリンクを挿入します。"
+        },
+        {
+          "taskId": 3,
+          "description": "シート［塾月次実績］のセル範囲【B9:G14】の数値の書式を「通貨」に変更します。小数点以下1桁まで表示されるようにします。"
+        },
+        {
+          "taskId": 4,
+          "description": "プロパティのキーワードに「\"学習塾収益\"」と追加します。"
+        }
+      ]
+    }
+  ]
+}

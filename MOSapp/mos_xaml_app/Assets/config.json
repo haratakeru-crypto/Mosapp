@@ -167,5 +167,16 @@
         }
       }
     }
+  },
+  "practiceVariants": {
+    "1": {
+      "1": {
+        "1": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant1\\project1.xlsx",
+          "library": "ExcelChecker1_2_PV1",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant1.json"
+        }
+      }
+    }
   }
 }

@@ -1,0 +1,1302 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。8-1=目次挿入（図形内・副題下以外）、8-2=脚注、8-3=脚注番号形式、8-4=特殊文字、8-5=SmartArt、8-6=SmartArt色、8-7=リンク（最下部以外）の操作種別を維持。",
+    "operationBoundary": "操作種別・UIパス・Checkerが検証する操作カテゴリは教材CSV準拠。数値・固有名詞・表セル値・脚注・置換語のみ差替。",
+    "contentPolicy": "docx事前配置は骨組み不可。テーマに沿った完全な本文・表データ・数値をセットごとに記載。",
+    "forbiddenPlaceholderPatterns": [
+      "xxx",
+      "...",
+      "ダミー",
+      "サンプル",
+      "テスト",
+      "Lorem",
+      "（ここに",
+      "空欄"
+    ],
+    "forbiddenParagraphTexts": [
+      "サイバーセキュリティ",
+      "マルウェア",
+      "参考文献一覧",
+      "機密性",
+      "完全性",
+      "可用性",
+      "TOP"
+    ],
+    "perSetMustVary": [
+      "副題と目次配置",
+      "脚注見出しと脚注番号形式",
+      "文献見出しと特殊文字",
+      "SmartArt種類とラベル",
+      "SmartArt色",
+      "リンク種別と図形位置"
+    ],
+    "mustNotReuseAcrossSets": [
+      "subtitle",
+      "tocPlacement",
+      "footnoteAnchor",
+      "footnoteStartNumber",
+      "specialChar",
+      "smartArtType",
+      "smartArtLabels",
+      "smartArtColor",
+      "linkType",
+      "linkShapeText",
+      "linkUrl"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "見出し・脚注・SmartArtラベルを完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "tableOfContents": "引用 → 目次 → 自動目次2",
+    "footnote": "引用 → 脚注",
+    "footnoteNumbering": "引用 → 脚注 → 脚注と文末脚注",
+    "specialChar": "挿入 → 記号 → その他の記号",
+    "smartArt": "挿入 → SmartArt",
+    "smartArtColor": "SmartArtのデザイン → 色の変更",
+    "hyperlink": "挿入 → リンク"
+  },
+  "sourceFile": "Project8.docx",
+  "projectId": 8,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project8_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたは店舗POSセキュリティに関するレポートを作成しています。",
+      "tasks": [
+        "タスク8-1　副題「－店舗POSの守り方－」の直後に「自動作成の目次2」の目次を挿入します。",
+        "タスク8-2　見出し「POSセキュリティの基本」の下にある「レジ端末」の後ろに「\"不正操作を検知する仕組み\"」と脚注を挿入します。",
+        "タスク8-3　脚注の開始番号を「*（アスタリスク）」に変更します。",
+        "タスク8-4　見出し「資料一覧」の先頭に「©（著作権記号）」の特殊文字を挿入します。",
+        "タスク8-5　最後のページにSmart Art「基本プロセス」を挿入し、「\"注文\"」、「\"在庫\"」、「\"決済\"」と入力します。文字列の順序は問いません。",
+        "タスク8-6　最後のページのSmart Artの色を「モノクロ」に変更します。",
+        "タスク8-7　見出し「対策の基本」の下の「一覧へ」と書かれた図形に、見出し「資料一覧」へのリンクを挿入します。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "POSセキュリティの基本",
+          "対策の基本",
+          "資料一覧"
+        ],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景",
+        "pageCount": 3,
+        "paragraphCount": 16
+      },
+      "contentBlocks": {
+        "subtitle": "－店舗POSの守り方－",
+        "bodyUnderHeadings": {
+          "対策の基本": [
+            "パスワード管理とアクセス権限の見直しを行います。",
+            "ログの定期確認で異常を早期に発見します。"
+          ],
+          "POSセキュリティの基本": [
+            "店舗のレジ端末は日々の売上処理の中心です。",
+            "不正操作や情報漏えいのリスクに備える必要があります。"
+          ]
+        },
+        "bibliographyEntries": [
+          "●POSセキュリティガイドライン2025",
+          "●小売業向け情報保護ハンドブック",
+          "●決済端末運用マニュアル"
+        ],
+        "smartArtInserted": false,
+        "documentOutline": {
+          "title": "カフェセキュリティレポート",
+          "subtitle": "－店舗POSの守り方－",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "はじめに",
+              "body": [
+                "本レポートはカフェ分野のセキュリティ対策を整理します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 背景",
+                  "body": [
+                    "情報漏えいへの備えが重要です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 リスク概要",
+                      "body": [
+                        "内部不正と外部攻撃の両面に対応します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 想定脅威",
+                          "body": [
+                            "運用ルールの徹底が前提です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "POSセキュリティの基本",
+              "body": [
+                "店舗のレジ端末は日々の売上処理の中心です。",
+                "不正操作や情報漏えいのリスクに備える必要があります。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 基本概念",
+                  "body": [
+                    "「レジ端末」は本文中で重要語として扱います。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 用語整理",
+                      "body": [
+                        "脚注は未挿入です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 レジ端末の位置づけ",
+                          "body": [
+                            "関連規格に沿って説明します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-1: 目次未挿入（図形内・副題下以外の指定位置） / 8-2: 脚注未挿入"
+            },
+            {
+              "level": 1,
+              "text": "対策の基本",
+              "body": [
+                "パスワード管理とアクセス権限の見直しを行います。",
+                "ログの定期確認で異常を早期に発見します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 運用上の注意",
+                  "body": [
+                    "ログを定期確認します。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 日常点検",
+                      "body": [
+                        "異常時は即時報告します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 記録保管",
+                          "body": [
+                            "記録は90日間保管します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "資料一覧",
+              "body": [
+                "以下に参考資料を列挙します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 参照ガイド",
+                  "body": [
+                    "最新版を参照してください。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 社内規程",
+                      "body": [
+                        "年1回見直しを実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 改訂履歴",
+                          "body": [
+                            "特殊文字は未挿入です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-4: 見出し「資料一覧」先頭に特殊文字未挿入 / 8-5: SmartArt未挿入 / 8-7: リンク未設定"
+            }
+          ]
+        },
+        "linkShape": {
+          "text": "一覧へ",
+          "placement": "underHeading",
+          "nearHeading": "対策の基本",
+          "linkType": "heading",
+          "note": "見出し「対策の基本」下に「一覧へ」図形（リンク未設定）",
+          "targetHeading": "資料一覧"
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "subtitle": "－店舗POSの守り方－",
+          "tocStyle": "自動作成の目次2",
+          "tocPlacement": "afterSubtitle",
+          "insertInShape": false,
+          "placementDescription": "副題の直後（図形外）"
+        },
+        "task8_2": {
+          "heading": "POSセキュリティの基本",
+          "footnoteAnchor": "レジ端末",
+          "footnoteText": "不正操作を検知する仕組み"
+        },
+        "task8_3": {
+          "footnoteStartNumber": "*",
+          "numberFormat": "Symbol",
+          "numberLabel": "*（アスタリスク）"
+        },
+        "task8_4": {
+          "heading": "資料一覧",
+          "specialChar": "©",
+          "specialCharName": "©（著作権記号）"
+        },
+        "task8_5": {
+          "page": "last",
+          "smartArtType": "基本プロセス",
+          "smartArtLabels": [
+            "注文",
+            "在庫",
+            "決済"
+          ]
+        },
+        "task8_6": {
+          "smartArtColor": "モノクロ",
+          "smartArtAccent": ""
+        },
+        "task8_7": {
+          "linkShapeText": "一覧へ",
+          "linkType": "heading",
+          "linkTargetHeading": "資料一覧",
+          "linkShapePlacement": "underHeading",
+          "linkNearHeading": "対策の基本"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project8_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは電子カルテセキュリティに関するレポートを作成しています。",
+      "tasks": [
+        "タスク8-1　見出し「はじめに」の下に「自動作成の目次2」の目次を挿入します。",
+        "タスク8-2　見出し「カルテ保護の要点」の下にある「電子カルテ」の後ろに「\"患者情報を保護する規格\"」と脚注を挿入します。",
+        "タスク8-3　脚注の開始番号を「壱」に変更します。",
+        "タスク8-4　見出し「文献リスト」の先頭に「™（商標記号）」の特殊文字を挿入します。",
+        "タスク8-5　最後のページにSmart Art「サイクル」を挿入し、「\"患者\"」、「\"診療\"」、「\"連携\"」と入力します。文字列の順序は問いません。",
+        "タスク8-6　最後のページのSmart Artの色を「アクセント1」に変更します。",
+        "タスク8-7　見出し「カルテ保護の要点」の下の「本院案内」と書かれた図形に、「https://medical-hospital.example.jp/security」のリンクを挿入します。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "カルテ保護の要点",
+          "対策の基本",
+          "文献リスト"
+        ],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント",
+        "pageCount": 3,
+        "paragraphCount": 17
+      },
+      "contentBlocks": {
+        "subtitle": "－電子カルテの守り方－",
+        "bodyUnderHeadings": {
+          "対策の基本": [
+            "アクセス権限を職種ごとに最小化します。",
+            "操作ログを保管し定期的に監査します。"
+          ],
+          "カルテ保護の要点": [
+            "電子カルテは患者の診療情報を一元管理します。",
+            "漏えいや改ざんから守る仕組みが求められます。"
+          ]
+        },
+        "bibliographyEntries": [
+          "●医療情報システム安全管理ガイドライン",
+          "●電子カルテ情報管理指針",
+          "●個人情報保護法施行規則"
+        ],
+        "smartArtInserted": false,
+        "documentOutline": {
+          "title": "医療セキュリティレポート",
+          "subtitle": "－電子カルテの守り方－",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "はじめに",
+              "body": [
+                "本レポートは医療分野のセキュリティ対策を整理します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 背景",
+                  "body": [
+                    "情報漏えいへの備えが重要です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 リスク概要",
+                      "body": [
+                        "内部不正と外部攻撃の両面に対応します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 想定脅威",
+                          "body": [
+                            "運用ルールの徹底が前提です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "カルテ保護の要点",
+              "body": [
+                "電子カルテは患者の診療情報を一元管理します。",
+                "漏えいや改ざんから守る仕組みが求められます。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 基本概念",
+                  "body": [
+                    "「電子カルテ」は本文中で重要語として扱います。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 用語整理",
+                      "body": [
+                        "脚注は未挿入です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 電子カルテの位置づけ",
+                          "body": [
+                            "関連規格に沿って説明します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-1: 目次未挿入（図形内・副題下以外の指定位置） / 8-2: 脚注未挿入"
+            },
+            {
+              "level": 1,
+              "text": "対策の基本",
+              "body": [
+                "アクセス権限を職種ごとに最小化します。",
+                "操作ログを保管し定期的に監査します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 運用上の注意",
+                  "body": [
+                    "ログを定期確認します。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 日常点検",
+                      "body": [
+                        "異常時は即時報告します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 記録保管",
+                          "body": [
+                            "記録は90日間保管します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "文献リスト",
+              "body": [
+                "以下に参考資料を列挙します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 参照ガイド",
+                  "body": [
+                    "最新版を参照してください。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 社内規程",
+                      "body": [
+                        "年1回見直しを実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 改訂履歴",
+                          "body": [
+                            "特殊文字は未挿入です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-4: 見出し「文献リスト」先頭に特殊文字未挿入 / 8-5: SmartArt未挿入 / 8-7: リンク未設定"
+            }
+          ]
+        },
+        "linkShape": {
+          "text": "本院案内",
+          "placement": "underHeading",
+          "nearHeading": "カルテ保護の要点",
+          "linkType": "url",
+          "note": "見出し「カルテ保護の要点」下に「本院案内」図形（URLリンク未設定）",
+          "linkUrl": "https://medical-hospital.example.jp/security"
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "subtitle": "－電子カルテの守り方－",
+          "tocStyle": "自動作成の目次2",
+          "tocPlacement": "underHeading",
+          "tocAnchorHeading": "はじめに",
+          "insertInShape": false,
+          "placementDescription": "見出し「はじめに」の下"
+        },
+        "task8_2": {
+          "heading": "カルテ保護の要点",
+          "footnoteAnchor": "電子カルテ",
+          "footnoteText": "患者情報を保護する規格"
+        },
+        "task8_3": {
+          "footnoteStartNumber": "壱",
+          "numberFormat": "Chosho",
+          "numberLabel": "壱"
+        },
+        "task8_4": {
+          "heading": "文献リスト",
+          "specialChar": "™",
+          "specialCharName": "™（商標記号）"
+        },
+        "task8_5": {
+          "page": "last",
+          "smartArtType": "サイクル",
+          "smartArtLabels": [
+            "患者",
+            "診療",
+            "連携"
+          ]
+        },
+        "task8_6": {
+          "smartArtColor": "アクセント1",
+          "smartArtAccent": ""
+        },
+        "task8_7": {
+          "linkShapeText": "本院案内",
+          "linkType": "url",
+          "linkUrl": "https://medical-hospital.example.jp/security",
+          "linkShapePlacement": "underHeading",
+          "linkNearHeading": "カルテ保護の要点"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project8_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは生産管理セキュリティに関するレポートを作成しています。",
+      "tasks": [
+        "タスク8-1　1ページ目の最後に「自動作成の目次2」の目次を挿入します。",
+        "タスク8-2　見出し「ライン安全の考え方」の下にある「制御端末」の後ろに「\"ライン停止を防ぐ仕組み\"」と脚注を挿入します。",
+        "タスク8-3　脚注の開始番号を「ⅰ」に変更します。",
+        "タスク8-4　見出し「参考資料」の先頭に「¶（段落記号）」の特殊文字を挿入します。",
+        "タスク8-5　最後のページにSmart Art「階層構造」を挿入し、「\"設備\"」、「\"人\"」、「\"手順\"」と入力します。文字列の順序は問いません。",
+        "タスク8-6　最後のページのSmart Artの色を「アクセント2」に変更します。",
+        "タスク8-7　見出し「対策の基本」の下の「文末」と書かれた図形に、文末へのリンクを挿入します。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "ライン安全の考え方",
+          "対策の基本",
+          "参考資料"
+        ],
+        "marginPreset": "広い",
+        "orientation": "縦",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞",
+        "pageCount": 3,
+        "paragraphCount": 16
+      },
+      "contentBlocks": {
+        "subtitle": "－生産ラインの守り方－",
+        "bodyUnderHeadings": {
+          "対策の基本": [
+            "ネットワーク分離とファームウェア署名検証を実施します。",
+            "異常検知のためのログ監視を行います。"
+          ],
+          "ライン安全の考え方": [
+            "制御端末は生産ラインの稼働を管理します。",
+            "不正操作はライン停止や品質事故につながります。"
+          ]
+        },
+        "bibliographyEntries": [
+          "●産業制御システムセキュリティガイド",
+          "●工場IoT運用ハンドブック",
+          "●品質管理システム規格"
+        ],
+        "smartArtInserted": false,
+        "documentOutline": {
+          "title": "製造セキュリティレポート",
+          "subtitle": "－生産ラインの守り方－",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "はじめに",
+              "body": [
+                "本レポートは製造分野のセキュリティ対策を整理します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 背景",
+                  "body": [
+                    "情報漏えいへの備えが重要です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 リスク概要",
+                      "body": [
+                        "内部不正と外部攻撃の両面に対応します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 想定脅威",
+                          "body": [
+                            "運用ルールの徹底が前提です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "ライン安全の考え方",
+              "body": [
+                "制御端末は生産ラインの稼働を管理します。",
+                "不正操作はライン停止や品質事故につながります。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 基本概念",
+                  "body": [
+                    "「制御端末」は本文中で重要語として扱います。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 用語整理",
+                      "body": [
+                        "脚注は未挿入です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 制御端末の位置づけ",
+                          "body": [
+                            "関連規格に沿って説明します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-1: 目次未挿入（図形内・副題下以外の指定位置） / 8-2: 脚注未挿入"
+            },
+            {
+              "level": 1,
+              "text": "対策の基本",
+              "body": [
+                "ネットワーク分離とファームウェア署名検証を実施します。",
+                "異常検知のためのログ監視を行います。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 運用上の注意",
+                  "body": [
+                    "ログを定期確認します。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 日常点検",
+                      "body": [
+                        "異常時は即時報告します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 記録保管",
+                          "body": [
+                            "記録は90日間保管します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "参考資料",
+              "body": [
+                "以下に参考資料を列挙します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 参照ガイド",
+                  "body": [
+                    "最新版を参照してください。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 社内規程",
+                      "body": [
+                        "年1回見直しを実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 改訂履歴",
+                          "body": [
+                            "特殊文字は未挿入です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-4: 見出し「参考資料」先頭に特殊文字未挿入 / 8-5: SmartArt未挿入 / 8-7: リンク未設定"
+            }
+          ]
+        },
+        "linkShape": {
+          "text": "文末",
+          "placement": "underHeading",
+          "nearHeading": "対策の基本",
+          "linkType": "documentEnd",
+          "note": "見出し「対策の基本」下に「文末」図形（文末リンク未設定）"
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "subtitle": "－生産ラインの守り方－",
+          "tocStyle": "自動作成の目次2",
+          "tocPlacement": "endOfPage1",
+          "insertInShape": false,
+          "placementDescription": "1ページ目の最後"
+        },
+        "task8_2": {
+          "heading": "ライン安全の考え方",
+          "footnoteAnchor": "制御端末",
+          "footnoteText": "ライン停止を防ぐ仕組み"
+        },
+        "task8_3": {
+          "footnoteStartNumber": "ⅰ",
+          "numberFormat": "Roman",
+          "numberLabel": "ⅰ"
+        },
+        "task8_4": {
+          "heading": "参考資料",
+          "specialChar": "¶",
+          "specialCharName": "¶（段落記号）"
+        },
+        "task8_5": {
+          "page": "last",
+          "smartArtType": "階層構造",
+          "smartArtLabels": [
+            "設備",
+            "人",
+            "手順"
+          ]
+        },
+        "task8_6": {
+          "smartArtColor": "アクセント2",
+          "smartArtAccent": ""
+        },
+        "task8_7": {
+          "linkShapeText": "文末",
+          "linkType": "documentEnd",
+          "linkShapePlacement": "underHeading",
+          "linkNearHeading": "対策の基本"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project8_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは予約管理セキュリティに関するレポートを作成しています。",
+      "tasks": [
+        "タスク8-1　見出し「対策の基本」の上に「自動作成の目次2」の目次を挿入します。",
+        "タスク8-2　見出し「予約情報の守り方」の下にある「予約端末」の後ろに「\"個人情報を保護する手順\"」と脚注を挿入します。",
+        "タスク8-3　脚注の開始番号を「※」に変更します。",
+        "タスク8-4　見出し「関連資料」の先頭に「®（登録商標記号）」の特殊文字を挿入します。",
+        "タスク8-5　最後のページにSmart Art「関係」を挿入し、「\"予約\"」、「\"決済\"」、「\"案内\"」と入力します。文字列の順序は問いません。",
+        "タスク8-6　最後のページのSmart Artの色を「アクセント3」に変更します。",
+        "タスク8-7　見出し「対策の基本」の下の「先頭へ」と書かれた図形に、文頭に戻るリンクを挿入します。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "予約情報の守り方",
+          "対策の基本",
+          "関連資料"
+        ],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "見出し下二重罫線",
+        "pageCount": 3,
+        "paragraphCount": 17
+      },
+      "contentBlocks": {
+        "subtitle": "－予約システムの守り方－",
+        "bodyUnderHeadings": {
+          "対策の基本": [
+            "暗号化通信と二要素認証を導入します。",
+            "スタッフ教育でフィッシング対策を徹底します。"
+          ],
+          "予約情報の守り方": [
+            "予約端末には旅行者の個人情報が蓄積されます。",
+            "漏えい防止と不正アクセス対策が重要です。"
+          ]
+        },
+        "bibliographyEntries": [
+          "●旅行業における個人情報保護ガイド",
+          "●予約システム運用マニュアル",
+          "●決済情報セキュリティ基準"
+        ],
+        "smartArtInserted": false,
+        "documentOutline": {
+          "title": "旅行セキュリティレポート",
+          "subtitle": "－予約システムの守り方－",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "はじめに",
+              "body": [
+                "本レポートは旅行分野のセキュリティ対策を整理します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 背景",
+                  "body": [
+                    "情報漏えいへの備えが重要です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 リスク概要",
+                      "body": [
+                        "内部不正と外部攻撃の両面に対応します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 想定脅威",
+                          "body": [
+                            "運用ルールの徹底が前提です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "予約情報の守り方",
+              "body": [
+                "予約端末には旅行者の個人情報が蓄積されます。",
+                "漏えい防止と不正アクセス対策が重要です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 基本概念",
+                  "body": [
+                    "「予約端末」は本文中で重要語として扱います。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 用語整理",
+                      "body": [
+                        "脚注は未挿入です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 予約端末の位置づけ",
+                          "body": [
+                            "関連規格に沿って説明します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-1: 目次未挿入（図形内・副題下以外の指定位置） / 8-2: 脚注未挿入"
+            },
+            {
+              "level": 1,
+              "text": "対策の基本",
+              "body": [
+                "暗号化通信と二要素認証を導入します。",
+                "スタッフ教育でフィッシング対策を徹底します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 運用上の注意",
+                  "body": [
+                    "ログを定期確認します。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 日常点検",
+                      "body": [
+                        "異常時は即時報告します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 記録保管",
+                          "body": [
+                            "記録は90日間保管します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "関連資料",
+              "body": [
+                "以下に参考資料を列挙します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 参照ガイド",
+                  "body": [
+                    "最新版を参照してください。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 社内規程",
+                      "body": [
+                        "年1回見直しを実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 改訂履歴",
+                          "body": [
+                            "特殊文字は未挿入です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-4: 見出し「関連資料」先頭に特殊文字未挿入 / 8-5: SmartArt未挿入 / 8-7: リンク未設定"
+            }
+          ]
+        },
+        "linkShape": {
+          "text": "先頭へ",
+          "placement": "underHeading",
+          "nearHeading": "対策の基本",
+          "linkType": "documentTop",
+          "note": "見出し「対策の基本」下に「先頭へ」図形（文頭リンク未設定）"
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "subtitle": "－予約システムの守り方－",
+          "tocStyle": "自動作成の目次2",
+          "tocPlacement": "aboveHeading",
+          "tocAnchorHeading": "対策の基本",
+          "insertInShape": false,
+          "placementDescription": "見出し「対策の基本」の上"
+        },
+        "task8_2": {
+          "heading": "予約情報の守り方",
+          "footnoteAnchor": "予約端末",
+          "footnoteText": "個人情報を保護する手順"
+        },
+        "task8_3": {
+          "footnoteStartNumber": "※",
+          "numberFormat": "Symbol",
+          "numberLabel": "※"
+        },
+        "task8_4": {
+          "heading": "関連資料",
+          "specialChar": "®",
+          "specialCharName": "®（登録商標記号）"
+        },
+        "task8_5": {
+          "page": "last",
+          "smartArtType": "関係",
+          "smartArtLabels": [
+            "予約",
+            "決済",
+            "案内"
+          ]
+        },
+        "task8_6": {
+          "smartArtColor": "アクセント3",
+          "smartArtAccent": ""
+        },
+        "task8_7": {
+          "linkShapeText": "先頭へ",
+          "linkType": "documentTop",
+          "linkShapePlacement": "underHeading",
+          "linkNearHeading": "対策の基本"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project8_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは学習データセキュリティに関するレポートを作成しています。",
+      "tasks": [
+        "タスク8-1　最初の見出し1の直前に「自動作成の目次2」の目次を挿入します。",
+        "タスク8-2　見出し「学習データの保護」の下にある「学習端末」の後ろに「\"成績情報を守る仕組み\"」と脚注を挿入します。",
+        "タスク8-3　脚注の開始番号を「ア」に変更します。",
+        "タスク8-4　見出し「出典一覧」の先頭に「⋯（中点リーダ）」の特殊文字を挿入します。",
+        "タスク8-5　最後のページにSmart Art「ピラミッド」を挿入し、「\"授業\"」、「\"自習\"」、「\"共有\"」と入力します。文字列の順序は問いません。",
+        "タスク8-6　最後のページのSmart Artの色を「アクセント4」に変更します。",
+        "タスク8-7　見出し「学習データの保護」の下の「出典へ」と書かれた図形に、見出し「出典一覧」へのリンクを挿入します。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": [
+          "学習データの保護",
+          "対策の基本",
+          "出典一覧"
+        ],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め",
+        "pageCount": 3,
+        "paragraphCount": 16
+      },
+      "contentBlocks": {
+        "subtitle": "－学習端末の守り方－",
+        "bodyUnderHeadings": {
+          "対策の基本": [
+            "アカウント管理とパスワードポリシーを徹底します。",
+            "共有PCの利用後は必ずログオフします。"
+          ],
+          "学習データの保護": [
+            "学習端末には生徒の成績や課題データが保存されます。",
+            "窃取や漏えいから守る対策が必要です。"
+          ]
+        },
+        "bibliographyEntries": [
+          "●学校教育における情報モラル指針",
+          "●学習管理システム運用ガイド",
+          "●個人情報保護法Q&A"
+        ],
+        "smartArtInserted": false,
+        "documentOutline": {
+          "title": "学習塾セキュリティレポート",
+          "subtitle": "－学習端末の守り方－",
+          "minHeadingLevel": 4,
+          "sections": [
+            {
+              "level": 1,
+              "text": "はじめに",
+              "body": [
+                "本レポートは学習塾分野のセキュリティ対策を整理します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "1.1 背景",
+                  "body": [
+                    "情報漏えいへの備えが重要です。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "1.1.1 リスク概要",
+                      "body": [
+                        "内部不正と外部攻撃の両面に対応します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "1.1.1.1 想定脅威",
+                          "body": [
+                            "運用ルールの徹底が前提です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "学習データの保護",
+              "body": [
+                "学習端末には生徒の成績や課題データが保存されます。",
+                "窃取や漏えいから守る対策が必要です。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "2.1 基本概念",
+                  "body": [
+                    "「学習端末」は本文中で重要語として扱います。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "2.1.1 用語整理",
+                      "body": [
+                        "脚注は未挿入です。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "2.1.1.1 学習端末の位置づけ",
+                          "body": [
+                            "関連規格に沿って説明します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-1: 目次未挿入（図形内・副題下以外の指定位置） / 8-2: 脚注未挿入"
+            },
+            {
+              "level": 1,
+              "text": "対策の基本",
+              "body": [
+                "アカウント管理とパスワードポリシーを徹底します。",
+                "共有PCの利用後は必ずログオフします。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "3.1 運用上の注意",
+                  "body": [
+                    "ログを定期確認します。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "3.1.1 日常点検",
+                      "body": [
+                        "異常時は即時報告します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "3.1.1.1 記録保管",
+                          "body": [
+                            "記録は90日間保管します。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 1,
+              "text": "出典一覧",
+              "body": [
+                "以下に参考資料を列挙します。"
+              ],
+              "children": [
+                {
+                  "level": 2,
+                  "text": "4.1 参照ガイド",
+                  "body": [
+                    "最新版を参照してください。"
+                  ],
+                  "children": [
+                    {
+                      "level": 3,
+                      "text": "4.1.1 社内規程",
+                      "body": [
+                        "年1回見直しを実施します。"
+                      ],
+                      "children": [
+                        {
+                          "level": 4,
+                          "text": "4.1.1.1 改訂履歴",
+                          "body": [
+                            "特殊文字は未挿入です。"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "note": "8-4: 見出し「出典一覧」先頭に特殊文字未挿入 / 8-5: SmartArt未挿入 / 8-7: リンク未設定"
+            }
+          ]
+        },
+        "linkShape": {
+          "text": "出典へ",
+          "placement": "underHeading",
+          "nearHeading": "学習データの保護",
+          "linkType": "heading",
+          "note": "見出し「学習データの保護」下に「出典へ」図形（見出しリンク未設定）",
+          "targetHeading": "出典一覧"
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "subtitle": "－学習端末の守り方－",
+          "tocStyle": "自動作成の目次2",
+          "tocPlacement": "beforeFirstHeading1",
+          "insertInShape": false,
+          "placementDescription": "最初の見出し1の直前"
+        },
+        "task8_2": {
+          "heading": "学習データの保護",
+          "footnoteAnchor": "学習端末",
+          "footnoteText": "成績情報を守る仕組み"
+        },
+        "task8_3": {
+          "footnoteStartNumber": "ア",
+          "numberFormat": "Aiueo",
+          "numberLabel": "ア"
+        },
+        "task8_4": {
+          "heading": "出典一覧",
+          "specialChar": "⋯",
+          "specialCharName": "⋯（中点リーダ）"
+        },
+        "task8_5": {
+          "page": "last",
+          "smartArtType": "ピラミッド",
+          "smartArtLabels": [
+            "授業",
+            "自習",
+            "共有"
+          ]
+        },
+        "task8_6": {
+          "smartArtColor": "アクセント4",
+          "smartArtAccent": ""
+        },
+        "task8_7": {
+          "linkShapeText": "出典へ",
+          "linkType": "heading",
+          "linkTargetHeading": "出典一覧",
+          "linkShapePlacement": "underHeading",
+          "linkNearHeading": "学習データの保護"
+        }
+      }
+    }
+  ]
+}

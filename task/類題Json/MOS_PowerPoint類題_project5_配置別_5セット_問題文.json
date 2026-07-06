@@ -1,0 +1,1294 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project5の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "MOS合格対策",
+      "対策講座",
+      "PC教室",
+      "通信講座",
+      "MOSって何？",
+      "男の子",
+      "スマイル"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）",
+      "図形の形状（slideMap.shapes と問題文）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "alignShapeType": "丸",
+      "rectShapeType": "四角",
+      "sourceShapeType": "星",
+      "targetShapeType": "スマイル",
+      "gateShapeType": "論理積ゲート",
+      "iconFillColor": "濃い赤",
+      "slideTitleDecorative": "MOSって何？"
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project5.pptx",
+  "projectId": 5,
+  "variantType": "layout",
+  "taskCount": 7,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project5_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたはバリスタ研修資料を作成しています。",
+      "tasks": [
+        "タスク5-1　スライド３の六角形の図形４個の右端を揃えます。",
+        "タスク5-2　スライド５の小さい五角形の大きさを他の五角形と同じ幅にします。",
+        "タスク5-3　スライド４の雲の図形をハートに変更します。",
+        "タスク5-4　スライド６の図形を手前から「バリスタ研修」「抽出実習」「品質チェック」になるように重なりの順番を変更します。",
+        "タスク5-5　スライド６の3つの論理積ゲートの図形をグループ化します。",
+        "タスク5-6　スライド「研修の目的」の講師写真の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。",
+        "タスク5-7　スライド２の[?]のアイコンに「濃い青」の塗りつぶしを設定します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "バリスタ研修ガイド"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "研修の目的",
+            "shapes": [
+              {
+                "id": "decorativeImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "講師写真",
+                "count": 1,
+                "notes": "5-6: 代替テキスト装飾化未実施"
+              },
+              {
+                "id": "helpIcon",
+                "type": "アイコン",
+                "insertName": "アイコン",
+                "label": "[?]",
+                "count": 1,
+                "notes": "5-7: 塗りつぶし「濃い青」未設定"
+              }
+            ],
+            "notes": "5-6/5-7: 代替テキスト・アイコン塗り未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "工程の確認",
+            "shapes": [
+              {
+                "id": "alignShape1",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape2",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape3",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape4",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1
+              }
+            ],
+            "notes": "5-1: 4図形の右揃え未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "品質管理",
+            "shapes": [
+              {
+                "id": "sourceShape",
+                "type": "雲",
+                "insertName": "雲",
+                "count": 1,
+                "notes": "5-3: 「ハート」への変更未実施"
+              }
+            ],
+            "notes": "5-3: 雲→ハート 未変更"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "実習項目",
+            "shapes": [
+              {
+                "id": "rectLarge1",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectLarge2",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectSmall",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1,
+                "label": "小",
+                "notes": "5-2: 幅が他と異なる"
+              }
+            ],
+            "notes": "5-2: 小さい図形の幅調整未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "研修フロー",
+            "shapes": [
+              {
+                "id": "zOrderShape1",
+                "type": "四角形",
+                "insertName": "四角形",
+                "label": "バリスタ研修",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape2",
+                "type": "四角形",
+                "insertName": "四角形",
+                "label": "抽出実習",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape3",
+                "type": "四角形",
+                "insertName": "四角形",
+                "label": "品質チェック",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "gateShape1",
+                "type": "論理積ゲート",
+                "insertName": "論理積ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape2",
+                "type": "論理積ゲート",
+                "insertName": "論理積ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape3",
+                "type": "論理積ゲート",
+                "insertName": "論理積ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              }
+            ],
+            "notes": "5-4/5-5: 重なり順・グループ化未実施"
+          }
+        ],
+        "preTaskState": {
+          "alignOnSlide3": false,
+          "widthMatchOnSlide5": false,
+          "shapeChangeOnSlide4": false,
+          "zOrderOnSlide6": false,
+          "groupOnSlide6": false,
+          "decorativeAltText": false,
+          "iconFillOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task5_1": {
+          "slideNo": 3,
+          "alignShapeType": "六角形",
+          "alignShapeInsertName": "六角形",
+          "count": 4,
+          "operation": "alignRight"
+        },
+        "task5_2": {
+          "slideNo": 5,
+          "rectShapeType": "五角形",
+          "rectShapeInsertName": "五角形",
+          "operation": "matchWidth"
+        },
+        "task5_3": {
+          "slideNo": 4,
+          "sourceShapeType": "雲",
+          "sourceShapeInsertName": "雲",
+          "targetShapeType": "ハート",
+          "targetShapeInsertName": "ハート",
+          "operation": "changeShape"
+        },
+        "task5_4": {
+          "slideNo": 6,
+          "zOrderShapeType": "四角形",
+          "labels": [
+            "バリスタ研修",
+            "抽出実習",
+            "品質チェック"
+          ],
+          "operation": "zOrder"
+        },
+        "task5_5": {
+          "slideNo": 6,
+          "gateShapeType": "論理積ゲート",
+          "gateShapeInsertName": "論理積ゲート",
+          "count": 3,
+          "operation": "groupShapes"
+        },
+        "task5_6": {
+          "slideTitle": "研修の目的",
+          "imageLabel": "講師写真",
+          "operation": "decorativeAltText"
+        },
+        "task5_7": {
+          "slideNo": 2,
+          "iconSymbol": "?",
+          "iconFillColor": "濃い青",
+          "operation": "iconFill"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project5_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは医療事務研修資料を作成しています。",
+      "tasks": [
+        "タスク5-1　スライド３の四角の図形４個の右端を揃えます。",
+        "タスク5-2　スライド５の小さい角丸四角の大きさを他の角丸四角と同じ幅にします。",
+        "タスク5-3　スライド４のハートの図形を太陽に変更します。",
+        "タスク5-4　スライド６の図形を手前から「初診受付」「検査予約」「結果説明」になるように重なりの順番を変更します。",
+        "タスク5-5　スライド６の3つの論理和ゲートの図形をグループ化します。",
+        "タスク5-6　スライド「受付の基本」のスタッフ写真の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。",
+        "タスク5-7　スライド２の[!]のアイコンに「オレンジ」の塗りつぶしを設定します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "医療事務研修"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受付の基本",
+            "shapes": [
+              {
+                "id": "decorativeImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "スタッフ写真",
+                "count": 1,
+                "notes": "5-6: 代替テキスト装飾化未実施"
+              },
+              {
+                "id": "helpIcon",
+                "type": "アイコン",
+                "insertName": "アイコン",
+                "label": "[!]",
+                "count": 1,
+                "notes": "5-7: 塗りつぶし「オレンジ」未設定"
+              }
+            ],
+            "notes": "5-6/5-7: 代替テキスト・アイコン塗り未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "記録管理",
+            "shapes": [
+              {
+                "id": "alignShape1",
+                "type": "四角",
+                "insertName": "四角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape2",
+                "type": "四角",
+                "insertName": "四角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape3",
+                "type": "四角",
+                "insertName": "四角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape4",
+                "type": "四角",
+                "insertName": "四角形",
+                "count": 1
+              }
+            ],
+            "notes": "5-1: 4図形の右揃え未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "連絡体制",
+            "shapes": [
+              {
+                "id": "sourceShape",
+                "type": "ハート",
+                "insertName": "ハート",
+                "count": 1,
+                "notes": "5-3: 「太陽」への変更未実施"
+              }
+            ],
+            "notes": "5-3: ハート→太陽 未変更"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "業務分担",
+            "shapes": [
+              {
+                "id": "rectLarge1",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectLarge2",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectSmall",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "count": 1,
+                "label": "小",
+                "notes": "5-2: 幅が他と異なる"
+              }
+            ],
+            "notes": "5-2: 小さい図形の幅調整未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "受付フロー",
+            "shapes": [
+              {
+                "id": "zOrderShape1",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "label": "初診受付",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape2",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "label": "検査予約",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape3",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "label": "結果説明",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "gateShape1",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape2",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape3",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              }
+            ],
+            "notes": "5-4/5-5: 重なり順・グループ化未実施"
+          }
+        ],
+        "preTaskState": {
+          "alignOnSlide3": false,
+          "widthMatchOnSlide5": false,
+          "shapeChangeOnSlide4": false,
+          "zOrderOnSlide6": false,
+          "groupOnSlide6": false,
+          "decorativeAltText": false,
+          "iconFillOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task5_1": {
+          "slideNo": 3,
+          "alignShapeType": "四角",
+          "alignShapeInsertName": "四角形",
+          "count": 4,
+          "operation": "alignRight"
+        },
+        "task5_2": {
+          "slideNo": 5,
+          "rectShapeType": "角丸四角",
+          "rectShapeInsertName": "角丸四角形",
+          "operation": "matchWidth"
+        },
+        "task5_3": {
+          "slideNo": 4,
+          "sourceShapeType": "ハート",
+          "sourceShapeInsertName": "ハート",
+          "targetShapeType": "太陽",
+          "targetShapeInsertName": "太陽",
+          "operation": "changeShape"
+        },
+        "task5_4": {
+          "slideNo": 6,
+          "zOrderShapeType": "角丸四角",
+          "labels": [
+            "初診受付",
+            "検査予約",
+            "結果説明"
+          ],
+          "operation": "zOrder"
+        },
+        "task5_5": {
+          "slideNo": 6,
+          "gateShapeType": "論理和ゲート",
+          "gateShapeInsertName": "論理和ゲート",
+          "count": 3,
+          "operation": "groupShapes"
+        },
+        "task5_6": {
+          "slideTitle": "受付の基本",
+          "imageLabel": "スタッフ写真",
+          "operation": "decorativeAltText"
+        },
+        "task5_7": {
+          "slideNo": 2,
+          "iconSymbol": "!",
+          "iconFillColor": "オレンジ",
+          "operation": "iconFill"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project5_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは設備保全研修資料を作成しています。",
+      "tasks": [
+        "タスク5-1　スライド３の三角の図形４個の右端を揃えます。",
+        "タスク5-2　スライド５の小さい平行四辺形の大きさを他の平行四辺形と同じ幅にします。",
+        "タスク5-3　スライド４の稲妻の図形を月に変更します。",
+        "タスク5-4　スライド６の図形を手前から「日常点検」「定期保全」「異常対応」になるように重なりの順番を変更します。",
+        "タスク5-5　スライド６の3つの排他的論理和の図形をグループ化します。",
+        "タスク5-6　スライド「保全の目的」の技術者写真の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。",
+        "タスク5-7　スライド２の[i]のアイコンに「紫」の塗りつぶしを設定します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "設備保全研修"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "保全の目的",
+            "shapes": [
+              {
+                "id": "decorativeImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "技術者写真",
+                "count": 1,
+                "notes": "5-6: 代替テキスト装飾化未実施"
+              },
+              {
+                "id": "helpIcon",
+                "type": "アイコン",
+                "insertName": "アイコン",
+                "label": "[i]",
+                "count": 1,
+                "notes": "5-7: 塗りつぶし「紫」未設定"
+              }
+            ],
+            "notes": "5-6/5-7: 代替テキスト・アイコン塗り未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "保全手順",
+            "shapes": [
+              {
+                "id": "alignShape1",
+                "type": "三角",
+                "insertName": "三角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape2",
+                "type": "三角",
+                "insertName": "三角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape3",
+                "type": "三角",
+                "insertName": "三角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape4",
+                "type": "三角",
+                "insertName": "三角形",
+                "count": 1
+              }
+            ],
+            "notes": "5-1: 4図形の右揃え未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "異常対応",
+            "shapes": [
+              {
+                "id": "sourceShape",
+                "type": "稲妻",
+                "insertName": "稲妻",
+                "count": 1,
+                "notes": "5-3: 「月」への変更未実施"
+              }
+            ],
+            "notes": "5-3: 稲妻→月 未変更"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "記録管理",
+            "shapes": [
+              {
+                "id": "rectLarge1",
+                "type": "平行四辺形",
+                "insertName": "平行四辺形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectLarge2",
+                "type": "平行四辺形",
+                "insertName": "平行四辺形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectSmall",
+                "type": "平行四辺形",
+                "insertName": "平行四辺形",
+                "count": 1,
+                "label": "小",
+                "notes": "5-2: 幅が他と異なる"
+              }
+            ],
+            "notes": "5-2: 小さい図形の幅調整未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "保全フロー",
+            "shapes": [
+              {
+                "id": "zOrderShape1",
+                "type": "吹き出し",
+                "insertName": "吹き出し: 角丸",
+                "label": "日常点検",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape2",
+                "type": "吹き出し",
+                "insertName": "吹き出し: 角丸",
+                "label": "定期保全",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape3",
+                "type": "吹き出し",
+                "insertName": "吹き出し: 角丸",
+                "label": "異常対応",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "gateShape1",
+                "type": "排他的論理和",
+                "insertName": "排他的論理和",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape2",
+                "type": "排他的論理和",
+                "insertName": "排他的論理和",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape3",
+                "type": "排他的論理和",
+                "insertName": "排他的論理和",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              }
+            ],
+            "notes": "5-4/5-5: 重なり順・グループ化未実施"
+          }
+        ],
+        "preTaskState": {
+          "alignOnSlide3": false,
+          "widthMatchOnSlide5": false,
+          "shapeChangeOnSlide4": false,
+          "zOrderOnSlide6": false,
+          "groupOnSlide6": false,
+          "decorativeAltText": false,
+          "iconFillOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task5_1": {
+          "slideNo": 3,
+          "alignShapeType": "三角",
+          "alignShapeInsertName": "三角形",
+          "count": 4,
+          "operation": "alignRight"
+        },
+        "task5_2": {
+          "slideNo": 5,
+          "rectShapeType": "平行四辺形",
+          "rectShapeInsertName": "平行四辺形",
+          "operation": "matchWidth"
+        },
+        "task5_3": {
+          "slideNo": 4,
+          "sourceShapeType": "稲妻",
+          "sourceShapeInsertName": "稲妻",
+          "targetShapeType": "月",
+          "targetShapeInsertName": "月",
+          "operation": "changeShape"
+        },
+        "task5_4": {
+          "slideNo": 6,
+          "zOrderShapeType": "吹き出し",
+          "labels": [
+            "日常点検",
+            "定期保全",
+            "異常対応"
+          ],
+          "operation": "zOrder"
+        },
+        "task5_5": {
+          "slideNo": 6,
+          "gateShapeType": "排他的論理和",
+          "gateShapeInsertName": "排他的論理和",
+          "count": 3,
+          "operation": "groupShapes"
+        },
+        "task5_6": {
+          "slideTitle": "保全の目的",
+          "imageLabel": "技術者写真",
+          "operation": "decorativeAltText"
+        },
+        "task5_7": {
+          "slideNo": 2,
+          "iconSymbol": "i",
+          "iconFillColor": "紫",
+          "operation": "iconFill"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project5_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは旅行代理店研修資料を作成しています。",
+      "tasks": [
+        "タスク5-1　スライド３の菱形の図形４個の右端を揃えます。",
+        "タスク5-2　スライド５の小さいひし形の大きさを他のひし形と同じ幅にします。",
+        "タスク5-3　スライド４の月の図形を花に変更します。",
+        "タスク5-4　スライド６の図形を手前から「国内旅行」「海外旅行」「添乗員同行」になるように重なりの順番を変更します。",
+        "タスク5-5　スライド６の3つの論理和ゲートの図形をグループ化します。",
+        "タスク5-6　スライド「接客の基本」のカウンター写真の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。",
+        "タスク5-7　スライド２の[+]のアイコンに「黄色」の塗りつぶしを設定します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "旅行代理店研修"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "接客の基本",
+            "shapes": [
+              {
+                "id": "decorativeImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "カウンター写真",
+                "count": 1,
+                "notes": "5-6: 代替テキスト装飾化未実施"
+              },
+              {
+                "id": "helpIcon",
+                "type": "アイコン",
+                "insertName": "アイコン",
+                "label": "[+]",
+                "count": 1,
+                "notes": "5-7: 塗りつぶし「黄色」未設定"
+              }
+            ],
+            "notes": "5-6/5-7: 代替テキスト・アイコン塗り未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "予約対応",
+            "shapes": [
+              {
+                "id": "alignShape1",
+                "type": "菱形",
+                "insertName": "菱形",
+                "count": 1
+              },
+              {
+                "id": "alignShape2",
+                "type": "菱形",
+                "insertName": "菱形",
+                "count": 1
+              },
+              {
+                "id": "alignShape3",
+                "type": "菱形",
+                "insertName": "菱形",
+                "count": 1
+              },
+              {
+                "id": "alignShape4",
+                "type": "菱形",
+                "insertName": "菱形",
+                "count": 1
+              }
+            ],
+            "notes": "5-1: 4図形の右揃え未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "変更手続",
+            "shapes": [
+              {
+                "id": "sourceShape",
+                "type": "月",
+                "insertName": "月",
+                "count": 1,
+                "notes": "5-3: 「花」への変更未実施"
+              }
+            ],
+            "notes": "5-3: 月→花 未変更"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "クレーム対応",
+            "shapes": [
+              {
+                "id": "rectLarge1",
+                "type": "ひし形",
+                "insertName": "菱形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectLarge2",
+                "type": "ひし形",
+                "insertName": "菱形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectSmall",
+                "type": "ひし形",
+                "insertName": "菱形",
+                "count": 1,
+                "label": "小",
+                "notes": "5-2: 幅が他と異なる"
+              }
+            ],
+            "notes": "5-2: 小さい図形の幅調整未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "予約フロー",
+            "shapes": [
+              {
+                "id": "zOrderShape1",
+                "type": "四角形",
+                "insertName": "四角形",
+                "label": "国内旅行",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape2",
+                "type": "四角形",
+                "insertName": "四角形",
+                "label": "海外旅行",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape3",
+                "type": "四角形",
+                "insertName": "四角形",
+                "label": "添乗員同行",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "gateShape1",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape2",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape3",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              }
+            ],
+            "notes": "5-4/5-5: 重なり順・グループ化未実施"
+          }
+        ],
+        "preTaskState": {
+          "alignOnSlide3": false,
+          "widthMatchOnSlide5": false,
+          "shapeChangeOnSlide4": false,
+          "zOrderOnSlide6": false,
+          "groupOnSlide6": false,
+          "decorativeAltText": false,
+          "iconFillOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task5_1": {
+          "slideNo": 3,
+          "alignShapeType": "菱形",
+          "alignShapeInsertName": "菱形",
+          "count": 4,
+          "operation": "alignRight"
+        },
+        "task5_2": {
+          "slideNo": 5,
+          "rectShapeType": "ひし形",
+          "rectShapeInsertName": "菱形",
+          "operation": "matchWidth"
+        },
+        "task5_3": {
+          "slideNo": 4,
+          "sourceShapeType": "月",
+          "sourceShapeInsertName": "月",
+          "targetShapeType": "花",
+          "targetShapeInsertName": "花",
+          "operation": "changeShape"
+        },
+        "task5_4": {
+          "slideNo": 6,
+          "zOrderShapeType": "四角形",
+          "labels": [
+            "国内旅行",
+            "海外旅行",
+            "添乗員同行"
+          ],
+          "operation": "zOrder"
+        },
+        "task5_5": {
+          "slideNo": 6,
+          "gateShapeType": "論理和ゲート",
+          "gateShapeInsertName": "論理和ゲート",
+          "count": 3,
+          "operation": "groupShapes"
+        },
+        "task5_6": {
+          "slideTitle": "接客の基本",
+          "imageLabel": "カウンター写真",
+          "operation": "decorativeAltText"
+        },
+        "task5_7": {
+          "slideNo": 2,
+          "iconSymbol": "+",
+          "iconFillColor": "黄色",
+          "operation": "iconFill"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project5_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは講師研修資料を作成しています。",
+      "tasks": [
+        "タスク5-1　スライド３の五角形の図形４個の右端を揃えます。",
+        "タスク5-2　スライド５の小さい六角形の大きさを他の六角形と同じ幅にします。",
+        "タスク5-3　スライド４の平行四辺形の図形を稲妻に変更します。",
+        "タスク5-4　スライド６の図形を手前から「春期講座」「夏期講座」「秋期講座」になるように重なりの順番を変更します。",
+        "タスク5-5　スライド６の3つの論理和ゲートの図形をグループ化します。",
+        "タスク5-6　スライド「授業設計」の講師写真の画像の代替テキストを装飾化し、スクリーンリーダーに表示させないようにします。",
+        "タスク5-7　スライド２の[※]のアイコンに「濃い緑」の塗りつぶしを設定します。"
+      ],
+      "layout": {
+        "slideCount": 6,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "講師研修ガイド"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "授業設計",
+            "shapes": [
+              {
+                "id": "decorativeImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "講師写真",
+                "count": 1,
+                "notes": "5-6: 代替テキスト装飾化未実施"
+              },
+              {
+                "id": "helpIcon",
+                "type": "アイコン",
+                "insertName": "アイコン",
+                "label": "[※]",
+                "count": 1,
+                "notes": "5-7: 塗りつぶし「濃い緑」未設定"
+              }
+            ],
+            "notes": "5-6/5-7: 代替テキスト・アイコン塗り未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "進度管理",
+            "shapes": [
+              {
+                "id": "alignShape1",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape2",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape3",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1
+              },
+              {
+                "id": "alignShape4",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1
+              }
+            ],
+            "notes": "5-1: 4図形の右揃え未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "質問対応",
+            "shapes": [
+              {
+                "id": "sourceShape",
+                "type": "平行四辺形",
+                "insertName": "平行四辺形",
+                "count": 1,
+                "notes": "5-3: 「稲妻」への変更未実施"
+              }
+            ],
+            "notes": "5-3: 平行四辺形→稲妻 未変更"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "保護者連絡",
+            "shapes": [
+              {
+                "id": "rectLarge1",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectLarge2",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1,
+                "label": "大"
+              },
+              {
+                "id": "rectSmall",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1,
+                "label": "小",
+                "notes": "5-2: 幅が他と異なる"
+              }
+            ],
+            "notes": "5-2: 小さい図形の幅調整未実施"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "授業フロー",
+            "shapes": [
+              {
+                "id": "zOrderShape1",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "label": "春期講座",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape2",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "label": "夏期講座",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "zOrderShape3",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "label": "秋期講座",
+                "count": 1,
+                "notes": "5-4: 重なり順未変更"
+              },
+              {
+                "id": "gateShape1",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape2",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              },
+              {
+                "id": "gateShape3",
+                "type": "論理和ゲート",
+                "insertName": "論理和ゲート",
+                "count": 1,
+                "notes": "5-5: グループ化未実施"
+              }
+            ],
+            "notes": "5-4/5-5: 重なり順・グループ化未実施"
+          }
+        ],
+        "preTaskState": {
+          "alignOnSlide3": false,
+          "widthMatchOnSlide5": false,
+          "shapeChangeOnSlide4": false,
+          "zOrderOnSlide6": false,
+          "groupOnSlide6": false,
+          "decorativeAltText": false,
+          "iconFillOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task5_1": {
+          "slideNo": 3,
+          "alignShapeType": "五角形",
+          "alignShapeInsertName": "五角形",
+          "count": 4,
+          "operation": "alignRight"
+        },
+        "task5_2": {
+          "slideNo": 5,
+          "rectShapeType": "六角形",
+          "rectShapeInsertName": "六角形",
+          "operation": "matchWidth"
+        },
+        "task5_3": {
+          "slideNo": 4,
+          "sourceShapeType": "平行四辺形",
+          "sourceShapeInsertName": "平行四辺形",
+          "targetShapeType": "稲妻",
+          "targetShapeInsertName": "稲妻",
+          "operation": "changeShape"
+        },
+        "task5_4": {
+          "slideNo": 6,
+          "zOrderShapeType": "角丸四角",
+          "labels": [
+            "春期講座",
+            "夏期講座",
+            "秋期講座"
+          ],
+          "operation": "zOrder"
+        },
+        "task5_5": {
+          "slideNo": 6,
+          "gateShapeType": "論理和ゲート",
+          "gateShapeInsertName": "論理和ゲート",
+          "count": 3,
+          "operation": "groupShapes"
+        },
+        "task5_6": {
+          "slideTitle": "授業設計",
+          "imageLabel": "講師写真",
+          "operation": "decorativeAltText"
+        },
+        "task5_7": {
+          "slideNo": 2,
+          "iconSymbol": "※",
+          "iconFillColor": "濃い緑",
+          "operation": "iconFill"
+        }
+      }
+    }
+  ]
+}

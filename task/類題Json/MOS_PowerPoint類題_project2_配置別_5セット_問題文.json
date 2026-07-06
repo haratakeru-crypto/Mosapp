@@ -1,0 +1,785 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project2の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "MOS合格対策",
+      "スプリット",
+      "ワイプアウト",
+      "黒板",
+      "ジャンプしてターン",
+      "今年度募集について",
+      "ニュートロン",
+      "男の子"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "durationSec": 3,
+      "autoAdvanceSec": 5,
+      "transitionAll": "スプリット"
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project2.pptx",
+  "projectId": 2,
+  "variantType": "layout",
+  "taskCount": 8,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project2_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたはカフェのバリスタ研修ガイド資料を作成しています。",
+      "tasks": [
+        "タスク2-1　すべてのスライドに、画面切り替え「プッシュ」を設定します。効果のオプションを「右から」にします。",
+        "タスク2-2　すべての画面切り替えの継続時間を2秒に設定します。",
+        "タスク2-3　スライド3、4、5に「フェード」の画面切り替え効果を設定します。",
+        "タスク2-4　すべてのスライドが、「4」秒後に自動で次のスライドへ進むように画面切り替えのタイミングを設定します。",
+        "タスク2-5　スライド６の3Ｄモデル「地球儀」に、アニメーション「ターンテーブル」を設定します。",
+        "タスク2-6　スライド2のバリスタ端末と確認マークの２つの画像が、スライドの右下からから登場するようにします。アニメーションの継続時間は「0.75\"秒にします。",
+        "タスク2-7　スライド「研修スケジュールについて」の箇条書きに設定されたアニメーションの効果を「ひし形」に変更します。また、クリックするとすべて同時に動くようにします。",
+        "タスク2-8　スライド４の星の図形にアニメーションの軌跡「プラス」を設定します。円の図形にはアニメーションを設定しません。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "バリスタ研修ガイド"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "研修の目的",
+            "notes": "2-6: 画像「バリスタ端末」「確認マーク」配置・アニメ未設定",
+            "objects": [
+              "バリスタ端末",
+              "確認マーク"
+            ]
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "設備の基本"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "抽出の手順",
+            "notes": "2-8: 図形「星」に軌跡未設定・円図形はアニメなし",
+            "objects": [
+              "星",
+              "円"
+            ]
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "品質管理"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "研修スケジュールについて",
+            "notes": "2-7: 箇条書きアニメ効果「ひし形」未変更",
+            "bullets": [
+              "項目Aの確認",
+              "項目Bの確認",
+              "項目Cの確認"
+            ]
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置",
+            "objects": [
+              "地球儀"
+            ],
+            "notes": "2-5: 3Dモデル「地球儀」に「ターンテーブル」未設定"
+          }
+        ],
+        "preTaskState": {
+          "transitionsApplied": false,
+          "animationsApplied": false,
+          "autoAdvanceSet": false
+        }
+      },
+      "taskParams": {
+        "task2_1": {
+          "transition": "プッシュ",
+          "transitionOption": "右から",
+          "applyTo": "all",
+          "operation": "setTransition"
+        },
+        "task2_2": {
+          "durationSec": 2,
+          "applyTo": "all",
+          "operation": "transitionDuration"
+        },
+        "task2_3": {
+          "slideNos": [
+            3,
+            4,
+            5
+          ],
+          "transition": "フェード",
+          "operation": "perSlideTransition"
+        },
+        "task2_4": {
+          "autoAdvanceSec": 4,
+          "applyTo": "all",
+          "operation": "autoAdvance"
+        },
+        "task2_5": {
+          "slideNo": 6,
+          "model3dName": "地球儀",
+          "animation": "ターンテーブル",
+          "operation": "model3dAnimation"
+        },
+        "task2_6": {
+          "slideNo": 2,
+          "imageNames": [
+            "バリスタ端末",
+            "確認マーク"
+          ],
+          "direction": "右下から",
+          "durationSec": 0.75,
+          "operation": "imageEntrance"
+        },
+        "task2_7": {
+          "slideTitle": "研修スケジュールについて",
+          "slideNo": 6,
+          "effect": "ひし形",
+          "timing": "すべて同時",
+          "operation": "bulletAnimation"
+        },
+        "task2_8": {
+          "slideNo": 4,
+          "shapeName": "星",
+          "excludeShape": "円",
+          "motionPath": "プラス",
+          "operation": "motionPath"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project2_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは医療事務の新人研修資料を作成しています。",
+      "tasks": [
+        "タスク2-1　すべてのスライドに、画面切り替え「フェード」を設定します。",
+        "タスク2-2　すべての画面切り替えの継続時間を4秒に設定します。",
+        "タスク2-3　スライド3、4、5に「プッシュ」の画面切り替え効果を設定します。",
+        "タスク2-4　すべてのスライドが、「6」秒後に自動で次のスライドへ進むように画面切り替えのタイミングを設定します。",
+        "タスク2-5　スライド６の3Ｄモデル「聴診器」に、アニメーション「ジャンプ」を設定します。",
+        "タスク2-6　スライド2の受付端末と案内マークの２つの画像が、スライドの左上からから登場するようにします。アニメーションの継続時間は「1.0\"秒にします。",
+        "タスク2-7　スライド「受付オペレーションについて」の箇条書きに設定されたアニメーションの効果を「チェックマーク」に変更します。また、クリックするとすべて同時に動くようにします。",
+        "タスク2-8　スライド４の星の図形にアニメーションの軌跡「ハート」を設定します。円の図形にはアニメーションを設定しません。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "医療事務研修"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受付の基本",
+            "notes": "2-6: 画像「受付端末」「案内マーク」配置・アニメ未設定",
+            "objects": [
+              "受付端末",
+              "案内マーク"
+            ]
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "記録の取り扱い"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "連絡体制",
+            "notes": "2-8: 図形「星」に軌跡未設定・円図形はアニメなし",
+            "objects": [
+              "星",
+              "円"
+            ]
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "個人情報"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "受付オペレーションについて",
+            "notes": "2-7: 箇条書きアニメ効果「チェックマーク」未変更",
+            "bullets": [
+              "項目Aの確認",
+              "項目Bの確認",
+              "項目Cの確認"
+            ]
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置",
+            "objects": [
+              "聴診器"
+            ],
+            "notes": "2-5: 3Dモデル「聴診器」に「ジャンプ」未設定"
+          }
+        ],
+        "preTaskState": {
+          "transitionsApplied": false,
+          "animationsApplied": false,
+          "autoAdvanceSet": false
+        }
+      },
+      "taskParams": {
+        "task2_1": {
+          "transition": "フェード",
+          "transitionOption": null,
+          "applyTo": "all",
+          "operation": "setTransition"
+        },
+        "task2_2": {
+          "durationSec": 4,
+          "applyTo": "all",
+          "operation": "transitionDuration"
+        },
+        "task2_3": {
+          "slideNos": [
+            3,
+            4,
+            5
+          ],
+          "transition": "プッシュ",
+          "operation": "perSlideTransition"
+        },
+        "task2_4": {
+          "autoAdvanceSec": 6,
+          "applyTo": "all",
+          "operation": "autoAdvance"
+        },
+        "task2_5": {
+          "slideNo": 6,
+          "model3dName": "聴診器",
+          "animation": "ジャンプ",
+          "operation": "model3dAnimation"
+        },
+        "task2_6": {
+          "slideNo": 2,
+          "imageNames": [
+            "受付端末",
+            "案内マーク"
+          ],
+          "direction": "左上から",
+          "durationSec": 1.0,
+          "operation": "imageEntrance"
+        },
+        "task2_7": {
+          "slideTitle": "受付オペレーションについて",
+          "slideNo": 6,
+          "effect": "チェックマーク",
+          "timing": "すべて同時",
+          "operation": "bulletAnimation"
+        },
+        "task2_8": {
+          "slideNo": 4,
+          "shapeName": "星",
+          "excludeShape": "円",
+          "motionPath": "ハート",
+          "operation": "motionPath"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project2_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは製造現場の設備保全研修資料を作成しています。",
+      "tasks": [
+        "タスク2-1　すべてのスライドに、画面切り替え「渦巻き」を設定します。",
+        "タスク2-2　すべての画面切り替えの継続時間を5秒に設定します。",
+        "タスク2-3　スライド3、4、5に「切り替え」の画面切り替え効果を設定します。",
+        "タスク2-4　すべてのスライドが、「7」秒後に自動で次のスライドへ進むように画面切り替えのタイミングを設定します。",
+        "タスク2-5　スライド６の3Ｄモデル「工具箱」に、アニメーション「回転」を設定します。",
+        "タスク2-6　スライド2の保全端末と注意マークの２つの画像が、スライドの左下からから登場するようにします。アニメーションの継続時間は「0.85\"秒にします。",
+        "タスク2-7　スライド「保全手順の確認について」の箇条書きに設定されたアニメーションの効果を「四角形」に変更します。また、クリックするとすべて同時に動くようにします。",
+        "タスク2-8　スライド４の星の図形にアニメーションの軌跡「ループ」を設定します。円の図形にはアニメーションを設定しません。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "設備保全研修"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "保全の目的",
+            "notes": "2-6: 画像「保全端末」「注意マーク」配置・アニメ未設定",
+            "objects": [
+              "保全端末",
+              "注意マーク"
+            ]
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "点検手順"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "異常時対応",
+            "notes": "2-8: 図形「星」に軌跡未設定・円図形はアニメなし",
+            "objects": [
+              "星",
+              "円"
+            ]
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "記録管理"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "保全手順の確認について",
+            "notes": "2-7: 箇条書きアニメ効果「四角形」未変更",
+            "bullets": [
+              "項目Aの確認",
+              "項目Bの確認",
+              "項目Cの確認"
+            ]
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置",
+            "objects": [
+              "工具箱"
+            ],
+            "notes": "2-5: 3Dモデル「工具箱」に「回転」未設定"
+          }
+        ],
+        "preTaskState": {
+          "transitionsApplied": false,
+          "animationsApplied": false,
+          "autoAdvanceSet": false
+        }
+      },
+      "taskParams": {
+        "task2_1": {
+          "transition": "渦巻き",
+          "transitionOption": null,
+          "applyTo": "all",
+          "operation": "setTransition"
+        },
+        "task2_2": {
+          "durationSec": 5,
+          "applyTo": "all",
+          "operation": "transitionDuration"
+        },
+        "task2_3": {
+          "slideNos": [
+            3,
+            4,
+            5
+          ],
+          "transition": "切り替え",
+          "operation": "perSlideTransition"
+        },
+        "task2_4": {
+          "autoAdvanceSec": 7,
+          "applyTo": "all",
+          "operation": "autoAdvance"
+        },
+        "task2_5": {
+          "slideNo": 6,
+          "model3dName": "工具箱",
+          "animation": "回転",
+          "operation": "model3dAnimation"
+        },
+        "task2_6": {
+          "slideNo": 2,
+          "imageNames": [
+            "保全端末",
+            "注意マーク"
+          ],
+          "direction": "左下から",
+          "durationSec": 0.85,
+          "operation": "imageEntrance"
+        },
+        "task2_7": {
+          "slideTitle": "保全手順の確認について",
+          "slideNo": 6,
+          "effect": "四角形",
+          "timing": "すべて同時",
+          "operation": "bulletAnimation"
+        },
+        "task2_8": {
+          "slideNo": 4,
+          "shapeName": "星",
+          "excludeShape": "円",
+          "motionPath": "ループ",
+          "operation": "motionPath"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project2_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは旅行代理店の新人研修資料を作成しています。",
+      "tasks": [
+        "タスク2-1　すべてのスライドに、画面切り替え「カバー」を設定します。効果のオプションを「左から」にします。",
+        "タスク2-2　すべての画面切り替えの継続時間を2.5秒に設定します。",
+        "タスク2-3　スライド3、4、5に「渦巻き」の画面切り替え効果を設定します。",
+        "タスク2-4　すべてのスライドが、「8」秒後に自動で次のスライドへ進むように画面切り替えのタイミングを設定します。",
+        "タスク2-5　スライド６の3Ｄモデル「飛行機」に、アニメーション「ターンテーブル」を設定します。",
+        "タスク2-6　スライド2の地球儀端末とクエスチョンマークの２つの画像が、スライドの右上からから登場するようにします。アニメーションの継続時間は「1.2\"秒にします。",
+        "タスク2-7　スライド「予約対応の基本について」の箇条書きに設定されたアニメーションの効果を「ひし形」に変更します。また、クリックするとすべて同時に動くようにします。",
+        "タスク2-8　スライド４の星の図形にアニメーションの軌跡「ベンド」を設定します。円の図形にはアニメーションを設定しません。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "旅行代理店研修"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "接客の基本",
+            "notes": "2-6: 画像「地球儀端末」「クエスチョンマーク」配置・アニメ未設定",
+            "objects": [
+              "地球儀端末",
+              "クエスチョンマーク"
+            ]
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "予約システム"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "変更対応",
+            "notes": "2-8: 図形「星」に軌跡未設定・円図形はアニメなし",
+            "objects": [
+              "星",
+              "円"
+            ]
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "クレーム対応"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "予約対応の基本について",
+            "notes": "2-7: 箇条書きアニメ効果「ひし形」未変更",
+            "bullets": [
+              "項目Aの確認",
+              "項目Bの確認",
+              "項目Cの確認"
+            ]
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置",
+            "objects": [
+              "飛行機"
+            ],
+            "notes": "2-5: 3Dモデル「飛行機」に「ターンテーブル」未設定"
+          }
+        ],
+        "preTaskState": {
+          "transitionsApplied": false,
+          "animationsApplied": false,
+          "autoAdvanceSet": false
+        }
+      },
+      "taskParams": {
+        "task2_1": {
+          "transition": "カバー",
+          "transitionOption": "左から",
+          "applyTo": "all",
+          "operation": "setTransition"
+        },
+        "task2_2": {
+          "durationSec": 2.5,
+          "applyTo": "all",
+          "operation": "transitionDuration"
+        },
+        "task2_3": {
+          "slideNos": [
+            3,
+            4,
+            5
+          ],
+          "transition": "渦巻き",
+          "operation": "perSlideTransition"
+        },
+        "task2_4": {
+          "autoAdvanceSec": 8,
+          "applyTo": "all",
+          "operation": "autoAdvance"
+        },
+        "task2_5": {
+          "slideNo": 6,
+          "model3dName": "飛行機",
+          "animation": "ターンテーブル",
+          "operation": "model3dAnimation"
+        },
+        "task2_6": {
+          "slideNo": 2,
+          "imageNames": [
+            "地球儀端末",
+            "クエスチョンマーク"
+          ],
+          "direction": "右上から",
+          "durationSec": 1.2,
+          "operation": "imageEntrance"
+        },
+        "task2_7": {
+          "slideTitle": "予約対応の基本について",
+          "slideNo": 6,
+          "effect": "ひし形",
+          "timing": "すべて同時",
+          "operation": "bulletAnimation"
+        },
+        "task2_8": {
+          "slideNo": 4,
+          "shapeName": "星",
+          "excludeShape": "円",
+          "motionPath": "ベンド",
+          "operation": "motionPath"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project2_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは学習塾の講師研修資料を作成しています。",
+      "tasks": [
+        "タスク2-1　すべてのスライドに、画面切り替え「切り替え」を設定します。",
+        "タスク2-2　すべての画面切り替えの継続時間を4.5秒に設定します。",
+        "タスク2-3　スライド3、4、5に「フェード」の画面切り替え効果を設定します。",
+        "タスク2-4　すべてのスライドが、「10」秒後に自動で次のスライドへ進むように画面切り替えのタイミングを設定します。",
+        "タスク2-5　スライド６の3Ｄモデル「ノートパソコン」に、アニメーション「ジャンプ」を設定します。",
+        "タスク2-6　スライド2のノートPC端末とヒントマークの２つの画像が、スライドの右下からから登場するようにします。アニメーションの継続時間は「0.9\"秒にします。",
+        "タスク2-7　スライド「授業運営の基本について」の箇条書きに設定されたアニメーションの効果を「チェックマーク」に変更します。また、クリックするとすべて同時に動くようにします。",
+        "タスク2-8　スライド４の星の図形にアニメーションの軌跡「プラス」を設定します。円の図形にはアニメーションを設定しません。"
+      ],
+      "layout": {
+        "slideCount": 7,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "講師研修ガイド"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "授業設計",
+            "notes": "2-6: 画像「ノートPC端末」「ヒントマーク」配置・アニメ未設定",
+            "objects": [
+              "ノートPC端末",
+              "ヒントマーク"
+            ]
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "進度管理"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "質問対応",
+            "notes": "2-8: 図形「星」に軌跡未設定・円図形はアニメなし",
+            "objects": [
+              "星",
+              "円"
+            ]
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "保護者連絡"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "授業運営の基本について",
+            "notes": "2-7: 箇条書きアニメ効果「チェックマーク」未変更",
+            "bullets": [
+              "項目Aの確認",
+              "項目Bの確認",
+              "項目Cの確認"
+            ]
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置",
+            "objects": [
+              "ノートパソコン"
+            ],
+            "notes": "2-5: 3Dモデル「ノートパソコン」に「ジャンプ」未設定"
+          }
+        ],
+        "preTaskState": {
+          "transitionsApplied": false,
+          "animationsApplied": false,
+          "autoAdvanceSet": false
+        }
+      },
+      "taskParams": {
+        "task2_1": {
+          "transition": "切り替え",
+          "transitionOption": null,
+          "applyTo": "all",
+          "operation": "setTransition"
+        },
+        "task2_2": {
+          "durationSec": 4.5,
+          "applyTo": "all",
+          "operation": "transitionDuration"
+        },
+        "task2_3": {
+          "slideNos": [
+            3,
+            4,
+            5
+          ],
+          "transition": "フェード",
+          "operation": "perSlideTransition"
+        },
+        "task2_4": {
+          "autoAdvanceSec": 10,
+          "applyTo": "all",
+          "operation": "autoAdvance"
+        },
+        "task2_5": {
+          "slideNo": 6,
+          "model3dName": "ノートパソコン",
+          "animation": "ジャンプ",
+          "operation": "model3dAnimation"
+        },
+        "task2_6": {
+          "slideNo": 2,
+          "imageNames": [
+            "ノートPC端末",
+            "ヒントマーク"
+          ],
+          "direction": "右下から",
+          "durationSec": 0.9,
+          "operation": "imageEntrance"
+        },
+        "task2_7": {
+          "slideTitle": "授業運営の基本について",
+          "slideNo": 6,
+          "effect": "チェックマーク",
+          "timing": "すべて同時",
+          "operation": "bulletAnimation"
+        },
+        "task2_8": {
+          "slideNo": 4,
+          "shapeName": "星",
+          "excludeShape": "円",
+          "motionPath": "プラス",
+          "operation": "motionPath"
+        }
+      }
+    }
+  ]
+}

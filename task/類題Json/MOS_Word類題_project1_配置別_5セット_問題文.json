@@ -1,0 +1,327 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。1-1=編集記号の表示/非表示、1-2=箇条書き化、1-3=スタイル適用、1-4=スタイル変更、1-5=書式クリアの操作種別を維持。",
+    "forbiddenParagraphTexts": [
+      "CSR活動のメリット",
+      "社員のコンプライアンス意識の確立",
+      "CSR活動の光と影",
+      "会社の社会的責任",
+      "ゼミ",
+      "第１節　はじめに",
+      "第２節 会社の社会的責任の定義と問題点"
+    ],
+    "perSetMustVary": [
+      "導入文と本文テーマ",
+      "1-1の操作（非表示のみ／表示のみ）",
+      "1-2の箇条書き段落数",
+      "1-3の対象位置とスタイル名",
+      "1-4の対象段落種別と変更先スタイル",
+      "書式傾向（罫線・縞・背景色）",
+      "印刷向き・改ページ位置",
+      "文書テーマカラー"
+    ],
+    "mustNotReuseAcrossSets": [
+      "見出し文字列",
+      "対象段落の先頭文",
+      "画像名",
+      "書式パターン",
+      "余白プリセットの組み合わせ",
+      "1-3のスタイル名",
+      "1-4の変更先スタイル名"
+    ],
+    "taskTypeVariation": {
+      "task1_1": "セットごとに「非表示のみ」または「表示のみ」",
+      "task1_2": "箇条書き化する段落数は2〜6でセットごとに異なる",
+      "task1_3": "画像隣以外の段落指定可。スタイルは参照２以外も使用",
+      "task1_4": "小見出し以外の段落指定可。変更先は見出し３以外も使用"
+    },
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "見出し・段落・スタイル名・画像名を完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "showHideMarks": "ホーム → 段落 → ¶（編集記号の表示/非表示）",
+    "bulletList": "ホーム → 段落 → 箇条書き",
+    "styleGallery": "ホーム → スタイル",
+    "clearFormatting": "ホーム → フォント → すべての書式をクリア"
+  },
+  "sourceFile": "Project1.docx",
+  "projectId": 1,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project1_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたはカフェ開店準備のマニュアルを作成しています。",
+      "tasks": [
+        "タスク1-1　編集記号を非表示にしてください。",
+        "タスク1-2　見出し「抽出のコツ」の下の「フィルター交換周期の見直し」から2つの段落を箇条書きにしてください。",
+        "タスク1-3　画像「エスプレッソマシン」の左の段落にスタイル「参照２」を設定してください。",
+        "タスク1-4　見出し「第2章 衛生管理」内の小見出し「デカフェ需要の拡大」のスタイルを「見出し４」に変更します。",
+        "タスク1-5　見出し「第1章 焙煎入門」の下にある「アラビカ種の特徴」に設定されている書式をすべてクリアしてください。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1章 焙煎入門", "第2章 衛生管理"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景＋下罫線点線",
+        "imagePlacement": "本文右寄せ（エスプレッソマシン）",
+        "pageBreakAfter": "第1章末尾",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 28
+      },
+      "taskParams": {
+        "task1_1": {"operation": "showHideMarks", "steps": ["非表示"], "initialState": "表示"},
+        "task1_2": {
+          "heading": "抽出のコツ",
+          "startParagraph": "フィルター交換周期の見直し",
+          "paragraphCount": 2,
+          "listType": "箇条書き"
+        },
+        "task1_3": {
+          "imageName": "エスプレッソマシン",
+          "targetParagraph": "抽出圧力は9気圧前後を維持し、蒸気ノズルの清掃を毎日実施します。",
+          "anchor": "leftOfImage",
+          "styleUi": "参照２",
+          "styleInternal": "参照2"
+        },
+        "task1_4": {
+          "targetType": "subheading",
+          "parentHeading": "第2章 衛生管理",
+          "targetLabel": "デカフェ需要の拡大",
+          "targetStyle": "見出し４",
+          "targetStyleInternal": "見出し4"
+        },
+        "task1_5": {
+          "heading": "第1章 焙煎入門",
+          "targetParagraph": "アラビカ種の特徴",
+          "prefilledFormat": ["太字", "下線"],
+          "operation": "clearFormatting"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project1_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは院内感染対策ガイドを作成しています。",
+      "tasks": [
+        "タスク1-1　編集記号を表示してください。",
+        "タスク1-2　見出し「手洗いのポイント」の下の「指先と爪の間の洗浄」から4つの段落を箇条書きにしてください。",
+        "タスク1-3　見出し「第1節 基本手順」の下の「手指衛生は最も基本的な対策です。」にスタイル「強調」を設定してください。",
+        "タスク1-4　見出し「手洗いのポイント」のスタイルを「見出し２」に変更します。",
+        "タスク1-5　見出し「第1節 基本手順」の下にある「七歩洗手法の手順」に設定されている書式をすべてクリアしてください。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1節 基本手順", "第2節 感染経路"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント（緑・1.5pt）",
+        "imagePlacement": "本文中央（消毒液スタンド）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 26
+      },
+      "taskParams": {
+        "task1_1": {"operation": "showHideMarks", "steps": ["表示"], "initialState": "非表示"},
+        "task1_2": {
+          "heading": "手洗いのポイント",
+          "startParagraph": "指先と爪の間の洗浄",
+          "paragraphCount": 4,
+          "listType": "箇条書き"
+        },
+        "task1_3": {
+          "heading": "第1節 基本手順",
+          "targetParagraph": "手指衛生は最も基本的な対策です。",
+          "anchor": "underHeading",
+          "styleUi": "強調",
+          "styleInternal": "強調"
+        },
+        "task1_4": {
+          "targetType": "heading",
+          "targetLabel": "手洗いのポイント",
+          "targetStyle": "見出し２",
+          "targetStyleInternal": "見出し2"
+        },
+        "task1_5": {
+          "heading": "第1節 基本手順",
+          "targetParagraph": "七歩洗手法の手順",
+          "prefilledFormat": ["太字", "斜体"],
+          "operation": "clearFormatting"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project1_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは品質管理マニュアルを作成しています。",
+      "tasks": [
+        "タスク1-1　編集記号を非表示にしてください。",
+        "タスク1-2　見出し「検査の流れ」の下の「サンプル抽出の基準」から5つの段落を箇条書きにしてください。",
+        "タスク1-3　画像「検査ライン」の下の段落「外観検査はライン速度を15m/分以下に設定し、異物検知センサーを毎シフト校正します。」にスタイル「引用」を設定してください。",
+        "タスク1-4　見出し「2. 不良対策」内の「ライン停止時は異物の原因を記録する。」のスタイルを「目次」に変更します。",
+        "タスク1-5　見出し「1. 工程概要」の下にある「トレーサビリティの重要性」に設定されている書式をすべてクリアしてください。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["1. 工程概要", "2. 不良対策"],
+        "marginPreset": "広い",
+        "orientation": "横向き",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞（2段落ごと）",
+        "imagePlacement": "本文左寄せ（検査ライン）",
+        "pageBreakAfter": "1. 工程概要末尾",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 30
+      },
+      "taskParams": {
+        "task1_1": {"operation": "showHideMarks", "steps": ["非表示"], "initialState": "表示"},
+        "task1_2": {
+          "heading": "検査の流れ",
+          "startParagraph": "サンプル抽出の基準",
+          "paragraphCount": 5,
+          "listType": "箇条書き"
+        },
+        "task1_3": {
+          "imageName": "検査ライン",
+          "targetParagraph": "外観検査はライン速度を15m/分以下に設定し、異物検知センサーを毎シフト校正します。",
+          "anchor": "belowImage",
+          "styleUi": "引用",
+          "styleInternal": "引用"
+        },
+        "task1_4": {
+          "targetType": "bodyParagraph",
+          "parentHeading": "2. 不良対策",
+          "targetLabel": "ライン停止時は異物の原因を記録する。",
+          "targetStyle": "目次",
+          "targetStyleInternal": "目次"
+        },
+        "task1_5": {
+          "heading": "1. 工程概要",
+          "targetParagraph": "トレーサビリティの重要性",
+          "prefilledFormat": ["太字", "下線", "文字色オレンジ"],
+          "operation": "clearFormatting"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project1_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは旅行代理店の案内文を作成しています。",
+      "tasks": [
+        "タスク1-1　編集記号を表示してください。",
+        "タスク1-2　見出し「持ち物チェック」の下の「パスポート有効期限の確認」から3つの段落を箇条書きにしてください。",
+        "タスク1-3　見出し「第1部 出発前」の下の「渡航手続きは早めに準備しましょう。」にスタイル「参照１」を設定してください。",
+        "タスク1-4　見出し「第2部 現地情報」内の小見出し「海外保険の選び方」のスタイルを「見出し１」に変更します。",
+        "タスク1-5　見出し「第1部 出発前」の下にある「ビザ申請の注意点」に設定されている書式をすべてクリアしてください。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1部 出発前", "第2部 現地情報"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "セクション区切り後に改ページ＋見出し下二重罫線",
+        "imagePlacement": "本文右下（スーツケース）",
+        "pageBreakAfter": "第1部末尾（セクション区切り）",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 27
+      },
+      "taskParams": {
+        "task1_1": {"operation": "showHideMarks", "steps": ["表示"], "initialState": "非表示"},
+        "task1_2": {
+          "heading": "持ち物チェック",
+          "startParagraph": "パスポート有効期限の確認",
+          "paragraphCount": 3,
+          "listType": "箇条書き"
+        },
+        "task1_3": {
+          "heading": "第1部 出発前",
+          "targetParagraph": "渡航手続きは早めに準備しましょう。",
+          "anchor": "underHeading",
+          "styleUi": "参照１",
+          "styleInternal": "参照1"
+        },
+        "task1_4": {
+          "targetType": "subheading",
+          "parentHeading": "第2部 現地情報",
+          "targetLabel": "海外保険の選び方",
+          "targetStyle": "見出し１",
+          "targetStyleInternal": "見出し1"
+        },
+        "task1_5": {
+          "heading": "第1部 出発前",
+          "targetParagraph": "ビザ申請の注意点",
+          "prefilledFormat": ["太字", "ハイライト黄"],
+          "operation": "clearFormatting"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project1_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは夏期講習の案内文を作成しています。",
+      "tasks": [
+        "タスク1-1　編集記号を非表示にしてください。",
+        "タスク1-2　見出し「学習のコツ」の下の「復習間隔の設定」から6つの段落を箇条書きにしてください。",
+        "タスク1-3　画像「ノートPC」の右の段落にスタイル「キャプション」を設定してください。",
+        "タスク1-4　見出し「第2回 応用演習」の下の「応用問題では時間配分が重要です。」のスタイルを「強調」に変更します。",
+        "タスク1-5　見出し「第1回 導入」の下にある「基礎計算力の定着」に設定されている書式をすべてクリアしてください。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1回 導入", "第2回 応用演習"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め＋引用段落に紫左罫線",
+        "imagePlacement": "見出し直下（ノートPC）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 25
+      },
+      "taskParams": {
+        "task1_1": {"operation": "showHideMarks", "steps": ["非表示"], "initialState": "表示"},
+        "task1_2": {
+          "heading": "学習のコツ",
+          "startParagraph": "復習間隔の設定",
+          "paragraphCount": 6,
+          "listType": "箇条書き"
+        },
+        "task1_3": {
+          "imageName": "ノートPC",
+          "targetParagraph": "動画教材は1日2本までとし、視聴後に10分間の確認テストを実施します。",
+          "anchor": "rightOfImage",
+          "styleUi": "キャプション",
+          "styleInternal": "キャプション"
+        },
+        "task1_4": {
+          "targetType": "bodyParagraph",
+          "parentHeading": "第2回 応用演習",
+          "targetLabel": "応用問題では時間配分が重要です。",
+          "targetStyle": "強調",
+          "targetStyleInternal": "強調"
+        },
+        "task1_5": {
+          "heading": "第1回 導入",
+          "targetParagraph": "基礎計算力の定着",
+          "prefilledFormat": ["太字", "斜体", "下線"],
+          "operation": "clearFormatting"
+        }
+      }
+    }
+  ]
+}

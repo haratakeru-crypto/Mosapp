@@ -1,0 +1,518 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project8の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "見せる！",
+      "見せる！スライドの基本ルール",
+      "中間スタイル4-アクセント4",
+      "濃い緑、テキスト2、白+基本色80％"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "tableSlideTitle": "見せる！スライドの基本ルール",
+      "tableStyle": "中間スタイル4-アクセント4",
+      "backgroundColor": "濃い緑、テキスト2、白+基本色80％",
+      "slideWidthCm": 27.54,
+      "slideHeightCm": 17.46
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project8.pptx",
+  "projectId": 8,
+  "variantType": "layout",
+  "taskCount": 5,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project8_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたはカフェの店舗プレゼン技法資料を作成しています。",
+      "tasks": [
+        "タスク8-1　スライド「伝わるスライドの基本ルール」の表を、スタイル「中間スタイル3-アクセント2」に変更します。表スタイルのオプションを設定して、行が１行おきに変更されないようにします。",
+        "タスク8-2　スライド１の背景を「濃い茶、テキスト2、白+基本色60％」に変更します。",
+        "タスク8-3　スライドのサイズを「画面に合わせる16：9」にします。",
+        "タスク8-4　スライドの大きさを、高さ「\"19.05\"cm」、幅「\"25.4\"cm」に変更します。スライドは画面に合わせます。",
+        "タスク8-5　スライドをグレースケールで表示し、スライド２のイラストを「明るいグレースケール」にします。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "伝わるプレゼンの極意",
+            "notes": "8-2: 背景色「濃い茶、テキスト2、白+基本色60％」未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "伝わるスライドの基本ルール",
+            "objects": [
+              "表",
+              "イラスト"
+            ],
+            "notes": "8-1: 表スタイル「中間スタイル3-アクセント2」未変更 / 8-5: イラストのグレースケール未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "視覚的な工夫"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "構成のコツ"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "tableStyleApplied": false,
+          "backgroundOnSlide1": false,
+          "slideSize169": false,
+          "slideSizeCustom": false,
+          "grayscaleIllustration": false
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "slideTitle": "伝わるスライドの基本ルール",
+          "tableStyle": "中間スタイル3-アクセント2",
+          "bandedRows": false,
+          "operation": "tableStyle"
+        },
+        "task8_2": {
+          "slideNo": 1,
+          "backgroundColor": "濃い茶、テキスト2、白+基本色60％",
+          "operation": "slideBackground"
+        },
+        "task8_3": {
+          "slideSize": "画面に合わせる(16:9)",
+          "operation": "slideSizePreset"
+        },
+        "task8_4": {
+          "widthCm": 25.4,
+          "heightCm": 19.05,
+          "scaleToFit": true,
+          "operation": "slideSizeCustom"
+        },
+        "task8_5": {
+          "slideNo": 2,
+          "grayscaleView": true,
+          "illustrationStyle": "明るいグレースケール",
+          "operation": "grayscaleIllustration"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project8_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは医療説明会のプレゼン技法資料を作成しています。",
+      "tasks": [
+        "タスク8-1　スライド「説明会スライドの基本ルール」の表を、スタイル「中間スタイル2-アクセント3」に変更します。表スタイルのオプションを設定して、行が１行おきに変更されないようにします。",
+        "タスク8-2　スライド１の背景を「濃い緑、テキスト2、白+基本色70％」に変更します。",
+        "タスク8-3　スライドのサイズを「画面に合わせる16：9」にします。",
+        "タスク8-4　スライドの大きさを、高さ「\"18.0\"cm」、幅「\"26.0\"cm」に変更します。スライドは画面に合わせます。",
+        "タスク8-5　スライドをグレースケールで表示し、スライド２のイラストを「明るいグレースケール」にします。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "院内説明の極意",
+            "notes": "8-2: 背景色「濃い緑、テキスト2、白+基本色70％」未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "説明会スライドの基本ルール",
+            "objects": [
+              "表",
+              "イラスト"
+            ],
+            "notes": "8-1: 表スタイル「中間スタイル2-アクセント3」未変更 / 8-5: イラストのグレースケール未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "図表の見せ方"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "質疑の進め方"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "tableStyleApplied": false,
+          "backgroundOnSlide1": false,
+          "slideSize169": false,
+          "slideSizeCustom": false,
+          "grayscaleIllustration": false
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "slideTitle": "説明会スライドの基本ルール",
+          "tableStyle": "中間スタイル2-アクセント3",
+          "bandedRows": false,
+          "operation": "tableStyle"
+        },
+        "task8_2": {
+          "slideNo": 1,
+          "backgroundColor": "濃い緑、テキスト2、白+基本色70％",
+          "operation": "slideBackground"
+        },
+        "task8_3": {
+          "slideSize": "画面に合わせる(16:9)",
+          "operation": "slideSizePreset"
+        },
+        "task8_4": {
+          "widthCm": 26.0,
+          "heightCm": 18.0,
+          "scaleToFit": true,
+          "operation": "slideSizeCustom"
+        },
+        "task8_5": {
+          "slideNo": 2,
+          "grayscaleView": true,
+          "illustrationStyle": "明るいグレースケール",
+          "operation": "grayscaleIllustration"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project8_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは工場見学会のプレゼン技法資料を作成しています。",
+      "tasks": [
+        "タスク8-1　スライド「見学会スライドの基本ルール」の表を、スタイル「中間スタイル5-アクセント1」に変更します。表スタイルのオプションを設定して、行が１行おきに変更されないようにします。",
+        "タスク8-2　スライド１の背景を「濃い青灰、テキスト2、白+基本色75％」に変更します。",
+        "タスク8-3　スライドのサイズを「画面に合わせる16：9」にします。",
+        "タスク8-4　スライドの大きさを、高さ「\"17.8\"cm」、幅「\"27.0\"cm」に変更します。スライドは画面に合わせます。",
+        "タスク8-5　スライドをグレースケールで表示し、スライド２のイラストを「明るいグレースケール」にします。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "見学会プレゼンの極意",
+            "notes": "8-2: 背景色「濃い青灰、テキスト2、白+基本色75％」未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "見学会スライドの基本ルール",
+            "objects": [
+              "表",
+              "イラスト"
+            ],
+            "notes": "8-1: 表スタイル「中間スタイル5-アクセント1」未変更 / 8-5: イラストのグレースケール未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "安全標識の見せ方"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "質問対応のコツ"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "tableStyleApplied": false,
+          "backgroundOnSlide1": false,
+          "slideSize169": false,
+          "slideSizeCustom": false,
+          "grayscaleIllustration": false
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "slideTitle": "見学会スライドの基本ルール",
+          "tableStyle": "中間スタイル5-アクセント1",
+          "bandedRows": false,
+          "operation": "tableStyle"
+        },
+        "task8_2": {
+          "slideNo": 1,
+          "backgroundColor": "濃い青灰、テキスト2、白+基本色75％",
+          "operation": "slideBackground"
+        },
+        "task8_3": {
+          "slideSize": "画面に合わせる(16:9)",
+          "operation": "slideSizePreset"
+        },
+        "task8_4": {
+          "widthCm": 27.0,
+          "heightCm": 17.8,
+          "scaleToFit": true,
+          "operation": "slideSizeCustom"
+        },
+        "task8_5": {
+          "slideNo": 2,
+          "grayscaleView": true,
+          "illustrationStyle": "明るいグレースケール",
+          "operation": "grayscaleIllustration"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project8_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは旅行商品説明のプレゼン技法資料を作成しています。",
+      "tasks": [
+        "タスク8-1　スライド「提案スライドの基本ルール」の表を、スタイル「中間スタイル4-アクセント5」に変更します。表スタイルのオプションを設定して、行が１行おきに変更されないようにします。",
+        "タスク8-2　スライド１の背景を「濃い水色、テキスト2、白+基本色65％」に変更します。",
+        "タスク8-3　スライドのサイズを「画面に合わせる16：9」にします。",
+        "タスク8-4　スライドの大きさを、高さ「\"17.5\"cm」、幅「\"28.0\"cm」に変更します。スライドは画面に合わせます。",
+        "タスク8-5　スライドをグレースケールで表示し、スライド２のイラストを「明るいグレースケール」にします。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "提案プレゼンの極意",
+            "notes": "8-2: 背景色「濃い水色、テキスト2、白+基本色65％」未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "提案スライドの基本ルール",
+            "objects": [
+              "表",
+              "イラスト"
+            ],
+            "notes": "8-1: 表スタイル「中間スタイル4-アクセント5」未変更 / 8-5: イラストのグレースケール未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "行程表の見せ方"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "価格提示のコツ"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "tableStyleApplied": false,
+          "backgroundOnSlide1": false,
+          "slideSize169": false,
+          "slideSizeCustom": false,
+          "grayscaleIllustration": false
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "slideTitle": "提案スライドの基本ルール",
+          "tableStyle": "中間スタイル4-アクセント5",
+          "bandedRows": false,
+          "operation": "tableStyle"
+        },
+        "task8_2": {
+          "slideNo": 1,
+          "backgroundColor": "濃い水色、テキスト2、白+基本色65％",
+          "operation": "slideBackground"
+        },
+        "task8_3": {
+          "slideSize": "画面に合わせる(16:9)",
+          "operation": "slideSizePreset"
+        },
+        "task8_4": {
+          "widthCm": 28.0,
+          "heightCm": 17.5,
+          "scaleToFit": true,
+          "operation": "slideSizeCustom"
+        },
+        "task8_5": {
+          "slideNo": 2,
+          "grayscaleView": true,
+          "illustrationStyle": "明るいグレースケール",
+          "operation": "grayscaleIllustration"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project8_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは学習塾説明会のプレゼン技法資料を作成しています。",
+      "tasks": [
+        "タスク8-1　スライド「講座案内スライドの基本ルール」の表を、スタイル「中間スタイル6-アクセント4」に変更します。表スタイルのオプションを設定して、行が１行おきに変更されないようにします。",
+        "タスク8-2　スライド１の背景を「濃いオレンジ、テキスト2、白+基本色55％」に変更します。",
+        "タスク8-3　スライドのサイズを「画面に合わせる16：9」にします。",
+        "タスク8-4　スライドの大きさを、高さ「\"16.8\"cm」、幅「\"28.5\"cm」に変更します。スライドは画面に合わせます。",
+        "タスク8-5　スライドをグレースケールで表示し、スライド２のイラストを「明るいグレースケール」にします。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "講座説明の極意",
+            "notes": "8-2: 背景色「濃いオレンジ、テキスト2、白+基本色55％」未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "講座案内スライドの基本ルール",
+            "objects": [
+              "表",
+              "イラスト"
+            ],
+            "notes": "8-1: 表スタイル「中間スタイル6-アクセント4」未変更 / 8-5: イラストのグレースケール未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "進度表の見せ方"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "保護者説明のコツ"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "まとめ"
+          }
+        ],
+        "preTaskState": {
+          "tableStyleApplied": false,
+          "backgroundOnSlide1": false,
+          "slideSize169": false,
+          "slideSizeCustom": false,
+          "grayscaleIllustration": false
+        }
+      },
+      "taskParams": {
+        "task8_1": {
+          "slideTitle": "講座案内スライドの基本ルール",
+          "tableStyle": "中間スタイル6-アクセント4",
+          "bandedRows": false,
+          "operation": "tableStyle"
+        },
+        "task8_2": {
+          "slideNo": 1,
+          "backgroundColor": "濃いオレンジ、テキスト2、白+基本色55％",
+          "operation": "slideBackground"
+        },
+        "task8_3": {
+          "slideSize": "画面に合わせる(16:9)",
+          "operation": "slideSizePreset"
+        },
+        "task8_4": {
+          "widthCm": 28.5,
+          "heightCm": 16.8,
+          "scaleToFit": true,
+          "operation": "slideSizeCustom"
+        },
+        "task8_5": {
+          "slideNo": 2,
+          "grayscaleView": true,
+          "illustrationStyle": "明るいグレースケール",
+          "operation": "grayscaleIllustration"
+        }
+      }
+    }
+  ]
+}

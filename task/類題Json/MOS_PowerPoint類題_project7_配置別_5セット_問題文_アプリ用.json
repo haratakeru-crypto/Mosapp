@@ -1,0 +1,146 @@
+{
+  "sourceFile": "Project7.pptx",
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット1_カフェ.pptx",
+      "projectId": 7,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは店舗運営における情報モラル研修資料を作成しています。\nスライド１にコメント「\"投稿前の事実確認を徹底する\"」を挿入します。"
+        },
+        {
+          "taskId": 2,
+          "description": "スライド１枚目の文字列「店舗運営支援」に、Webページ「\"https://cafe-guide.example.jp/\"」を表示するハイパーリンクを設定します。"
+        },
+        {
+          "taskId": 3,
+          "description": "スライド６の後ろに、文書「まとめ_カフェ.docx」のアウトラインを使用してスライドを挿入します。"
+        },
+        {
+          "taskId": 4,
+          "description": "スライドのフッターに、スライド番号と「\"cafe-guide.example.jp\"」をタイトルスライド以外に追加します。"
+        },
+        {
+          "taskId": 5,
+          "description": "５枚目の「事例A」と６枚目の「事例B」のフッターに「\"運営事例\"」と挿入します。他のスライドには表示しません。"
+        }
+      ]
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット2_医療.pptx",
+      "projectId": 7,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは医療機関の情報公開ガイドライン資料を作成しています。\nスライド１にコメント「\"患者情報の取扱注意を周知する\"」を挿入します。"
+        },
+        {
+          "taskId": 2,
+          "description": "スライド１枚目の文字列「健診情報支援」に、Webページ「\"https://clinic-info.example.jp/\"」を表示するハイパーリンクを設定します。"
+        },
+        {
+          "taskId": 3,
+          "description": "スライド６の後ろに、文書「まとめ_医療.docx」のアウトラインを使用してスライドを挿入します。"
+        },
+        {
+          "taskId": 4,
+          "description": "スライドのフッターに、スライド番号と「\"clinic-info.example.jp\"」をタイトルスライド以外に追加します。"
+        },
+        {
+          "taskId": 5,
+          "description": "５枚目の「事例C」と６枚目の「事例D」のフッターに「\"院内事例\"」と挿入します。他のスライドには表示しません。"
+        }
+      ]
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット3_製造.pptx",
+      "projectId": 7,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは製造現場の情報セキュリティ啓発資料を作成しています。\nスライド１にコメント「\"設備データの持ち出し禁止を再確認\"」を挿入します。"
+        },
+        {
+          "taskId": 2,
+          "description": "スライド１枚目の文字列「保全情報支援」に、Webページ「\"https://factory-safe.example.jp/\"」を表示するハイパーリンクを設定します。"
+        },
+        {
+          "taskId": 3,
+          "description": "スライド６の後ろに、文書「まとめ_製造.docx」のアウトラインを使用してスライドを挿入します。"
+        },
+        {
+          "taskId": 4,
+          "description": "スライドのフッターに、スライド番号と「\"factory-safe.example.jp\"」をタイトルスライド以外に追加します。"
+        },
+        {
+          "taskId": 5,
+          "description": "５枚目の「事例E」と６枚目の「事例F」のフッターに「\"安全事例\"」と挿入します。他のスライドには表示しません。"
+        }
+      ]
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット4_旅行.pptx",
+      "projectId": 7,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは旅行会社の顧客情報保護研修資料を作成しています。\nスライド１にコメント「\"予約情報の第三者提供を禁止\"」を挿入します。"
+        },
+        {
+          "taskId": 2,
+          "description": "スライド１枚目の文字列「予約情報支援」に、Webページ「\"https://tour-book.example.jp/\"」を表示するハイパーリンクを設定します。"
+        },
+        {
+          "taskId": 3,
+          "description": "スライド６の後ろに、文書「まとめ_旅行.docx」のアウトラインを使用してスライドを挿入します。"
+        },
+        {
+          "taskId": 4,
+          "description": "スライドのフッターに、スライド番号と「\"tour-book.example.jp\"」をタイトルスライド以外に追加します。"
+        },
+        {
+          "taskId": 5,
+          "description": "５枚目の「事例G」と６枚目の「事例H」のフッターに「\"対応事例\"」と挿入します。他のスライドには表示しません。"
+        }
+      ]
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット5_学習塾.pptx",
+      "projectId": 7,
+      "tasks": [
+        {
+          "taskId": 1,
+          "description": "あなたは学習塾の保護者向け情報モラル説明資料を作成しています。\nスライド１にコメント「\"成績情報の共有範囲を限定する\"」を挿入します。"
+        },
+        {
+          "taskId": 2,
+          "description": "スライド１枚目の文字列「学習記録支援」に、Webページ「\"https://juku-portal.example.jp/\"」を表示するハイパーリンクを設定します。"
+        },
+        {
+          "taskId": 3,
+          "description": "スライド６の後ろに、文書「まとめ_学習塾.docx」のアウトラインを使用してスライドを挿入します。"
+        },
+        {
+          "taskId": 4,
+          "description": "スライドのフッターに、スライド番号と「\"juku-portal.example.jp\"」をタイトルスライド以外に追加します。"
+        },
+        {
+          "taskId": 5,
+          "description": "５枚目の「事例I」と６枚目の「事例J」のフッターに「\"指導事例\"」と挿入します。他のスライドには表示しません。"
+        }
+      ]
+    }
+  ]
+}

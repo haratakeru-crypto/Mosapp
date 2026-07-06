@@ -92,6 +92,9 @@ namespace Ui.ViewModels
         private bool _isShutdownWaitOverlayVisible;
         private bool _showScoreButton;
         private bool _showPauseButton;
+        private bool _showVariantButton;
+        private int _variantSetNo = 1;
+        private bool _isVariantMode;
         private ProjectInfo _currentProject;
         private ExcelApp _sharedExcelApp;
 
@@ -221,6 +224,9 @@ namespace Ui.ViewModels
         /// </summary>
         public event EventHandler SharedExcelApplicationAttached;
 
+        /// <summary>教材↔類題の切替完了時に発火。AppBar が問題文を再読込する。</summary>
+        public event EventHandler VariantModeChanged;
+
         private DispatcherTimer _attachRetryTimer;
         private int _attachRetryAttempts;
         private const int MaxAttachRetryAttempts = 30;
@@ -237,6 +243,7 @@ namespace Ui.ViewModels
             ResetExamCommand = new RelayCommand(ExecuteResetExam);
             NextProjectCommand = new RelayCommand(ExecuteNextProject);
             UiTestCommand = new RelayCommand(ExecuteUiTest);
+            SwitchVariantModeCommand = new RelayCommand(ExecuteSwitchVariantMode);
     }
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
@@ -279,6 +286,7 @@ namespace Ui.ViewModels
         public ICommand ResetExamCommand { get; }
         public ICommand NextProjectCommand { get; }
         public ICommand UiTestCommand { get; }
+        public ICommand SwitchVariantModeCommand { get; }
 
     public bool IsExcelOverlayVisible
         {
@@ -597,6 +605,55 @@ namespace Ui.ViewModels
             get => _showPauseButton;
             set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
         }
+
+        /// <summary>類題切替ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        public bool ShowVariantButton
+        {
+            get => _showVariantButton;
+            set { _showVariantButton = value; OnPropertyChanged(nameof(ShowVariantButton)); }
+        }
+
+        /// <summary>類題セット番号（1〜5）。ComboBox と連動。</summary>
+        public int VariantSetNo
+        {
+            get => _variantSetNo;
+            set
+            {
+                int clamped = Math.Max(1, Math.Min(5, value));
+                if (_variantSetNo == clamped) return;
+                _variantSetNo = clamped;
+                OnPropertyChanged(nameof(VariantSetNo));
+                OnPropertyChanged(nameof(VariantSetIndex));
+                OnPropertyChanged(nameof(VariantButtonLabel));
+            }
+        }
+
+        /// <summary>ComboBox の SelectedIndex（0始まり）用。</summary>
+        public int VariantSetIndex
+        {
+            get => VariantSetNo - 1;
+            set => VariantSetNo = value + 1;
+        }
+
+        /// <summary>現在類題モードか（false = 教材）。</summary>
+        public bool IsVariantMode
+        {
+            get => _isVariantMode;
+            private set
+            {
+                if (_isVariantMode == value) return;
+                _isVariantMode = value;
+                OnPropertyChanged(nameof(IsVariantMode));
+                OnPropertyChanged(nameof(VariantButtonLabel));
+                OnPropertyChanged(nameof(CanSelectVariantSet));
+            }
+        }
+
+        /// <summary>教材モード中のみ類題セット ComboBox を変更可能。</summary>
+        public bool CanSelectVariantSet => !IsVariantMode;
+
+        /// <summary>アプリバー類題ボタンの表示文言。</summary>
+        public string VariantButtonLabel => IsVariantMode ? "教材へ" : $"類題{VariantSetNo}へ";
         
         public bool IsNextProjectVisible => CurrentProject != null && CurrentProject.ProjectNumber <= 10;
 
@@ -662,6 +719,8 @@ namespace Ui.ViewModels
 
             if (!WaitForExcelShutdownToCompleteBeforeOpeningProject())
                 return;
+
+            IsVariantMode = false;
 
             string filePath = GetProjectFilePath(projectId);
             ClearStaleSharedExcelBeforeOpen(filePath);
@@ -1229,6 +1288,141 @@ namespace Ui.ViewModels
             return string.Empty;
         }
 
+        private static JToken GetPracticeVariantEntry(JObject config, int groupId, int projectId, int variantSetNo)
+        {
+            var projectNode = config["practiceVariants"]?[groupId.ToString()]?[projectId.ToString()];
+            if (projectNode == null)
+                return null;
+
+            var bySet = projectNode[variantSetNo.ToString()];
+            if (bySet != null)
+                return bySet;
+
+            if (projectNode["excelFile"] != null && variantSetNo == 1)
+                return projectNode;
+
+            return null;
+        }
+
+        public string GetVariantProjectFilePath(int groupId, int projectId, int variantSetNo)
+        {
+            try
+            {
+                var config = LoadConfig();
+                var entry = GetPracticeVariantEntry(config, groupId, projectId, variantSetNo);
+                string configuredPath = entry?["excelFile"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(configuredPath))
+                    return configuredPath;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GetVariantProjectFilePath] config read failed: {ex.Message}");
+            }
+
+            return $"C:\\MOSTest\\Excel365\\Tab{groupId}\\PracticeVariant{variantSetNo}\\project{projectId}.xlsx";
+        }
+
+        public string GetActiveProjectFilePath(int groupId, int projectId)
+        {
+            if (IsVariantMode)
+                return GetVariantProjectFilePath(groupId, projectId, VariantSetNo);
+
+            return GetProjectFilePath(groupId, projectId);
+        }
+
+        /// <summary>AppBar の問題文 JSON ファイル名を返す。</summary>
+        public string GetTasksJsonFileName(int groupId)
+        {
+            if (!IsVariantMode)
+            {
+                return groupId switch
+                {
+                    1 => "MOS演習問題文一覧.json",
+                    2 => "MOS模擬試験①問題文一覧.json",
+                    3 => "MOS模擬試験②問題文一覧.json",
+                    _ => "MOS模擬アプリ問題文一覧.json"
+                };
+            }
+
+            try
+            {
+                int projectId = CurrentProject?.ProjectNumber ?? 0;
+                if (projectId > 0)
+                {
+                    var config = LoadConfig();
+                    var entry = GetPracticeVariantEntry(config, groupId, projectId, VariantSetNo);
+                    string tasksJson = entry?["tasksJson"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(tasksJson))
+                        return tasksJson;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GetTasksJsonFileName] config read failed: {ex.Message}");
+            }
+
+            return $"MOS演習問題文一覧_PracticeVariant{VariantSetNo}.json";
+        }
+
+        private string GetScoringLibraryName(JObject config, int groupId, int projectId)
+        {
+            var projectConfig = GetProjectConfig(config, groupId, projectId);
+            string libraryName = projectConfig?["library"]?.ToString();
+            if (string.IsNullOrWhiteSpace(libraryName))
+                libraryName = $"ExcelChecker{groupId}_{projectId}";
+
+            if (!IsVariantMode)
+                return libraryName;
+
+            var entry = GetPracticeVariantEntry(config, groupId, projectId, VariantSetNo);
+            string variantLibrary = entry?["library"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(variantLibrary))
+                return variantLibrary;
+
+            return $"{libraryName}_PV{VariantSetNo}";
+        }
+
+        private void ExecuteSwitchVariantMode(object parameter)
+        {
+            if (CurrentProject == null)
+            {
+                MessageBox.Show("プロジェクトが開始されていません。", "類題", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            int groupId = int.Parse(CurrentProject.Group.Replace("Group ", ""));
+            int projectId = CurrentProject.ProjectNumber;
+            bool targetVariantMode = !IsVariantMode;
+
+            string filePath = targetVariantMode
+                ? GetVariantProjectFilePath(groupId, projectId, VariantSetNo)
+                : GetProjectFilePath(groupId, projectId);
+
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                string modeLabel = targetVariantMode ? $"類題{VariantSetNo}" : "教材";
+                MessageBox.Show(
+                    $"ファイルが見つかりません。\n\n{modeLabel}:\n{filePath}",
+                    "類題切替",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            IsVariantMode = targetVariantMode;
+
+            CurrentProject = new ProjectInfo
+            {
+                Name = CurrentProject.Name,
+                FilePath = filePath,
+                Group = CurrentProject.Group,
+                ProjectNumber = CurrentProject.ProjectNumber
+            };
+
+            OpenExcelWorkbookAfterResetByShell(filePath);
+            VariantModeChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         private async void ExecuteScoreAsync(object parameter)
         {
             if (CurrentProject == null)
@@ -1248,11 +1442,7 @@ namespace Ui.ViewModels
             }
 
             int taskCount = projectConfig["taskCount"].Value<int>();
-            string libraryName = projectConfig["library"]?.ToString();
-            if (string.IsNullOrWhiteSpace(libraryName))
-            {
-                libraryName = $"ExcelChecker{groupId}_{projectId}";
-            }
+            string libraryName = GetScoringLibraryName(config, groupId, projectId);
 
             // 「採点中です」オーバーレイを表示
             Window scoringOverlay = null;

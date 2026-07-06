@@ -1,0 +1,4 @@
+﻿no,style_family,workbook,sheet_name,table_name,table_range,internal_name,name_local,gallery_name_mos
+1,中間,project1.xlsx,試験結果,結果内容,$A$4:$K$24,TableStyleMedium15,テーブル スタイル (中間) 15,白、テーブルスタイル（中間）15
+2,中間,project1.xlsx,担当者リスト,担当者一覧,$A$4:$H$19,TableStyleMedium21,テーブル スタイル (中間) 21,緑、テーブルスタイル（中間）21
+3,中間,project1.xlsx,イベント売上,文化祭売上,$A$4:$F$16,TableStyleMedium19,テーブル スタイル (中間) 19,水色、テーブルスタイル（中間）19

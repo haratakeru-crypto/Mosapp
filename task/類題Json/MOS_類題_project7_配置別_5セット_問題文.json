@@ -1,0 +1,311 @@
+{
+
+  "variantRules": {
+
+    "scope": "MOSスペシャリストの内容の範疇内。各タスクの操作種別を変更しない。",
+
+    "forbiddenSheetNames": ["売上報告", "受注明細", "下半期売上"],
+
+    "specificity": "シート名・セル範囲・並べ替え列・条件付き書式ルール・視覚書式種別・ヘッダー/フッター位置を具体指定。",
+
+    "perSetMustVary": [
+
+      "タスク7-2の並べ替え列と昇順/降順",
+
+      "タスク7-3の視覚的書式種別",
+
+      "タスク7-4の条件付き書式ルール",
+
+      "タスク7-5/7-6のヘッダー・フッター位置",
+
+      "タスク7-7の負の数表示形式"
+
+    ]
+
+  },
+
+  "excelUiNames": {
+
+    "build": "2508",
+
+    "showFormulas": "数式 → 数式の表示",
+
+    "sort": "データ → 並べ替え",
+
+    "iconSet": "ホーム → 条件付き書式 → アイコンセット",
+
+    "dataBar": "ホーム → 条件付き書式 → データバー",
+
+    "colorScale": "ホーム → 条件付き書式 → カラースケール",
+
+    "conditionalFormat": "ホーム → 条件付き書式 → セルの強調表示ルール",
+
+    "headerFooter": "挿入 → ヘッダーとフッター",
+
+    "accessibility": "ファイル → 情報 → 問題のチェック → アクセシビリティの問題のチェック"
+
+  },
+
+  "sourceFile": "project7.xlsx",
+
+  "projectId": 7,
+
+  "variantType": "layout",
+
+  "sets": [
+
+    {
+
+      "setNo": 1,
+
+      "theme": "カフェ",
+
+      "workbook": "MOS_類題_project7_配置別_セット1_カフェ.xlsx",
+
+      "problemStatement": "あなたはカフェの受注・売上データを管理・分析しています。",
+
+      "tasks": [
+
+        "タスク7-1　シート［注文集計報告］の数式を表示します。",
+
+        "タスク7-2　シート［仕入明細］の表を「商品名」の降順で並べ替え、「商品名」が同じ場合は「発注日」の昇順に並べ替えします。",
+
+        "タスク7-3　シート［後半期売上］のセル範囲【G6:L11】の「7月」から「12月」の列に、アイコンセット「3つの矢印（色分け）」を設定します。",
+
+        "タスク7-4　シート［後半期売上］のセル範囲【G6:L11】の「7月」から「12月」の列に、条件付き書式を使って「4800」と等しいセルに「濃い黄色の文字、黄色の背景」を設定します。",
+
+        "タスク7-5　シート「仕入明細」のヘッダーの右に現在の日付を挿入します。",
+
+        "タスク7-6　シート「仕入明細」のフッターの右に「P/N」を挿入してください。「P」はページ番号、「N」は総ページ数とします。",
+
+        "タスク7-7　ブックにアクセシビリティチェックを実行し、おすすめアクションから、負の数を赤色で表示する形式を選択します。正解の形式が複数ある場合があります。"
+
+      ],
+
+      "layout": {"sheetCount": 4, "sheets": ["注文集計報告", "仕入明細", "後半期売上", "日次補助"], "tableStart": "A3", "headerRow": 3, "tableShape": "5列×30行", "colWidths": [6, 28, 14, 14, 12], "rowHeights": {"title": 30, "header": 26, "data": 20}, "visual": "縦棒グラフ", "visualSheet": "日次補助", "format": "枠線なし＋交互薄ベージュ縞", "tabColor": "8B5A2B", "print": "縦向き"},
+
+      "taskParams": {
+
+        "task7_1": {"sheet": "注文集計報告", "displayFormulas": true, "otherSheetsFormulas": false},
+
+        "task7_2": {"sheet": "仕入明細", "sortKey1": "商品名", "order1": "desc", "sortKey2": "発注日", "order2": "asc", "dataRange": "A5:F20"},
+
+        "task7_3": {"sheet": "後半期売上", "range": "G6:L11", "months": "7月〜12月", "visualFormat": "iconSet", "iconSet": "3つの矢印（色分け）"},
+
+        "task7_4": {"sheet": "後半期売上", "cfRange": "G6:L11", "rule": "equalTo", "ruleUi": "値に等しい", "threshold": 4800, "format": "濃い黄色の文字、黄色の背景"},
+
+        "task7_5": {"sheet": "仕入明細", "headerPosition": "right", "headerPositionUi": "右", "content": "currentDate"},
+
+        "task7_6": {"sheet": "仕入明細", "footerPosition": "right", "footerPositionUi": "右", "content": "P/N"},
+
+        "task7_7": {"action": "負の数を赤色で表示", "actionUi": "赤字"}
+
+      }
+
+    },
+
+    {
+
+      "setNo": 2,
+
+      "theme": "医療",
+
+      "workbook": "MOS_類題_project7_配置別_セット2_医療.xlsx",
+
+      "problemStatement": "あなたは医療機関の診療・受付データを管理・分析しています。",
+
+      "tasks": [
+
+        "タスク7-1　シート［診療集計報告］の数式を表示します。",
+
+        "タスク7-2　シート［薬品発注明細］の表を「診療科」の昇順で並べ替え、「診療科」が同じ場合は「数量」の降順に並べ替えします。",
+
+        "タスク7-3　シート［診療後半期］のセル範囲【H7:M12】の「7月」から「12月」の列に、データバー「グラデーション青」のデータバーを設定します。",
+
+        "タスク7-4　シート［診療後半期］のセル範囲【H7:M12】の「7月」から「12月」の列に、条件付き書式を使って「1800」より小さいセルに「濃い黄色の文字、黄色の背景」を設定します。",
+
+        "タスク7-5　シート「薬品発注明細」のヘッダーの左に現在の日付を挿入します。",
+
+        "タスク7-6　シート「薬品発注明細」のフッターの左に「P/N」を挿入してください。「P」はページ番号、「N」は総ページ数とします。",
+
+        "タスク7-7　ブックにアクセシビリティチェックを実行し、おすすめアクションから、負の数を括弧で表示する形式を選択します。正解の形式が複数ある場合があります。"
+
+      ],
+
+      "layout": {"sheetCount": 5, "sheets": ["診療集計報告", "薬品発注明細", "診療後半期", "外来分析", "健診補助"], "tableStart": "B5", "headerRow": 5, "tableShape": "12列×8行", "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12], "rowHeights": {"title": 40, "header": 30, "data": 24}, "visual": "スパークライン", "visualSheet": "外来分析", "format": "上下太罫線＋ヘッダー濃緑白字", "tabColor": "38761D", "print": "横向き"},
+
+      "taskParams": {
+
+        "task7_1": {"sheet": "診療集計報告", "displayFormulas": true},
+
+        "task7_2": {"sheet": "薬品発注明細", "sortKey1": "診療科", "order1": "asc", "sortKey2": "数量", "order2": "desc", "dataRange": "B6:G22"},
+
+        "task7_3": {"sheet": "診療後半期", "range": "H7:M12", "months": "7月〜12月", "visualFormat": "dataBar", "dataBar": "グラデーション青"},
+
+        "task7_4": {"sheet": "診療後半期", "cfRange": "H7:M12", "rule": "lessThan", "ruleUi": "より小さい", "threshold": 1800, "format": "濃い黄色の文字、黄色の背景"},
+
+        "task7_5": {"sheet": "薬品発注明細", "headerPosition": "left", "headerPositionUi": "左", "content": "currentDate"},
+
+        "task7_6": {"sheet": "薬品発注明細", "footerPosition": "left", "footerPositionUi": "左", "content": "P/N"},
+
+        "task7_7": {"action": "負の数を括弧で表示", "actionUi": "カッコつき"}
+
+      }
+
+    },
+
+    {
+
+      "setNo": 3,
+
+      "theme": "製造",
+
+      "workbook": "MOS_類題_project7_配置別_セット3_製造.xlsx",
+
+      "problemStatement": "あなたは製造現場の受注・生産データを管理・分析しています。",
+
+      "tasks": [
+
+        "タスク7-1　シート［生産集計報告］の数式を表示します。",
+
+        "タスク7-2　シート［部品発注明細］の表を「部品名」の昇順で並べ替え、「部品名」が同じ場合は「納入数」の昇順に並べ替えします。",
+
+        "タスク7-3　シート［工場後半期］のセル範囲【E5:J10】の「7月」から「12月」の列に、カラースケール「緑・黄・赤のカラースケール」を設定します。",
+
+        "タスク7-4　シート［工場後半期］のセル範囲【E5:J10】の「7月」から「12月」の列に、条件付き書式を使って下位「2」項目のセルに「濃い黄色の文字、黄色の背景」を設定します。",
+
+        "タスク7-5　シート「部品発注明細」のヘッダーの中央に現在の日付を挿入します。",
+
+        "タスク7-6　シート「部品発注明細」のフッターの中央に「P/N」を挿入してください。「P」はページ番号、「N」は総ページ数とします。",
+
+        "タスク7-7　ブックにアクセシビリティチェックを実行し、おすすめアクションから、負の数に白い三角形を表示する形式を選択します。正解の形式が複数ある場合があります。"
+
+      ],
+
+      "layout": {"sheetCount": 4, "sheets": ["生産集計報告", "部品発注明細", "工場後半期", "品質補助"], "tableStart": "C4", "headerRow": 4, "tableShape": "8列×8行", "colWidths": [2, 14, 10, 10, 10, 10, 10, 12], "rowHeights": {"title": 34, "header": 26, "data": 20}, "visual": "円グラフ", "visualSheet": "品質補助", "format": "太罫線囲み＋ヘッダーオレンジ", "tabColor": "595959", "print": "縦向き"},
+
+      "taskParams": {
+
+        "task7_1": {"sheet": "生産集計報告", "displayFormulas": true},
+
+        "task7_2": {"sheet": "部品発注明細", "sortKey1": "部品名", "order1": "asc", "sortKey2": "納入数", "order2": "asc", "dataRange": "C5:H18"},
+
+        "task7_3": {"sheet": "工場後半期", "range": "E5:J10", "months": "7月〜12月", "visualFormat": "colorScale", "colorScale": "緑・黄・赤のカラースケール"},
+
+        "task7_4": {"sheet": "工場後半期", "cfRange": "E5:J10", "rule": "bottomItems", "ruleUi": "下位n項目", "bottomN": 2, "format": "濃い黄色の文字、黄色の背景"},
+
+        "task7_5": {"sheet": "部品発注明細", "headerPosition": "center", "headerPositionUi": "中央", "content": "currentDate"},
+
+        "task7_6": {"sheet": "部品発注明細", "footerPosition": "center", "footerPositionUi": "中央", "content": "P/N"},
+
+        "task7_7": {"action": "負の数に白い三角形を表示", "actionUi": "白三角△"}
+
+      }
+
+    },
+
+    {
+
+      "setNo": 4,
+
+      "theme": "旅行",
+
+      "workbook": "MOS_類題_project7_配置別_セット4_旅行.xlsx",
+
+      "problemStatement": "あなたは旅行会社の予約・売上データを管理・分析しています。",
+
+      "tasks": [
+
+        "タスク7-1　シート［予約集計報告］の数式を表示します。",
+
+        "タスク7-2　シート［航空券明細］の表を「出発空港」の降順で並べ替え、「出発空港」が同じ場合は「搭乗人数」の昇順に並べ替えします。",
+
+        "タスク7-3　シート［旅行後半期］のセル範囲【F8:K13】の「7月」から「12月」の列に、データバー「オレンジ」のデータバーを設定します。",
+
+        "タスク7-4　シート［旅行後半期］のセル範囲【F8:K13】の「7月」から「12月」の列に、条件付き書式を使って上位「3」項目のセルに「濃い黄色の文字、黄色の背景」を設定します。",
+
+        "タスク7-5　シート「航空券明細」のヘッダーの右に現在の日付を挿入します。",
+
+        "タスク7-6　シート「航空券明細」のフッターの左に「P/N」を挿入してください。「P」はページ番号、「N」は総ページ数とします。",
+
+        "タスク7-7　ブックにアクセシビリティチェックを実行し、おすすめアクションから、負の数に黒い三角形を表示する形式を選択します。正解の形式が複数ある場合があります。"
+
+      ],
+
+      "layout": {"sheetCount": 6, "sheets": ["予約集計報告", "航空券明細", "旅行後半期", "宿泊分析", "支店別", "観光地"], "tableStart": "D6", "headerRow": 6, "tableShape": "4列×6行×3", "colWidths": [3, 12, 14, 12, 12, 12, 12], "rowHeights": {"title": 30, "header": 22, "data": 20}, "visual": "シェイプ", "visualSheet": "観光地", "format": "縦縞＋スカイブルー薄罫線", "tabColor": "1F4E79", "print": "横向き"},
+
+      "taskParams": {
+
+        "task7_1": {"sheet": "予約集計報告", "displayFormulas": true},
+
+        "task7_2": {"sheet": "航空券明細", "sortKey1": "出発空港", "order1": "desc", "sortKey2": "搭乗人数", "order2": "asc", "dataRange": "D7:I20"},
+
+        "task7_3": {"sheet": "旅行後半期", "range": "F8:K13", "months": "7月〜12月", "visualFormat": "dataBar", "dataBar": "オレンジ"},
+
+        "task7_4": {"sheet": "旅行後半期", "cfRange": "F8:K13", "rule": "topItems", "ruleUi": "上位n項目", "topN": 3, "format": "濃い黄色の文字、黄色の背景"},
+
+        "task7_5": {"sheet": "航空券明細", "headerPosition": "right", "headerPositionUi": "右", "content": "currentDate"},
+
+        "task7_6": {"sheet": "航空券明細", "footerPosition": "left", "footerPositionUi": "左", "content": "P/N"},
+
+        "task7_7": {"action": "負の数に黒い三角形を表示", "actionUi": "黒三角▲"}
+
+      }
+
+    },
+
+    {
+
+      "setNo": 5,
+
+      "theme": "学習塾",
+
+      "workbook": "MOS_類題_project7_配置別_セット5_学習塾.xlsx",
+
+      "problemStatement": "あなたは学習塾の受講・収益データを管理・分析しています。",
+
+      "tasks": [
+
+        "タスク7-1　シート［受講集計報告］の数式を表示します。",
+
+        "タスク7-2　シート［教材発注明細］の表を「講座名」の降順で並べ替え、「講座名」が同じ場合は「冊数」の降順に並べ替えします。",
+
+        "タスク7-3　シート［塾後半期］のセル範囲【C9:H14】の「7月」から「12月」の列に、カラースケール「白・青のカラースケール」を設定します。",
+
+        "タスク7-4　シート［塾後半期］のセル範囲【C9:H14】の「7月」から「12月」の列に、条件付き書式を使って重複する値のセルに「濃い黄色の文字、黄色の背景」を設定します。",
+
+        "タスク7-5　シート「教材発注明細」のヘッダーの左に現在の日付を挿入します。",
+
+        "タスク7-6　シート「教材発注明細」のフッターの中央に「P/N」を挿入してください。「P」はページ番号、「N」は総ページ数とします。",
+
+        "タスク7-7　ブックにアクセシビリティチェックを実行し、おすすめアクションから、負の数に赤いマイナス記号を表示する形式を選択します。正解の形式が複数ある場合があります。"
+
+      ],
+
+      "layout": {"sheetCount": 5, "sheets": ["受講集計報告", "教材発注明細", "塾後半期", "模試分析", "教室別"], "tableStart": "A8", "headerRow": 7, "tableShape": "9列×12行", "colWidths": [8, 16, 10, 10, 10, 10, 10, 10, 14], "rowHeights": {"title": 40, "header": 28, "data": 22}, "visual": "画像枠", "visualSheet": "模試分析", "format": "交互縞＋下罫線＋ネイビー白字", "tabColor": "BF9000", "print": "縦向き"},
+
+      "taskParams": {
+
+        "task7_1": {"sheet": "受講集計報告", "displayFormulas": true},
+
+        "task7_2": {"sheet": "教材発注明細", "sortKey1": "講座名", "order1": "desc", "sortKey2": "冊数", "order2": "desc", "dataRange": "A9:F24"},
+
+        "task7_3": {"sheet": "塾後半期", "range": "C9:H14", "months": "7月〜12月", "visualFormat": "colorScale", "colorScale": "白・青のカラースケール"},
+
+        "task7_4": {"sheet": "塾後半期", "cfRange": "C9:H14", "rule": "duplicateValues", "ruleUi": "重複する値", "format": "濃い黄色の文字、黄色の背景"},
+
+        "task7_5": {"sheet": "教材発注明細", "headerPosition": "left", "headerPositionUi": "左", "content": "currentDate"},
+
+        "task7_6": {"sheet": "教材発注明細", "footerPosition": "center", "footerPositionUi": "中央", "content": "P/N"},
+
+        "task7_7": {"action": "負の数に赤いマイナス記号を表示", "actionUi": "赤いマイナス記号"}
+
+      }
+
+    }
+
+  ]
+
+}
+
+

@@ -96,6 +96,25 @@
                           Margin="0,0,15,0"
                           VerticalAlignment="Center"
                           FontSize="14"/>
+                <!-- 類題ボタンの表示 -->
+                <CheckBox Content="類題ボタン"
+                          IsChecked="{Binding ShowVariantButton, Mode=TwoWay}"
+                          Margin="0,0,15,0"
+                          VerticalAlignment="Center"
+                          FontSize="14"/>
+                <!-- 類題セット選択（教材モード中のみ変更可） -->
+                <ComboBox Width="90"
+                          Margin="0,0,15,0"
+                          VerticalAlignment="Center"
+                          FontSize="14"
+                          SelectedIndex="{Binding VariantSetIndex, Mode=TwoWay}"
+                          IsEnabled="{Binding CanSelectVariantSet}">
+                    <ComboBoxItem Content="類題1"/>
+                    <ComboBoxItem Content="類題2"/>
+                    <ComboBoxItem Content="類題3"/>
+                    <ComboBoxItem Content="類題4"/>
+                    <ComboBoxItem Content="類題5"/>
+                </ComboBox>
                 <!-- プロジェクトリセットボタン -->
                 <Button Name="ProjectResetButton"
                         Content="プロジェクトリセット"

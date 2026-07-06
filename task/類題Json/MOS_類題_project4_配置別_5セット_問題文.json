@@ -1,0 +1,438 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリストの内容の範疇内。各タスクの操作種別を変更しない。",
+    "dataPolicy": "シート名・データ内容は教材と似せず無作為に作成。実ブックと矛盾しないセル指定。",
+    "uiPolicy": "ビルド2508で利用可能なボタン・名称のみ使用（excelUiNames 参照）。",
+    "specificity": "セル範囲・列名・数値・グラフ種類を曖昧にせず具体指定。複数グラフがあるシートはシート名＋グラフ種類で指示。",
+    "forbiddenSheetNames": ["上半期売上", "５年間売上", "下半期売上", "商品別売上"],
+    "taskTypeVariation": {
+      "task4_1": "5セットでスパークライン種類を分散（縦棒・勝敗・折れ線）",
+      "task4_2": "5セットでグラフ種類を分散（積み上げ縦棒以外：簇状縦棒・折れ線・面・横棒・3-D縦棒）",
+      "task4_3": "5セットで円グラフ以外（ドーナツ・横棒・3-D縦棒・面）かつ配置も右側以外"
+    },
+    "perSetMustVary": [
+      "表の開始セル位置",
+      "ヘッダー行の位置",
+      "表の縦横比",
+      "列数と行数",
+      "列幅セット",
+      "行高（タイトル/ヘッダー/データ/集計）",
+      "シート数（3〜6）",
+      "視覚要素（縦棒グラフ/円グラフ/スパークライン/シェイプ/画像枠）",
+      "書式の傾向",
+      "シートタブ色",
+      "印刷向き・印刷タイトル行・改ページ",
+      "テーマと色"
+    ],
+    "mustNotReuseAcrossSets": [
+      "列幅セット",
+      "表開始セル",
+      "ヘッダー行の位置",
+      "視覚要素（グラフ種類）",
+      "書式パターン",
+      "task4_1のスパークライン種類（同一種類の連続使用を避ける）",
+      "task4_2のグラフ種類",
+      "task4_3のグラフ種類と配置"
+    ]
+  },
+  "excelUiNames": {
+    "build": "2508",
+    "sparkline": {
+      "tab": "挿入",
+      "group": "スパークライン",
+      "types": {
+        "column": "縦棒",
+        "line": "折れ線",
+        "winLoss": "勝敗"
+      }
+    },
+    "chart": {
+      "clusteredColumn": "挿入 → 縦棒/横棒 → 縦棒（簇状）",
+      "stackedColumn": "挿入 → おすすめのグラフ → 積み上げ縦棒",
+      "column3D": "挿入 → 縦棒/横棒 → 3-D縦棒",
+      "barClustered": "挿入 → 縦棒/横棒 → 横棒",
+      "line": "挿入 → 折れ線",
+      "area": "挿入 → 面",
+      "doughnut": "挿入 → 円グラフまたはドーナツ → ドーナツ",
+      "pie3D": "挿入 → 円グラフまたはドーナツ → 3-D円"
+    },
+    "altText": "グラフを選択 → 右クリック → 代替テキストの編集"
+  },
+  "sourceFile": "project4.xlsx",
+  "projectId": 4,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project4_配置別_セット1_カフェ.xlsx",
+      "problemStatement": "あなたはカフェの焙煎豆・ドリンクの売上実績を集計しています。",
+      "tasks": [
+        "タスク4-1　シート［焙煎豆売上］のセル範囲【I4:I9】に、データ範囲【B4:G9】をもとに、1月から6月の売上の大小を表す縦棒スパークラインを挿入します。",
+        "タスク4-2　シート［ラテ5年比較］のセル範囲【A5:C11】のデータをもとに、メニューごとに2019年度と2020年度の売上を比較する簇状縦棒グラフを作成します。",
+        "タスク4-3　シート［スイーツ下半期］のセル範囲【A6:A12】を項目、【H6:H12】を値とする、売上合計のドーナツグラフを作成します。凡例はスイーツ名を表示し、グラフをセル【A15】を起点に表の下へ移動します。",
+        "タスク4-4　シート［駅前店売上］の縦棒グラフに、代替テキスト「\"駅前店の来客グラフ\"」を追加します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["焙煎豆売上", "ラテ5年比較", "スイーツ下半期", "駅前店売上", "日次来客数"],
+        "tableStart": "A3",
+        "headerRow": 3,
+        "tableShape": "5列×30行（縦長）",
+        "colWidths": [6, 28, 14, 14, 12],
+        "rowHeights": {
+          "title": 30,
+          "header": 26,
+          "data": 20,
+          "summary": 28
+        },
+        "visual": "縦棒グラフ",
+        "visualSheet": "日次来客数",
+        "format": "枠線なし＋交互薄ベージュ縞",
+        "tabColor": "8B5A2B",
+        "print": "縦向き"
+      },
+      "taskParams": {
+        "task4_1": {
+          "sheet": "焙煎豆売上",
+          "sparklineColumn": "月次推移",
+          "location": "I4:I9",
+          "sourceData": "B4:G9",
+          "type": "column",
+          "typeUi": "縦棒",
+          "monthCount": 6,
+          "headerRow": 3,
+          "dataRows": "4:9"
+        },
+        "task4_2": {
+          "sheet": "ラテ5年比較",
+          "chartType": "clusteredColumn",
+          "chartTypeUi": "簇状縦棒",
+          "dataRange": "A5:C11",
+          "categoryColumn": "A",
+          "compareYears": ["2019", "2020"],
+          "seriesCount": 2,
+          "headerRow": 4
+        },
+        "task4_3": {
+          "sheet": "スイーツ下半期",
+          "chartType": "doughnut",
+          "chartTypeUi": "ドーナツ",
+          "categoryRange": "A6:A12",
+          "valueRange": "H6:H12",
+          "legendCategory": "スイーツ名",
+          "chartAnchor": "A15",
+          "chartPlacement": "below",
+          "chartPlacementJa": "表の下",
+          "headerRow": 5
+        },
+        "task4_4": {
+          "sheet": "駅前店売上",
+          "targetChartType": "column",
+          "targetChartTypeUi": "縦棒グラフ",
+          "altText": "駅前店の来客グラフ",
+          "chartPreExists": true,
+          "otherChartsOnSheet": []
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project4_配置別_セット2_医療.xlsx",
+      "problemStatement": "あなたは医療機関の外来・診療科の収益データを集計しています。",
+      "tasks": [
+        "タスク4-1　シート［外来月次］のセル範囲【K6:K11】に、データ範囲【D6:I11】をもとに、1月から6月の増減の状況を表す勝敗スパークラインを挿入します。",
+        "タスク4-2　シート［診療科5年］のセル範囲【B6:D12】のデータをもとに、診療科ごとに2018年度と2019年度の売上を比較する折れ線グラフを作成します。",
+        "タスク4-3　シート［処置実績］のセル範囲【C7:C13】を項目、【J7:J13】を値とする、売上合計の横棒グラフを作成します。凡例は処置名を表示し、グラフをセル【B3】を起点に表の上へ移動します。",
+        "タスク4-4　シート［本院収益］の円グラフに、代替テキスト「\"本院の月次収益グラフ\"」を追加します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["外来月次", "診療科5年", "処置実績", "本院収益", "待機分析"],
+        "tableStart": "B5",
+        "headerRow": 5,
+        "tableShape": "12列×8行（横長）",
+        "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12],
+        "rowHeights": {
+          "title": 40,
+          "header": 30,
+          "data": 24,
+          "summary": 34
+        },
+        "visual": "スパークライン",
+        "visualSheet": "待機分析",
+        "format": "上下太罫線＋ヘッダー濃緑白字",
+        "tabColor": "38761D",
+        "print": "横向き・印刷タイトル行$5:$6"
+      },
+      "taskParams": {
+        "task4_1": {
+          "sheet": "外来月次",
+          "sparklineColumn": "収益推移",
+          "location": "K6:K11",
+          "sourceData": "D6:I11",
+          "type": "winLoss",
+          "typeUi": "勝敗",
+          "monthCount": 6,
+          "headerRow": 5,
+          "dataRows": "6:11",
+          "dataNote": "前月比の増減（正負値）を入力"
+        },
+        "task4_2": {
+          "sheet": "診療科5年",
+          "chartType": "line",
+          "chartTypeUi": "折れ線",
+          "dataRange": "B6:D12",
+          "categoryColumn": "B",
+          "compareYears": ["2018", "2019"],
+          "seriesCount": 2,
+          "headerRow": 5
+        },
+        "task4_3": {
+          "sheet": "処置実績",
+          "chartType": "barClustered",
+          "chartTypeUi": "横棒",
+          "categoryRange": "C7:C13",
+          "valueRange": "J7:J13",
+          "legendCategory": "処置名",
+          "chartAnchor": "B3",
+          "chartPlacement": "above",
+          "chartPlacementJa": "表の上",
+          "headerRow": 6
+        },
+        "task4_4": {
+          "sheet": "本院収益",
+          "targetChartType": "pie",
+          "targetChartTypeUi": "円グラフ",
+          "altText": "本院の月次収益グラフ",
+          "chartPreExists": true,
+          "otherChartsOnSheet": ["column"]
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project4_配置別_セット3_製造.xlsx",
+      "problemStatement": "あなたは製造現場の部品出荷・工場別の生産売上を集計しています。",
+      "tasks": [
+        "タスク4-1　シート［部品出荷表］のセル範囲【I5:I10】に、データ範囲【E5:J10】をもとに、1月から6月の売上の推移を表す折れ線スパークラインを挿入します。",
+        "タスク4-2　シート［工場5年実績］のセル範囲【C5:E11】のデータをもとに、製品ごとに2020年度と2021年度の売上を比較する面グラフを作成します。",
+        "タスク4-3　シート［資材下半期］のセル範囲【B5:B11】を項目、【G5:G11】を値とする、売上合計の3-D縦棒グラフを作成します。凡例は資材名を表示し、グラフをセル【A3】を起点に表の左側へ移動します。",
+        "タスク4-4　シート［第一工場売上］の折れ線グラフに、代替テキスト「\"第一工場の稼働グラフ\"」を追加します。"
+      ],
+      "layout": {
+        "sheetCount": 4,
+        "sheets": ["部品出荷表", "工場5年実績", "資材下半期", "第一工場売上"],
+        "tableStart": "C4",
+        "headerRow": 4,
+        "tableShape": "8列×8行（正方）",
+        "colWidths": [2, 14, 10, 10, 10, 10, 10, 12],
+        "rowHeights": {
+          "title": 34,
+          "header": 26,
+          "data": 20,
+          "summary": 30
+        },
+        "visual": "円グラフ",
+        "visualSheet": "第一工場売上",
+        "format": "太罫線囲み＋ヘッダーオレンジ",
+        "tabColor": "595959",
+        "print": "縦向き・改ページ行14"
+      },
+      "taskParams": {
+        "task4_1": {
+          "sheet": "部品出荷表",
+          "sparklineColumn": "出荷推移",
+          "location": "I5:I10",
+          "sourceData": "E5:J10",
+          "type": "line",
+          "typeUi": "折れ線",
+          "monthCount": 6,
+          "headerRow": 4,
+          "dataRows": "5:10"
+        },
+        "task4_2": {
+          "sheet": "工場5年実績",
+          "chartType": "area",
+          "chartTypeUi": "面",
+          "dataRange": "C5:E11",
+          "categoryColumn": "C",
+          "compareYears": ["2020", "2021"],
+          "seriesCount": 2,
+          "headerRow": 4
+        },
+        "task4_3": {
+          "sheet": "資材下半期",
+          "chartType": "column3D",
+          "chartTypeUi": "3-D縦棒",
+          "categoryRange": "B5:B11",
+          "valueRange": "G5:G11",
+          "legendCategory": "資材名",
+          "chartAnchor": "A3",
+          "chartPlacement": "left",
+          "chartPlacementJa": "表の左側",
+          "headerRow": 4
+        },
+        "task4_4": {
+          "sheet": "第一工場売上",
+          "targetChartType": "line",
+          "targetChartTypeUi": "折れ線グラフ",
+          "altText": "第一工場の稼働グラフ",
+          "chartPreExists": true,
+          "otherChartsOnSheet": ["pie"]
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project4_配置別_セット4_旅行.xlsx",
+      "problemStatement": "あなたは旅行会社のツアー予約・支店別の売上実績を集計しています。",
+      "tasks": [
+        "タスク4-1　シート［ツアー予約月次］のセル範囲【H7:H12】に、データ範囲【E7:J12】をもとに、1月から6月の増減の状況を表す勝敗スパークラインを挿入します。",
+        "タスク4-2　シート［企画5年推移］のセル範囲【D7:F13】のデータをもとに、企画ごとに2019年度と2020年度の売上を比較する横棒グラフを作成します。",
+        "タスク4-3　シート［宿泊プラン］のセル範囲【D8:D14】を項目、【K8:K14】を値とする、売上合計の面グラフを作成します。凡例はプラン名を表示し、グラフをセル【B16】を起点に表の左下へ移動します。",
+        "タスク4-4　シート［銀座支店売上］の積み上げ縦棒グラフに、代替テキスト「\"銀座支店の予約グラフ\"」を追加します。"
+      ],
+      "layout": {
+        "sheetCount": 6,
+        "sheets": ["ツアー予約月次", "企画5年推移", "宿泊プラン", "銀座支店売上", "航空券補助", "観光地案内"],
+        "tableStart": "D6",
+        "headerRow": 6,
+        "tableShape": "4列×6行×3表（分割構造）",
+        "colWidths": [3, 12, 14, 12, 12, 12, 12],
+        "rowHeights": {
+          "title": 30,
+          "header": 22,
+          "data": 20,
+          "summary": 26
+        },
+        "visual": "シェイプ",
+        "visualSheet": "観光地案内",
+        "format": "縦縞＋スカイブルー薄罫線",
+        "tabColor": "1F4E79",
+        "print": "横向き"
+      },
+      "taskParams": {
+        "task4_1": {
+          "sheet": "ツアー予約月次",
+          "sparklineColumn": "予約推移",
+          "location": "H7:H12",
+          "sourceData": "E7:J12",
+          "type": "winLoss",
+          "typeUi": "勝敗",
+          "monthCount": 6,
+          "headerRow": 6,
+          "dataRows": "7:12",
+          "dataNote": "前月比の増減（正負値）を入力"
+        },
+        "task4_2": {
+          "sheet": "企画5年推移",
+          "chartType": "barClustered",
+          "chartTypeUi": "横棒",
+          "dataRange": "D7:F13",
+          "categoryColumn": "D",
+          "compareYears": ["2019", "2020"],
+          "seriesCount": 2,
+          "headerRow": 6
+        },
+        "task4_3": {
+          "sheet": "宿泊プラン",
+          "chartType": "area",
+          "chartTypeUi": "面",
+          "categoryRange": "D8:D14",
+          "valueRange": "K8:K14",
+          "legendCategory": "プラン名",
+          "chartAnchor": "B16",
+          "chartPlacement": "bottomLeft",
+          "chartPlacementJa": "表の左下",
+          "headerRow": 7
+        },
+        "task4_4": {
+          "sheet": "銀座支店売上",
+          "targetChartType": "stackedColumn",
+          "targetChartTypeUi": "積み上げ縦棒グラフ",
+          "altText": "銀座支店の予約グラフ",
+          "chartPreExists": true,
+          "otherChartsOnSheet": ["pie"]
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project4_配置別_セット5_学習塾.xlsx",
+      "problemStatement": "あなたは学習塾の講座受講・教室別の売上実績を集計しています。",
+      "tasks": [
+        "タスク4-1　シート［講座受講月次］のセル範囲【J8:J13】に、データ範囲【C8:H13】をもとに、1月から6月の売上の推移を表す折れ線スパークラインを挿入します。",
+        "タスク4-2　シート［講座5年比較］のセル範囲【A8:C14】のデータをもとに、講座ごとに2021年度と2022年度の売上を比較する3-D縦棒グラフを作成します。",
+        "タスク4-3　シート［教材販売］のセル範囲【A9:A15】を項目、【I9:I15】を値とする、売上合計のドーナツグラフを作成します。凡例は教材名を表示し、グラフをセル【K2】を起点にシート右上へ移動します。",
+        "タスク4-4　シート［池袋校売上］の面グラフに、代替テキスト「\"池袋校の受講グラフ\"」を追加します。"
+      ],
+      "layout": {
+        "sheetCount": 5,
+        "sheets": ["講座受講月次", "講座5年比較", "教材販売", "池袋校売上", "模試結果"],
+        "tableStart": "A8",
+        "headerRow": 7,
+        "tableShape": "9列×12行",
+        "colWidths": [8, 16, 10, 10, 10, 10, 10, 10, 14],
+        "rowHeights": {
+          "title": 40,
+          "header": 28,
+          "data": 22,
+          "summary": 32
+        },
+        "visual": "画像枠",
+        "visualSheet": "模試結果",
+        "format": "交互縞＋下罫線＋ネイビー白字",
+        "tabColor": "BF9000",
+        "print": "縦向き・印刷タイトル行$7:$8"
+      },
+      "taskParams": {
+        "task4_1": {
+          "sheet": "講座受講月次",
+          "sparklineColumn": "受講推移",
+          "location": "J8:J13",
+          "sourceData": "C8:H13",
+          "type": "line",
+          "typeUi": "折れ線",
+          "monthCount": 6,
+          "headerRow": 7,
+          "dataRows": "8:13"
+        },
+        "task4_2": {
+          "sheet": "講座5年比較",
+          "chartType": "column3D",
+          "chartTypeUi": "3-D縦棒",
+          "dataRange": "A8:C14",
+          "categoryColumn": "A",
+          "compareYears": ["2021", "2022"],
+          "seriesCount": 2,
+          "headerRow": 7
+        },
+        "task4_3": {
+          "sheet": "教材販売",
+          "chartType": "doughnut",
+          "chartTypeUi": "ドーナツ",
+          "categoryRange": "A9:A15",
+          "valueRange": "I9:I15",
+          "legendCategory": "教材名",
+          "chartAnchor": "K2",
+          "chartPlacement": "topRight",
+          "chartPlacementJa": "シート右上",
+          "headerRow": 8
+        },
+        "task4_4": {
+          "sheet": "池袋校売上",
+          "targetChartType": "area",
+          "targetChartTypeUi": "面グラフ",
+          "altText": "池袋校の受講グラフ",
+          "chartPreExists": true,
+          "otherChartsOnSheet": ["column"]
+        }
+      }
+    }
+  ]
+}

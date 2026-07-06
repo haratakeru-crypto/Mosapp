@@ -1,0 +1,142 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリストの内容の範疇内。関数の種類を変更しない。",
+    "forbiddenSheetNames": ["イベント売上", "試験結果", "申込一覧"],
+    "specificity": "基準セル・関数対象範囲・列名を【】で具体指定。",
+    "perSetMustVary": [
+      "タスク8-1の合計列名", "タスク8-2の集計対象列と指標名",
+      "タスク8-3の関数（COUNT/COUNTA）と対象列", "タスク8-4の集計列名と対象列",
+      "タスク8-5の列名と乱数範囲", "タスク8-6の関数（LEFT/RIGHT）と略称列・元列・文字数"
+    ]
+  },
+  "sourceFile": "project8.xlsx",
+  "projectId": 8,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project8_配置別_セット1_カフェ.xlsx",
+      "problemStatement": "あなたはカフェのイベント売上データを管理・分析しています。",
+      "tasks": [
+        "タスク8-1　シート［フェア売上］のセル【I6】の数式をコピーして、「催事合計」の列を完成させます。",
+        "タスク8-2　シート［フェア売上］のセル【K4】に、関数を使って「1日目」から「4日目」の「最高来客数」を算出します。",
+        "タスク8-3　シート［バリスタ検定］のセル【J5】に、関数を使って「参加者」を算出します。参加者は「実施回数」の個数で求めます。",
+        "タスク8-4　シート［バリスタ検定］のセル【K5】に、関数を使って「未記入者」を算出してください。未記入者は「実施回数」が入力されていないセルの個数で求めます。",
+        "タスク8-5　シート［バリスタ検定］の「班」の列に、関数を使って1から4までのランダムな番号を表示します。",
+        "タスク8-6　シート［バリスタ検定］の「店舗略称」の列に、関数を使って「店舗コード」の左端から2文字を表示します。",
+        "タスク8-7　シート［試飲申込］の「メニュー一覧」の列に、関数を使って「メニュー名」を重複しないように表示します。"
+      ],
+      "layout": {"sheetCount": 4, "sheets": ["フェア売上", "バリスタ検定", "試飲申込", "日次補助"], "tableStart": "A3", "headerRow": 3, "tableShape": "5列×25行", "colWidths": [6, 28, 14, 14, 12], "rowHeights": {"title": 30, "header": 26, "data": 20}, "visual": "縦棒グラフ", "visualSheet": "日次補助", "format": "枠線なし＋交互薄ベージュ縞", "tabColor": "8B5A2B", "print": "縦向き"},
+      "taskParams": {
+        "task8_1": {"sheet": "フェア売上", "sourceCell": "I6", "targetColumn": "催事合計", "fillDownRange": "I6:I15"},
+        "task8_2": {"sheet": "フェア売上", "targetCell": "K4", "function": "MAX", "range": "C4:F4", "dayLabels": "1日目〜4日目", "metric": "最高来客数"},
+        "task8_3": {"sheet": "バリスタ検定", "targetCell": "J5", "function": "COUNT", "resultLabel": "参加者", "countColumn": "実施回数", "countType": "numeric", "dataRange": "D6:D25"},
+        "task8_4": {"sheet": "バリスタ検定", "targetCell": "K5", "function": "COUNTBLANK", "resultLabel": "未記入者", "countColumn": "実施回数", "dataRange": "D6:D25"},
+        "task8_5": {"sheet": "バリスタ検定", "targetColumn": "班", "function": "RANDBETWEEN", "min": 1, "max": 4, "fillRange": "G6:G25"},
+        "task8_6": {"sheet": "バリスタ検定", "targetColumn": "店舗略称", "function": "LEFT", "sourceColumn": "店舗コード", "chars": 2, "fillRange": "H6:H25"},
+        "task8_7": {"sheet": "試飲申込", "targetColumn": "メニュー一覧", "function": "UNIQUE", "sourceColumn": "メニュー名", "sourceRange": "B5:B30"}
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project8_配置別_セット2_医療.xlsx",
+      "problemStatement": "あなたは医療機関の健診イベントデータを管理・分析しています。",
+      "tasks": [
+        "タスク8-1　シート［健診売上］のセル【H7】の数式をコピーして、「健診合計」の列を完成させます。",
+        "タスク8-2　シート［健診売上］のセル【J5】に、関数を使って「月」「火」「水」「木」の「最大件数」を算出します。",
+        "タスク8-3　シート［技能検定結果］のセル【I6】に、関数を使って「登録者」を算出します。登録者は「所属」に入力されている文字列の個数で求めます。",
+        "タスク8-4　シート［技能検定結果］のセル【J6】に、関数を使って「未登録者」を算出してください。未登録者は「所属」が入力されていないセルの個数で求めます。",
+        "タスク8-5　シート［技能検定結果］の「チーム」の列に、関数を使って1から9までのランダムな番号を表示します。",
+        "タスク8-6　シート［技能検定結果］の「診療科略称」の列に、関数を使って「職員ID」の右端から3文字を表示します。",
+        "タスク8-7　シート［健診申込］の「診療科一覧」の列に、関数を使って「診療科」を重複しないように表示します。"
+      ],
+      "layout": {"sheetCount": 5, "sheets": ["健診売上", "技能検定結果", "健診申込", "外来分析", "待機補助"], "tableStart": "B5", "headerRow": 5, "tableShape": "12列×8行", "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12], "rowHeights": {"title": 40, "header": 30, "data": 24}, "visual": "折れ線グラフ", "visualSheet": "外来分析", "format": "上下太罫線＋ヘッダー濃緑白字", "tabColor": "38761D", "print": "横向き"},
+      "taskParams": {
+        "task8_1": {"sheet": "健診売上", "sourceCell": "H7", "targetColumn": "健診合計", "fillDownRange": "H7:H16"},
+        "task8_2": {"sheet": "健診売上", "targetCell": "J5", "function": "MAX", "range": "D5:G5", "dayLabels": "月・火・水・木", "metric": "最大件数"},
+        "task8_3": {"sheet": "技能検定結果", "targetCell": "I6", "function": "COUNTA", "resultLabel": "登録者", "countColumn": "所属", "countType": "text", "dataRange": "C7:C28"},
+        "task8_4": {"sheet": "技能検定結果", "targetCell": "J6", "function": "COUNTBLANK", "resultLabel": "未登録者", "countColumn": "所属", "dataRange": "C7:C28"},
+        "task8_5": {"sheet": "技能検定結果", "targetColumn": "チーム", "function": "RANDBETWEEN", "min": 1, "max": 9, "fillRange": "H7:H28"},
+        "task8_6": {"sheet": "技能検定結果", "targetColumn": "診療科略称", "function": "RIGHT", "sourceColumn": "職員ID", "chars": 3, "fillRange": "I7:I28"},
+        "task8_7": {"sheet": "健診申込", "targetColumn": "診療科一覧", "function": "UNIQUE", "sourceColumn": "診療科", "sourceRange": "C6:C32"}
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project8_配置別_セット3_製造.xlsx",
+      "problemStatement": "あなたは製造現場の展示会売上データを管理・分析しています。",
+      "tasks": [
+        "タスク8-1　シート［展示会売上］のセル【G6】の数式をコピーして、「出荷合計」の列を完成させます。",
+        "タスク8-2　シート［展示会売上］のセル【I4】に、関数を使って「第1班」から「第4班」の「最高生産数」を算出します。",
+        "タスク8-3　シート［技能査定結果］のセル【H5】に、関数を使って「認定者」を算出します。認定者は「検定級」に入力されている文字列の個数で求めます。",
+        "タスク8-4　シート［技能査定結果］のセル【I5】に、関数を使って「未認定者」を算出してください。未認定者は「検定級」が入力されていないセルの個数で求めます。",
+        "タスク8-5　シート［技能査定結果］の「ライン」の列に、関数を使って1から3までのランダムな番号を表示します。",
+        "タスク8-6　シート［技能査定結果］の「工場略称」の列に、関数を使って「工場コード」の左端から3文字を表示します。",
+        "タスク8-7　シート［見学申込］の「製品一覧」の列に、関数を使って「製品名」を重複しないように表示します。"
+      ],
+      "layout": {"sheetCount": 4, "sheets": ["展示会売上", "技能査定結果", "見学申込", "品質補助"], "tableStart": "C4", "headerRow": 4, "tableShape": "8列×8行", "colWidths": [2, 14, 10, 10, 10, 10, 10, 12], "rowHeights": {"title": 34, "header": 26, "data": 20}, "visual": "円グラフ", "visualSheet": "品質補助", "format": "太罫線囲み＋ヘッダーオレンジ", "tabColor": "595959", "print": "縦向き"},
+      "taskParams": {
+        "task8_1": {"sheet": "展示会売上", "sourceCell": "G6", "targetColumn": "出荷合計", "fillDownRange": "G6:G14"},
+        "task8_2": {"sheet": "展示会売上", "targetCell": "I4", "function": "MAX", "range": "C4:F4", "dayLabels": "第1班〜第4班", "metric": "最高生産数"},
+        "task8_3": {"sheet": "技能査定結果", "targetCell": "H5", "function": "COUNTA", "resultLabel": "認定者", "countColumn": "検定級", "countType": "text", "dataRange": "D5:D22"},
+        "task8_4": {"sheet": "技能査定結果", "targetCell": "I5", "function": "COUNTBLANK", "resultLabel": "未認定者", "countColumn": "検定級", "dataRange": "D5:D22"},
+        "task8_5": {"sheet": "技能査定結果", "targetColumn": "ライン", "function": "RANDBETWEEN", "min": 1, "max": 3, "fillRange": "G5:G22"},
+        "task8_6": {"sheet": "技能査定結果", "targetColumn": "工場略称", "function": "LEFT", "sourceColumn": "工場コード", "chars": 3, "fillRange": "H5:H22"},
+        "task8_7": {"sheet": "見学申込", "targetColumn": "製品一覧", "function": "UNIQUE", "sourceColumn": "製品名", "sourceRange": "B5:B28"}
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project8_配置別_セット4_旅行.xlsx",
+      "problemStatement": "あなたは旅行会社のフェア売上データを管理・分析しています。",
+      "tasks": [
+        "タスク8-1　シート［旅行フェア売上］のセル【J8】の数式をコピーして、「週末合計」の列を完成させます。",
+        "タスク8-2　シート［旅行フェア売上］のセル【L6】に、関数を使って「金」「土」「日」「祝」の「最高予約数」を算出します。",
+        "タスク8-3　シート［語学検定結果］のセル【K7】に、関数を使って「来場者」を算出します。来場者は「評価点」の個数で求めます。",
+        "タスク8-4　シート［語学検定結果］のセル【L7】に、関数を使って「未応募者」を算出してください。未応募者は「評価点」が入力されていないセルの個数で求めます。",
+        "タスク8-5　シート［語学検定結果］の「ブロック」の列に、関数を使って1から7までのランダムな番号を表示します。",
+        "タスク8-6　シート［語学検定結果］の「支店略称」の列に、関数を使って「担当者ID」の右端から4文字を表示します。",
+        "タスク8-7　シート［ツアー申込］の「企画一覧」の列に、関数を使って「企画名」を重複しないように表示します。"
+      ],
+      "layout": {"sheetCount": 6, "sheets": ["旅行フェア売上", "語学検定結果", "ツアー申込", "宿泊", "支店", "観光地"], "tableStart": "D6", "headerRow": 6, "tableShape": "4列×6行×3", "colWidths": [3, 12, 14, 12, 12, 12, 12], "rowHeights": {"title": 30, "header": 22, "data": 20}, "visual": "シェイプ", "visualSheet": "観光地", "format": "縦縞＋スカイブルー薄罫線", "tabColor": "1F4E79", "print": "横向き"},
+      "taskParams": {
+        "task8_1": {"sheet": "旅行フェア売上", "sourceCell": "J8", "targetColumn": "週末合計", "fillDownRange": "J8:J17"},
+        "task8_2": {"sheet": "旅行フェア売上", "targetCell": "L6", "function": "MAX", "range": "E6:H6", "dayLabels": "金・土・日・祝", "metric": "最高予約数"},
+        "task8_3": {"sheet": "語学検定結果", "targetCell": "K7", "function": "COUNT", "resultLabel": "来場者", "countColumn": "評価点", "countType": "numeric", "dataRange": "G8:G30"},
+        "task8_4": {"sheet": "語学検定結果", "targetCell": "L7", "function": "COUNTBLANK", "resultLabel": "未応募者", "countColumn": "評価点", "dataRange": "G8:G30"},
+        "task8_5": {"sheet": "語学検定結果", "targetColumn": "ブロック", "function": "RANDBETWEEN", "min": 1, "max": 7, "fillRange": "I8:I30"},
+        "task8_6": {"sheet": "語学検定結果", "targetColumn": "支店略称", "function": "RIGHT", "sourceColumn": "担当者ID", "chars": 4, "fillRange": "J8:J30"},
+        "task8_7": {"sheet": "ツアー申込", "targetColumn": "企画一覧", "function": "UNIQUE", "sourceColumn": "企画名", "sourceRange": "D7:D35"}
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project8_配置別_セット5_学習塾.xlsx",
+      "problemStatement": "あなたは学習塾の模試イベントデータを管理・分析しています。",
+      "tasks": [
+        "タスク8-1　シート［模試フェア売上］のセル【K9】の数式をコピーして、「6日間合計」の列を完成させます。",
+        "タスク8-2　シート［模試フェア売上］のセル【M7】に、関数を使って「1限」から「4限」の「最高受講数」を算出します。",
+        "タスク8-3　シート［模擬試験結果］のセル【J8】に、関数を使って「受講登録者」を算出します。受講登録者は「コース」に入力されている文字列の個数で求めます。",
+        "タスク8-4　シート［模擬試験結果］のセル【K8】に、関数を使って「未登録者」を算出してください。未登録者は「コース」が入力されていないセルの個数で求めます。",
+        "タスク8-5　シート［模擬試験結果］の「ゼミ」の列に、関数を使って1から5までのランダムな番号を表示します。",
+        "タスク8-6　シート［模擬試験結果］の「教室略称」の列に、関数を使って「生徒番号」の右端から2文字を表示します。",
+        "タスク8-7　シート［講座申込］の「講座一覧」の列に、関数を使って「講座名」を重複しないように表示します。"
+      ],
+      "layout": {"sheetCount": 5, "sheets": ["模試フェア売上", "模擬試験結果", "講座申込", "教室別", "講師配置"], "tableStart": "A8", "headerRow": 7, "tableShape": "9列×12行", "colWidths": [8, 16, 10, 10, 10, 10, 10, 10, 14], "rowHeights": {"title": 40, "header": 28, "data": 22}, "visual": "画像枠", "visualSheet": "教室別", "format": "交互縞＋下罫線＋ネイビー白字", "tabColor": "BF9000", "print": "縦向き"},
+      "taskParams": {
+        "task8_1": {"sheet": "模試フェア売上", "sourceCell": "K9", "targetColumn": "6日間合計", "fillDownRange": "K9:K20"},
+        "task8_2": {"sheet": "模試フェア売上", "targetCell": "M7", "function": "MAX", "range": "C7:F7", "dayLabels": "1限〜4限", "metric": "最高受講数"},
+        "task8_3": {"sheet": "模擬試験結果", "targetCell": "J8", "function": "COUNTA", "resultLabel": "受講登録者", "countColumn": "コース", "countType": "text", "dataRange": "E9:E32"},
+        "task8_4": {"sheet": "模擬試験結果", "targetCell": "K8", "function": "COUNTBLANK", "resultLabel": "未登録者", "countColumn": "コース", "dataRange": "E9:E32"},
+        "task8_5": {"sheet": "模擬試験結果", "targetColumn": "ゼミ", "function": "RANDBETWEEN", "min": 1, "max": 5, "fillRange": "G9:G32"},
+        "task8_6": {"sheet": "模擬試験結果", "targetColumn": "教室略称", "function": "RIGHT", "sourceColumn": "生徒番号", "chars": 2, "fillRange": "I9:I32"},
+        "task8_7": {"sheet": "講座申込", "targetColumn": "講座一覧", "function": "UNIQUE", "sourceColumn": "講座名", "sourceRange": "B8:B35"}
+      }
+    }
+  ]
+}

@@ -1,0 +1,637 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project7の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "情報学習支援",
+      "rabbitway.jp",
+      "情報発信の責任を考える",
+      "参考事例",
+      "事例１",
+      "事例2",
+      "まとめ.docx"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "hyperlinkUrl": "https://rabbitway.jp/",
+      "footerDomain": "rabbitway.jp",
+      "commentText": "情報発信の責任を考える",
+      "hyperlinkPhrase": "情報学習支援",
+      "caseFooter": "参考事例",
+      "outlineDoc": "まとめ.docx"
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project7.pptx",
+  "projectId": 7,
+  "variantType": "layout",
+  "taskCount": 5,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたは店舗運営における情報モラル研修資料を作成しています。",
+      "tasks": [
+        "タスク7-1　スライド１にコメント「\"投稿前の事実確認を徹底する\"」を挿入します。",
+        "タスク7-2　スライド１枚目の文字列「店舗運営支援」に、Webページ「\"https://cafe-guide.example.jp/\"」を表示するハイパーリンクを設定します。",
+        "タスク7-3　スライド６の後ろに、文書「まとめ_カフェ.docx」のアウトラインを使用してスライドを挿入します。",
+        "タスク7-4　スライドのフッターに、スライド番号と「\"cafe-guide.example.jp\"」をタイトルスライド以外に追加します。",
+        "タスク7-5　５枚目の「事例A」と６枚目の「事例B」のフッターに「\"運営事例\"」と挿入します。他のスライドには表示しません。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "情報モラルの基本",
+            "objects": [
+              "店舗運営支援"
+            ],
+            "notes": "7-1: コメント「投稿前の事実確認を徹底する」未投稿 / 7-2: ハイパーリンク未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "発信のルール"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "個人情報の取扱"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例の背景"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例A",
+            "notes": "7-5: フッター「運営事例」未設定（事例スライド）"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例B",
+            "notes": "7-5: フッター「運営事例」未設定 / 7-3: この後にアウトライン挿入予定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "確認のポイント"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "今後の取組",
+            "notes": "7-3: スライド6の後に「まとめ_カフェ.docx」から挿入する想定（未挿入）"
+          }
+        ],
+        "preTaskState": {
+          "commentOnSlide1": false,
+          "hyperlinkOnSlide1": false,
+          "outlineInserted": false,
+          "globalFooterApplied": false,
+          "caseFooterApplied": false
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "slideNo": 1,
+          "commentText": "投稿前の事実確認を徹底する",
+          "operation": "insertComment"
+        },
+        "task7_2": {
+          "slideNo": 1,
+          "hyperlinkPhrase": "店舗運営支援",
+          "hyperlinkUrl": "https://cafe-guide.example.jp/",
+          "operation": "insertHyperlink"
+        },
+        "task7_3": {
+          "insertAfterSlide": 6,
+          "outlineDoc": "まとめ_カフェ.docx",
+          "operation": "insertOutlineSlides"
+        },
+        "task7_4": {
+          "footerDomain": "cafe-guide.example.jp",
+          "excludeTitleSlide": true,
+          "slideNumber": true,
+          "operation": "headerFooterAll"
+        },
+        "task7_5": {
+          "slideNos": [
+            5,
+            6
+          ],
+          "slideTitles": [
+            "事例A",
+            "事例B"
+          ],
+          "footerText": "運営事例",
+          "operation": "headerFooterSelected"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは医療機関の情報公開ガイドライン資料を作成しています。",
+      "tasks": [
+        "タスク7-1　スライド１にコメント「\"患者情報の取扱注意を周知する\"」を挿入します。",
+        "タスク7-2　スライド１枚目の文字列「健診情報支援」に、Webページ「\"https://clinic-info.example.jp/\"」を表示するハイパーリンクを設定します。",
+        "タスク7-3　スライド６の後ろに、文書「まとめ_医療.docx」のアウトラインを使用してスライドを挿入します。",
+        "タスク7-4　スライドのフッターに、スライド番号と「\"clinic-info.example.jp\"」をタイトルスライド以外に追加します。",
+        "タスク7-5　５枚目の「事例C」と６枚目の「事例D」のフッターに「\"院内事例\"」と挿入します。他のスライドには表示しません。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "情報公開の基本",
+            "objects": [
+              "健診情報支援"
+            ],
+            "notes": "7-1: コメント「患者情報の取扱注意を周知する」未投稿 / 7-2: ハイパーリンク未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "記録の管理"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "同意の取得"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例の背景"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例C",
+            "notes": "7-5: フッター「院内事例」未設定（事例スライド）"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例D",
+            "notes": "7-5: フッター「院内事例」未設定 / 7-3: この後にアウトライン挿入予定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "監査のポイント"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "改善計画",
+            "notes": "7-3: スライド6の後に「まとめ_医療.docx」から挿入する想定（未挿入）"
+          }
+        ],
+        "preTaskState": {
+          "commentOnSlide1": false,
+          "hyperlinkOnSlide1": false,
+          "outlineInserted": false,
+          "globalFooterApplied": false,
+          "caseFooterApplied": false
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "slideNo": 1,
+          "commentText": "患者情報の取扱注意を周知する",
+          "operation": "insertComment"
+        },
+        "task7_2": {
+          "slideNo": 1,
+          "hyperlinkPhrase": "健診情報支援",
+          "hyperlinkUrl": "https://clinic-info.example.jp/",
+          "operation": "insertHyperlink"
+        },
+        "task7_3": {
+          "insertAfterSlide": 6,
+          "outlineDoc": "まとめ_医療.docx",
+          "operation": "insertOutlineSlides"
+        },
+        "task7_4": {
+          "footerDomain": "clinic-info.example.jp",
+          "excludeTitleSlide": true,
+          "slideNumber": true,
+          "operation": "headerFooterAll"
+        },
+        "task7_5": {
+          "slideNos": [
+            5,
+            6
+          ],
+          "slideTitles": [
+            "事例C",
+            "事例D"
+          ],
+          "footerText": "院内事例",
+          "operation": "headerFooterSelected"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは製造現場の情報セキュリティ啓発資料を作成しています。",
+      "tasks": [
+        "タスク7-1　スライド１にコメント「\"設備データの持ち出し禁止を再確認\"」を挿入します。",
+        "タスク7-2　スライド１枚目の文字列「保全情報支援」に、Webページ「\"https://factory-safe.example.jp/\"」を表示するハイパーリンクを設定します。",
+        "タスク7-3　スライド６の後ろに、文書「まとめ_製造.docx」のアウトラインを使用してスライドを挿入します。",
+        "タスク7-4　スライドのフッターに、スライド番号と「\"factory-safe.example.jp\"」をタイトルスライド以外に追加します。",
+        "タスク7-5　５枚目の「事例E」と６枚目の「事例F」のフッターに「\"安全事例\"」と挿入します。他のスライドには表示しません。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "情報セキュリティの基本",
+            "objects": [
+              "保全情報支援"
+            ],
+            "notes": "7-1: コメント「設備データの持ち出し禁止を再確認」未投稿 / 7-2: ハイパーリンク未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "アクセス制御"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "ログの保管"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例の背景"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例E",
+            "notes": "7-5: フッター「安全事例」未設定（事例スライド）"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例F",
+            "notes": "7-5: フッター「安全事例」未設定 / 7-3: この後にアウトライン挿入予定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "点検のポイント"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "教育計画",
+            "notes": "7-3: スライド6の後に「まとめ_製造.docx」から挿入する想定（未挿入）"
+          }
+        ],
+        "preTaskState": {
+          "commentOnSlide1": false,
+          "hyperlinkOnSlide1": false,
+          "outlineInserted": false,
+          "globalFooterApplied": false,
+          "caseFooterApplied": false
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "slideNo": 1,
+          "commentText": "設備データの持ち出し禁止を再確認",
+          "operation": "insertComment"
+        },
+        "task7_2": {
+          "slideNo": 1,
+          "hyperlinkPhrase": "保全情報支援",
+          "hyperlinkUrl": "https://factory-safe.example.jp/",
+          "operation": "insertHyperlink"
+        },
+        "task7_3": {
+          "insertAfterSlide": 6,
+          "outlineDoc": "まとめ_製造.docx",
+          "operation": "insertOutlineSlides"
+        },
+        "task7_4": {
+          "footerDomain": "factory-safe.example.jp",
+          "excludeTitleSlide": true,
+          "slideNumber": true,
+          "operation": "headerFooterAll"
+        },
+        "task7_5": {
+          "slideNos": [
+            5,
+            6
+          ],
+          "slideTitles": [
+            "事例E",
+            "事例F"
+          ],
+          "footerText": "安全事例",
+          "operation": "headerFooterSelected"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは旅行会社の顧客情報保護研修資料を作成しています。",
+      "tasks": [
+        "タスク7-1　スライド１にコメント「\"予約情報の第三者提供を禁止\"」を挿入します。",
+        "タスク7-2　スライド１枚目の文字列「予約情報支援」に、Webページ「\"https://tour-book.example.jp/\"」を表示するハイパーリンクを設定します。",
+        "タスク7-3　スライド６の後ろに、文書「まとめ_旅行.docx」のアウトラインを使用してスライドを挿入します。",
+        "タスク7-4　スライドのフッターに、スライド番号と「\"tour-book.example.jp\"」をタイトルスライド以外に追加します。",
+        "タスク7-5　５枚目の「事例G」と６枚目の「事例H」のフッターに「\"対応事例\"」と挿入します。他のスライドには表示しません。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "顧客情報の基本",
+            "objects": [
+              "予約情報支援"
+            ],
+            "notes": "7-1: コメント「予約情報の第三者提供を禁止」未投稿 / 7-2: ハイパーリンク未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "予約データ管理"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "クレーム対応"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例の背景"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例G",
+            "notes": "7-5: フッター「対応事例」未設定（事例スライド）"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例H",
+            "notes": "7-5: フッター「対応事例」未設定 / 7-3: この後にアウトライン挿入予定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "確認のポイント"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "運用改善",
+            "notes": "7-3: スライド6の後に「まとめ_旅行.docx」から挿入する想定（未挿入）"
+          }
+        ],
+        "preTaskState": {
+          "commentOnSlide1": false,
+          "hyperlinkOnSlide1": false,
+          "outlineInserted": false,
+          "globalFooterApplied": false,
+          "caseFooterApplied": false
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "slideNo": 1,
+          "commentText": "予約情報の第三者提供を禁止",
+          "operation": "insertComment"
+        },
+        "task7_2": {
+          "slideNo": 1,
+          "hyperlinkPhrase": "予約情報支援",
+          "hyperlinkUrl": "https://tour-book.example.jp/",
+          "operation": "insertHyperlink"
+        },
+        "task7_3": {
+          "insertAfterSlide": 6,
+          "outlineDoc": "まとめ_旅行.docx",
+          "operation": "insertOutlineSlides"
+        },
+        "task7_4": {
+          "footerDomain": "tour-book.example.jp",
+          "excludeTitleSlide": true,
+          "slideNumber": true,
+          "operation": "headerFooterAll"
+        },
+        "task7_5": {
+          "slideNos": [
+            5,
+            6
+          ],
+          "slideTitles": [
+            "事例G",
+            "事例H"
+          ],
+          "footerText": "対応事例",
+          "operation": "headerFooterSelected"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project7_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは学習塾の保護者向け情報モラル説明資料を作成しています。",
+      "tasks": [
+        "タスク7-1　スライド１にコメント「\"成績情報の共有範囲を限定する\"」を挿入します。",
+        "タスク7-2　スライド１枚目の文字列「学習記録支援」に、Webページ「\"https://juku-portal.example.jp/\"」を表示するハイパーリンクを設定します。",
+        "タスク7-3　スライド６の後ろに、文書「まとめ_学習塾.docx」のアウトラインを使用してスライドを挿入します。",
+        "タスク7-4　スライドのフッターに、スライド番号と「\"juku-portal.example.jp\"」をタイトルスライド以外に追加します。",
+        "タスク7-5　５枚目の「事例I」と６枚目の「事例J」のフッターに「\"指導事例\"」と挿入します。他のスライドには表示しません。"
+      ],
+      "layout": {
+        "slideCount": 8,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "保護者連絡の基本",
+            "objects": [
+              "学習記録支援"
+            ],
+            "notes": "7-1: コメント「成績情報の共有範囲を限定する」未投稿 / 7-2: ハイパーリンク未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "成績データ管理"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "写真の掲載"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例の背景"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例I",
+            "notes": "7-5: フッター「指導事例」未設定（事例スライド）"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "事例J",
+            "notes": "7-5: フッター「指導事例」未設定 / 7-3: この後にアウトライン挿入予定"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "確認のポイント"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "年度計画",
+            "notes": "7-3: スライド6の後に「まとめ_学習塾.docx」から挿入する想定（未挿入）"
+          }
+        ],
+        "preTaskState": {
+          "commentOnSlide1": false,
+          "hyperlinkOnSlide1": false,
+          "outlineInserted": false,
+          "globalFooterApplied": false,
+          "caseFooterApplied": false
+        }
+      },
+      "taskParams": {
+        "task7_1": {
+          "slideNo": 1,
+          "commentText": "成績情報の共有範囲を限定する",
+          "operation": "insertComment"
+        },
+        "task7_2": {
+          "slideNo": 1,
+          "hyperlinkPhrase": "学習記録支援",
+          "hyperlinkUrl": "https://juku-portal.example.jp/",
+          "operation": "insertHyperlink"
+        },
+        "task7_3": {
+          "insertAfterSlide": 6,
+          "outlineDoc": "まとめ_学習塾.docx",
+          "operation": "insertOutlineSlides"
+        },
+        "task7_4": {
+          "footerDomain": "juku-portal.example.jp",
+          "excludeTitleSlide": true,
+          "slideNumber": true,
+          "operation": "headerFooterAll"
+        },
+        "task7_5": {
+          "slideNos": [
+            5,
+            6
+          ],
+          "slideTitles": [
+            "事例I",
+            "事例J"
+          ],
+          "footerText": "指導事例",
+          "operation": "headerFooterSelected"
+        }
+      }
+    }
+  ]
+}

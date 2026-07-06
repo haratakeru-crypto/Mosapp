@@ -140,6 +140,9 @@ namespace MOSExcelMogiApp
             
             // プロジェクト変更時に問題文を更新するイベントを購読
             _viewModel.CurrentProjectChanged += OnCurrentProjectChanged;
+
+            // 教材↔類題切替時に問題文を再読込
+            _viewModel.VariantModeChanged += OnVariantModeChanged;
             
             // レビューページ表示要求イベントを購読
             _viewModel.OpenReviewPageRequested += OnOpenReviewPageRequested;
@@ -669,13 +672,15 @@ namespace MOSExcelMogiApp
         {
             try
             {
-                string jsonFileName = groupId switch
-                {
-                    1 => "MOS演習問題文一覧.json",        // GroupId=1 → 演習タブ
-                    2 => "MOS模擬試験①問題文一覧.json",  // GroupId=2 → 模試①タブ（通常はCSVから読み込むが、フォールバック用）
-                    3 => "MOS模擬試験②問題文一覧.json",  // GroupId=3 → 模試②タブ
-                    _ => "MOS模擬アプリ問題文一覧.json"
-                };
+                string jsonFileName = _viewModel != null
+                    ? _viewModel.GetTasksJsonFileName(groupId)
+                    : groupId switch
+                    {
+                        1 => "MOS演習問題文一覧.json",
+                        2 => "MOS模擬試験①問題文一覧.json",
+                        3 => "MOS模擬試験②問題文一覧.json",
+                        _ => "MOS模擬アプリ問題文一覧.json"
+                    };
                 
                 string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", jsonFileName);
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Loading tasks from: {jsonFileName} (GroupId: {groupId})");
@@ -1740,6 +1745,15 @@ namespace MOSExcelMogiApp
             }
         }
 
+        private void OnVariantModeChanged(object sender, EventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("[AppBarWindow] OnVariantModeChanged: reloading tasks");
+            LoadTasks();
+            _currentTaskId = 1;
+            UpdateTaskDisplay();
+            WriteCurrentTaskFile();
+        }
+
         private void OnOpenReviewPageRequested(object sender, EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] OnOpenReviewPageRequested called");
@@ -1773,6 +1787,7 @@ namespace MOSExcelMogiApp
             {
                 _viewModel.ExamEnded -= OnExamEnded;
                 _viewModel.CurrentProjectChanged -= OnCurrentProjectChanged;
+                _viewModel.VariantModeChanged -= OnVariantModeChanged;
                 _viewModel.OpenReviewPageRequested -= OnOpenReviewPageRequested;
                 _viewModel.SharedExcelApplicationAttached -= OnSharedExcelApplicationAttached;
             }

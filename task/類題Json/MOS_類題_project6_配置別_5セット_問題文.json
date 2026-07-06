@@ -1,0 +1,116 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリストの内容の範疇内。各タスクの操作種別を変更しない。",
+    "forbiddenSheetNames": ["売上一覧", "販売実績"],
+    "specificity": "セル範囲・固定行/列・リンクURL・通貨列・プロパティ項目を具体指定。",
+    "perSetMustVary": ["タスク6-1の固定種別", "タスク6-3の小数点表示", "タスク6-4のプロパティ項目"]
+  },
+  "excelUiNames": {
+    "build": "2508",
+    "freezePanes": "表示 → ウィンドウ枠の固定",
+    "hyperlink": "挿入 → リンク",
+    "currencyFormat": "ホーム → 数値 → 通貨",
+    "documentProperties": "ファイル → 情報 → プロパティ",
+    "propertyFields": ["タイトル", "件名", "作成者", "会社", "カテゴリ", "キーワード", "コメント", "状態"]
+  },
+  "sourceFile": "project6.xlsx",
+  "projectId": 6,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project6_配置別_セット1_カフェ.xlsx",
+      "problemStatement": "あなたはカフェの注文・月次実績データを管理しています。",
+      "tasks": [
+        "タスク6-1　シート［メニュー注文一覧］の1～6行目が、常に表示されるように設定します。",
+        "タスク6-2　シート［メニュー注文一覧］の文字列「本日のおすすめブレンド」に、「\"https://cafe-example.jp/menu\"」のハイパーリンクを挿入します。",
+        "タスク6-3　シート［店舗月次実績］のセル範囲【C6:H11】の数値の書式を「通貨」に変更します。小数点は表示されないようにします。",
+        "タスク6-4　プロパティの状態に「\"確定版\"」と設定します。"
+      ],
+      "layout": {"sheetCount": 4, "sheets": ["メニュー注文一覧", "店舗月次実績", "日次来客", "仕入補助"], "tableStart": "A3", "headerRow": 3, "tableShape": "5列×25行", "colWidths": [6, 28, 14, 14, 12], "rowHeights": {"title": 30, "header": 26, "data": 20}, "visual": "縦棒グラフ", "visualSheet": "日次来客", "format": "枠線なし＋交互薄ベージュ縞", "tabColor": "8B5A2B", "print": "縦向き"},
+      "taskParams": {
+        "task6_1": {"sheet": "メニュー注文一覧", "freezeType": "rows", "freezeRows": "1:6", "freezeAt": "A7"},
+        "task6_2": {"sheet": "メニュー注文一覧", "linkText": "本日のおすすめブレンド", "hyperlink": "https://cafe-example.jp/menu"},
+        "task6_3": {"sheet": "店舗月次実績", "currencyRange": "C6:H11", "months": "1月〜6月", "decimalPlaces": 0, "showDecimals": false},
+        "task6_4": {"property": "status", "propertyUi": "状態", "value": "確定版"}
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project6_配置別_セット2_医療.xlsx",
+      "problemStatement": "あなたは医療機関の外来・診療実績データを管理しています。",
+      "tasks": [
+        "タスク6-1　シート［外来受付一覧］のA列からB列が、常に表示されるように設定します。",
+        "タスク6-2　シート［外来受付一覧］の文字列「オンライン予約はこちら」に、「\"https://clinic-example.jp/reserve\"」のハイパーリンクを挿入します。",
+        "タスク6-3　シート［月次診療実績］のセル範囲【D7:I12】の数値の書式を「通貨」に変更します。小数点以下1桁まで表示されるようにします。",
+        "タスク6-4　プロパティの作成者に「\"診療事務課\"」と設定します。"
+      ],
+      "layout": {"sheetCount": 5, "sheets": ["外来受付一覧", "月次診療実績", "診療科別", "待機分析", "健診補助"], "tableStart": "B5", "headerRow": 5, "tableShape": "12列×8行", "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12], "rowHeights": {"title": 40, "header": 30, "data": 24}, "visual": "折れ線グラフ", "visualSheet": "診療科別", "format": "上下太罫線＋ヘッダー濃緑白字", "tabColor": "38761D", "print": "横向き"},
+      "taskParams": {
+        "task6_1": {"sheet": "外来受付一覧", "freezeType": "columns", "freezeCols": "A:B", "freezeAt": "C6"},
+        "task6_2": {"sheet": "外来受付一覧", "linkText": "オンライン予約はこちら", "hyperlink": "https://clinic-example.jp/reserve"},
+        "task6_3": {"sheet": "月次診療実績", "currencyRange": "D7:I12", "months": "1月〜6月", "decimalPlaces": 1, "showDecimals": true},
+        "task6_4": {"property": "author", "propertyUi": "作成者", "value": "診療事務課"}
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project6_配置別_セット3_製造.xlsx",
+      "problemStatement": "あなたは製造現場の受注・月次生産データを管理しています。",
+      "tasks": [
+        "タスク6-1　シート［製造受注一覧］の1～3行目が、常に表示されるように設定します。",
+        "タスク6-2　シート［製造受注一覧］の文字列「部品仕様データベース」に、「\"https://factory-example.jp/parts\"」のハイパーリンクを挿入します。",
+        "タスク6-3　シート［工場月次実績］のセル範囲【E5:J10】の数値の書式を「通貨」に変更します。小数点以下2桁まで表示されるようにします。",
+        "タスク6-4　プロパティの会社に「\"サンプル製造株式会社\"」と設定します。"
+      ],
+      "layout": {"sheetCount": 4, "sheets": ["製造受注一覧", "工場月次実績", "品質検査", "出荷補助"], "tableStart": "C4", "headerRow": 4, "tableShape": "8列×8行", "colWidths": [2, 14, 10, 10, 10, 10, 10, 12], "rowHeights": {"title": 34, "header": 26, "data": 20}, "visual": "円グラフ", "visualSheet": "品質検査", "format": "太罫線囲み＋ヘッダーオレンジ", "tabColor": "595959", "print": "縦向き"},
+      "taskParams": {
+        "task6_1": {"sheet": "製造受注一覧", "freezeType": "rows", "freezeRows": "1:3", "freezeAt": "A4"},
+        "task6_2": {"sheet": "製造受注一覧", "linkText": "部品仕様データベース", "hyperlink": "https://factory-example.jp/parts"},
+        "task6_3": {"sheet": "工場月次実績", "currencyRange": "E5:J10", "months": "1月〜6月", "decimalPlaces": 2, "showDecimals": true},
+        "task6_4": {"property": "company", "propertyUi": "会社", "value": "サンプル製造株式会社"}
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project6_配置別_セット4_旅行.xlsx",
+      "problemStatement": "あなたは旅行会社のツアー予約・月次売上データを管理しています。",
+      "tasks": [
+        "タスク6-1　シート［ツアー予約一覧］のA列からC列が、常に表示されるように設定します。",
+        "タスク6-2　シート［ツアー予約一覧］の文字列「公式ツアーサイト」に、「\"https://travel-example.jp/tours\"」のハイパーリンクを挿入します。",
+        "タスク6-3　シート［旅行月次実績］のセル範囲【F8:K13】の数値の書式を「通貨」に変更します。小数点以下3桁まで表示されるようにします。",
+        "タスク6-4　プロパティのカテゴリに「\"旅行予約管理\"」と設定します。"
+      ],
+      "layout": {"sheetCount": 6, "sheets": ["ツアー予約一覧", "旅行月次実績", "航空券", "宿泊分析", "支店別", "観光地"], "tableStart": "D6", "headerRow": 6, "tableShape": "4列×6行×3", "colWidths": [3, 12, 14, 12, 12, 12, 12], "rowHeights": {"title": 30, "header": 22, "data": 20}, "visual": "シェイプ", "visualSheet": "観光地", "format": "縦縞＋スカイブルー薄罫線", "tabColor": "1F4E79", "print": "横向き"},
+      "taskParams": {
+        "task6_1": {"sheet": "ツアー予約一覧", "freezeType": "columns", "freezeCols": "A:C", "freezeAt": "D7"},
+        "task6_2": {"sheet": "ツアー予約一覧", "linkText": "公式ツアーサイト", "hyperlink": "https://travel-example.jp/tours"},
+        "task6_3": {"sheet": "旅行月次実績", "currencyRange": "F8:K13", "months": "1月〜6月", "decimalPlaces": 3, "showDecimals": true},
+        "task6_4": {"property": "category", "propertyUi": "カテゴリ", "value": "旅行予約管理"}
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project6_配置別_セット5_学習塾.xlsx",
+      "problemStatement": "あなたは学習塾の講座受講・月次収益データを管理しています。",
+      "tasks": [
+        "タスク6-1　シート［講座受講一覧］のA列からE列が、常に表示されるように設定します。",
+        "タスク6-2　シート［講座受講一覧］の文字列「受講申込フォーム」に、「\"https://juku-example.jp/apply\"」のハイパーリンクを挿入します。",
+        "タスク6-3　シート［塾月次実績］のセル範囲【B9:G14】の数値の書式を「通貨」に変更します。小数点以下1桁まで表示されるようにします。",
+        "タスク6-4　プロパティのキーワードに「\"学習塾収益\"」と追加します。"
+      ],
+      "layout": {"sheetCount": 5, "sheets": ["講座受講一覧", "塾月次実績", "模試結果", "講師配置", "教室別"], "tableStart": "A8", "headerRow": 7, "tableShape": "9列×12行", "colWidths": [8, 16, 10, 10, 10, 10, 10, 10, 14], "rowHeights": {"title": 40, "header": 28, "data": 22}, "visual": "画像枠", "visualSheet": "模試結果", "format": "交互縞＋下罫線＋ネイビー白字", "tabColor": "BF9000", "print": "縦向き"},
+      "taskParams": {
+        "task6_1": {"sheet": "講座受講一覧", "freezeType": "columns", "freezeCols": "A:E", "freezeAt": "F8"},
+        "task6_2": {"sheet": "講座受講一覧", "linkText": "受講申込フォーム", "hyperlink": "https://juku-example.jp/apply"},
+        "task6_3": {"sheet": "塾月次実績", "currencyRange": "B9:G14", "months": "1月〜6月", "decimalPlaces": 1, "showDecimals": true},
+        "task6_4": {"property": "keywords", "propertyUi": "キーワード", "value": "学習塾収益"}
+      }
+    }
+  ]
+}

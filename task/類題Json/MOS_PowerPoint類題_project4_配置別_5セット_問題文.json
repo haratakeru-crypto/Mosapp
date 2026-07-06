@@ -1,0 +1,1017 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project4の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "教育者必見",
+      "いつでも体験可能です!",
+      "英語教育",
+      "子供",
+      "青い図形",
+      "楕円 ぼかし",
+      "テクスチャライザー"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）",
+      "図形の形状（slideMap.shapes と問題文）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "inputShapeType": "図形",
+      "inputShapeColorDesc": "青",
+      "textBoxShapeType": "テキストボックス",
+      "shapeText": "教育者必見",
+      "targetPhrase": "いつでも体験可能です!",
+      "fillColor": "青、アクセント1",
+      "glowPt": 18,
+      "quickStyle": "楕円 ぼかし",
+      "artEffect": "テクスチャライザー",
+      "borderPt": 0.75
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project4.pptx",
+  "projectId": 4,
+  "variantType": "layout",
+  "taskCount": 8,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project4_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたは店舗メニュー紹介資料を作成しています。",
+      "tasks": [
+        "タスク4-1　スライド１の茶の角丸四角に、「\"スタッフ必読\"」と入力します。",
+        "タスク4-2　スライド４の文字列「いつでも試飲できます!」に、文字の塗りつぶし「オレンジ、アクセント4」を設定します。",
+        "タスク4-3　スライド１枚目の店舗外観の画像に、図の効果「光彩:12pt;オレンジ、アクセントカラー4」を設定します。",
+        "タスク4-4　スライド１の店舗外観の画像に、スタイル「透かし」を設定し、「ブロック」のアート効果を設定します。",
+        "タスク4-5　スライド５の右の画像を左の画像の上端に合わせます。水平方向には動かさないようにします。",
+        "タスク4-6　スライド５の右側の画像の右端を、スライドの右端に揃えてトリミングします。画像の右端以外は変更しないでください。トリミングした領域をプレゼンテーションから完全に削除しないでください。",
+        "タスク4-7　2枚目のスライドの角丸四角形に、塗りつぶし「茶、アクセント1、白+基本色60%」、枠線「濃い茶」、太さ「1pt」を設定します。",
+        "タスク4-8　スライド３のコンテンツ領域にあるテキストボックスを、スライドの垂直方向の中央に配置します。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "春のメニュー案内",
+            "shapes": [
+              {
+                "id": "inputShape",
+                "type": "角丸四角",
+                "insertName": "角丸四角形",
+                "fillColorDesc": "茶",
+                "count": 1,
+                "text": null,
+                "notes": "4-1: 文字未入力"
+              },
+              {
+                "id": "heroImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "店舗外観",
+                "count": 1,
+                "notes": "4-3/4-4: 光彩・スタイル・アート効果未設定"
+              }
+            ],
+            "objects": [
+              "角丸四角",
+              "店舗外観"
+            ],
+            "notes": "4-1: 図形に文字未入力 / 4-3/4-4: 画像効果未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "提供スタイル",
+            "shapes": [
+              {
+                "id": "textBoxShape",
+                "type": "角丸四角形",
+                "insertName": "角丸四角形",
+                "count": 1,
+                "notes": "4-7: 塗り・枠線未設定"
+              }
+            ],
+            "notes": "4-7: テキストボックスの書式未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "店舗コンセプト",
+            "shapes": [
+              {
+                "id": "centerTextBox",
+                "type": "角丸四角形",
+                "insertName": "角丸四角形",
+                "count": 1,
+                "notes": "4-8: 上下中央配置未実施"
+              }
+            ],
+            "notes": "4-8: 垂直方向中央配置未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "体験キャンペーン",
+            "shapes": [
+              {
+                "id": "phraseText",
+                "type": "テキストボックス",
+                "insertName": "テキストボックス",
+                "text": "いつでも試飲できます!",
+                "count": 1,
+                "notes": "4-2: 文字塗りつぶし未設定"
+              }
+            ],
+            "notes": "4-2: 「いつでも試飲できます!」の塗りつぶし未設定"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "商品写真",
+            "shapes": [
+              {
+                "id": "imageLeft",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "メニュー看板",
+                "count": 1
+              },
+              {
+                "id": "imageRight",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "カップ写真",
+                "count": 1
+              }
+            ],
+            "objects": [
+              "メニュー看板",
+              "カップ写真"
+            ],
+            "notes": "4-5/4-6: 画像配置・トリミング未実施"
+          }
+        ],
+        "preTaskState": {
+          "shapeTextOnSlide1": false,
+          "textFillOnSlide4": false,
+          "pictureEffectsOnSlide1": false,
+          "imageAlignOnSlide5": false,
+          "textBoxFormatOnSlide2": false,
+          "verticalCenterOnSlide3": false
+        }
+      },
+      "taskParams": {
+        "task4_1": {
+          "slideNo": 1,
+          "inputShapeType": "角丸四角",
+          "inputShapeInsertName": "角丸四角形",
+          "inputShapeColorDesc": "茶",
+          "shapeText": "スタッフ必読",
+          "operation": "shapeTextInput"
+        },
+        "task4_2": {
+          "slideNo": 4,
+          "targetPhrase": "いつでも試飲できます!",
+          "fillColor": "オレンジ、アクセント4",
+          "operation": "textFillColor"
+        },
+        "task4_3": {
+          "slideNo": 1,
+          "imageLabel": "店舗外観",
+          "glowPt": 12,
+          "glowColor": "オレンジ、アクセントカラー4",
+          "operation": "pictureGlow"
+        },
+        "task4_4": {
+          "slideNo": 1,
+          "imageLabel": "店舗外観",
+          "quickStyle": "透かし",
+          "artEffect": "ブロック",
+          "operation": "pictureStyleArt"
+        },
+        "task4_5": {
+          "slideNo": 5,
+          "align": "上揃え",
+          "operation": "alignImages"
+        },
+        "task4_6": {
+          "slideNo": 5,
+          "side": "right",
+          "operation": "cropImage"
+        },
+        "task4_7": {
+          "slideNo": 2,
+          "textBoxShapeType": "角丸四角形",
+          "shapeFillColor": "茶、アクセント1、白+基本色60%",
+          "borderColor": "濃い茶",
+          "borderPt": 1,
+          "operation": "shapeFillBorder"
+        },
+        "task4_8": {
+          "slideNo": 3,
+          "align": "上下中央揃え",
+          "operation": "verticalCenter"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project4_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは健診案内チラシ資料を作成しています。",
+      "tasks": [
+        "タスク4-1　スライド１の緑の平行四辺形に、「\"受付案内\"」と入力します。",
+        "タスク4-2　スライド４の文字列「平日夜間も受付中!」に、文字の塗りつぶし「緑、アクセント1」を設定します。",
+        "タスク4-3　スライド１枚目の受付写真の画像に、図の効果「光彩:15pt;青、アクセントカラー5」を設定します。",
+        "タスク4-4　スライド１の受付写真の画像に、スタイル「反射」を設定し、「水彩」のアート効果を設定します。",
+        "タスク4-5　スライド５の右の画像を左の画像の上端に合わせます。水平方向には動かさないようにします。",
+        "タスク4-6　スライド５の右側の画像の右端を、スライドの右端に揃えてトリミングします。画像の右端以外は変更しないでください。トリミングした領域をプレゼンテーションから完全に削除しないでください。",
+        "タスク4-7　2枚目のスライドのテキストボックスに、塗りつぶし「緑、アクセント1、白+基本色60%」、枠線「濃い緑」、太さ「1.5pt」を設定します。",
+        "タスク4-8　スライド３のコンテンツ領域にあるテキストボックスを、スライドの垂直方向の中央に配置します。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "健診メニュー案内",
+            "shapes": [
+              {
+                "id": "inputShape",
+                "type": "平行四辺形",
+                "insertName": "平行四辺形",
+                "fillColorDesc": "緑",
+                "count": 1,
+                "text": null,
+                "notes": "4-1: 文字未入力"
+              },
+              {
+                "id": "heroImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "受付写真",
+                "count": 1,
+                "notes": "4-3/4-4: 光彩・スタイル・アート効果未設定"
+              }
+            ],
+            "objects": [
+              "平行四辺形",
+              "受付写真"
+            ],
+            "notes": "4-1: 図形に文字未入力 / 4-3/4-4: 画像効果未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "受付の流れ",
+            "shapes": [
+              {
+                "id": "textBoxShape",
+                "type": "テキストボックス",
+                "insertName": "テキストボックス",
+                "count": 1,
+                "notes": "4-7: 塗り・枠線未設定"
+              }
+            ],
+            "notes": "4-7: テキストボックスの書式未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "検査の準備",
+            "shapes": [
+              {
+                "id": "centerTextBox",
+                "type": "テキストボックス",
+                "insertName": "テキストボックス",
+                "count": 1,
+                "notes": "4-8: 上下中央配置未実施"
+              }
+            ],
+            "notes": "4-8: 垂直方向中央配置未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "夜間受付案内",
+            "shapes": [
+              {
+                "id": "phraseText",
+                "type": "テキストボックス",
+                "insertName": "テキストボックス",
+                "text": "平日夜間も受付中!",
+                "count": 1,
+                "notes": "4-2: 文字塗りつぶし未設定"
+              }
+            ],
+            "notes": "4-2: 「平日夜間も受付中!」の塗りつぶし未設定"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "院内写真",
+            "shapes": [
+              {
+                "id": "imageLeft",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "待合室",
+                "count": 1
+              },
+              {
+                "id": "imageRight",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "案内板",
+                "count": 1
+              }
+            ],
+            "objects": [
+              "待合室",
+              "案内板"
+            ],
+            "notes": "4-5/4-6: 画像配置・トリミング未実施"
+          }
+        ],
+        "preTaskState": {
+          "shapeTextOnSlide1": false,
+          "textFillOnSlide4": false,
+          "pictureEffectsOnSlide1": false,
+          "imageAlignOnSlide5": false,
+          "textBoxFormatOnSlide2": false,
+          "verticalCenterOnSlide3": false
+        }
+      },
+      "taskParams": {
+        "task4_1": {
+          "slideNo": 1,
+          "inputShapeType": "平行四辺形",
+          "inputShapeInsertName": "平行四辺形",
+          "inputShapeColorDesc": "緑",
+          "shapeText": "受付案内",
+          "operation": "shapeTextInput"
+        },
+        "task4_2": {
+          "slideNo": 4,
+          "targetPhrase": "平日夜間も受付中!",
+          "fillColor": "緑、アクセント1",
+          "operation": "textFillColor"
+        },
+        "task4_3": {
+          "slideNo": 1,
+          "imageLabel": "受付写真",
+          "glowPt": 15,
+          "glowColor": "青、アクセントカラー5",
+          "operation": "pictureGlow"
+        },
+        "task4_4": {
+          "slideNo": 1,
+          "imageLabel": "受付写真",
+          "quickStyle": "反射",
+          "artEffect": "水彩",
+          "operation": "pictureStyleArt"
+        },
+        "task4_5": {
+          "slideNo": 5,
+          "align": "上揃え",
+          "operation": "alignImages"
+        },
+        "task4_6": {
+          "slideNo": 5,
+          "side": "right",
+          "operation": "cropImage"
+        },
+        "task4_7": {
+          "slideNo": 2,
+          "textBoxShapeType": "テキストボックス",
+          "shapeFillColor": "緑、アクセント1、白+基本色60%",
+          "borderColor": "濃い緑",
+          "borderPt": 1.5,
+          "operation": "shapeFillBorder"
+        },
+        "task4_8": {
+          "slideNo": 3,
+          "align": "上下中央揃え",
+          "operation": "verticalCenter"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project4_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは工場見学会案内資料を作成しています。",
+      "tasks": [
+        "タスク4-1　スライド１の青灰の六角形に、「\"見学歓迎\"」と入力します。",
+        "タスク4-2　スライド４の文字列「安全装備をご用意ください!」に、文字の塗りつぶし「青灰、アクセント2」を設定します。",
+        "タスク4-3　スライド１枚目の工場全景の画像に、図の効果「光彩:20pt;紫、アクセントカラー3」を設定します。",
+        "タスク4-4　スライド１の工場全景の画像に、スタイル「ソフトエッジ 長方形」を設定し、「フィルムの粒」のアート効果を設定します。",
+        "タスク4-5　スライド５の右の画像を左の画像の上端に合わせます。水平方向には動かさないようにします。",
+        "タスク4-6　スライド５の右側の画像の右端を、スライドの右端に揃えてトリミングします。画像の右端以外は変更しないでください。トリミングした領域をプレゼンテーションから完全に削除しないでください。",
+        "タスク4-7　2枚目のスライドの平行四辺形に、塗りつぶし「青灰、アクセント2、白+基本色60%」、枠線「濃い青」、太さ「2pt」を設定します。",
+        "タスク4-8　スライド３のコンテンツ領域にあるテキストボックスを、スライドの垂直方向の中央に配置します。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "見学会のご案内",
+            "shapes": [
+              {
+                "id": "inputShape",
+                "type": "六角形",
+                "insertName": "六角形",
+                "fillColorDesc": "青灰",
+                "count": 1,
+                "text": null,
+                "notes": "4-1: 文字未入力"
+              },
+              {
+                "id": "heroImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "工場全景",
+                "count": 1,
+                "notes": "4-3/4-4: 光彩・スタイル・アート効果未設定"
+              }
+            ],
+            "objects": [
+              "六角形",
+              "工場全景"
+            ],
+            "notes": "4-1: 図形に文字未入力 / 4-3/4-4: 画像効果未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "見学ルート",
+            "shapes": [
+              {
+                "id": "textBoxShape",
+                "type": "平行四辺形",
+                "insertName": "平行四辺形",
+                "count": 1,
+                "notes": "4-7: 塗り・枠線未設定"
+              }
+            ],
+            "notes": "4-7: テキストボックスの書式未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "安全の心得",
+            "shapes": [
+              {
+                "id": "centerTextBox",
+                "type": "平行四辺形",
+                "insertName": "平行四辺形",
+                "count": 1,
+                "notes": "4-8: 上下中央配置未実施"
+              }
+            ],
+            "notes": "4-8: 垂直方向中央配置未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "持ち物のご案内",
+            "shapes": [
+              {
+                "id": "phraseText",
+                "type": "テキストボックス",
+                "insertName": "テキストボックス",
+                "text": "安全装備をご用意ください!",
+                "count": 1,
+                "notes": "4-2: 文字塗りつぶし未設定"
+              }
+            ],
+            "notes": "4-2: 「安全装備をご用意ください!」の塗りつぶし未設定"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "工場写真",
+            "shapes": [
+              {
+                "id": "imageLeft",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "ライン設備",
+                "count": 1
+              },
+              {
+                "id": "imageRight",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "安全標識",
+                "count": 1
+              }
+            ],
+            "objects": [
+              "ライン設備",
+              "安全標識"
+            ],
+            "notes": "4-5/4-6: 画像配置・トリミング未実施"
+          }
+        ],
+        "preTaskState": {
+          "shapeTextOnSlide1": false,
+          "textFillOnSlide4": false,
+          "pictureEffectsOnSlide1": false,
+          "imageAlignOnSlide5": false,
+          "textBoxFormatOnSlide2": false,
+          "verticalCenterOnSlide3": false
+        }
+      },
+      "taskParams": {
+        "task4_1": {
+          "slideNo": 1,
+          "inputShapeType": "六角形",
+          "inputShapeInsertName": "六角形",
+          "inputShapeColorDesc": "青灰",
+          "shapeText": "見学歓迎",
+          "operation": "shapeTextInput"
+        },
+        "task4_2": {
+          "slideNo": 4,
+          "targetPhrase": "安全装備をご用意ください!",
+          "fillColor": "青灰、アクセント2",
+          "operation": "textFillColor"
+        },
+        "task4_3": {
+          "slideNo": 1,
+          "imageLabel": "工場全景",
+          "glowPt": 20,
+          "glowColor": "紫、アクセントカラー3",
+          "operation": "pictureGlow"
+        },
+        "task4_4": {
+          "slideNo": 1,
+          "imageLabel": "工場全景",
+          "quickStyle": "ソフトエッジ 長方形",
+          "artEffect": "フィルムの粒",
+          "operation": "pictureStyleArt"
+        },
+        "task4_5": {
+          "slideNo": 5,
+          "align": "上揃え",
+          "operation": "alignImages"
+        },
+        "task4_6": {
+          "slideNo": 5,
+          "side": "right",
+          "operation": "cropImage"
+        },
+        "task4_7": {
+          "slideNo": 2,
+          "textBoxShapeType": "平行四辺形",
+          "shapeFillColor": "青灰、アクセント2、白+基本色60%",
+          "borderColor": "濃い青",
+          "borderPt": 2,
+          "operation": "shapeFillBorder"
+        },
+        "task4_8": {
+          "slideNo": 3,
+          "align": "上下中央揃え",
+          "operation": "verticalCenter"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project4_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたはツアー商品紹介資料を作成しています。",
+      "tasks": [
+        "タスク4-1　スライド１の水色のクラウドに、「\"予約受付中\"」と入力します。",
+        "タスク4-2　スライド４の文字列「早期割引あり!」に、文字の塗りつぶし「水色、アクセント5」を設定します。",
+        "タスク4-3　スライド１枚目の旅行風景の画像に、図の効果「光彩:22pt;赤、アクセントカラー2」を設定します。",
+        "タスク4-4　スライド１の旅行風景の画像に、スタイル「角丸四角形」を設定し、「マーカー」のアート効果を設定します。",
+        "タスク4-5　スライド５の右の画像を左の画像の上端に合わせます。水平方向には動かさないようにします。",
+        "タスク4-6　スライド５の右側の画像の右端を、スライドの右端に揃えてトリミングします。画像の右端以外は変更しないでください。トリミングした領域をプレゼンテーションから完全に削除しないでください。",
+        "タスク4-7　2枚目のスライドの五角形に、塗りつぶし「水色、アクセント5、白+基本色60%」、枠線「濃い水色」、太さ「2.5pt」を設定します。",
+        "タスク4-8　スライド３のコンテンツ領域にあるテキストボックスを、スライドの垂直方向の中央に配置します。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "春のツアー案内",
+            "shapes": [
+              {
+                "id": "inputShape",
+                "type": "クラウド",
+                "insertName": "クラウド",
+                "fillColorDesc": "水色",
+                "count": 1,
+                "text": null,
+                "notes": "4-1: 文字未入力"
+              },
+              {
+                "id": "heroImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "旅行風景",
+                "count": 1,
+                "notes": "4-3/4-4: 光彩・スタイル・アート効果未設定"
+              }
+            ],
+            "objects": [
+              "クラウド",
+              "旅行風景"
+            ],
+            "notes": "4-1: 図形に文字未入力 / 4-3/4-4: 画像効果未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "行程の概要",
+            "shapes": [
+              {
+                "id": "textBoxShape",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1,
+                "notes": "4-7: 塗り・枠線未設定"
+              }
+            ],
+            "notes": "4-7: テキストボックスの書式未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "持ち物リスト",
+            "shapes": [
+              {
+                "id": "centerTextBox",
+                "type": "五角形",
+                "insertName": "五角形",
+                "count": 1,
+                "notes": "4-8: 上下中央配置未実施"
+              }
+            ],
+            "notes": "4-8: 垂直方向中央配置未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "割引キャンペーン",
+            "shapes": [
+              {
+                "id": "phraseText",
+                "type": "テキストボックス",
+                "insertName": "テキストボックス",
+                "text": "早期割引あり!",
+                "count": 1,
+                "notes": "4-2: 文字塗りつぶし未設定"
+              }
+            ],
+            "notes": "4-2: 「早期割引あり!」の塗りつぶし未設定"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "旅行写真",
+            "shapes": [
+              {
+                "id": "imageLeft",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "観光地",
+                "count": 1
+              },
+              {
+                "id": "imageRight",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "旅行カバン",
+                "count": 1
+              }
+            ],
+            "objects": [
+              "観光地",
+              "旅行カバン"
+            ],
+            "notes": "4-5/4-6: 画像配置・トリミング未実施"
+          }
+        ],
+        "preTaskState": {
+          "shapeTextOnSlide1": false,
+          "textFillOnSlide4": false,
+          "pictureEffectsOnSlide1": false,
+          "imageAlignOnSlide5": false,
+          "textBoxFormatOnSlide2": false,
+          "verticalCenterOnSlide3": false
+        }
+      },
+      "taskParams": {
+        "task4_1": {
+          "slideNo": 1,
+          "inputShapeType": "クラウド",
+          "inputShapeInsertName": "クラウド",
+          "inputShapeColorDesc": "水色",
+          "shapeText": "予約受付中",
+          "operation": "shapeTextInput"
+        },
+        "task4_2": {
+          "slideNo": 4,
+          "targetPhrase": "早期割引あり!",
+          "fillColor": "水色、アクセント5",
+          "operation": "textFillColor"
+        },
+        "task4_3": {
+          "slideNo": 1,
+          "imageLabel": "旅行風景",
+          "glowPt": 22,
+          "glowColor": "赤、アクセントカラー2",
+          "operation": "pictureGlow"
+        },
+        "task4_4": {
+          "slideNo": 1,
+          "imageLabel": "旅行風景",
+          "quickStyle": "角丸四角形",
+          "artEffect": "マーカー",
+          "operation": "pictureStyleArt"
+        },
+        "task4_5": {
+          "slideNo": 5,
+          "align": "上揃え",
+          "operation": "alignImages"
+        },
+        "task4_6": {
+          "slideNo": 5,
+          "side": "right",
+          "operation": "cropImage"
+        },
+        "task4_7": {
+          "slideNo": 2,
+          "textBoxShapeType": "五角形",
+          "shapeFillColor": "水色、アクセント5、白+基本色60%",
+          "borderColor": "濃い水色",
+          "borderPt": 2.5,
+          "operation": "shapeFillBorder"
+        },
+        "task4_8": {
+          "slideNo": 3,
+          "align": "上下中央揃え",
+          "operation": "verticalCenter"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project4_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは講座案内チラシ資料を作成しています。",
+      "tasks": [
+        "タスク4-1　スライド１のオレンジの吹き出し: 角丸に、「\"体験申込可\"」と入力します。",
+        "タスク4-2　スライド４の文字列「無料体験実施中!」に、文字の塗りつぶし「紫、アクセント3」を設定します。",
+        "タスク4-3　スライド１枚目の教室風景の画像に、図の効果「光彩:25pt;黄色」を設定します。",
+        "タスク4-4　スライド１の教室風景の画像に、スタイル「ぼかし 長方形」を設定し、「ペイントストローク」のアート効果を設定します。",
+        "タスク4-5　スライド５の右の画像を左の画像の上端に合わせます。水平方向には動かさないようにします。",
+        "タスク4-6　スライド５の右側の画像の右端を、スライドの右端に揃えてトリミングします。画像の右端以外は変更しないでください。トリミングした領域をプレゼンテーションから完全に削除しないでください。",
+        "タスク4-7　2枚目のスライドの六角形に、塗りつぶし「オレンジ、アクセント4、白+基本色60%」、枠線「濃いオレンジ」、太さ「3pt」を設定します。",
+        "タスク4-8　スライド３のコンテンツ領域にあるテキストボックスを、スライドの垂直方向の中央に配置します。"
+      ],
+      "layout": {
+        "slideCount": 5,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック"
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルとコンテンツ",
+            "title": "秋期講座案内",
+            "shapes": [
+              {
+                "id": "inputShape",
+                "type": "吹き出し: 角丸",
+                "insertName": "吹き出し: 角丸",
+                "fillColorDesc": "オレンジ",
+                "count": 1,
+                "text": null,
+                "notes": "4-1: 文字未入力"
+              },
+              {
+                "id": "heroImage",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "教室風景",
+                "count": 1,
+                "notes": "4-3/4-4: 光彩・スタイル・アート効果未設定"
+              }
+            ],
+            "objects": [
+              "吹き出し: 角丸",
+              "教室風景"
+            ],
+            "notes": "4-1: 図形に文字未入力 / 4-3/4-4: 画像効果未設定"
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "授業の流れ",
+            "shapes": [
+              {
+                "id": "textBoxShape",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1,
+                "notes": "4-7: 塗り・枠線未設定"
+              }
+            ],
+            "notes": "4-7: テキストボックスの書式未設定"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "学習方針",
+            "shapes": [
+              {
+                "id": "centerTextBox",
+                "type": "六角形",
+                "insertName": "六角形",
+                "count": 1,
+                "notes": "4-8: 上下中央配置未実施"
+              }
+            ],
+            "notes": "4-8: 垂直方向中央配置未実施"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "体験授業案内",
+            "shapes": [
+              {
+                "id": "phraseText",
+                "type": "テキストボックス",
+                "insertName": "テキストボックス",
+                "text": "無料体験実施中!",
+                "count": 1,
+                "notes": "4-2: 文字塗りつぶし未設定"
+              }
+            ],
+            "notes": "4-2: 「無料体験実施中!」の塗りつぶし未設定"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "教室写真",
+            "shapes": [
+              {
+                "id": "imageLeft",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "講義風景",
+                "count": 1
+              },
+              {
+                "id": "imageRight",
+                "type": "画像",
+                "insertName": "画像",
+                "label": "教材サンプル",
+                "count": 1
+              }
+            ],
+            "objects": [
+              "講義風景",
+              "教材サンプル"
+            ],
+            "notes": "4-5/4-6: 画像配置・トリミング未実施"
+          }
+        ],
+        "preTaskState": {
+          "shapeTextOnSlide1": false,
+          "textFillOnSlide4": false,
+          "pictureEffectsOnSlide1": false,
+          "imageAlignOnSlide5": false,
+          "textBoxFormatOnSlide2": false,
+          "verticalCenterOnSlide3": false
+        }
+      },
+      "taskParams": {
+        "task4_1": {
+          "slideNo": 1,
+          "inputShapeType": "吹き出し: 角丸",
+          "inputShapeInsertName": "吹き出し: 角丸",
+          "inputShapeColorDesc": "オレンジ",
+          "shapeText": "体験申込可",
+          "operation": "shapeTextInput"
+        },
+        "task4_2": {
+          "slideNo": 4,
+          "targetPhrase": "無料体験実施中!",
+          "fillColor": "紫、アクセント3",
+          "operation": "textFillColor"
+        },
+        "task4_3": {
+          "slideNo": 1,
+          "imageLabel": "教室風景",
+          "glowPt": 25,
+          "glowColor": "黄色",
+          "operation": "pictureGlow"
+        },
+        "task4_4": {
+          "slideNo": 1,
+          "imageLabel": "教室風景",
+          "quickStyle": "ぼかし 長方形",
+          "artEffect": "ペイントストローク",
+          "operation": "pictureStyleArt"
+        },
+        "task4_5": {
+          "slideNo": 5,
+          "align": "上揃え",
+          "operation": "alignImages"
+        },
+        "task4_6": {
+          "slideNo": 5,
+          "side": "right",
+          "operation": "cropImage"
+        },
+        "task4_7": {
+          "slideNo": 2,
+          "textBoxShapeType": "六角形",
+          "shapeFillColor": "オレンジ、アクセント4、白+基本色60%",
+          "borderColor": "濃いオレンジ",
+          "borderPt": 3,
+          "operation": "shapeFillBorder"
+        },
+        "task4_8": {
+          "slideNo": 3,
+          "align": "上下中央揃え",
+          "operation": "verticalCenter"
+        }
+      }
+    }
+  ]
+}

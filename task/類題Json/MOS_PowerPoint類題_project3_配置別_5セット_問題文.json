@@ -1,0 +1,873 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。Project3の操作種別はPP修正版CSV準拠。数値・名称・文言・図形形状のみ差替。",
+    "forbiddenTexts": [
+      "Power Point 新機能",
+      "タイムライン",
+      "ターゲットリスト",
+      "虫眼鏡",
+      "機能の概要",
+      "画面録画で説明",
+      "ズーム機能で訴求力アップ",
+      "デザインアイデアで魅力的",
+      "伝わるスライドの要素",
+      "グラデーション循環-アクセント６",
+      "グラデーション 循環-アクセント6"
+    ],
+    "perSetMustVary": [
+      "テーマ色とデザインテーマ",
+      "スライドタイトルと本文",
+      "数値パラメータ",
+      "UI選択肢（レイアウト・画面切り替え・SmartArt等）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "spacingPt",
+      "sectionNew",
+      "zoomTitle",
+      "transitionAll",
+      "durationSec",
+      "autoAdvanceSec",
+      "smartArtColor",
+      "inputShapeType",
+      "alignShapeType",
+      "customShowName"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "スライド番号・UI名・文字列・図形形状を完全一致で指定",
+    "textbookDefaults": {
+      "modelWidth": 2.5,
+      "modelHeight": 6.5,
+      "smartArtType": "タイムライン"
+    }
+  },
+  "powerPointUiNames": {
+    "build": "2508",
+    "newSlide": "ホーム → 新しいスライド",
+    "hideSlide": "スライドショー → 非表示スライド",
+    "layout": "ホーム → レイアウト",
+    "columns": "ホーム → 段の追加または削除 → 2 段組み",
+    "characterSpacing": "ホーム → 文字の間隔 → その他の間隔",
+    "section": "ホーム → セクション",
+    "zoom": "挿入 → ズーム",
+    "transitionTab": "画面切り替え",
+    "animationTab": "アニメーション",
+    "smartArt": "SmartArt グラフィックの挿入",
+    "model3d": "挿入 → 3D モデル"
+  },
+  "sourceFile": "Project3.pptx",
+  "projectId": 3,
+  "variantType": "layout",
+  "taskCount": 7,
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_PowerPoint類題_project3_配置別_セット1_カフェ.pptx",
+      "problemStatement": "あなたは店舗DX導入についての社内説明資料を作成しています。",
+      "tasks": [
+        "タスク3-1　スライド７にSmartArtグラフィック「基本プロセス」の手順を追加し、文字列「\"受付\"」「\"提供\"」を入力します。不要な図形は削除します。",
+        "タスク3-2　スライド７のSmartArtグラフィックに、色「塗りつぶし-アクセント3」を設定します。",
+        "タスク3-3　スライド６の箇条書きを「水平ボックスリスト」のSmartArtに変更します。",
+        "タスク3-4　スライド１に3Dモデル「ノートパソコン」を挿入します。幅を「\"3.0\"」に変更して中央の楕円の図形の中に配置します。正確な位置は問いません。",
+        "タスク3-5　スライド10の3Dモデルのビューを上面にし、高さを「\"5.5\"」に変更します。",
+        "タスク3-6　「導入の概要」のスライドにスライドズームを挿入して「POS連携の手順」「スタッフ教育の流れ」「売上分析の見える化」へリンクを作成します。タイトルの下に配置し、スライドズームが重ならないようにします。",
+        "タスク3-7　スライド２にセクションズームのリンクを挿入します。セクション「1.導入の概要」と「2.運用のポイント」にリンクを作成し、それぞれ文字の下に配置します。"
+      ],
+      "layout": {
+        "slideCount": 10,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "オフィス",
+        "colorTheme": "茶、スライドの背景2",
+        "fontTheme": "メイリオ",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "1.導入の概要"
+          },
+          {
+            "startSlide": 8,
+            "name": "2.運用のポイント"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "店舗DX導入についての社内説明資料を作成しています。",
+            "notes": "3-4: 楕円図形内に3Dモデル未挿入",
+            "objects": [
+              "楕円図形"
+            ]
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "目次",
+            "notes": "3-7: セクションズーム未挿入"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "導入の概要",
+            "notes": "3-6: スライドズーム未挿入"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "POS連携の手順"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "スタッフ教育の流れ"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "売上分析の見える化",
+            "bullets": [
+              "要点A",
+              "要点B",
+              "要点C"
+            ],
+            "notes": "3-3: 箇条書き→SmartArt「水平ボックスリスト」未変換"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "SmartArt配置スライド",
+            "notes": "3-1/3-2: SmartArt「基本プロセス」未追加・色未設定"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.導入の概要"
+          },
+          {
+            "slideNo": 9,
+            "layout": "タイトルとコンテンツ",
+            "title": "補足"
+          },
+          {
+            "slideNo": 10,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置スライド",
+            "objects": [
+              "既存3Dモデル"
+            ],
+            "notes": "3-5: ビュー・高さ未変更"
+          }
+        ],
+        "preTaskState": {
+          "smartArtOnSlide7": false,
+          "slideZoomOnSlide3": false,
+          "sectionZoomOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task3_1": {
+          "slideNo": 7,
+          "smartArtCategory": "手順",
+          "smartArtType": "基本プロセス",
+          "labels": [
+            "受付",
+            "提供"
+          ],
+          "operation": "insertSmartArt"
+        },
+        "task3_2": {
+          "slideNo": 7,
+          "smartArtColor": "塗りつぶし-アクセント3",
+          "operation": "smartArtColor"
+        },
+        "task3_3": {
+          "slideNo": 6,
+          "smartArtType": "水平ボックスリスト",
+          "smartArtCategory": "リスト",
+          "operation": "convertToSmartArt"
+        },
+        "task3_4": {
+          "slideNo": 1,
+          "modelName": "ノートパソコン",
+          "width": 3.0,
+          "anchorShape": "楕円",
+          "operation": "insert3dModel"
+        },
+        "task3_5": {
+          "slideNo": 10,
+          "view": "上面",
+          "height": 5.5,
+          "operation": "model3dViewSize"
+        },
+        "task3_6": {
+          "parentSlideTitle": "導入の概要",
+          "linkTitles": [
+            "POS連携の手順",
+            "スタッフ教育の流れ",
+            "売上分析の見える化"
+          ],
+          "operation": "slideZoom"
+        },
+        "task3_7": {
+          "slideNo": 2,
+          "sectionNames": [
+            "1.導入の概要",
+            "2.運用のポイント"
+          ],
+          "operation": "sectionZoom"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_PowerPoint類題_project3_配置別_セット2_医療.pptx",
+      "problemStatement": "あなたは電子カルテ運用についての院内説明資料を作成しています。",
+      "tasks": [
+        "タスク3-1　スライド７にSmartArtグラフィック「上向き矢印」の手順を追加し、文字列「\"問診\"」「\"診察\"」を入力します。不要な図形は削除します。",
+        "タスク3-2　スライド７のSmartArtグラフィックに、色「カラフル-アクセント4」を設定します。",
+        "タスク3-3　スライド６の箇条書きを「箇条書き」のSmartArtに変更します。",
+        "タスク3-4　スライド１に3Dモデル「聴診器」を挿入します。幅を「\"2.8\"」に変更して中央の楕円の図形の中に配置します。正確な位置は問いません。",
+        "タスク3-5　スライド10の3Dモデルのビューを上前面にし、高さを「\"5.0\"」に変更します。",
+        "タスク3-6　「運用の全体像」のスライドにスライドズームを挿入して「記録入力の手順」「権限設定の流れ」「監査ログの確認」へリンクを作成します。タイトルの下に配置し、スライドズームが重ならないようにします。",
+        "タスク3-7　スライド２にセクションズームのリンクを挿入します。セクション「1.運用の全体像」と「2.セキュリティ対策」にリンクを作成し、それぞれ文字の下に配置します。"
+      ],
+      "layout": {
+        "slideCount": 10,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "センチュリー",
+        "variant": "モダン",
+        "colorTheme": "緑、アクセント1",
+        "fontTheme": "メイリオ",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "1.運用の全体像"
+          },
+          {
+            "startSlide": 8,
+            "name": "2.セキュリティ対策"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "電子カルテ運用についての院内説明資料を作成しています。",
+            "notes": "3-4: 楕円図形内に3Dモデル未挿入",
+            "objects": [
+              "楕円図形"
+            ]
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "目次",
+            "notes": "3-7: セクションズーム未挿入"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "運用の全体像",
+            "notes": "3-6: スライドズーム未挿入"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "記録入力の手順"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "権限設定の流れ"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "監査ログの確認",
+            "bullets": [
+              "要点A",
+              "要点B",
+              "要点C"
+            ],
+            "notes": "3-3: 箇条書き→SmartArt「箇条書き」未変換"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "SmartArt配置スライド",
+            "notes": "3-1/3-2: SmartArt「上向き矢印」未追加・色未設定"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.運用の全体像"
+          },
+          {
+            "slideNo": 9,
+            "layout": "タイトルとコンテンツ",
+            "title": "補足"
+          },
+          {
+            "slideNo": 10,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置スライド",
+            "objects": [
+              "既存3Dモデル"
+            ],
+            "notes": "3-5: ビュー・高さ未変更"
+          }
+        ],
+        "preTaskState": {
+          "smartArtOnSlide7": false,
+          "slideZoomOnSlide3": false,
+          "sectionZoomOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task3_1": {
+          "slideNo": 7,
+          "smartArtCategory": "手順",
+          "smartArtType": "上向き矢印",
+          "labels": [
+            "問診",
+            "診察"
+          ],
+          "operation": "insertSmartArt"
+        },
+        "task3_2": {
+          "slideNo": 7,
+          "smartArtColor": "カラフル-アクセント4",
+          "operation": "smartArtColor"
+        },
+        "task3_3": {
+          "slideNo": 6,
+          "smartArtType": "箇条書き",
+          "smartArtCategory": "リスト",
+          "operation": "convertToSmartArt"
+        },
+        "task3_4": {
+          "slideNo": 1,
+          "modelName": "聴診器",
+          "width": 2.8,
+          "anchorShape": "楕円",
+          "operation": "insert3dModel"
+        },
+        "task3_5": {
+          "slideNo": 10,
+          "view": "上前面",
+          "height": 5.0,
+          "operation": "model3dViewSize"
+        },
+        "task3_6": {
+          "parentSlideTitle": "運用の全体像",
+          "linkTitles": [
+            "記録入力の手順",
+            "権限設定の流れ",
+            "監査ログの確認"
+          ],
+          "operation": "slideZoom"
+        },
+        "task3_7": {
+          "slideNo": 2,
+          "sectionNames": [
+            "1.運用の全体像",
+            "2.セキュリティ対策"
+          ],
+          "operation": "sectionZoom"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_PowerPoint類題_project3_配置別_セット3_製造.pptx",
+      "problemStatement": "あなたは生産ラインIoT化についての説明資料を作成しています。",
+      "tasks": [
+        "タスク3-1　スライド７にSmartArtグラフィック「連続ブロック プロセス」の手順を追加し、文字列「\"収集\"」「\"分析\"」を入力します。不要な図形は削除します。",
+        "タスク3-2　スライド７のSmartArtグラフィックに、色「塗りつぶし-アクセント2」を設定します。",
+        "タスク3-3　スライド６の箇条書きを「L型リスト」のSmartArtに変更します。",
+        "タスク3-4　スライド１に3Dモデル「工具箱」を挿入します。幅を「\"3.2\"」に変更して中央の楕円の図形の中に配置します。正確な位置は問いません。",
+        "タスク3-5　スライド10の3Dモデルのビューを上面にし、高さを「\"6.0\"」に変更します。",
+        "タスク3-6　「IoT導入の概要」のスライドにスライドズームを挿入して「センサー設置手順」「データ連携手順」「異常検知の運用」へリンクを作成します。タイトルの下に配置し、スライドズームが重ならないようにします。",
+        "タスク3-7　スライド２にセクションズームのリンクを挿入します。セクション「1.IoT導入の概要」と「2.保全の効率化」にリンクを作成し、それぞれ文字の下に配置します。"
+      ],
+      "layout": {
+        "slideCount": 10,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "イオン",
+        "variant": "シンプル",
+        "colorTheme": "青灰、アクセント2",
+        "fontTheme": "游ゴシック",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "1.IoT導入の概要"
+          },
+          {
+            "startSlide": 8,
+            "name": "2.保全の効率化"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "生産ラインIoT化",
+            "notes": "3-4: 楕円図形内に3Dモデル未挿入",
+            "objects": [
+              "楕円図形"
+            ]
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "目次",
+            "notes": "3-7: セクションズーム未挿入"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "IoT導入の概要",
+            "notes": "3-6: スライドズーム未挿入"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "センサー設置手順"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "データ連携手順"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "異常検知の運用",
+            "bullets": [
+              "要点A",
+              "要点B",
+              "要点C"
+            ],
+            "notes": "3-3: 箇条書き→SmartArt「L型リスト」未変換"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "SmartArt配置スライド",
+            "notes": "3-1/3-2: SmartArt「連続ブロック プロセス」未追加・色未設定"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.IoT導入の概要"
+          },
+          {
+            "slideNo": 9,
+            "layout": "タイトルとコンテンツ",
+            "title": "補足"
+          },
+          {
+            "slideNo": 10,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置スライド",
+            "objects": [
+              "既存3Dモデル"
+            ],
+            "notes": "3-5: ビュー・高さ未変更"
+          }
+        ],
+        "preTaskState": {
+          "smartArtOnSlide7": false,
+          "slideZoomOnSlide3": false,
+          "sectionZoomOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task3_1": {
+          "slideNo": 7,
+          "smartArtCategory": "手順",
+          "smartArtType": "連続ブロック プロセス",
+          "labels": [
+            "収集",
+            "分析"
+          ],
+          "operation": "insertSmartArt"
+        },
+        "task3_2": {
+          "slideNo": 7,
+          "smartArtColor": "塗りつぶし-アクセント2",
+          "operation": "smartArtColor"
+        },
+        "task3_3": {
+          "slideNo": 6,
+          "smartArtType": "L型リスト",
+          "smartArtCategory": "リスト",
+          "operation": "convertToSmartArt"
+        },
+        "task3_4": {
+          "slideNo": 1,
+          "modelName": "工具箱",
+          "width": 3.2,
+          "anchorShape": "楕円",
+          "operation": "insert3dModel"
+        },
+        "task3_5": {
+          "slideNo": 10,
+          "view": "上面",
+          "height": 6.0,
+          "operation": "model3dViewSize"
+        },
+        "task3_6": {
+          "parentSlideTitle": "IoT導入の概要",
+          "linkTitles": [
+            "センサー設置手順",
+            "データ連携手順",
+            "異常検知の運用"
+          ],
+          "operation": "slideZoom"
+        },
+        "task3_7": {
+          "slideNo": 2,
+          "sectionNames": [
+            "1.IoT導入の概要",
+            "2.保全の効率化"
+          ],
+          "operation": "sectionZoom"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_PowerPoint類題_project3_配置別_セット4_旅行.pptx",
+      "problemStatement": "あなたは予約システム刷新についての説明資料を作成しています。",
+      "tasks": [
+        "タスク3-1　スライド７にSmartArtグラフィック「基本プロセス」の手順を追加し、文字列「\"予約\"」「\"決済\"」を入力します。不要な図形は削除します。",
+        "タスク3-2　スライド７のSmartArtグラフィックに、色「グラデーション-アクセント5」を設定します。",
+        "タスク3-3　スライド６の箇条書きを「横方向のリスト」のSmartArtに変更します。",
+        "タスク3-4　スライド１に3Dモデル「飛行機」を挿入します。幅を「\"2.7\"」に変更して中央の楕円の図形の中に配置します。正確な位置は問いません。",
+        "タスク3-5　スライド10の3Dモデルのビューを上前面にし、高さを「\"5.8\"」に変更します。",
+        "タスク3-6　「刷新計画の概要」のスライドにスライドズームを挿入して「在庫連携の手順」「顧客通知の流れ」「レポート活用」へリンクを作成します。タイトルの下に配置し、スライドズームが重ならないようにします。",
+        "タスク3-7　スライド２にセクションズームのリンクを挿入します。セクション「1.刷新計画の概要」と「2.オペレーション改善」にリンクを作成し、それぞれ文字の下に配置します。"
+      ],
+      "layout": {
+        "slideCount": 10,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "バーチ",
+        "variant": "モダン",
+        "colorTheme": "水色、アクセント5",
+        "fontTheme": "メイリオ",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "1.刷新計画の概要"
+          },
+          {
+            "startSlide": 8,
+            "name": "2.オペレーション改善"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "予約システム刷新",
+            "notes": "3-4: 楕円図形内に3Dモデル未挿入",
+            "objects": [
+              "楕円図形"
+            ]
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "目次",
+            "notes": "3-7: セクションズーム未挿入"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "刷新計画の概要",
+            "notes": "3-6: スライドズーム未挿入"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "在庫連携の手順"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "顧客通知の流れ"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "レポート活用",
+            "bullets": [
+              "要点A",
+              "要点B",
+              "要点C"
+            ],
+            "notes": "3-3: 箇条書き→SmartArt「横方向のリスト」未変換"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "SmartArt配置スライド",
+            "notes": "3-1/3-2: SmartArt「基本プロセス」未追加・色未設定"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.刷新計画の概要"
+          },
+          {
+            "slideNo": 9,
+            "layout": "タイトルとコンテンツ",
+            "title": "補足"
+          },
+          {
+            "slideNo": 10,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置スライド",
+            "objects": [
+              "既存3Dモデル"
+            ],
+            "notes": "3-5: ビュー・高さ未変更"
+          }
+        ],
+        "preTaskState": {
+          "smartArtOnSlide7": false,
+          "slideZoomOnSlide3": false,
+          "sectionZoomOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task3_1": {
+          "slideNo": 7,
+          "smartArtCategory": "手順",
+          "smartArtType": "基本プロセス",
+          "labels": [
+            "予約",
+            "決済"
+          ],
+          "operation": "insertSmartArt"
+        },
+        "task3_2": {
+          "slideNo": 7,
+          "smartArtColor": "グラデーション-アクセント5",
+          "operation": "smartArtColor"
+        },
+        "task3_3": {
+          "slideNo": 6,
+          "smartArtType": "横方向のリスト",
+          "smartArtCategory": "リスト",
+          "operation": "convertToSmartArt"
+        },
+        "task3_4": {
+          "slideNo": 1,
+          "modelName": "飛行機",
+          "width": 2.7,
+          "anchorShape": "楕円",
+          "operation": "insert3dModel"
+        },
+        "task3_5": {
+          "slideNo": 10,
+          "view": "上前面",
+          "height": 5.8,
+          "operation": "model3dViewSize"
+        },
+        "task3_6": {
+          "parentSlideTitle": "刷新計画の概要",
+          "linkTitles": [
+            "在庫連携の手順",
+            "顧客通知の流れ",
+            "レポート活用"
+          ],
+          "operation": "slideZoom"
+        },
+        "task3_7": {
+          "slideNo": 2,
+          "sectionNames": [
+            "1.刷新計画の概要",
+            "2.オペレーション改善"
+          ],
+          "operation": "sectionZoom"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_PowerPoint類題_project3_配置別_セット5_学習塾.pptx",
+      "problemStatement": "あなたは学習管理システム導入についての説明資料を作成しています。",
+      "tasks": [
+        "タスク3-1　スライド７にSmartArtグラフィック「上向き矢印」の手順を追加し、文字列「\"登録\"」「\"共有\"」を入力します。不要な図形は削除します。",
+        "タスク3-2　スライド７のSmartArtグラフィックに、色「カラフル-アクセント1」を設定します。",
+        "タスク3-3　スライド６の箇条書きを「水平ボックスリスト」のSmartArtに変更します。",
+        "タスク3-4　スライド１に3Dモデル「ノートパソコン」を挿入します。幅を「\"3.1\"」に変更して中央の楕円の図形の中に配置します。正確な位置は問いません。",
+        "タスク3-5　スライド10の3Dモデルのビューを上面にし、高さを「\"5.2\"」に変更します。",
+        "タスク3-6　「LMS導入の概要」のスライドにスライドズームを挿入して「教材配布の手順」「課題提出の流れ」「成績集計の活用」へリンクを作成します。タイトルの下に配置し、スライドズームが重ならないようにします。",
+        "タスク3-7　スライド２にセクションズームのリンクを挿入します。セクション「1.LMS導入の概要」と「2.学習データの保護」にリンクを作成し、それぞれ文字の下に配置します。"
+      ],
+      "layout": {
+        "slideCount": 10,
+        "slideSize": "ワイド スクリーン (16:9)",
+        "designTheme": "ロード",
+        "variant": "オフィス",
+        "colorTheme": "オレンジ、アクセント4",
+        "fontTheme": "游ゴシック",
+        "sections": [
+          {
+            "startSlide": 1,
+            "name": "1.LMS導入の概要"
+          },
+          {
+            "startSlide": 8,
+            "name": "2.学習データの保護"
+          }
+        ]
+      },
+      "contentBlocks": {
+        "slideMap": [
+          {
+            "slideNo": 1,
+            "layout": "タイトルスライド",
+            "title": "学習管理システム導入",
+            "notes": "3-4: 楕円図形内に3Dモデル未挿入",
+            "objects": [
+              "楕円図形"
+            ]
+          },
+          {
+            "slideNo": 2,
+            "layout": "タイトルとコンテンツ",
+            "title": "目次",
+            "notes": "3-7: セクションズーム未挿入"
+          },
+          {
+            "slideNo": 3,
+            "layout": "タイトルとコンテンツ",
+            "title": "LMS導入の概要",
+            "notes": "3-6: スライドズーム未挿入"
+          },
+          {
+            "slideNo": 4,
+            "layout": "タイトルとコンテンツ",
+            "title": "教材配布の手順"
+          },
+          {
+            "slideNo": 5,
+            "layout": "タイトルとコンテンツ",
+            "title": "課題提出の流れ"
+          },
+          {
+            "slideNo": 6,
+            "layout": "タイトルとコンテンツ",
+            "title": "成績集計の活用",
+            "bullets": [
+              "要点A",
+              "要点B",
+              "要点C"
+            ],
+            "notes": "3-3: 箇条書き→SmartArt「水平ボックスリスト」未変換"
+          },
+          {
+            "slideNo": 7,
+            "layout": "タイトルとコンテンツ",
+            "title": "SmartArt配置スライド",
+            "notes": "3-1/3-2: SmartArt「上向き矢印」未追加・色未設定"
+          },
+          {
+            "slideNo": 8,
+            "layout": "タイトルとコンテンツ",
+            "title": "1.LMS導入の概要"
+          },
+          {
+            "slideNo": 9,
+            "layout": "タイトルとコンテンツ",
+            "title": "補足"
+          },
+          {
+            "slideNo": 10,
+            "layout": "タイトルとコンテンツ",
+            "title": "3Dモデル配置スライド",
+            "objects": [
+              "既存3Dモデル"
+            ],
+            "notes": "3-5: ビュー・高さ未変更"
+          }
+        ],
+        "preTaskState": {
+          "smartArtOnSlide7": false,
+          "slideZoomOnSlide3": false,
+          "sectionZoomOnSlide2": false
+        }
+      },
+      "taskParams": {
+        "task3_1": {
+          "slideNo": 7,
+          "smartArtCategory": "手順",
+          "smartArtType": "上向き矢印",
+          "labels": [
+            "登録",
+            "共有"
+          ],
+          "operation": "insertSmartArt"
+        },
+        "task3_2": {
+          "slideNo": 7,
+          "smartArtColor": "カラフル-アクセント1",
+          "operation": "smartArtColor"
+        },
+        "task3_3": {
+          "slideNo": 6,
+          "smartArtType": "水平ボックスリスト",
+          "smartArtCategory": "リスト",
+          "operation": "convertToSmartArt"
+        },
+        "task3_4": {
+          "slideNo": 1,
+          "modelName": "ノートパソコン",
+          "width": 3.1,
+          "anchorShape": "楕円",
+          "operation": "insert3dModel"
+        },
+        "task3_5": {
+          "slideNo": 10,
+          "view": "上面",
+          "height": 5.2,
+          "operation": "model3dViewSize"
+        },
+        "task3_6": {
+          "parentSlideTitle": "LMS導入の概要",
+          "linkTitles": [
+            "教材配布の手順",
+            "課題提出の流れ",
+            "成績集計の活用"
+          ],
+          "operation": "slideZoom"
+        },
+        "task3_7": {
+          "slideNo": 2,
+          "sectionNames": [
+            "1.LMS導入の概要",
+            "2.学習データの保護"
+          ],
+          "operation": "sectionZoom"
+        }
+      }
+    }
+  ]
+}

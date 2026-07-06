@@ -1,0 +1,242 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。3-1=余白、3-2=セクション区切り、3-3=印刷向き、3-4=段組み、3-5=段区切り、3-6=行間の操作種別を維持。",
+    "forbiddenParagraphTexts": [
+      "参考文献一覧",
+      "茨城県天心記念五浦美術館",
+      "美術館",
+      "五浦"
+    ],
+    "perSetMustVary": [
+      "導入文と本文テーマ",
+      "文献セクション見出し名",
+      "段区切り対象の文献項目",
+      "書式傾向・テーマカラー",
+      "3-1余白プリセット（やや狭い以外）",
+      "3-2セクション区切り種別（次のページから以外）",
+      "3-3対象セクション（文献直前の本文見出し）と向き（縦・横の混在）",
+      "3-4段組み（2段以外）",
+      "3-6行間（1.3以外・行間倍数以外を含む）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "文献セクション見出し",
+      "段区切り対象の先頭文"
+    ],
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "見出し・文献項目を完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "pageMargins": "レイアウト → 余白 → （標準／狭い／広い／ミラー等）",
+    "sectionBreak": "レイアウト → 区切り → （連続／偶数ページから／奇数ページから）",
+    "orientation": "レイアウト → 方向 → （縦向き／横向き）",
+    "columns": "レイアウト → 段組み → （3／やや狭い2段組み／左／右）",
+    "columnBreak": "レイアウト → 区切り → 段",
+    "lineSpacing": "ホーム → 段落 → 行と段落の間隔 → （1.5／2.0／固定値／1.6行等）"
+  },
+  "sourceFile": "Project3.docx",
+  "projectId": 3,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project3_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたは焙煎技術の学芸レポートを作成しています。",
+      "tasks": [
+        "タスク3-1　文書の余白を「広い」に設定します。",
+        "タスク3-2　見出し「参考資料一覧」の先頭にセクション区切りを挿入し、連続で始まるように設定します。",
+        "タスク3-3　見出し「第2章 抽出技術」で始まるセクションの印刷の向きを、「縦向き」に設定します。",
+        "タスク3-4　見出し「参考資料一覧」で始まるセクションを3段組みに設定します。",
+        "タスク3-5　見出し「参考資料一覧」の「●焙煎ガイド協会『コーヒー焙煎の基礎』」の先頭に段区切りを挿入します。",
+        "タスク3-6　見出し「参考資料一覧」で始まるセクションの1段目の行間をすべて\"1.5\"に設定します。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1章 焙煎の基礎", "第2章 抽出技術", "参考資料一覧"],
+        "marginPreset": "標準",
+        "initialMarginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景＋下罫線点線",
+        "imagePlacement": "本文右寄せ（コーヒー豆）",
+        "pageBreakAfter": "第1章末尾",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 28,
+        "bibliographyItemCount": 6
+      },
+      "taskParams": {
+        "task3_1": {"marginPreset": "広い", "operation": "pageMargins"},
+        "task3_2": {"sectionHeading": "参考資料一覧", "breakType": "continuous", "breakTypeUi": "連続"},
+        "task3_3": {"sectionHeading": "第2章 抽出技術", "orientation": "縦向き", "targetSection": "bodyBeforeBibliography"},
+        "task3_4": {"sectionHeading": "参考資料一覧", "columns": 3, "columnPreset": "3"},
+        "task3_5": {
+          "sectionHeading": "参考資料一覧",
+          "columnBreakBefore": "●焙煎ガイド協会『コーヒー焙煎の基礎』"
+        },
+        "task3_6": {"sectionHeading": "参考資料一覧", "lineSpacing": 1.5, "lineSpacingRule": "multiple", "lineSpacingUi": "1.5", "column": 1}
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project3_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは院内感染対策の学芸レポートを作成しています。",
+      "tasks": [
+        "タスク3-1　文書の余白を「狭い」に設定します。",
+        "タスク3-2　見出し「文献一覧」の先頭にセクション区切りを挿入し、偶数ページから始まるように設定します。",
+        "タスク3-3　見出し「第2節 予防策」で始まるセクションの印刷の向きを、「横向き」に設定します。",
+        "タスク3-4　見出し「文献一覧」で始まるセクションをやや狭い2段組みに設定します。",
+        "タスク3-5　見出し「文献一覧」の「●日本感染症学会『院内感染対策ガイドライン』」の先頭に段区切りを挿入します。",
+        "タスク3-6　見出し「文献一覧」で始まるセクションの1段目の行間をすべて\"固定値 18ポイント\"に設定します。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1節 感染経路", "第2節 予防策", "文献一覧"],
+        "marginPreset": "やや狭い",
+        "initialMarginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント（緑・1.5pt）",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 26,
+        "bibliographyItemCount": 7
+      },
+      "taskParams": {
+        "task3_1": {"marginPreset": "狭い", "operation": "pageMargins"},
+        "task3_2": {"sectionHeading": "文献一覧", "breakType": "evenPage", "breakTypeUi": "偶数ページから"},
+        "task3_3": {"sectionHeading": "第2節 予防策", "orientation": "横向き", "targetSection": "bodyBeforeBibliography"},
+        "task3_4": {"sectionHeading": "文献一覧", "columns": 2, "columnPreset": "やや狭い2段組み", "evenlySpaced": false},
+        "task3_5": {
+          "sectionHeading": "文献一覧",
+          "columnBreakBefore": "●日本感染症学会『院内感染対策ガイドライン』"
+        },
+        "task3_6": {"sectionHeading": "文献一覧", "lineSpacing": 18, "lineSpacingRule": "exactly", "lineSpacingUi": "固定値 18ポイント", "column": 1}
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project3_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは品質管理の学芸レポートを作成しています。",
+      "tasks": [
+        "タスク3-1　文書の余白を「標準」に設定します。",
+        "タスク3-2　見出し「参照文献」の先頭にセクション区切りを挿入し、奇数ページから始まるように設定します。",
+        "タスク3-3　見出し「2. 検査手順」で始まるセクションの印刷の向きを、「縦向き」に設定します。",
+        "タスク3-4　見出し「参照文献」で始まるセクションを左段組みに設定します。",
+        "タスク3-5　見出し「参照文献」の「●品質管理学会『製造工程の品質保証』」の先頭に段区切りを挿入します。",
+        "タスク3-6　見出し「参照文献」で始まるセクションの1段目の行間をすべて\"2\"に設定します。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["1. 工程概要", "2. 検査手順", "参照文献"],
+        "marginPreset": "広い",
+        "initialMarginPreset": "広い",
+        "orientation": "横向き",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞（2段落ごと）",
+        "imagePlacement": "本文左寄せ（検査ライン）",
+        "pageBreakAfter": "1. 工程概要末尾",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 30,
+        "bibliographyItemCount": 8
+      },
+      "taskParams": {
+        "task3_1": {"marginPreset": "標準", "operation": "pageMargins"},
+        "task3_2": {"sectionHeading": "参照文献", "breakType": "oddPage", "breakTypeUi": "奇数ページから"},
+        "task3_3": {"sectionHeading": "2. 検査手順", "orientation": "縦向き", "targetSection": "bodyBeforeBibliography"},
+        "task3_4": {"sectionHeading": "参照文献", "columns": 2, "columnPreset": "左"},
+        "task3_5": {
+          "sectionHeading": "参照文献",
+          "columnBreakBefore": "●品質管理学会『製造工程の品質保証』"
+        },
+        "task3_6": {"sectionHeading": "参照文献", "lineSpacing": 2.0, "lineSpacingRule": "multiple", "lineSpacingUi": "2", "column": 1}
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project3_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは観光地調査の学芸レポートを作成しています。",
+      "tasks": [
+        "タスク3-1　文書の余白を「ミラー」に設定します。",
+        "タスク3-2　見出し「情報ソース一覧」の先頭にセクション区切りを挿入し、連続で始まるように設定します。",
+        "タスク3-3　見出し「第2部 分析結果」で始まるセクションの印刷の向きを、「横向き」に設定します。",
+        "タスク3-4　見出し「情報ソース一覧」で始まるセクションを右段組みに設定します。",
+        "タスク3-5　見出し「情報ソース一覧」の「●観光庁『観光立国推進基本計画』」の先頭に段区切りを挿入します。",
+        "タスク3-6　見出し「情報ソース一覧」で始まるセクションの1段目の行間をすべて\"1.15\"に設定します。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1部 調査概要", "第2部 分析結果", "情報ソース一覧"],
+        "marginPreset": "標準",
+        "initialMarginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "見出し下二重罫線",
+        "imagePlacement": "本文右下（スーツケース）",
+        "pageBreakAfter": "第1部末尾",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 27,
+        "bibliographyItemCount": 6
+      },
+      "taskParams": {
+        "task3_1": {"marginPreset": "ミラー", "operation": "pageMargins"},
+        "task3_2": {"sectionHeading": "情報ソース一覧", "breakType": "continuous", "breakTypeUi": "連続"},
+        "task3_3": {"sectionHeading": "第2部 分析結果", "orientation": "横向き", "targetSection": "bodyBeforeBibliography"},
+        "task3_4": {"sectionHeading": "情報ソース一覧", "columns": 2, "columnPreset": "右"},
+        "task3_5": {
+          "sectionHeading": "情報ソース一覧",
+          "columnBreakBefore": "●観光庁『観光立国推進基本計画』"
+        },
+        "task3_6": {"sectionHeading": "情報ソース一覧", "lineSpacing": 1.15, "lineSpacingRule": "multiple", "lineSpacingUi": "1.15", "column": 1}
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project3_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは学習指導法の学芸レポートを作成しています。",
+      "tasks": [
+        "タスク3-1　文書の余白を「広い」に設定します。",
+        "タスク3-2　見出し「推奨読書リスト」の先頭にセクション区切りを挿入し、偶数ページから始まるように設定します。",
+        "タスク3-3　見出し「第2回 実践例」で始まるセクションの印刷の向きを、「縦向き」に設定します。",
+        "タスク3-4　見出し「推奨読書リスト」で始まるセクションを3段組みに設定します。",
+        "タスク3-5　見出し「推奨読書リスト」の「●教育出版協会『効果的な学習法入門』」の先頭に段区切りを挿入します。",
+        "タスク3-6　見出し「推奨読書リスト」で始まるセクションの1段目の行間をすべて\"1.6\"行に設定します。"
+      ],
+      "layout": {
+        "sectionCount": 2,
+        "headings": ["第1回 学習理論", "第2回 実践例", "推奨読書リスト"],
+        "marginPreset": "やや狭い",
+        "initialMarginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め＋引用段落に紫左罫線",
+        "imagePlacement": "見出し直下（ノートPC）",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 25,
+        "bibliographyItemCount": 7
+      },
+      "taskParams": {
+        "task3_1": {"marginPreset": "広い", "operation": "pageMargins"},
+        "task3_2": {"sectionHeading": "推奨読書リスト", "breakType": "evenPage", "breakTypeUi": "偶数ページから"},
+        "task3_3": {"sectionHeading": "第2回 実践例", "orientation": "縦向き", "targetSection": "bodyBeforeBibliography"},
+        "task3_4": {"sectionHeading": "推奨読書リスト", "columns": 3, "columnPreset": "3"},
+        "task3_5": {
+          "sectionHeading": "推奨読書リスト",
+          "columnBreakBefore": "●教育出版協会『効果的な学習法入門』"
+        },
+        "task3_6": {"sectionHeading": "推奨読書リスト", "lineSpacing": 1.6, "lineSpacingRule": "atLeast", "lineSpacingUi": "1.6行", "column": 1}
+      }
+    }
+  ]
+}

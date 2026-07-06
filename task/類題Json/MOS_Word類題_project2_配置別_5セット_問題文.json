@@ -1,0 +1,331 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリスト範疇。2-1=切り取り貼り付け、2-2=箇条書きレベル変更、2-3=文字色変更、2-4=図形入力、2-5=図形内書式の操作種別を維持。",
+    "forbiddenParagraphTexts": [
+      "朗読会",
+      "朗読を楽しみましょう",
+      "青空文庫のURLはコチラ↓",
+      "方法",
+      "ご参加お待ちしております"
+    ],
+    "perSetMustVary": [
+      "導入文と本文テーマ",
+      "2-1の切り取り元段落（こちら↓形式以外）",
+      "2-2の箇条書きレベル（3以外）",
+      "2-3の文字色（教材色以外）",
+      "2-4の図形種別と配置（最下部テキストボックス以外）",
+      "2-5のフォントサイズと書式（斜体は1セットのみ）"
+    ],
+    "mustNotReuseAcrossSets": [
+      "切り取り文字列",
+      "貼り付け先見出し",
+      "2-2見出し",
+      "2-3対象文字列と文字色",
+      "2-4入力テキスト",
+      "2-4図形種別",
+      "2-5フォントサイズ"
+    ],
+    "taskTypeVariation": {
+      "task2_1": "切り取り元は本文段落（こちら↓形式は使用しない）",
+      "task2_2": "箇条書きレベルは2・4・5など3以外でセットごとに異なる",
+      "task2_3": "文字色は許容リスト（ブルーグレー/濃い赤/ゴールド/薄い青）から選出",
+      "task2_4": "図形は吹き出し・楕円など（最下部の四角テキストボックス以外）",
+      "task2_5": "15pt以外のサイズ＋太字/下線/斜体（斜体は1セットのみ）"
+    },
+    "uiPolicy": "ビルド2508のリボン表示名を使用",
+    "specificity": "見出し・文字列・図形位置を完全一致で指定"
+  },
+  "wordUiNames": {
+    "build": "2508",
+    "cutPaste": "ホーム → クリップボード → 切り取り／貼り付け",
+    "bulletLevel": "ホーム → 段落 → 箇条書きのレベルの増減",
+    "fontColor": "ホーム → フォント → フォントの色",
+    "shapeText": "挿入 → 図形 → 図形を選択して文字入力",
+    "fontFormat": "ホーム → フォント → サイズ／太字／下線／斜体"
+  },
+  "sourceFile": "Project2.docx",
+  "projectId": 2,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_Word類題_project2_配置別_セット1_カフェ.docx",
+      "problemStatement": "あなたはラテアート体験会の案内文を作成しています。",
+      "tasks": [
+        "タスク2-1　「開催日は毎週土曜日です。」の文字列を切り取って、見出し「ラテアートに挑戦しよう！」の下の段落に貼り付けます。",
+        "タスク2-2　見出し「準備するもの」の下にある箇条書きのレベルを「2」に変更します。",
+        "タスク2-3　文書内の「ラテアートに挑戦しよう！」の文字の色を「ブルーグレー、テキスト2、白+基本色80％」に変更します。",
+        "タスク2-4　見出し「当日の注意」の下にある吹き出しの図形に、「\"ご来店お待ちしております\"」と入力します。",
+        "タスク2-5　吹き出しの図形内の文字列を12ptの太字にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["ラテアートに挑戦しよう！", "準備するもの", "当日の注意"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "基本（シンプル）",
+        "themeColor": "茶色",
+        "format": "見出し下に薄茶背景＋下罫線点線",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 22
+      },
+      "taskParams": {
+        "task2_1": {
+          "cutText": "開催日は毎週土曜日です。",
+          "cutSource": "bodyParagraph",
+          "targetHeading": "ラテアートに挑戦しよう！",
+          "linkParagraphContains": "https://cafe-example.jp/latte",
+          "operation": "cutPaste"
+        },
+        "task2_2": {
+          "heading": "準備するもの",
+          "listLevel": 2,
+          "bulletCount": 3,
+          "initialLevel": 1
+        },
+        "task2_3": {
+          "targetText": "ラテアートに挑戦しよう！",
+          "fontColorUi": "ブルーグレー、テキスト2、白+基本色80％"
+        },
+        "task2_4": {
+          "shapeType": "吹き出し",
+          "shapeLocation": "underHeading",
+          "anchorHeading": "当日の注意",
+          "inputText": "ご来店お待ちしております"
+        },
+        "task2_5": {
+          "fontSizePt": 12,
+          "fontStyle": "太字",
+          "sameShapeAs": "task2_4"
+        }
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_Word類題_project2_配置別_セット2_医療.docx",
+      "problemStatement": "あなたは健康セミナーの案内文を作成しています。",
+      "tasks": [
+        "タスク2-1　「受付は9時から開始します。」の文字列を切り取って、見出し「健康講座へようこそ！」の下の段落に貼り付けます。",
+        "タスク2-2　見出し「当日の流れ」の下にある箇条書きのレベルを「4」に変更します。",
+        "タスク2-3　文書内の「健康講座へようこそ！」の文字の色を「濃い赤」に変更します。",
+        "タスク2-4　見出し「参加上の注意」の横にある楕円の図形に、「\"ご参加をお待ちしております\"」と入力します。",
+        "タスク2-5　楕円の図形内の文字列を14ptの下線にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["健康講座へようこそ！", "当日の流れ", "参加上の注意"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "線（シンプル）",
+        "themeColor": "緑",
+        "format": "本文段落に左罫線アクセント（緑・1.5pt）",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 24
+      },
+      "taskParams": {
+        "task2_1": {
+          "cutText": "受付は9時から開始します。",
+          "cutSource": "bodyParagraph",
+          "targetHeading": "健康講座へようこそ！",
+          "linkParagraphContains": "https://health-seminar.jp/info",
+          "operation": "cutPaste"
+        },
+        "task2_2": {
+          "heading": "当日の流れ",
+          "listLevel": 4,
+          "bulletCount": 3,
+          "initialLevel": 1
+        },
+        "task2_3": {
+          "targetText": "健康講座へようこそ！",
+          "fontColorUi": "濃い赤"
+        },
+        "task2_4": {
+          "shapeType": "楕円",
+          "shapeLocation": "besideHeading",
+          "anchorHeading": "参加上の注意",
+          "inputText": "ご参加をお待ちしております"
+        },
+        "task2_5": {
+          "fontSizePt": 14,
+          "fontStyle": "下線",
+          "sameShapeAs": "task2_4"
+        }
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_Word類題_project2_配置別_セット3_製造.docx",
+      "problemStatement": "あなたは安全講習の案内文を作成しています。",
+      "tasks": [
+        "タスク2-1　「筆記用具は各自でご準備ください。」の文字列を切り取って、見出し「安全講習を受講しましょう！」の下の段落に貼り付けます。",
+        "タスク2-2　見出し「持参品」の下にある箇条書きのレベルを「5」に変更します。",
+        "タスク2-3　文書内の「安全講習を受講しましょう！」の文字の色を「ゴールド、アクセント4、白+基本色60％」に変更します。",
+        "タスク2-4　見出し「講習の概要」の下にある五角形の図形に、「\"皆様のご参加をお待ちしています\"」と入力します。",
+        "タスク2-5　五角形の図形内の文字列を16ptの太字にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["安全講習を受講しましょう！", "持参品", "講習の概要"],
+        "marginPreset": "広い",
+        "orientation": "縦",
+        "styleSet": "モダン",
+        "themeColor": "青灰",
+        "format": "交互段落に薄灰背景縞（2段落ごと）",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 26
+      },
+      "taskParams": {
+        "task2_1": {
+          "cutText": "筆記用具は各自でご準備ください。",
+          "cutSource": "bodyParagraph",
+          "targetHeading": "安全講習を受講しましょう！",
+          "linkParagraphContains": "https://safety-training.jp/dl",
+          "operation": "cutPaste"
+        },
+        "task2_2": {
+          "heading": "持参品",
+          "listLevel": 5,
+          "bulletCount": 3,
+          "initialLevel": 1
+        },
+        "task2_3": {
+          "targetText": "安全講習を受講しましょう！",
+          "fontColorUi": "ゴールド、アクセント4、白+基本色60％"
+        },
+        "task2_4": {
+          "shapeType": "五角形",
+          "shapeLocation": "underHeading",
+          "anchorHeading": "講習の概要",
+          "inputText": "皆様のご参加をお待ちしています"
+        },
+        "task2_5": {
+          "fontSizePt": 16,
+          "fontStyle": "太字",
+          "sameShapeAs": "task2_4"
+        }
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_Word類題_project2_配置別_セット4_旅行.docx",
+      "problemStatement": "あなたは添乗員研修の案内文を作成しています。",
+      "tasks": [
+        "タスク2-1　「集合時刻は午前8時30分です。」の文字列を切り取って、見出し「添乗員研修を始めましょう！」の下の段落に貼り付けます。",
+        "タスク2-2　見出し「研修内容」の下にある箇条書きのレベルを「2」に変更します。",
+        "タスク2-3　文書内の「添乗員研修を始めましょう！」の文字の色を「薄い青」に変更します。",
+        "タスク2-4　見出し「集合場所」の下にある矢印の図形に、「\"お申し込みお待ちしております\"」と入力します。",
+        "タスク2-5　矢印の図形内の文字列を18ptの下線にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["添乗員研修を始めましょう！", "研修内容", "集合場所"],
+        "marginPreset": "標準",
+        "orientation": "縦",
+        "styleSet": "伝統",
+        "themeColor": "橙",
+        "format": "見出し下二重罫線＋セクション区切り風の余白",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 23
+      },
+      "taskParams": {
+        "task2_1": {
+          "cutText": "集合時刻は午前8時30分です。",
+          "cutSource": "bodyParagraph",
+          "targetHeading": "添乗員研修を始めましょう！",
+          "linkParagraphContains": "https://travel-guide.jp/schedule",
+          "operation": "cutPaste"
+        },
+        "task2_2": {
+          "heading": "研修内容",
+          "listLevel": 2,
+          "bulletCount": 3,
+          "initialLevel": 1
+        },
+        "task2_3": {
+          "targetText": "添乗員研修を始めましょう！",
+          "fontColorUi": "薄い青"
+        },
+        "task2_4": {
+          "shapeType": "矢印",
+          "shapeLocation": "underHeading",
+          "anchorHeading": "集合場所",
+          "inputText": "お申し込みお待ちしております"
+        },
+        "task2_5": {
+          "fontSizePt": 18,
+          "fontStyle": "下線",
+          "sameShapeAs": "task2_4"
+        }
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_Word類題_project2_配置別_セット5_学習塾.docx",
+      "problemStatement": "あなたは保護者説明会の案内文を作成しています。",
+      "tasks": [
+        "タスク2-1　「説明会は14時から行います。」の文字列を切り取って、見出し「保護者説明会へようこそ！」の下の段落に貼り付けます。",
+        "タスク2-2　見出し「説明会の流れ」の下にある箇条書きのレベルを「4」に変更します。",
+        "タスク2-3　文書内の「保護者説明会へようこそ！」の文字の色を「ブルーグレー、テキスト2、白+基本色40％」に変更します。",
+        "タスク2-4　見出し「お問い合わせ」の下にある雲形の図形に、「\"会場でお待ちしております\"」と入力します。",
+        "タスク2-5　雲形の図形内の文字列を11ptの斜体にします。"
+      ],
+      "layout": {
+        "sectionCount": 1,
+        "headings": ["保護者説明会へようこそ！", "説明会の流れ", "お問い合わせ"],
+        "marginPreset": "やや狭い",
+        "orientation": "縦",
+        "styleSet": "オフィス",
+        "themeColor": "紫",
+        "format": "段落右余白広め＋引用段落に紫左罫線",
+        "imagePlacement": "なし",
+        "pageBreakAfter": "なし",
+        "printTitleRow": "なし（表なし）",
+        "paragraphCount": 21
+      },
+      "taskParams": {
+        "task2_1": {
+          "cutText": "説明会は14時から行います。",
+          "cutSource": "bodyParagraph",
+          "targetHeading": "保護者説明会へようこそ！",
+          "linkParagraphContains": "https://juku-school.jp/request",
+          "operation": "cutPaste"
+        },
+        "task2_2": {
+          "heading": "説明会の流れ",
+          "listLevel": 4,
+          "bulletCount": 3,
+          "initialLevel": 1
+        },
+        "task2_3": {
+          "targetText": "保護者説明会へようこそ！",
+          "fontColorUi": "ブルーグレー、テキスト2、白+基本色40％"
+        },
+        "task2_4": {
+          "shapeType": "雲形",
+          "shapeLocation": "underHeading",
+          "anchorHeading": "お問い合わせ",
+          "inputText": "会場でお待ちしております"
+        },
+        "task2_5": {
+          "fontSizePt": 11,
+          "fontStyle": "斜体",
+          "sameShapeAs": "task2_4"
+        }
+      }
+    }
+  ]
+}

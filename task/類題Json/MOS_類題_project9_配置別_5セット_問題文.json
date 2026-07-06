@@ -1,0 +1,132 @@
+{
+  "variantRules": {
+    "scope": "MOSスペシャリストの内容の範疇内。名前定義・名前付き範囲・文字列関数の操作種別を変更しない。",
+    "forbiddenSheetNames": ["学生名簿", "売上報告", "担当者リスト", "申込一覧"],
+    "specificity": "定義範囲・名前・結合列・名前付き範囲名・結合文字列を具体指定。",
+    "perSetMustVary": [
+      "タスク9-1の定義名", "タスク9-2の名前付き範囲と変更値",
+      "タスク9-3の名前付き範囲名", "タスク9-4の結合列の組み合わせ",
+      "タスク9-5のセル列と文字列", "タスク9-6の区切り記号"
+    ]
+  },
+  "sourceFile": "project9.xlsx",
+  "projectId": 9,
+  "variantType": "layout",
+  "sets": [
+    {
+      "setNo": 1,
+      "theme": "カフェ",
+      "workbook": "MOS_類題_project9_配置別_セット1_カフェ.xlsx",
+      "problemStatement": "あなたはカフェのスタッフ・イベント参加データを集計しています。",
+      "tasks": [
+        "タスク9-1　シート［スタッフ名簿］のセル範囲【C5:C22】に、「\"スタッフ名\"」の名前を定義します。",
+        "タスク9-2　名前「代表店舗」の名前付き範囲に移動し、セルの内容を「\"焙煎店\"」に変更します。",
+        "タスク9-3　シート［売上集計報告］のセル【J6】に、関数を使用して全店舗の来客総合計を求めます。ただし、セル参照や数値は使用せず、名前付き範囲「来客合計」を使用します。",
+        "タスク9-4　シート［スタッフ名簿］の「店舗班」の列に関数を使って「店舗」と「班」の文字列を結合して表示します。",
+        "タスク9-5　シート［仕入先リスト］の「表示番号」の列に、関数を使って「連番」と文字列「\"ST-\"」をつなげて表示します。",
+        "タスク9-6　シート［試飲申込］の「所属」の列に、関数を使って「エリア」と文字列「\" / \"」と「店舗」を組み合わせて表示します。　　例）駅前 / 焙煎店"
+      ],
+      "layout": {"sheetCount": 5, "sheets": ["スタッフ名簿", "売上集計報告", "仕入先リスト", "試飲申込", "日次補助"], "tableStart": "A3", "headerRow": 3, "tableShape": "5列×25行", "colWidths": [6, 28, 14, 14, 12], "rowHeights": {"title": 30, "header": 26, "data": 20}, "visual": "縦棒グラフ", "visualSheet": "日次補助", "format": "枠線なし＋交互薄ベージュ縞", "tabColor": "8B5A2B", "print": "縦向き"},
+      "taskParams": {
+        "task9_1": {"sheet": "スタッフ名簿", "defineRange": "C5:C22", "name": "スタッフ名"},
+        "task9_2": {"namedRange": "代表店舗", "changeType": "cellValue", "newValue": "焙煎店"},
+        "task9_3": {"sheet": "売上集計報告", "targetCell": "J6", "function": "SUM", "namedRange": "来客合計", "metric": "来客総合計"},
+        "task9_4": {"sheet": "スタッフ名簿", "targetColumn": "店舗班", "concatColumns": ["店舗", "班"]},
+        "task9_5": {"sheet": "仕入先リスト", "targetColumn": "表示番号", "sourceColumn": "連番", "literal": "ST-", "function": "CONCAT"},
+        "task9_6": {"sheet": "試飲申込", "targetColumn": "所属", "concatColumns": ["エリア", "店舗"], "separator": " / ", "example": "駅前 / 焙煎店"}
+      }
+    },
+    {
+      "setNo": 2,
+      "theme": "医療",
+      "workbook": "MOS_類題_project9_配置別_セット2_医療.xlsx",
+      "problemStatement": "あなたは医療機関の職員・健診参加データを集計しています。",
+      "tasks": [
+        "タスク9-1　シート［職員名簿］のセル範囲【D6:D28】に、「\"職員名\"」の名前を定義します。",
+        "タスク9-2　名前「健診会場」の名前付き範囲に移動し、セルの内容を「\"本院ホール\"」に変更します。",
+        "タスク9-3　シート［診療集計報告］のセル【K7】に、関数を使用して全診療科の診療実績合計を求めます。ただし、セル参照や数値は使用せず、名前付き範囲「診療実績合計」を使用します。",
+        "タスク9-4　シート［職員名簿］の「診療科専門」の列に関数を使って「診療科」と「専門分野」の文字列を結合して表示します。",
+        "タスク9-5　シート［協力会社リスト］の「社員コード」の列に、関数を使って「番号」と文字列「\"M-\"」をつなげて表示します。",
+        "タスク9-6　シート［健診申込］の「所属」の列に、関数を使って「キャンパス」と文字列「\" & \"」と「診療科」を組み合わせて表示します。　　例）本院 & 内科"
+      ],
+      "layout": {"sheetCount": 5, "sheets": ["職員名簿", "診療集計報告", "協力会社リスト", "健診申込", "外来補助"], "tableStart": "B5", "headerRow": 5, "tableShape": "12列×8行", "colWidths": [3, 18, 9, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12], "rowHeights": {"title": 40, "header": 30, "data": 24}, "visual": "スパークライン", "visualSheet": "外来補助", "format": "上下太罫線＋ヘッダー濃緑白字", "tabColor": "38761D", "print": "横向き"},
+      "taskParams": {
+        "task9_1": {"sheet": "職員名簿", "defineRange": "D6:D28", "name": "職員名"},
+        "task9_2": {"namedRange": "健診会場", "changeType": "cellValue", "newValue": "本院ホール"},
+        "task9_3": {"sheet": "診療集計報告", "targetCell": "K7", "function": "SUM", "namedRange": "診療実績合計", "metric": "診療実績合計"},
+        "task9_4": {"sheet": "職員名簿", "targetColumn": "診療科専門", "concatColumns": ["診療科", "専門分野"]},
+        "task9_5": {"sheet": "協力会社リスト", "targetColumn": "社員コード", "sourceColumn": "番号", "literal": "M-", "function": "CONCAT"},
+        "task9_6": {"sheet": "健診申込", "targetColumn": "所属", "concatColumns": ["キャンパス", "診療科"], "separator": " & ", "example": "本院 & 内科"}
+      }
+    },
+    {
+      "setNo": 3,
+      "theme": "製造",
+      "workbook": "MOS_類題_project9_配置別_セット3_製造.xlsx",
+      "problemStatement": "あなたは製造現場の社員・見学会データを集計しています。",
+      "tasks": [
+        "タスク9-1　シート［社員名簿］のセル範囲【E5:E24】に、「\"作業者名\"」の名前を定義します。",
+        "タスク9-2　名前「見学ライン」の名前付き範囲に移動し、セルの内容を「\"第一組立\"」に変更します。",
+        "タスク9-3　シート［生産集計報告］のセル【I5】に、関数を使用して全工場の出荷実績合計を求めます。ただし、セル参照や数値は使用せず、名前付き範囲「出荷実績合計」を使用します。",
+        "タスク9-4　シート［社員名簿］の「工場ライン」の列に関数を使って「工場」と「ライン」の文字列を結合して表示します。",
+        "タスク9-5　シート［取引先リスト］の「型番表示」の列に、関数を使って「基本型」と文字列「\"MK-\"」をつなげて表示します。",
+        "タスク9-6　シート［見学申込］の「所属」の列に、関数を使って「工場」と文字列「\" × \"」と「ライン」を組み合わせて表示します。　　例）第一 × 組立"
+      ],
+      "layout": {"sheetCount": 4, "sheets": ["社員名簿", "生産集計報告", "取引先リスト", "見学申込"], "tableStart": "C4", "headerRow": 4, "tableShape": "8列×8行", "colWidths": [2, 14, 10, 10, 10, 10, 10, 12], "rowHeights": {"title": 34, "header": 26, "data": 20}, "visual": "円グラフ", "visualSheet": "見学申込", "format": "太罫線囲み＋ヘッダーオレンジ", "tabColor": "595959", "print": "縦向き"},
+      "taskParams": {
+        "task9_1": {"sheet": "社員名簿", "defineRange": "E5:E24", "name": "作業者名"},
+        "task9_2": {"namedRange": "見学ライン", "changeType": "cellValue", "newValue": "第一組立"},
+        "task9_3": {"sheet": "生産集計報告", "targetCell": "I5", "function": "SUM", "namedRange": "出荷実績合計", "metric": "出荷実績合計"},
+        "task9_4": {"sheet": "社員名簿", "targetColumn": "工場ライン", "concatColumns": ["工場", "ライン"]},
+        "task9_5": {"sheet": "取引先リスト", "targetColumn": "型番表示", "sourceColumn": "基本型", "literal": "MK-", "function": "CONCAT"},
+        "task9_6": {"sheet": "見学申込", "targetColumn": "所属", "concatColumns": ["工場", "ライン"], "separator": " × ", "example": "第一 × 組立"}
+      }
+    },
+    {
+      "setNo": 4,
+      "theme": "旅行",
+      "workbook": "MOS_類題_project9_配置別_セット4_旅行.xlsx",
+      "problemStatement": "あなたは旅行会社の社員・ツアー参加データを集計しています。",
+      "tasks": [
+        "タスク9-1　シート［社員名簿］のセル範囲【F7:F26】に、「\"担当者名\"」の名前を定義します。",
+        "タスク9-2　名前「出発空港」の名前付き範囲に移動し、セルの内容を「\"羽田\"」に変更します。",
+        "タスク9-3　シート［予約集計報告］のセル【L8】に、関数を使用して全支店の予約件数合計を求めます。ただし、セル参照や数値は使用せず、名前付き範囲「予約件数合計」を使用します。",
+        "タスク9-4　シート［社員名簿］の「支店企画」の列に関数を使って「支店」と「企画区分」の文字列を結合して表示します。",
+        "タスク9-5　シート［提携先リスト］の「予約番号」の列に、関数を使って「受付番号」と文字列「\"TR-\"」をつなげて表示します。",
+        "タスク9-6　シート［ツアー申込］の「所属」の列に、関数を使って「支店」と文字列「\"：\"」と「企画区分」を組み合わせて表示します。　　例）銀座：企画"
+      ],
+      "layout": {"sheetCount": 6, "sheets": ["社員名簿", "予約集計報告", "提携先リスト", "ツアー申込", "宿泊", "観光地"], "tableStart": "D6", "headerRow": 6, "tableShape": "4列×6行×3", "colWidths": [3, 12, 14, 12, 12, 12, 12], "rowHeights": {"title": 30, "header": 22, "data": 20}, "visual": "シェイプ", "visualSheet": "観光地", "format": "縦縞＋スカイブルー薄罫線", "tabColor": "1F4E79", "print": "横向き"},
+      "taskParams": {
+        "task9_1": {"sheet": "社員名簿", "defineRange": "F7:F26", "name": "担当者名"},
+        "task9_2": {"namedRange": "出発空港", "changeType": "cellValue", "newValue": "羽田"},
+        "task9_3": {"sheet": "予約集計報告", "targetCell": "L8", "function": "SUM", "namedRange": "予約件数合計", "metric": "予約件数合計"},
+        "task9_4": {"sheet": "社員名簿", "targetColumn": "支店企画", "concatColumns": ["支店", "企画区分"]},
+        "task9_5": {"sheet": "提携先リスト", "targetColumn": "予約番号", "sourceColumn": "受付番号", "literal": "TR-", "function": "CONCAT"},
+        "task9_6": {"sheet": "ツアー申込", "targetColumn": "所属", "concatColumns": ["支店", "企画区分"], "separator": "：", "example": "銀座：企画"}
+      }
+    },
+    {
+      "setNo": 5,
+      "theme": "学習塾",
+      "workbook": "MOS_類題_project9_配置別_セット5_学習塾.xlsx",
+      "problemStatement": "あなたは学習塾の講師・受講申込データを集計しています。",
+      "tasks": [
+        "タスク9-1　シート［講師名簿］のセル範囲【B8:B30】に、「\"講師名\"」の名前を定義します。",
+        "タスク9-2　名前「模試会場」の名前付き範囲に移動し、セルの内容を「\"池袋校\"」に変更します。",
+        "タスク9-3　シート［受講集計報告］のセル【K9】に、関数を使用して全教室の受講料合計を求めます。ただし、セル参照や数値は使用せず、名前付き範囲「受講料合計」を使用します。",
+        "タスク9-4　シート［講師名簿］の「校舎コース」の列に関数を使って「校舎」と「コース」の文字列を結合して表示します。",
+        "タスク9-5　シート［教材会社リスト］の「教材コード」の列に、関数を使って「教材ID」と文字列「\"JK-\"」をつなげて表示します。",
+        "タスク9-6　シート［講座申込］の「所属」の列に、関数を使って「校舎」と文字列「\"・\"」と「コース」を組み合わせて表示します。　　例）池袋・数学"
+      ],
+      "layout": {"sheetCount": 5, "sheets": ["講師名簿", "受講集計報告", "教材会社リスト", "講座申込", "模試補助"], "tableStart": "A8", "headerRow": 7, "tableShape": "9列×12行", "colWidths": [8, 16, 10, 10, 10, 10, 10, 10, 14], "rowHeights": {"title": 40, "header": 28, "data": 22}, "visual": "画像枠", "visualSheet": "模試補助", "format": "交互縞＋下罫線＋ネイビー白字", "tabColor": "BF9000", "print": "縦向き"},
+      "taskParams": {
+        "task9_1": {"sheet": "講師名簿", "defineRange": "B8:B30", "name": "講師名"},
+        "task9_2": {"namedRange": "模試会場", "changeType": "cellValue", "newValue": "池袋校"},
+        "task9_3": {"sheet": "受講集計報告", "targetCell": "K9", "function": "SUM", "namedRange": "受講料合計", "metric": "受講料合計"},
+        "task9_4": {"sheet": "講師名簿", "targetColumn": "校舎コース", "concatColumns": ["校舎", "コース"]},
+        "task9_5": {"sheet": "教材会社リスト", "targetColumn": "教材コード", "sourceColumn": "教材ID", "literal": "JK-", "function": "CONCAT"},
+        "task9_6": {"sheet": "講座申込", "targetColumn": "所属", "concatColumns": ["校舎", "コース"], "separator": "・", "example": "池袋・数学"}
+      }
+    }
+  ]
+}
