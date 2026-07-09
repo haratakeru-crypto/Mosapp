@@ -29,12 +29,12 @@
             </Grid.RowDefinitions>
             
             <!-- ヘッダーバー -->
-            <Border Grid.Row="0" Background="#1E40AF" CornerRadius="8,8,0,0" Margin="0,0,0,6">
+            <Border Grid.Row="0" Background="#1E40AF" CornerRadius="8,8,0,0" Margin="0,0,0,6" ClipToBounds="False">
                 <Grid Margin="20,2">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     
                     <!-- 左側: タイマーとボタン -->
@@ -104,17 +104,46 @@
                                HorizontalAlignment="Center"
                                TextAlignment="Center"/>
                     
-                    <!-- 右側: ボタンとアイコン -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="20,0,10,0">
+                    <!-- 右側: ボタンとアイコン（列幅 Auto で切り抜き防止） -->
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right"
+                                Margin="12,0,0,0">
 
-                        <Button Name="VariantButton"
-                                Content="{Binding VariantButtonLabel}"
-                                Command="{Binding SwitchVariantModeCommand}"
-                                Visibility="{Binding ShowVariantButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        <Button Name="GoToTextbookButton"
+                                Content="教材"
+                                Command="{Binding GoToTextbookCommand}"
+                                Visibility="{Binding ShowGoToTextbookButton, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Background="White"
                                 Foreground="#1E40AF"
-                                Padding="24,10"
-                                Margin="0,0,10,0"
+                                Padding="16,10"
+                                Margin="0,0,8,0"
+                                BorderThickness="0"
+                                FontWeight="Medium"
+                                FontSize="16">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#F3F4F6"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Background" Value="#E5E7EB"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Name="GoToVariantButton"
+                                Content="{Binding GoToVariantButtonLabel}"
+                                Command="{Binding GoToVariantCommand}"
+                                Visibility="{Binding ShowGoToVariantButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Background="White"
+                                Foreground="#1E40AF"
+                                Padding="16,10"
+                                Margin="0,0,8,0"
                                 BorderThickness="0"
                                 FontWeight="Medium"
                                 FontSize="16">

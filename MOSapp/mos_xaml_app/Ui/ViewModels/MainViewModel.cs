@@ -243,7 +243,8 @@ namespace Ui.ViewModels
             ResetExamCommand = new RelayCommand(ExecuteResetExam);
             NextProjectCommand = new RelayCommand(ExecuteNextProject);
             UiTestCommand = new RelayCommand(ExecuteUiTest);
-            SwitchVariantModeCommand = new RelayCommand(ExecuteSwitchVariantMode);
+            GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode);
+            GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant);
     }
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
@@ -286,7 +287,10 @@ namespace Ui.ViewModels
         public ICommand ResetExamCommand { get; }
         public ICommand NextProjectCommand { get; }
         public ICommand UiTestCommand { get; }
-        public ICommand SwitchVariantModeCommand { get; }
+        /// <summary>類題モードから教材へ戻る。</summary>
+        public ICommand GoToTextbookCommand { get; }
+        /// <summary>教材→選択中の類題、または類題n→類題n+1 へ進む。</summary>
+        public ICommand GoToVariantCommand { get; }
 
     public bool IsExcelOverlayVisible
         {
@@ -586,6 +590,7 @@ namespace Ui.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CurrentProjectName));
                 OnPropertyChanged(nameof(IsNextProjectVisible));
+                NotifyVariantButtonStateChanged();
                 CurrentProjectChanged?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -610,7 +615,13 @@ namespace Ui.ViewModels
         public bool ShowVariantButton
         {
             get => _showVariantButton;
-            set { _showVariantButton = value; OnPropertyChanged(nameof(ShowVariantButton)); }
+            set
+            {
+                if (_showVariantButton == value) return;
+                _showVariantButton = value;
+                OnPropertyChanged(nameof(ShowVariantButton));
+                NotifyVariantButtonStateChanged();
+            }
         }
 
         /// <summary>類題セット番号（1〜5）。ComboBox と連動。</summary>
@@ -624,7 +635,7 @@ namespace Ui.ViewModels
                 _variantSetNo = clamped;
                 OnPropertyChanged(nameof(VariantSetNo));
                 OnPropertyChanged(nameof(VariantSetIndex));
-                OnPropertyChanged(nameof(VariantButtonLabel));
+                NotifyVariantButtonStateChanged();
             }
         }
 
@@ -644,16 +655,114 @@ namespace Ui.ViewModels
                 if (_isVariantMode == value) return;
                 _isVariantMode = value;
                 OnPropertyChanged(nameof(IsVariantMode));
-                OnPropertyChanged(nameof(VariantButtonLabel));
                 OnPropertyChanged(nameof(CanSelectVariantSet));
+                NotifyVariantButtonStateChanged();
             }
         }
 
         /// <summary>教材モード中のみ類題セット ComboBox を変更可能。</summary>
-        public bool CanSelectVariantSet => !IsVariantMode;
+        public bool CanSelectVariantSet => !IsVariantMode && HasVariantSupportForCurrentProject;
 
-        /// <summary>アプリバー類題ボタンの表示文言。</summary>
-        public string VariantButtonLabel => IsVariantMode ? "教材へ" : $"類題{VariantSetNo}へ";
+        /// <summary>現在プロジェクトに類題 Excel が1つ以上あるか（未配置の 5/9/10 等は false）。</summary>
+        public bool HasVariantSupportForCurrentProject
+        {
+            get
+            {
+                if (!TryGetCurrentGroupProjectId(out int groupId, out int projectId))
+                    return false;
+                for (int setNo = 1; setNo <= 5; setNo++)
+                {
+                    if (IsVariantExcelAvailable(groupId, projectId, setNo))
+                        return true;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>類題モード中のみ「教材」ボタンを表示。</summary>
+        public bool ShowGoToTextbookButton =>
+            ShowVariantButton && IsVariantMode && HasVariantSupportForCurrentProject;
+
+        /// <summary>
+        /// 教材モード: 「類題{選択セット}へ」。類題モード: 次の類題セットへ（5の次は1へループ）。
+        /// </summary>
+        public bool ShowGoToVariantButton =>
+            ShowVariantButton && HasVariantSupportForCurrentProject && CanGoToVariant;
+
+        private bool CanGoToVariant
+        {
+            get
+            {
+                if (!HasVariantSupportForCurrentProject)
+                    return false;
+                if (!TryGetCurrentGroupProjectId(out int groupId, out int projectId))
+                    return false;
+
+                if (!IsVariantMode)
+                    return IsVariantExcelAvailable(groupId, projectId, VariantSetNo);
+
+                return GetNextVariantSetNo(VariantSetNo, groupId, projectId) > 0;
+            }
+        }
+
+        /// <summary>次へ進む類題ボタンの文言。</summary>
+        public string GoToVariantButtonLabel
+        {
+            get
+            {
+                if (!IsVariantMode)
+                    return $"類題{VariantSetNo}へ";
+
+                if (!TryGetCurrentGroupProjectId(out int groupId, out int projectId))
+                    return $"類題{VariantSetNo}へ";
+
+                int nextSet = GetNextVariantSetNo(VariantSetNo, groupId, projectId);
+                return nextSet > 0 ? $"類題{nextSet}へ" : $"類題{VariantSetNo}へ";
+            }
+        }
+
+        /// <summary>類題モード時の次セット（5の次は1。未配置セットはスキップ）。</summary>
+        private int GetNextVariantSetNo(int currentSetNo, int groupId, int projectId)
+        {
+            for (int step = 1; step <= 4; step++)
+            {
+                int candidate = ((currentSetNo - 1 + step) % 5) + 1;
+                if (candidate != currentSetNo && IsVariantExcelAvailable(groupId, projectId, candidate))
+                    return candidate;
+            }
+            return 0;
+        }
+
+        private bool TryGetCurrentGroupProjectId(out int groupId, out int projectId)
+        {
+            groupId = 0;
+            projectId = 0;
+            if (CurrentProject == null)
+                return false;
+
+            if (!int.TryParse(CurrentProject.Group.Replace("Group ", ""), out groupId))
+                return false;
+
+            projectId = CurrentProject.ProjectNumber;
+            return projectId > 0;
+        }
+
+        public bool IsVariantExcelAvailable(int groupId, int projectId, int variantSetNo)
+        {
+            string path = GetVariantProjectFilePath(groupId, projectId, variantSetNo);
+            return !string.IsNullOrEmpty(path) && File.Exists(path);
+        }
+
+        private void NotifyVariantButtonStateChanged()
+        {
+            OnPropertyChanged(nameof(HasVariantSupportForCurrentProject));
+            OnPropertyChanged(nameof(CanSelectVariantSet));
+            OnPropertyChanged(nameof(ShowGoToTextbookButton));
+            OnPropertyChanged(nameof(ShowGoToVariantButton));
+            OnPropertyChanged(nameof(GoToVariantButtonLabel));
+            OnPropertyChanged(nameof(CanGoToVariant));
+            CommandManager.InvalidateRequerySuggested();
+        }
         
         public bool IsNextProjectVisible => CurrentProject != null && CurrentProject.ProjectNumber <= 10;
 
@@ -1382,7 +1491,30 @@ namespace Ui.ViewModels
             return $"{libraryName}_PV{VariantSetNo}";
         }
 
-        private void ExecuteSwitchVariantMode(object parameter)
+        private void ExecuteGoToTextbook(object parameter)
+        {
+            SwitchToVariantOrTextbook(targetVariantMode: false, targetSetNo: VariantSetNo);
+        }
+
+        private void ExecuteGoToVariant(object parameter)
+        {
+            if (!TryGetCurrentGroupProjectId(out int groupId, out int projectId))
+                return;
+
+            if (!IsVariantMode)
+            {
+                SwitchToVariantOrTextbook(targetVariantMode: true, targetSetNo: VariantSetNo);
+                return;
+            }
+
+            int nextSetNo = GetNextVariantSetNo(VariantSetNo, groupId, projectId);
+            if (nextSetNo <= 0)
+                return;
+
+            SwitchToVariantOrTextbook(targetVariantMode: true, targetSetNo: nextSetNo);
+        }
+
+        private void SwitchToVariantOrTextbook(bool targetVariantMode, int targetSetNo)
         {
             if (CurrentProject == null)
             {
@@ -1390,17 +1522,22 @@ namespace Ui.ViewModels
                 return;
             }
 
+            if (TryShowObjectSelectedWarningIfExcelObjectSelected())
+                return;
+
             int groupId = int.Parse(CurrentProject.Group.Replace("Group ", ""));
             int projectId = CurrentProject.ProjectNumber;
-            bool targetVariantMode = !IsVariantMode;
+            int previousSetNo = VariantSetNo;
+            bool previousVariantMode = IsVariantMode;
+            int setNoForPath = targetVariantMode ? Math.Max(1, Math.Min(5, targetSetNo)) : VariantSetNo;
 
             string filePath = targetVariantMode
-                ? GetVariantProjectFilePath(groupId, projectId, VariantSetNo)
+                ? GetVariantProjectFilePath(groupId, projectId, setNoForPath)
                 : GetProjectFilePath(groupId, projectId);
 
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
-                string modeLabel = targetVariantMode ? $"類題{VariantSetNo}" : "教材";
+                string modeLabel = targetVariantMode ? $"類題{setNoForPath}" : "教材";
                 MessageBox.Show(
                     $"ファイルが見つかりません。\n\n{modeLabel}:\n{filePath}",
                     "類題切替",
@@ -1408,6 +1545,27 @@ namespace Ui.ViewModels
                     MessageBoxImage.Warning);
                 return;
             }
+
+            try
+            {
+                TryReplaceExcelWorkbook(filePath, "[SwitchToVariantOrTextbook]");
+            }
+            catch (Exception ex)
+            {
+                VariantSetNo = previousSetNo;
+                if (IsVariantMode != previousVariantMode)
+                    IsVariantMode = previousVariantMode;
+
+                MessageBox.Show(
+                    $"Excel の切替に失敗しました。\n\n{ex.Message}",
+                    "類題切替",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            if (targetVariantMode)
+                VariantSetNo = setNoForPath;
 
             IsVariantMode = targetVariantMode;
 
@@ -1419,7 +1577,8 @@ namespace Ui.ViewModels
                 ProjectNumber = CurrentProject.ProjectNumber
             };
 
-            OpenExcelWorkbookAfterResetByShell(filePath);
+            string modeLabel2 = targetVariantMode ? $"類題{VariantSetNo}" : "教材";
+            ResultMessage = $"{modeLabel2}に切り替えました: {Path.GetFileName(filePath)}";
             VariantModeChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -2302,6 +2461,92 @@ namespace Ui.ViewModels
         }
 
         /// <summary>
+        /// 次プロジェクト／類題切替と同様、現在のブックを保存・閉じたあと指定ファイルを COM で開く。
+        /// </summary>
+        private void TryReplaceExcelWorkbook(string filePath, string logPrefix)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                throw new FileNotFoundException($"ファイルが見つかりません: {filePath}");
+
+            using (OleMessageFilterScope.Enter())
+            {
+                SaveCurrentExcelProject(closeWorkbook: true);
+
+                ExcelApp excelApp = TryGetExcelApplicationForProjectSwitch();
+                if (excelApp == null)
+                    throw new InvalidOperationException("Excel アプリケーションを取得できませんでした。");
+
+                CloseAllWorkbooks(excelApp, logPrefix);
+
+                for (int settleAttempt = 0; settleAttempt < 5 && excelApp.Workbooks.Count > 0; settleAttempt++)
+                {
+                    Thread.Sleep(100);
+                    CloseAllWorkbooks(excelApp, logPrefix);
+                }
+
+                string targetFullPathLower = Path.GetFullPath(filePath).ToLowerInvariant();
+                ExcelWorkbook targetWorkbook = null;
+
+                int openWorkbookCount = excelApp.Workbooks.Count;
+                for (int i = 1; i <= openWorkbookCount; i++)
+                {
+                    ExcelWorkbook wb = null;
+                    try
+                    {
+                        wb = excelApp.Workbooks[i];
+                        string wbFullPathLower = Path.GetFullPath(wb.FullName).ToLowerInvariant();
+                        if (wbFullPathLower == targetFullPathLower)
+                        {
+                            targetWorkbook = wb;
+                            wb = null;
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                        /* ignore */
+                    }
+                    finally
+                    {
+                        if (wb != null)
+                        {
+                            try { Marshal.ReleaseComObject(wb); } catch { }
+                        }
+                    }
+                }
+
+                if (targetWorkbook == null)
+                {
+                    Exception lastOpenError = null;
+                    for (int openAttempt = 0; openAttempt < 5; openAttempt++)
+                    {
+                        try
+                        {
+                            targetWorkbook = excelApp.Workbooks.Open(filePath, ReadOnly: false);
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            lastOpenError = ex;
+                            if (openAttempt < 4)
+                                Thread.Sleep(100);
+                        }
+                    }
+
+                    if (targetWorkbook == null)
+                        throw lastOpenError ?? new InvalidOperationException("ワークブックを開けませんでした。");
+                }
+
+                try { targetWorkbook.Activate(); } catch { }
+                try { excelApp.Visible = true; } catch { }
+            }
+
+            Application.Current?.Dispatcher?.BeginInvoke(
+                new Action(() => SharedExcelApplicationAttached?.Invoke(this, EventArgs.Empty)),
+                DispatcherPriority.Background);
+        }
+
+        /// <summary>
         /// 現在のExcelプロジェクトを自動保存する共通メソッド
         /// </summary>
         /// <param name="closeWorkbook">保存後にワークブックを閉じるかどうか</param>
@@ -2495,78 +2740,9 @@ namespace Ui.ViewModels
 
             try
             {
-                using (OleMessageFilterScope.Enter())
-                {
-                    SaveCurrentExcelProject(closeWorkbook: true);
+                IsVariantMode = false;
 
-                    ExcelApp excelApp = TryGetExcelApplicationForProjectSwitch();
-                    if (excelApp == null)
-                        throw new InvalidOperationException("Excel アプリケーションを取得できませんでした。");
-
-                    CloseAllWorkbooks(excelApp, "[ExecuteNextProject]");
-
-                    for (int settleAttempt = 0; settleAttempt < 5 && excelApp.Workbooks.Count > 0; settleAttempt++)
-                    {
-                        Thread.Sleep(100);
-                        CloseAllWorkbooks(excelApp, "[ExecuteNextProject]");
-                    }
-
-                    string targetFullPathLower = Path.GetFullPath(nextFilePath).ToLowerInvariant();
-                    ExcelWorkbook targetWorkbook = null;
-
-                    int openWorkbookCount = excelApp.Workbooks.Count;
-                    for (int i = 1; i <= openWorkbookCount; i++)
-                    {
-                        ExcelWorkbook wb = null;
-                        try
-                        {
-                            wb = excelApp.Workbooks[i];
-                            string wbFullPathLower = Path.GetFullPath(wb.FullName).ToLowerInvariant();
-                            if (wbFullPathLower == targetFullPathLower)
-                            {
-                                targetWorkbook = wb;
-                                wb = null;
-                                break;
-                            }
-                        }
-                        catch
-                        {
-                            /* ignore */
-                        }
-                        finally
-                        {
-                            if (wb != null)
-                            {
-                                try { Marshal.ReleaseComObject(wb); } catch { }
-                            }
-                        }
-                    }
-
-                    if (targetWorkbook == null)
-                    {
-                        Exception lastOpenError = null;
-                        for (int openAttempt = 0; openAttempt < 5; openAttempt++)
-                        {
-                            try
-                            {
-                                targetWorkbook = excelApp.Workbooks.Open(nextFilePath, ReadOnly: false);
-                                break;
-                            }
-                            catch (Exception ex)
-                            {
-                                lastOpenError = ex;
-                                if (openAttempt < 4)
-                                    Thread.Sleep(100);
-                            }
-                        }
-
-                        if (targetWorkbook == null)
-                            throw lastOpenError ?? new InvalidOperationException("次のプロジェクトファイルを開けませんでした。");
-                    }
-
-                    try { targetWorkbook.Activate(); } catch { }
-                    try { excelApp.Visible = true; } catch { }
-                }
+                TryReplaceExcelWorkbook(nextFilePath, "[ExecuteNextProject]");
 
                 CurrentProject = new ProjectInfo
                 {
@@ -2577,10 +2753,6 @@ namespace Ui.ViewModels
                 };
                 OnPropertyChanged(nameof(IsNextProjectVisible));
                 ResultMessage = $"次のプロジェクトに移動しました: {Path.GetFileName(nextFilePath)}";
-
-                Application.Current?.Dispatcher?.BeginInvoke(
-                    new Action(() => SharedExcelApplicationAttached?.Invoke(this, EventArgs.Empty)),
-                    DispatcherPriority.Background);
             }
             catch (Exception ex)
             {

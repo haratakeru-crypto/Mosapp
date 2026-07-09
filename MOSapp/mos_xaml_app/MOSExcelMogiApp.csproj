@@ -249,7 +249,25 @@
     <Content Include="References\JSON\MOS演習問題文一覧.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="References\JSON\MOS演習問題文一覧_PracticeVariant1.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS演習問題文一覧_PracticeVariant2.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS演習問題文一覧_PracticeVariant3.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS演習問題文一覧_PracticeVariant4.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\MOS演習問題文一覧_PracticeVariant5.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="References\CSV\解答手順あり模擬試験①問題文.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\CSV\MOS演習類題_問題解答一覧.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
