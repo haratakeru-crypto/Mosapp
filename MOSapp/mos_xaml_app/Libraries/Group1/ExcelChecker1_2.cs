@@ -94,22 +94,29 @@ namespace Libraries.Group1
 
                 // 2. プロパティチェック: 「最後の列」がONか
                 bool showLastColumn = GetTableProperty<bool>(table, "ShowTableStyleLastColumn", false);
-                
-                // 3. 視覚チェック: 最後の列が「普通の列」と違う色か
-                // 以前は「最初の列」と比較していたため、最初の列を変えても合格してしまった
-                bool visualLastEmphasis = CheckLastColumnEmphasisStrict(table);
-
-                Console.WriteLine($"[DEBUG] ShowLastColProp: {showLastColumn}, VisualLastCol: {visualLastEmphasis}");
-
-                // 判定: プロパティ設定または視覚的に正しいこと
-                if (showLastColumn || visualLastEmphasis)
+                if (showLastColumn)
                 {
-                    Console.WriteLine("[DEBUG] Task 2 Passed.");
+                    Console.WriteLine("[DEBUG] Task 2 Passed: ShowTableStyleLastColumn is ON.");
                     return true;
                 }
 
-                Console.WriteLine("[DEBUG] Task 2 Failed: Last column not emphasized.");
-                return false;
+                // 3. 視覚チェック: 最後の列が「普通の列」と違う色か
+                // タスク1の縞模様（列）だけで色差が出る誤合格を除外する
+                if (!TryGetLastColumnVisualEmphasis(table, out bool colorDiff, out bool isBold))
+                {
+                    Console.WriteLine("[DEBUG] Task 2 Failed: Last column not emphasized.");
+                    return false;
+                }
+
+                bool hasColumnStripes = GetTableProperty<bool>(table, "ShowTableStyleColumnStripes", false);
+                if (hasColumnStripes && colorDiff && !isBold)
+                {
+                    Console.WriteLine("[DEBUG] Task 2 Failed: Visual diff likely from column stripes (task 1), not last column emphasis.");
+                    return false;
+                }
+
+                Console.WriteLine($"[DEBUG] Task 2 Passed: VisualLastCol colorDiff={colorDiff}, bold={isBold}");
+                return true;
             });
         }
 
@@ -518,31 +525,34 @@ namespace Libraries.Group1
 
         private bool CheckLastColumnEmphasisStrict(ListObject table)
         {
+            return TryGetLastColumnVisualEmphasis(table, out bool colorDiff, out bool isBold)
+                && (colorDiff || isBold);
+        }
+
+        private bool TryGetLastColumnVisualEmphasis(ListObject table, out bool colorDiff, out bool isBold)
+        {
+            colorDiff = false;
+            isBold = false;
             try
             {
                 Range data = table.DataBodyRange;
                 if (data == null || data.Columns.Count < 2) return false;
-                
+
                 int lastCol = data.Columns.Count;
                 int checkRow = 1;
-                
-                // 普通の列（中間の列、例：2列目や3列目）と最後の列を比較
-                // 最初の列は特殊な場合があるので、中間の列を使う
-                int normalCol = Math.Min(2, lastCol - 1); // 2列目、または最後から2列目
-                
+                int normalCol = Math.Min(2, lastCol - 1);
+
                 Range normalCell = (Range)data.Cells[checkRow, normalCol];
                 Range lastCell = (Range)data.Cells[checkRow, lastCol];
-                
-                // DisplayFormat.Interior.Color (見た目通りの色を取得する)
+
                 double normalColColor = (double)normalCell.DisplayFormat.Interior.Color;
                 double lastColColor = (double)lastCell.DisplayFormat.Interior.Color;
-                
-                // 太字チェックも追加
-                dynamic lastFont = lastCell.Font;
-                bool isBold = lastFont.Bold;
+                colorDiff = normalColColor != lastColColor;
 
-                // 色が違う OR 太字になっている
-                return (normalColColor != lastColColor) || isBold;
+                dynamic lastFont = lastCell.Font;
+                isBold = lastFont.Bold;
+
+                return colorDiff || isBold;
             }
             catch { return false; }
         }

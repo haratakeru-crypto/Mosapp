@@ -636,6 +636,124 @@ namespace MOSExcelMogiApp
                 throw;
             }
         }
+
+        /// <summary>
+        /// 類題モード用リセット: PracticeVariant Templates → 作業用 xlsx に復元し Excel を開き直す（教材 Initial は更新しない）。
+        /// </summary>
+        public void ResetVariantProject(int groupId, int projectId, int variantSetNo, bool showMessage = true)
+        {
+            try
+            {
+                ExcelLogReader.ClearOperationLogForProject(projectId);
+                ExcelLogReader.ClearDestructiveLogForProject(projectId);
+
+                string projectFilePath = _viewModel?.GetVariantWorkingFilePath(groupId, projectId, variantSetNo);
+                if (string.IsNullOrEmpty(projectFilePath) && _viewModel?.CurrentProject != null)
+                    projectFilePath = _viewModel.CurrentProject.FilePath;
+
+                if (string.IsNullOrEmpty(projectFilePath))
+                {
+                    string errorMsg = $"類題ファイルのパスを取得できませんでした。\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}";
+                    if (showMessage)
+                        MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    throw new Exception(errorMsg);
+                }
+
+                string templatePath = _viewModel.GetVariantTemplateFilePath(groupId, projectId, variantSetNo);
+                if (!File.Exists(templatePath))
+                {
+                    string errorMsg = $"類題テンプレートファイルが見つかりません。\n\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{templatePath}";
+                    if (showMessage)
+                        MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    throw new Exception(errorMsg);
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Template: {templatePath}");
+                System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Working file: {projectFilePath}");
+
+                RemoveZoneIdentifier(templatePath);
+
+                System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Quitting Excel before reset");
+                _viewModel.QuitExcelForProjectReset();
+
+                int retryCount = 0;
+                while (retryCount < 10 && IsFileLocked(projectFilePath))
+                {
+                    System.Threading.Thread.Sleep(500);
+                    retryCount++;
+                    System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] File still locked, retry {retryCount}/10");
+                }
+
+                try
+                {
+                    if (File.Exists(projectFilePath))
+                    {
+                        FileInfo projectFileInfo = new FileInfo(projectFilePath);
+                        if (projectFileInfo.IsReadOnly)
+                            projectFileInfo.IsReadOnly = false;
+                    }
+
+                    string projectDirectory = System.IO.Path.GetDirectoryName(projectFilePath);
+                    if (!string.IsNullOrEmpty(projectDirectory) && !Directory.Exists(projectDirectory))
+                    {
+                        Directory.CreateDirectory(projectDirectory);
+                        System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Created directory: {projectDirectory}");
+                    }
+
+                    File.Copy(templatePath, projectFilePath, overwrite: true);
+                    RemoveZoneIdentifier(projectFilePath);
+
+                    FileInfo newProjectFile = new FileInfo(projectFilePath);
+                    if (newProjectFile.IsReadOnly)
+                        newProjectFile.IsReadOnly = false;
+
+                    System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Variant file reset successfully: {projectFilePath}");
+
+                    if (_viewModel?.CurrentProject != null)
+                    {
+                        var currentProject = _viewModel.CurrentProject;
+                        int currentGroupId = int.Parse(currentProject.Group.Replace("Group ", ""));
+                        int currentProjectId = currentProject.ProjectNumber;
+
+                        if (currentGroupId == groupId && currentProjectId == projectId)
+                        {
+                            _viewModel.OpenExcelWorkbookAfterResetByShell(projectFilePath);
+                            System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Reopened workbook via shell: {projectFilePath}");
+                        }
+                    }
+
+                    if (showMessage)
+                    {
+                        MessageBox.Show($"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。",
+                            "完了", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    string errorMsg = $"ファイルへのアクセスが拒否されました。\nファイルが他のプログラムで開かれている可能性があります。\n\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                    if (showMessage)
+                        MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    System.Diagnostics.Debug.WriteLine($"UnauthorizedAccessException in ResetVariantProject: {ex.Message}");
+                    throw new Exception(errorMsg, ex);
+                }
+                catch (IOException ex)
+                {
+                    string errorMsg = $"ファイルのコピー中にエラーが発生しました。\nファイルがロックされている可能性があります。\n\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                    if (showMessage)
+                        MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    System.Diagnostics.Debug.WriteLine($"IOException in ResetVariantProject: {ex.Message}");
+                    throw new Exception(errorMsg, ex);
+                }
+            }
+            catch (Exception ex)
+            {
+                string errorMsg = $"類題リセット中にエラーが発生しました。\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                if (showMessage)
+                    MessageBox.Show($"{errorMsg}\n\n{ex.StackTrace}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Diagnostics.Debug.WriteLine($"Error in ResetVariantProject: {ex.Message}\n{ex.StackTrace}");
+                throw;
+            }
+        }
         
         // Zone.Identifier ADS を削除して保護ビューを防ぐ
         [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]

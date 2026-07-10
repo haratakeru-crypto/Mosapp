@@ -129,7 +129,12 @@ def read_qa_workbook(path: Path) -> dict[int, dict[int, list[dict]]]:
         if sheet_project in result[variant_set] and result[variant_set][sheet_project]:
             print(f"  warn: duplicate sheet project {sheet_project} set {variant_set} in {path.name}")
         result[variant_set][sheet_project] = [
-            {"taskId": t["taskId"], "description": t["description"]} for t in tasks
+            {
+                "taskId": t["taskId"],
+                "description": t["description"],
+                "answerSteps": t.get("_answer", ""),
+            }
+            for t in tasks
         ]
 
     return result
@@ -165,7 +170,7 @@ def write_variant_json_files(merged: dict[int, dict[int, list[dict]]]) -> None:
 
 
 def write_answer_csv(merged: dict[int, dict[int, list[dict]]], qa_paths: list[Path]) -> None:
-    """解答手順付き CSV（社内原稿用。アプリは JSON のみ表示）。"""
+    """解答手順付き CSV（社内原稿用。アプリは JSON の answerSteps を参照）。"""
     CSV_OUT_DIR.mkdir(parents=True, exist_ok=True)
     lines = ["グループ,プロジェクト,類題セット,タスク番号,問題文,解答操作"]
 
@@ -220,7 +225,13 @@ def sync_excel_files_to_mostest(merged: dict[int, dict[int, list[dict]]]) -> int
             dst = dst_dir / f"project{project_id}.xlsx"
             shutil.copy2(src, dst)
             copied += 1
-    print(f"deployed {copied} variant xlsx files to MOSTest")
+
+            templates_dir = dst_dir / "Templates"
+            templates_dir.mkdir(parents=True, exist_ok=True)
+            dst_tpl = templates_dir / f"project{project_id}.xlsx"
+            shutil.copy2(src, dst_tpl)
+            copied += 1
+    print(f"deployed {copied} variant xlsx files to MOSTest (working + Templates)")
     return copied
 
 

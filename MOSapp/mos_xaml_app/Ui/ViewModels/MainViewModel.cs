@@ -1431,6 +1431,24 @@ namespace Ui.ViewModels
             return $"C:\\MOSTest\\Excel365\\Tab{groupId}\\PracticeVariant{variantSetNo}\\project{projectId}.xlsx";
         }
 
+        /// <summary>類題の作業用 Excel パス（リセット復元先）。</summary>
+        public string GetVariantWorkingFilePath(int groupId, int projectId, int variantSetNo) =>
+            GetVariantProjectFilePath(groupId, projectId, variantSetNo);
+
+        /// <summary>類題リセット用テンプレート Excel パス。</summary>
+        public string GetVariantTemplateFilePath(int groupId, int projectId, int variantSetNo)
+        {
+            string workingPath = GetVariantWorkingFilePath(groupId, projectId, variantSetNo);
+            if (!string.IsNullOrWhiteSpace(workingPath))
+            {
+                string dir = Path.GetDirectoryName(workingPath);
+                if (!string.IsNullOrEmpty(dir))
+                    return Path.Combine(dir, "Templates", $"project{projectId}.xlsx");
+            }
+
+            return $"C:\\MOSTest\\Excel365\\Tab{groupId}\\PracticeVariant{variantSetNo}\\Templates\\project{projectId}.xlsx";
+        }
+
         public string GetActiveProjectFilePath(int groupId, int projectId)
         {
             if (IsVariantMode)
@@ -1601,6 +1619,26 @@ namespace Ui.ViewModels
             }
 
             int taskCount = projectConfig["taskCount"].Value<int>();
+
+            if (IsVariantMode)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    try
+                    {
+                        var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
+                            ?? Application.Current.MainWindow;
+                        ScoringResultDialog.ShowVariantResults(owner, taskCount, groupId, projectId, VariantSetNo);
+                        ResultMessage = $"類題{VariantSetNo}: {taskCount}問の解答手順を表示できます";
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"結果の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                });
+                return;
+            }
+
             string libraryName = GetScoringLibraryName(config, groupId, projectId);
 
             // 「採点中です」オーバーレイを表示
@@ -2461,9 +2499,9 @@ namespace Ui.ViewModels
         }
 
         /// <summary>
-        /// 次プロジェクト／類題切替と同様、現在のブックを保存・閉じたあと指定ファイルを COM で開く。
+        /// 次プロジェクト／類題切替／類題リセットと同様、現在のブックを保存・閉じたあと指定ファイルを COM で開く。
         /// </summary>
-        private void TryReplaceExcelWorkbook(string filePath, string logPrefix)
+        public void TryReplaceExcelWorkbook(string filePath, string logPrefix)
         {
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 throw new FileNotFoundException($"ファイルが見つかりません: {filePath}");

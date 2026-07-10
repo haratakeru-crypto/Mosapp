@@ -26,17 +26,6 @@ namespace MOSExcelMogiApp.Views
     /// </summary>
     public partial class ReviewPageWindow : Window
     {
-        // #region agent log
-        // NOTE:
-        // AgentLog 呼び出しは一括採点のホットパスに多数存在し、
-        // 引数生成・JSON化・ファイル書き込みが処理時間に大きく影響する。
-        // ここでは未定義シンボルに紐づく Conditional 属性で、
-        // 呼び出しサイトごと完全にコンパイル除去してオーバーヘッドをゼロ化する。
-        [System.Diagnostics.Conditional("ENABLE_AGENT_LOG")]
-        private static void AgentLog(string location, string message, object data, string runId, string hypothesisId)
-        {
-        }
-        // #endregion
 
         public ICommand NavigateToTaskCommand { get; private set; }
         /// <summary>グループID、プロジェクトID、タスクIDの順。</summary>
@@ -591,14 +580,6 @@ namespace MOSExcelMogiApp.Views
             try
             {
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] EndExamButton_Click called");
-                // #region agent log
-                AgentLog(
-                    location: "ReviewPageWindow.EndExamButton_Click",
-                    message: "entry",
-                    data: new { groupId = _groupId, hasOnNavigateToTask = OnNavigateToTask != null },
-                    runId: "pre-fix",
-                    hypothesisId: "A");
-                // #endregion
                 
                 // ボタンを無効化して再クリックを防止
                 if (sender is Button button)
@@ -1014,45 +995,17 @@ namespace MOSExcelMogiApp.Views
                 try
                 {
                     // stale COM proxy（Excel再起動後の死んだ参照）検知
-                    int hwnd = _scoringExcelApp.Hwnd;
-                    int wbCount = _scoringExcelApp.Workbooks?.Count ?? 0;
+                    _ = _scoringExcelApp.Hwnd;
                     try { _scoringExcelApp.Visible = makeVisible; } catch { }
-                    AgentLog(
-                        location: caller,
-                        message: "excel_cached_ok",
-                        data: new { hwnd, wbCount, timeoutMs, makeVisible },
-                        runId: "pre-fix",
-                        hypothesisId: "F");
-                    if (wbCount == 0)
-                    {
-                        AgentLog(
-                            location: caller,
-                            message: "excel_cached_empty",
-                            data: new { hwnd, wbCount },
-                            runId: "pre-fix",
-                            hypothesisId: "F");
-                    }
                     return _scoringExcelApp;
                 }
-                catch (COMException cex)
+                catch (COMException)
                 {
-                    AgentLog(
-                        location: caller,
-                        message: "excel_cached_stale_released",
-                        data: new { hResult = $"0x{cex.HResult:X8}", cex.Message },
-                        runId: "pre-fix",
-                        hypothesisId: "F");
                     try { Marshal.ReleaseComObject(_scoringExcelApp); } catch { }
                     _scoringExcelApp = null;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    AgentLog(
-                        location: caller,
-                        message: "excel_cached_stale_released_noncom",
-                        data: new { ex = ex.Message },
-                        runId: "pre-fix",
-                        hypothesisId: "F");
                     try { Marshal.ReleaseComObject(_scoringExcelApp); } catch { }
                     _scoringExcelApp = null;
                 }
@@ -1064,23 +1017,11 @@ namespace MOSExcelMogiApp.Views
                 try { _scoringExcelApp.DisplayAlerts = false; } catch { }
                 try { ApplyScoringWindowLayout(_scoringExcelApp); } catch { }
                 try { _scoringExcelApp.Visible = makeVisible; } catch { }
-                AgentLog(
-                    location: caller,
-                    message: "excel_dedicated_created",
-                    data: new { timeoutMs, makeVisible, hwnd = _scoringExcelApp?.Hwnd ?? 0 },
-                    runId: "pre-fix",
-                    hypothesisId: "F");
                 return _scoringExcelApp;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[{caller}] Dedicated Excel creation failed: {ex.Message}");
-                AgentLog(
-                    location: caller,
-                    message: "excel_dedicated_create_failed",
-                    data: new { ex = ex.Message, timeoutMs, makeVisible },
-                    runId: "pre-fix",
-                    hypothesisId: "F");
                 return null;
             }
         }
@@ -1120,12 +1061,6 @@ namespace MOSExcelMogiApp.Views
                     reattachHwnd = 0;
                 }
 
-                AgentLog(
-                    location: caller,
-                    message: logMessage,
-                    data: new { reattachHwnd, reattachWbCount },
-                    runId: "pre-fix",
-                    hypothesisId: "F");
 
                 if (reattachWbCount <= 0)
                 {
@@ -1152,14 +1087,6 @@ namespace MOSExcelMogiApp.Views
                 // ExamResultStorageをクリア
                 Models.ExamResultStorage.Clear();
                 _scoringExcelApp = null;
-                // #region agent log
-                AgentLog(
-                    location: "ReviewPageWindow.ScoreAllProjects",
-                    message: "start",
-                    data: new { groupId = _groupId },
-                    runId: "pre-fix",
-                    hypothesisId: "A");
-                // #endregion
 
                 // 採点時間を短縮するため、ログファイルを一括読み込みしてキャッシュする
                 string logPath = ExcelLogReader.GetLogFilePath();
@@ -1180,14 +1107,6 @@ namespace MOSExcelMogiApp.Views
                 if (!File.Exists(configPath))
                 {
                     System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] config.json not found");
-                    // #region agent log
-                    AgentLog(
-                        location: "ReviewPageWindow.ScoreAllProjects",
-                        message: "config_missing",
-                        data: new { configPath },
-                        runId: "pre-fix",
-                        hypothesisId: "D");
-                    // #endregion
                     return;
                 }
                 
@@ -1199,14 +1118,6 @@ namespace MOSExcelMogiApp.Views
                 if (groupProjects == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] No projects found for group {_groupId}");
-                    // #region agent log
-                    AgentLog(
-                        location: "ReviewPageWindow.ScoreAllProjects",
-                        message: "groupProjects_null",
-                        data: new { groupId = _groupId },
-                        runId: "pre-fix",
-                        hypothesisId: "D");
-                    // #endregion
                     return;
                 }
                 
@@ -1226,14 +1137,6 @@ namespace MOSExcelMogiApp.Views
                         projectList.Add((projectId, taskCount, libraryName, filePath));
                     }
                 }
-                // #region agent log
-                AgentLog(
-                    location: "ReviewPageWindow.ScoreAllProjects",
-                    message: "project_list_built",
-                    data: new { groupId = _groupId, projectCount = projectList.Count, projects = projectList.Select(p => new { p.projectId, p.taskCount, p.libraryName, p.filePath }).ToList() },
-                    runId: "pre-fix",
-                    hypothesisId: "A");
-                // #endregion
                 
                 // ステップ1: 既に開いているファイルを確認し、必要に応じて開く
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Step 1: Checking Excel files...");
@@ -1271,14 +1174,6 @@ namespace MOSExcelMogiApp.Views
                 
                 // 必要なファイルを開き、開けたことを確認する（先頭失敗で全崩れしないため）。
                 EnsureProjectWorkbooksReady(filesToOpen);
-                // #region agent log
-                AgentLog(
-                    location: "ReviewPageWindow.ScoreAllProjects",
-                    message: "files_to_open",
-                    data: new { filesToOpenCount = filesToOpen.Count, filesToOpen },
-                    runId: "pre-fix",
-                    hypothesisId: "A");
-                // #endregion
                 
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Total files to open: {filesToOpen.Count}");
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] All files ready for scoring");
@@ -1288,14 +1183,6 @@ namespace MOSExcelMogiApp.Views
                 for (int idx = 0; idx < projectList.Count; idx++)
                 {
                     var project = projectList[idx];
-                    // #region agent log
-                    AgentLog(
-                        location: "ReviewPageWindow.ScoreAllProjects",
-                        message: "project_loop_entry",
-                        data: new { idx, projectId = project.projectId, project.taskCount, project.libraryName, project.filePath },
-                        runId: "pre-fix",
-                        hypothesisId: "A");
-                    // #endregion
                     
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Scoring project {project.projectId} ({idx + 1}/{projectList.Count}): library={project.libraryName}, taskCount={project.taskCount}");
                     
@@ -1309,14 +1196,6 @@ namespace MOSExcelMogiApp.Views
                             falseResults.Add(false);
                         }
                         Models.ExamResultStorage.SaveProjectResult(project.projectId, falseResults);
-                        // #region agent log
-                        AgentLog(
-                            location: "ReviewPageWindow.ScoreAllProjects",
-                            message: "file_missing_saved_all_false",
-                            data: new { projectId = project.projectId, project.filePath, taskCount = project.taskCount },
-                            runId: "pre-fix",
-                            hypothesisId: "D");
-                        // #endregion
                         continue;
                     }
                     
@@ -1325,36 +1204,6 @@ namespace MOSExcelMogiApp.Views
                         // ファイルを明示的にアクティブにする（重要！）
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Activating Excel file for project {project.projectId}: {project.filePath}");
                         bool activated = TryActivateProjectWorkbook(project.filePath, isFirstProject: idx == 0);
-                        // #region agent log
-                        string activeWorkbook = null;
-                        string activeWorkbookPath = null;
-                        int openWorkbookCount = -1;
-                        int excelHwnd = 0;
-                        bool releaseLogApp = false;
-                        ExcelApp logApp = null;
-                        try
-                        {
-                            logApp = GetExcelApplicationForScoringOptional(out releaseLogApp);
-                            openWorkbookCount = logApp?.Workbooks?.Count ?? -1;
-                            activeWorkbook = logApp?.ActiveWorkbook?.Name;
-                            activeWorkbookPath = logApp?.ActiveWorkbook?.FullName;
-                            excelHwnd = logApp?.Hwnd ?? 0;
-                        }
-                        catch { }
-                        finally
-                        {
-                            if (releaseLogApp && logApp != null)
-                            {
-                                try { Marshal.ReleaseComObject(logApp); } catch { }
-                            }
-                        }
-                        AgentLog(
-                            location: "ReviewPageWindow.ScoreAllProjects",
-                            message: "after_activate",
-                            data: new { projectId = project.projectId, activated, expectedPath = project.filePath, openWorkbookCount, excelHwnd, activeWorkbook, activeWorkbookPath },
-                            runId: "pre-fix",
-                            hypothesisId: "B");
-                        // #endregion
                         if (!activated)
                         {
                             System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] ERROR: Could not activate Excel file for project {project.projectId}");
@@ -1362,12 +1211,6 @@ namespace MOSExcelMogiApp.Views
 
                             // 先頭プロジェクト失敗時は復旧リトライを強める。
                             activated = TryActivateProjectWorkbook(project.filePath, isFirstProject: idx == 0);
-                            AgentLog(
-                                location: "ReviewPageWindow.ScoreAllProjects",
-                                message: "after_activate_retry_once",
-                                data: new { projectId = project.projectId, activated, expectedPath = project.filePath },
-                                runId: "pre-fix",
-                                hypothesisId: "B");
 
                             if (!activated)
                             {
@@ -1378,14 +1221,6 @@ namespace MOSExcelMogiApp.Views
                                     falseResults.Add(false);
                                 }
                                 Models.ExamResultStorage.SaveProjectResult(project.projectId, falseResults);
-                                // #region agent log
-                                AgentLog(
-                                    location: "ReviewPageWindow.ScoreAllProjects",
-                                    message: "activate_failed_saved_all_false",
-                                    data: new { projectId = project.projectId, expectedPath = project.filePath, taskCount = project.taskCount },
-                                    runId: "pre-fix",
-                                    hypothesisId: "B");
-                                // #endregion
                                 continue;
                             }
                         }
@@ -1397,12 +1232,6 @@ namespace MOSExcelMogiApp.Views
 
                         // 採点直前に再度アクティブ化して、直前に別ブックへ戻る現象を抑止する。
                         bool activatedBeforeScoring = ActivateExcelFile(project.filePath);
-                        AgentLog(
-                            location: "ReviewPageWindow.ScoreAllProjects",
-                            message: "after_activate_before_scoring",
-                            data: new { projectId = project.projectId, activatedBeforeScoring, expectedPath = project.filePath },
-                            runId: "pre-fix",
-                            hypothesisId: "B");
                         if (!activatedBeforeScoring)
                         {
                             var falseResults = new List<bool>();
@@ -1411,12 +1240,6 @@ namespace MOSExcelMogiApp.Views
                                 falseResults.Add(false);
                             }
                             Models.ExamResultStorage.SaveProjectResult(project.projectId, falseResults);
-                            AgentLog(
-                                location: "ReviewPageWindow.ScoreAllProjects",
-                                message: "activate_before_scoring_failed_saved_all_false",
-                                data: new { projectId = project.projectId, expectedPath = project.filePath, taskCount = project.taskCount },
-                                runId: "pre-fix",
-                                hypothesisId: "B");
                             continue;
                         }
                         
@@ -1430,14 +1253,6 @@ namespace MOSExcelMogiApp.Views
                         
                         // 採点結果を保存
                         Models.ExamResultStorage.SaveProjectResult(project.projectId, results);
-                        // #region agent log
-                        AgentLog(
-                            location: "ReviewPageWindow.ScoreAllProjects",
-                            message: "project_scored",
-                            data: new { projectId = project.projectId, expectedPath = project.filePath, project.libraryName, taskCount = project.taskCount, resultCount = results?.Count ?? -1, correctCount = results?.Count(r => r) ?? -1 },
-                            runId: "pre-fix",
-                            hypothesisId: "A");
-                        // #endregion
                         
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Project {project.projectId} scored: {results.Count(r => r)}/{results.Count} correct");
                         
@@ -1448,14 +1263,6 @@ namespace MOSExcelMogiApp.Views
                     {
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error scoring project {project.projectId}: {ex.Message}");
                         System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
-                        // #region agent log
-                        AgentLog(
-                            location: "ReviewPageWindow.ScoreAllProjects",
-                            message: "exception_scoring_project",
-                            data: new { projectId = project.projectId, project.libraryName, expectedPath = project.filePath, ex = ex.Message },
-                            runId: "pre-fix",
-                            hypothesisId: "E");
-                        // #endregion
                         // エラー時はすべてfalse
                         var falseResults = new List<bool>();
                         for (int i = 0; i < project.taskCount; i++)
@@ -1467,27 +1274,11 @@ namespace MOSExcelMogiApp.Views
                 }
                 
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] All projects scored successfully");
-                // #region agent log
-                AgentLog(
-                    location: "ReviewPageWindow.ScoreAllProjects",
-                    message: "end",
-                    data: new { groupId = _groupId, projectCount = projectList.Count },
-                    runId: "pre-fix",
-                    hypothesisId: "A");
-                // #endregion
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in ScoreAllProjects: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
-                // #region agent log
-                AgentLog(
-                    location: "ReviewPageWindow.ScoreAllProjects",
-                    message: "outer_exception",
-                    data: new { ex = ex.Message },
-                    runId: "pre-fix",
-                    hypothesisId: "E");
-                // #endregion
             }
             finally
             {
@@ -1517,12 +1308,6 @@ namespace MOSExcelMogiApp.Views
                     }
                 }
 
-                AgentLog(
-                    location: "ReviewPageWindow.ScoreAllProjects",
-                    message: "workbooks_ready_check",
-                    data: new { attempt, maxAttempts, requestedCount = filesToOpen.Count, allReady },
-                    runId: "pre-fix",
-                    hypothesisId: "B");
 
                 if (allReady) return true;
             }
@@ -1537,12 +1322,6 @@ namespace MOSExcelMogiApp.Views
             {
                 if (ActivateExcelFile(filePath))
                 {
-                    AgentLog(
-                        location: "ReviewPageWindow.ActivateExcelFile",
-                        message: "activate_project_retry_result",
-                        data: new { filePath, attempt, maxAttempts, success = true, isFirstProject },
-                        runId: "pre-fix",
-                        hypothesisId: "B");
                     return true;
                 }
 
@@ -1560,12 +1339,6 @@ namespace MOSExcelMogiApp.Views
                 Thread.Sleep(isFirstProject ? 400 : 250);
             }
 
-            AgentLog(
-                location: "ReviewPageWindow.ActivateExcelFile",
-                message: "activate_project_retry_result",
-                data: new { filePath, attempt = maxAttempts, maxAttempts, success = false, isFirstProject },
-                runId: "pre-fix",
-                hypothesisId: "B");
             return false;
         }
 
@@ -1669,34 +1442,6 @@ namespace MOSExcelMogiApp.Views
             {
                 System.Diagnostics.Debug.WriteLine(
                     $"[ReviewPageWindow] ExecuteScoringForProject called with libraryName: {libraryName}, taskCount: {taskCount}, slotProjectId: {slotProjectId}");
-                // #region agent log
-                string activeWbName = null;
-                string activeWbFullName = null;
-                int excelHwnd = 0;
-                bool releaseEntryApp = false;
-                ExcelApp entryApp = null;
-                try
-                {
-                    entryApp = GetExcelApplicationForScoringOptional(out releaseEntryApp);
-                    activeWbName = entryApp?.ActiveWorkbook?.Name;
-                    activeWbFullName = entryApp?.ActiveWorkbook?.FullName;
-                    excelHwnd = entryApp?.Hwnd ?? 0;
-                }
-                catch { }
-                finally
-                {
-                    if (releaseEntryApp && entryApp != null)
-                    {
-                        try { Marshal.ReleaseComObject(entryApp); } catch { }
-                    }
-                }
-                AgentLog(
-                    location: "ReviewPageWindow.ExecuteScoringForProject",
-                    message: "entry",
-                    data: new { libraryName, taskCount, slotProjectId, excelHwnd, activeWbName, activeWbFullName },
-                    runId: "pre-fix",
-                    hypothesisId: "B");
-                // #endregion
                 
                 // Extract group and project numbers from library name
                 var parts = libraryName.Replace("ExcelChecker", "").Split('_');
@@ -1829,14 +1574,6 @@ namespace MOSExcelMogiApp.Views
                     if (checkerType != null)
                     {
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Type found: {checkerType.Name}");
-                        // #region agent log
-                        AgentLog(
-                            location: "ReviewPageWindow.ExecuteScoringForProject",
-                            message: "checker_type_found",
-                            data: new { libraryName, checkerType = checkerType.FullName },
-                            runId: "pre-fix",
-                            hypothesisId: "C");
-                        // #endregion
 
 #if DEBUG
                         // Release では GetMethods 全列挙を避ける（採点時間への影響が大きい）
@@ -1874,12 +1611,6 @@ namespace MOSExcelMogiApp.Views
                             {
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] No method found for task {i}, returning false");
                                 results.Add(false);
-                                AgentLog(
-                                    location: "ReviewPageWindow.ExecuteScoringForProject",
-                                    message: "no_method_for_task_saved_false",
-                                    data: new { libraryName, taskIndex = i, tried = triedNames },
-                                    runId: "pre-fix",
-                                    hypothesisId: "C");
                                 continue;
                             }
 
@@ -1890,30 +1621,12 @@ namespace MOSExcelMogiApp.Views
                                     : binding.FilePathMethod != null && !string.IsNullOrEmpty(expectedFilePath)
                                         ? "private_filepath"
                                         : "public_no_args";
-                            AgentLog(
-                                location: "ReviewPageWindow.ExecuteScoringForProject",
-                                message: "method_found",
-                                data: new
-                                {
-                                    libraryName,
-                                    taskIndex = i,
-                                    methodName = resolvedName,
-                                    invokeMode
-                                },
-                                runId: "pre-fix",
-                                hypothesisId: "C");
 
                             try
                             {
                                 if (!binding.TryInvoke(checkerInstance, expectedFilePath, out bool invokeResult))
                                 {
                                     results.Add(false);
-                                    AgentLog(
-                                        location: "ReviewPageWindow.ExecuteScoringForProject",
-                                        message: "no_method_for_task_saved_false",
-                                        data: new { libraryName, taskIndex = i, tried = triedNames, note = "binding_resolve_mismatch" },
-                                        runId: "pre-fix",
-                                        hypothesisId: "C");
                                     continue;
                                 }
 
@@ -1921,38 +1634,18 @@ namespace MOSExcelMogiApp.Views
                                 invokeResult = ApplyDestructiveValidation(slotProjectId, i, invokeResult);
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method {resolvedName} result: {invokeResult}");
                                 results.Add(invokeResult);
-                                AgentLog(
-                                    location: "ReviewPageWindow.ExecuteScoringForProject",
-                                    message: "method_result",
-                                    data: new { libraryName, taskIndex = i, methodName = resolvedName, result = invokeResult },
-                                    runId: "pre-fix",
-                                    hypothesisId: "C");
                             }
                             catch (Exception ex)
                             {
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error invoking method {resolvedName}: {ex.Message}");
                                 System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
                                 results.Add(false);
-                                AgentLog(
-                                    location: "ReviewPageWindow.ExecuteScoringForProject",
-                                    message: "method_invoke_exception",
-                                    data: new { libraryName, taskIndex = i, methodName = resolvedName, ex = ex.Message },
-                                    runId: "pre-fix",
-                                    hypothesisId: "E");
                             }
                         }
                     }
                     else
                     {
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Checker type not found: {fullTypeName}");
-                        // #region agent log
-                        AgentLog(
-                            location: "ReviewPageWindow.ExecuteScoringForProject",
-                            message: "checker_type_not_found",
-                            data: new { libraryName, fullTypeName },
-                            runId: "pre-fix",
-                            hypothesisId: "C");
-                        // #endregion
                         // 型が見つからない場合はすべてfalse
                         for (int i = 0; i < taskCount; i++)
                         {
@@ -1963,14 +1656,6 @@ namespace MOSExcelMogiApp.Views
                 else
                 {
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Invalid library name format: {libraryName}");
-                    // #region agent log
-                    AgentLog(
-                        location: "ReviewPageWindow.ExecuteScoringForProject",
-                        message: "invalid_library_name_format",
-                        data: new { libraryName },
-                        runId: "pre-fix",
-                        hypothesisId: "C");
-                    // #endregion
                     // 無効な形式の場合はすべてfalse
                     for (int i = 0; i < taskCount; i++)
                     {
@@ -1982,14 +1667,6 @@ namespace MOSExcelMogiApp.Views
             {
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in ExecuteScoringForProject: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
-                // #region agent log
-                AgentLog(
-                    location: "ReviewPageWindow.ExecuteScoringForProject",
-                    message: "outer_exception",
-                    data: new { libraryName, taskCount, ex = ex.Message },
-                    runId: "pre-fix",
-                    hypothesisId: "E");
-                // #endregion
                 
                 // エラー時はすべてfalse
                 while (results.Count < taskCount)
@@ -2484,17 +2161,6 @@ namespace MOSExcelMogiApp.Views
                                     if (!string.IsNullOrEmpty(normalizedFilePath) &&
                                         normalizedActiveEarly == normalizedFilePath)
                                     {
-                                        AgentLog(
-                                            location: "ReviewPageWindow.ActivateExcelFile",
-                                            message: "short_circuit_already_active",
-                                            data: new
-                                            {
-                                                expected = filePath,
-                                                excelHwnd = excelApp?.Hwnd ?? 0,
-                                                activeFullName = activeFull
-                                            },
-                                            runId: "pre-fix",
-                                            hypothesisId: "A");
                                         System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] Short-circuit: already active {activeFull}");
                                         return true;
                                     }
@@ -2549,18 +2215,6 @@ namespace MOSExcelMogiApp.Views
                                             var normalizedActivePath = NormalizeExcelPath(active.FullName);
                                             if (normalizedActivePath == normalizedFilePath)
                                             {
-                                                AgentLog(
-                                                    location: "ReviewPageWindow.ActivateExcelFile",
-                                                    message: "active_match_found",
-                                                    data: new
-                                                    {
-                                                        expected = filePath,
-                                                        excelHwnd = excelApp?.Hwnd ?? 0,
-                                                        activeFullName = active.FullName,
-                                                        elapsedMs = sw.ElapsedMilliseconds
-                                                    },
-                                                    runId: "pre-fix",
-                                                    hypothesisId: "A");
                                                 System.Diagnostics.Debug.WriteLine($"[ActivateExcelFile] ActiveWorkbook switched successfully: {active.FullName}");
                                                 Marshal.ReleaseComObject(wb);
                                                 return true;
@@ -2590,18 +2244,6 @@ namespace MOSExcelMogiApp.Views
                                         return true;
                                     }
 
-                                    AgentLog(
-                                        location: "ReviewPageWindow.ActivateExcelFile",
-                                        message: "active_timeout_or_mismatch",
-                                        data: new
-                                        {
-                                            expected = filePath,
-                                            excelHwnd = excelApp?.Hwnd ?? 0,
-                                            activeFullName = activeFinal?.FullName,
-                                            elapsedMs = sw.ElapsedMilliseconds
-                                        },
-                                        runId: "pre-fix",
-                                        hypothesisId: "A");
                                 }
                                 catch { }
 
@@ -2624,14 +2266,8 @@ namespace MOSExcelMogiApp.Views
                 
                 return false;
             }
-            catch (COMException cex)
+            catch (COMException)
             {
-                AgentLog(
-                    location: "ReviewPageWindow.ActivateExcelFile",
-                    message: "activate_com_exception",
-                    data: new { hResult = $"0x{cex.HResult:X8}", cex.Message, filePath, allowRetryOnComException },
-                    runId: "pre-fix",
-                    hypothesisId: "F");
                 // COM不整合時は採点専用インスタンスを作り直して1回だけ再試行
                 try { if (_scoringExcelApp != null) Marshal.ReleaseComObject(_scoringExcelApp); } catch { }
                 _scoringExcelApp = null;
@@ -2641,12 +2277,6 @@ namespace MOSExcelMogiApp.Views
                         makeVisible: true,
                         timeoutMs: 30000,
                         caller: "ReviewPageWindow.ActivateExcelFile");
-                    AgentLog(
-                        location: "ReviewPageWindow.ActivateExcelFile",
-                        message: "activate_retry_once_after_com_exception",
-                        data: new { filePath },
-                        runId: "pre-fix",
-                        hypothesisId: "F");
                     return ActivateExcelFileInternal(filePath, allowRetryOnComException: false);
                 }
                 return false;

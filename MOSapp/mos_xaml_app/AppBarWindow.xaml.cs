@@ -244,14 +244,6 @@ namespace MOSExcelMogiApp
 
                 // フォールバック: 実行中のExcelプロセスを取得（複数ある場合は最も直前に起動したプロセスを対象にする）
                 var excelProcesses = Process.GetProcessesByName("EXCEL");
-                // #region agent log
-                try
-                {
-                    var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                    File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.PositionExcelWindow", message = "entry", data = new { excelCount = excelProcesses?.Length ?? 0 }, sessionId = "debug-session", hypothesisId = "H2" }) + "\n");
-                }
-                catch { }
-                // #endregion
                 if (excelHwnd == IntPtr.Zero && excelProcesses.Length == 0) return false;
 
                 Process excelProcess = null;
@@ -263,15 +255,6 @@ namespace MOSExcelMogiApp
                     if (excelProcess == null) return false;
                     processId = (uint)excelProcess.Id;
                 }
-                // #region agent log
-                try
-                {
-                    var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                    DateTime st = DateTime.MinValue; try { if (excelProcess != null) st = excelProcess.StartTime; } catch { }
-                    File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.PositionExcelWindow", message = "selected process", data = new { processId, startTime = st.ToString("o"), usedSharedHwnd = excelHwnd != IntPtr.Zero }, sessionId = "debug-session", hypothesisId = "H2" }) + "\n");
-                }
-                catch { }
-                // #endregion
                 // Excelのメインウィンドウハンドルを取得（リトライロジック）
                 int retryCount = 0;
                 const int maxRetries = 20; // 最大20回リトライ（10秒）
@@ -302,14 +285,6 @@ namespace MOSExcelMogiApp
                         retryCount++;
                     }
                 }
-                // #region agent log
-                try
-                {
-                    var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                    File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.PositionExcelWindow", message = "XLMAIN result", data = new { found = excelHwnd != IntPtr.Zero, retryCount }, sessionId = "debug-session", hypothesisId = "H3" }) + "\n");
-                }
-                catch { }
-                // #endregion
                 // ウィンドウハンドルが見つかった場合、必要時のみ前面に持ってきてからリサイズ（プロジェクト1-1と同じ高さで統一）
                 if (excelHwnd != IntPtr.Zero)
                 {
@@ -340,14 +315,6 @@ namespace MOSExcelMogiApp
                     int excelY = -excelBorderHeight / 2;
                     int excelWidth  = PhysicalScreenWidth  + excelBorderWidth;
                     int excelHeight = ExcelHeightPhysical  + excelBorderHeight;
-                    // #region agent log
-                    try
-                    {
-                        var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                        File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.PositionExcelWindow", message = "MoveWindow", data = new { excelWidth, excelHeight, excelX, excelY }, sessionId = "debug-session", hypothesisId = "H4" }) + "\n");
-                    }
-                    catch { }
-                    // #endregion
                     // 最大化/最小化状態だと MoveWindow が効かず比率が崩れることがあるため、必ず復元してから移動/リサイズする
                     try { ShowWindow(excelHwnd, SW_RESTORE); } catch { }
                     MoveWindow(excelHwnd, excelX, excelY, excelWidth, excelHeight, true);
@@ -1122,8 +1089,14 @@ namespace MOSExcelMogiApp
 
                     System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Current project: Group{groupId}, Project{projectId}");
 
+                    bool isVariantMode = _viewModel.IsVariantMode;
+                    int variantSetNo = _viewModel.VariantSetNo;
+                    string confirmMessage = isVariantMode
+                        ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしますか？\n（編集内容は失われます）"
+                        : $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）";
+
                     var result = MessageBox.Show(
-                        $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）",
+                        confirmMessage,
                         "確認",
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
@@ -1157,7 +1130,9 @@ namespace MOSExcelMogiApp
                     };
                     var label = new System.Windows.Controls.TextBlock
                     {
-                        Text = $"リセット中です...\nプロジェクト {groupId}-{projectId}",
+                        Text = isVariantMode
+                            ? $"リセット中です...\n類題{variantSetNo} プロジェクト {groupId}-{projectId}"
+                            : $"リセット中です...\nプロジェクト {groupId}-{projectId}",
                         FontSize = 14,
                         TextAlignment = System.Windows.TextAlignment.Center,
                         Foreground = System.Windows.Media.Brushes.SteelBlue
@@ -1169,13 +1144,17 @@ namespace MOSExcelMogiApp
                     MainWindow mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
                     if (mainWindow != null)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow found, calling ResetProject on UI thread");
+                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow found, calling reset on UI thread");
                         Exception resetError = null;
-                        // ResetProject は WPF オブジェクトにアクセスするため UI スレッド上で実行する。
-                        // DispatcherPriority.Background により先にオーバーレイの描画が完了してからリセット処理が開始される。
                         await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
-                            try { mainWindow.ResetProject(groupId, projectId, showMessage: false); }
+                            try
+                            {
+                                if (isVariantMode)
+                                    mainWindow.ResetVariantProject(groupId, projectId, variantSetNo, showMessage: false);
+                                else
+                                    mainWindow.ResetProject(groupId, projectId, showMessage: false);
+                            }
                             catch (Exception ex) { resetError = ex; }
                         }, System.Windows.Threading.DispatcherPriority.Background);
 
@@ -1189,7 +1168,14 @@ namespace MOSExcelMogiApp
                         }
                         else
                         {
-                            MessageBox.Show($"プロジェクト {groupId}-{projectId} をリセットしました。",
+                            _currentTaskId = 1;
+                            UpdateTaskDisplay();
+                            WriteCurrentTaskFile();
+
+                            string doneMessage = isVariantMode
+                                ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。"
+                                : $"プロジェクト {groupId}-{projectId} をリセットしました。";
+                            MessageBox.Show(doneMessage,
                                 "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
                     }
@@ -1695,14 +1681,6 @@ namespace MOSExcelMogiApp
             if (_viewModel.CurrentProject != null)
             {
                 int newProjectId = _viewModel.CurrentProject.ProjectNumber;
-                // #region agent log
-                try
-                {
-                    var logPath = @"c:\Users\kouza\source\repos\MOS PowerPoint app\.cursor\debug.log";
-                    File.AppendAllText(logPath, JsonConvert.SerializeObject(new { timestamp = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds, location = "AppBarWindow.OnCurrentProjectChanged", message = "entry", data = new { newProjectId, _currentProjectId }, sessionId = "debug-session", hypothesisId = "H1" }) + "\n");
-                }
-                catch { }
-                // #endregion
                 System.Diagnostics.Debug.WriteLine($"[OnCurrentProjectChanged] Project changed: {_currentProjectId} -> {newProjectId}");
                 
                 // プロジェクトが変更された場合のみ、タスクIDをリセット
