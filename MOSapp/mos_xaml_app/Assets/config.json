@@ -278,6 +278,33 @@
           "tasksJson": "MOS演習問題文一覧_PracticeVariant5.json"
         }
       },
+      "5": {
+        "1": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant1\\project5.xlsx",
+          "library": "ExcelChecker1_5_PV1",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant1.json"
+        },
+        "2": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant2\\project5.xlsx",
+          "library": "ExcelChecker1_5_PV2",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant2.json"
+        },
+        "3": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant3\\project5.xlsx",
+          "library": "ExcelChecker1_5_PV3",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant3.json"
+        },
+        "4": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant4\\project5.xlsx",
+          "library": "ExcelChecker1_5_PV4",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant4.json"
+        },
+        "5": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant5\\project5.xlsx",
+          "library": "ExcelChecker1_5_PV5",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant5.json"
+        }
+      },
       "6": {
         "1": {
           "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant1\\project6.xlsx",
@@ -356,6 +383,60 @@
         "5": {
           "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant5\\project8.xlsx",
           "library": "ExcelChecker1_7_PV5",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant5.json"
+        }
+      },
+      "9": {
+        "1": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant1\\project9.xlsx",
+          "library": "ExcelChecker1_8_PV1",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant1.json"
+        },
+        "2": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant2\\project9.xlsx",
+          "library": "ExcelChecker1_8_PV2",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant2.json"
+        },
+        "3": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant3\\project9.xlsx",
+          "library": "ExcelChecker1_8_PV3",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant3.json"
+        },
+        "4": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant4\\project9.xlsx",
+          "library": "ExcelChecker1_8_PV4",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant4.json"
+        },
+        "5": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant5\\project9.xlsx",
+          "library": "ExcelChecker1_8_PV5",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant5.json"
+        }
+      },
+      "10": {
+        "1": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant1\\project10.xlsx",
+          "library": "ExcelChecker1_10_PV1",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant1.json"
+        },
+        "2": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant2\\project10.xlsx",
+          "library": "ExcelChecker1_10_PV2",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant2.json"
+        },
+        "3": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant3\\project10.xlsx",
+          "library": "ExcelChecker1_10_PV3",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant3.json"
+        },
+        "4": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant4\\project10.xlsx",
+          "library": "ExcelChecker1_10_PV4",
+          "tasksJson": "MOS演習問題文一覧_PracticeVariant4.json"
+        },
+        "5": {
+          "excelFile": "C:\\MOSTest\\Excel365\\Tab1\\PracticeVariant5\\project10.xlsx",
+          "library": "ExcelChecker1_10_PV5",
           "tasksJson": "MOS演習問題文一覧_PracticeVariant5.json"
         }
       }
