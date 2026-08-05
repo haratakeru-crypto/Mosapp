@@ -510,7 +510,7 @@ namespace MOS_Word_app.Views
                 // Wordアプリケーションを閉じる
                 await System.Threading.Tasks.Task.Run(() => CloseWordApplication());
                 
-                // 結果画面ウィンドウを表示（flaggedStates, viewedStates, groupId を渡して時間切れ・CSV対応）
+                // 結果画面ウィンドウを表示（flaggedStates, viewedStates, groupId を渡して時間切れ対応）
                 ResultWindow resultWindow = null;
                 await Dispatcher.InvokeAsync(() =>
                 {

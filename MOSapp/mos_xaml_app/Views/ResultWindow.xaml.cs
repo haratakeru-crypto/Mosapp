@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using Newtonsoft.Json;
@@ -21,7 +20,6 @@ namespace MOSExcelMogiApp.Views
         private int _groupId = 1;
         private List<ResultProjectInfo> _allProjects; // すべてのプロジェクトを保持
         private bool _showingWrongOnly = false; // フィルター状態
-        private bool _csvExported = false; // CSV出力を1回だけ行うためのフラグ
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
         /// <summary>初回の <see cref="LoadResultsAsync"/>（問題文・一覧の読み込み含む）が完了したときに1回だけ発火する。</summary>
         public event EventHandler InitialPresentationCompleted;
@@ -249,21 +247,6 @@ namespace MOSExcelMogiApp.Views
                     _allProjects = resultProjects; // すべてのプロジェクトを保存
                 }, System.Windows.Threading.DispatcherPriority.Normal);
                 
-                // 採点表CSVをデスクトップに1回だけ出力
-                if (!_csvExported && _allProjects != null)
-                {
-                    try
-                    {
-                        int totalWrongTasks = _allProjects.Sum(p => p.Tasks.Count(t => t.ResultMark == "×"));
-                        await Task.Run(() => ExportScoringCsvToDesktop(totalWrongTasks, _allProjects));
-                        _csvExported = true;
-                    }
-                    catch (Exception csvEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] CSV export error: {csvEx.Message}");
-                    }
-                }
-                
                 // UI更新の機会を与える
                 await Task.Delay(50);
             }
@@ -447,94 +430,6 @@ namespace MOSExcelMogiApp.Views
                 text = text.Substring(1, text.Length - 2);
             }
             return text;
-        }
-
-        /// <summary>
-        /// 採点結果を教材用採点表CSVに記入し、デスクトップに書き出す。
-        /// </summary>
-        private void ExportScoringCsvToDesktop(int totalWrongTasks, List<ResultProjectInfo> resultProjects)
-        {
-            if (resultProjects == null) return;
-            var taskToValue = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var project in resultProjects)
-            {
-                foreach (var task in project.Tasks ?? Enumerable.Empty<ResultTaskInfo>())
-                {
-                    string key = $"{task.ProjectId}-{task.TaskId}";
-                    string value = task.ResultMark == "×" ? "×" : "";
-                    taskToValue[key] = value;
-                }
-            }
-
-            string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOSExcel教材用採点表.csv");
-            var lines = new List<string>();
-            if (File.Exists(templatePath))
-            {
-                lines.AddRange(File.ReadAllLines(templatePath, Encoding.UTF8));
-            }
-            else
-            {
-                lines.Add("教材用プロジェクト,,採点１回目,採点２回目");
-                foreach (var project in resultProjects)
-                {
-                    foreach (var task in project.Tasks ?? Enumerable.Empty<ResultTaskInfo>())
-                    {
-                        lines.Add($",{task.ProjectId}-{task.TaskId},,");
-                    }
-                }
-                lines.Add(",×の数,,");
-                lines.Add(",▲の数,,");
-                lines.Add(",,,");
-                int totalTasks = resultProjects.Sum(p => p.Tasks?.Count ?? 0);
-                lines.Add($",{totalTasks}問,,");
-            }
-
-            const int scoreColumnIndex = 2;
-            for (int i = 0; i < lines.Count; i++)
-            {
-                string line = lines[i];
-                string[] parts = line.Split(',');
-                if (parts.Length <= scoreColumnIndex) continue;
-                string col1 = parts[1].Trim();
-                if (taskToValue.TryGetValue(col1, out string value))
-                    parts[scoreColumnIndex] = value;
-                else if (col1 == "×の数")
-                    parts[scoreColumnIndex] = totalWrongTasks.ToString();
-                lines[i] = string.Join(",", parts);
-            }
-
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string fileName = $"MOSExcel教材用採点表_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            string outPath = Path.Combine(desktop, fileName);
-            var utf8Bom = new UTF8Encoding(true);
-            File.WriteAllLines(outPath, lines, utf8Bom);
-            System.Diagnostics.Debug.WriteLine($"[ResultWindow] CSV exported to {outPath}");
-
-            // 間違えた部分のみのCSVを同じタイミングで出力
-            ExportWrongAnswersCsvToDesktop(resultProjects);
-        }
-
-        /// <summary>間違えた問題のみをCSVに書き出し、デスクトップに保存する。</summary>
-        private void ExportWrongAnswersCsvToDesktop(List<ResultProjectInfo> resultProjects)
-        {
-            if (resultProjects == null) return;
-            var utf8Bom = new UTF8Encoding(true);
-            var csvLines = new List<string> { "プロジェクトID,タスク番号,問題文,正誤" };
-            foreach (var project in resultProjects)
-            {
-                foreach (var task in project.Tasks ?? Enumerable.Empty<ResultTaskInfo>())
-                {
-                    if (task.ResultMark != "×") continue;
-                    string desc = (task.Description ?? "").Replace("\"", "\"\"");
-                    if (desc.Contains(",") || desc.Contains("\n")) desc = "\"" + desc + "\"";
-                    csvLines.Add($"{task.ProjectId},{task.TaskId},{desc},×");
-                }
-            }
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string fileName = $"MOSExcel_間違えた問題_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            string outPath = Path.Combine(desktop, fileName);
-            File.WriteAllLines(outPath, csvLines, utf8Bom);
-            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Wrong answers CSV exported to {outPath}");
         }
 
         private async void EndButton_Click(object sender, RoutedEventArgs e)

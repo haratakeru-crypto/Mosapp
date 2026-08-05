@@ -436,7 +436,7 @@ namespace MOS_Word_app.Views
                 SaveAndCloseAllWordDocuments();
                 this.Hide();
 
-                // 現在のタイマー残り時間と状態情報を渡す（閲覧状態も渡して結果画面で時間切れ表示・CSV出力に利用）
+                // 現在のタイマー残り時間と状態情報を渡す（閲覧状態も渡して結果画面で時間切れ表示に利用）
                 var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, null, _groupId);
                 reviewWindow.OnNavigateToTask = NavigateToTask;
                 reviewWindow.Closed += (s, args) =>
