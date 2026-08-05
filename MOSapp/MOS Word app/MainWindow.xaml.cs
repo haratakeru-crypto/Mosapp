@@ -23,7 +23,7 @@ namespace MOS_Word_app
         private MainViewModel _viewModel;
         private Views.UiTestAppBarWindow _appBarWindow;
 
-        /// <summary>タイマー無効化フラグ。デフォルトは一時停止。プロジェクト一覧で「タイマーを使用」にチェックで有効。</summary>
+        /// <summary>タイマー無効化フラグ。デフォルトは一時停止（常時停止）。</summary>
         public static bool IsTimerDisabled { get; private set; } = true;
 
         public MainWindow()
@@ -108,16 +108,6 @@ namespace MOS_Word_app
             if (results == null || results.Count == 0)
                 return;
             Views.ScoreResultWindow.ShowResults(this, results);
-        }
-
-        private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = false;
-        }
-
-        private void TimerCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = true;
         }
 
         protected override void OnClosed(EventArgs e)

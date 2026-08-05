@@ -24,39 +24,9 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
-                <!-- 左側: UIテストボタン -->
-                <Button Grid.Column="0" 
-                        Content="UIテスト" 
-                        Command="{Binding UiTestCommand}"
-                        HorizontalAlignment="Left"
-                        Margin="10,5"
-                        Padding="20,8"
-                        Background="#64B5F6"
-                        Foreground="White"
-                        BorderThickness="0"
-                        FontSize="14"
-                        FontWeight="SemiBold"
-                        Cursor="Hand">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}" 
-                                                CornerRadius="5"
-                                                Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center" 
-                                                            VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                
-                <!-- 右側: すべてリセット、採点ボタンとテストモードテキスト -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                <!-- 右側: すべてリセット、採点ボタン -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0"
+                            HorizontalAlignment="Right">
                     <!-- すべてリセットボタン（ヘッダー） -->
                     <Button Content="すべてリセット"
                             Command="{Binding ResetAllInGroupCommand}"
@@ -102,16 +72,6 @@
                               VerticalAlignment="Center"
                               Foreground="White"
                               FontSize="14"/>
-                    <!-- タイマーを使用（デフォルト未チェック＝一時停止） -->
-                    <CheckBox Name="TimerCheckBox"
-                              Content="タイマーを使用"
-                              IsChecked="False"
-                              Margin="0,0,15,0"
-                              VerticalAlignment="Center"
-                              Foreground="White"
-                              FontSize="14"
-                              Checked="TimerCheckBox_Checked"
-                              Unchecked="TimerCheckBox_Unchecked"/>
                     <!-- 採点ボタン -->
                     <Button Content="採点" 
                             Command="{Binding ScoreCommand}"
@@ -141,12 +101,6 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    
-                    <TextBlock Text="テストモード" 
-                              Foreground="White"
-                              VerticalAlignment="Center"
-                              FontSize="14"
-                              FontWeight="SemiBold"/>
                 </StackPanel>
             </Grid>
         </Border>

@@ -121,18 +121,6 @@ namespace MOS_PowerPoint_app
             dialog.ShowDialog();
         }
 
-        private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = false; // チェックが入っている = タイマー有効
-            System.Diagnostics.Debug.WriteLine($"MainWindow: TimerCheckBox checked, IsTimerDisabled = {IsTimerDisabled}");
-        }
-        
-        private void TimerCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = true; // チェックが外れている = タイマー無効
-            System.Diagnostics.Debug.WriteLine($"MainWindow: TimerCheckBox unchecked, IsTimerDisabled = {IsTimerDisabled}");
-        }
-
         protected override void OnClosed(EventArgs e)
         {
             // イベント購読を解除

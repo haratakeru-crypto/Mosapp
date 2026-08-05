@@ -41,7 +41,6 @@ namespace MOS_PowerPoint_app
         {
             LoadProjects();
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
-            UiTestCommand = new RelayCommand(ExecuteUiTest);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllProjectsCommand = new RelayCommand(ExecuteResetAllProjects);
             TaskResults = new ObservableCollection<TaskResult>();
@@ -70,7 +69,6 @@ namespace MOS_PowerPoint_app
         }
 
         public ICommand OpenProjectCommand { get; }
-        public ICommand UiTestCommand { get; }
         public ICommand ScoreCommand { get; }
         public ICommand ResetAllProjectsCommand { get; }
 
@@ -305,11 +303,6 @@ namespace MOS_PowerPoint_app
                     System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
                 }
             }
-        }
-
-        private void ExecuteUiTest(object parameter)
-        {
-            ResultMessage = "UIテスト機能は準備中です";
         }
 
         private bool CanExecuteScore(object parameter)

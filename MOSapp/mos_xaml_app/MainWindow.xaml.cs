@@ -53,7 +53,6 @@ namespace MOSExcelMogiApp
             _viewModel.HideMainWindowRequested += OnHideMainWindowRequested;
             _viewModel.ShowMainWindowRequested += OnShowMainWindowRequested;
             _viewModel.ExamEnded += OnExamEnded;
-            _viewModel.UiTestRequested += OnUiTestRequested;
 
             Closing += MainWindow_Closing;
         }
@@ -111,23 +110,6 @@ namespace MOSExcelMogiApp
         {
             // アプリバーの参照をクリアして、次回新しいインスタンスを作成できるようにする
             _appBarWindow = null;
-        }
-        
-        private void OnUiTestRequested(object sender, EventArgs e)
-        {
-            // UIテスト機能の実装（ダイアログなし）
-        }
-        
-        private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = false;
-            System.Diagnostics.Debug.WriteLine($"MainWindow: TimerCheckBox checked, IsTimerDisabled = {IsTimerDisabled}");
-        }
-        
-        private void TimerCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = true;
-            System.Diagnostics.Debug.WriteLine($"MainWindow: TimerCheckBox unchecked, IsTimerDisabled = {IsTimerDisabled}");
         }
         
         private void ProjectResetButton_Click(object sender, RoutedEventArgs e)
@@ -874,7 +856,6 @@ namespace MOSExcelMogiApp
                 _viewModel.HideMainWindowRequested -= OnHideMainWindowRequested;
                 _viewModel.ShowMainWindowRequested -= OnShowMainWindowRequested;
                 _viewModel.ExamEnded -= OnExamEnded;
-                _viewModel.UiTestRequested -= OnUiTestRequested;
             }
             
             // アプリバーウィンドウを閉じる

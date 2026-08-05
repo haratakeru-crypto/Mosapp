@@ -215,7 +215,6 @@ namespace Ui.ViewModels
         public event EventHandler ShowAppBarRequested;
         public event EventHandler HideMainWindowRequested;
         public event EventHandler ShowMainWindowRequested;
-        public event EventHandler UiTestRequested;
         public event EventHandler CurrentProjectChanged;
         public event EventHandler OpenReviewPageRequested;
 
@@ -242,7 +241,6 @@ namespace Ui.ViewModels
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
             ResetExamCommand = new RelayCommand(ExecuteResetExam);
             NextProjectCommand = new RelayCommand(ExecuteNextProject);
-            UiTestCommand = new RelayCommand(ExecuteUiTest);
             GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode);
             GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant);
     }
@@ -286,7 +284,6 @@ namespace Ui.ViewModels
         public ICommand PauseExamCommand { get; }
         public ICommand ResetExamCommand { get; }
         public ICommand NextProjectCommand { get; }
-        public ICommand UiTestCommand { get; }
         /// <summary>類題モードから教材へ戻る。</summary>
         public ICommand GoToTextbookCommand { get; }
         /// <summary>教材→選択中の類題、または類題n→類題n+1 へ進む。</summary>
@@ -3004,22 +3001,6 @@ namespace Ui.ViewModels
                     try { Marshal.ReleaseComObject(excelApp); } catch { }
                 }
             }
-        }
-        
-        private void ExecuteUiTest(object parameter)
-        {
-            // UIテスト用のアプリバーウィンドウを表示
-            var uiTestAppBar = new MOSExcelMogiApp.Views.UiTestAppBarWindow();
-            uiTestAppBar.Show();
-            
-            // アプリバーの実高さを取得してから Excel を配置
-            uiTestAppBar.ContentRendered += (s, e) =>
-            {
-                int barHeight = (int)Math.Round(uiTestAppBar.ActualHeight > 0 ? uiTestAppBar.ActualHeight : uiTestAppBar.Height);
-                LaunchAndPositionExcel(barHeight);
-            };
-
-            UiTestRequested?.Invoke(this, EventArgs.Empty);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

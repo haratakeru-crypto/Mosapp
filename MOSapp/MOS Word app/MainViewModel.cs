@@ -54,7 +54,6 @@ namespace MOS_Word_app
         {
             LoadProjects();
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
-            UiTestCommand = new RelayCommand(ExecuteUiTest);
             TabSearchCommand = new RelayCommand(ExecuteTabSearch);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllInGroupCommand = new RelayCommand(ExecuteResetAllInGroup);
@@ -89,7 +88,6 @@ namespace MOS_Word_app
         }
 
         public ICommand OpenProjectCommand { get; }
-        public ICommand UiTestCommand { get; }
         public ICommand TabSearchCommand { get; }
         public ICommand ScoreCommand { get; }
         public ICommand ResetAllInGroupCommand { get; }
@@ -632,11 +630,6 @@ namespace MOS_Word_app
             {
                 foreach (var p in wordProcesses) p.Dispose();
             }
-        }
-
-        private void ExecuteUiTest(object parameter)
-        {
-            ResultMessage = "UIテスト機能は準備中です";
         }
 
         private void ExecuteTabSearch(object parameter)
