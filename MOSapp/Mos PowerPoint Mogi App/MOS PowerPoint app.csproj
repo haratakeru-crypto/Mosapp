@@ -262,6 +262,7 @@
     <Content Include="Assets\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Resource Include="Assets\qr_subete_no_saiten.png" />
     <Content Include="References\JSON\MOS模擬アプリ問題文一覧_PowerPoint.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

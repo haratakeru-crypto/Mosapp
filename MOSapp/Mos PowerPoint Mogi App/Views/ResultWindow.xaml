@@ -70,6 +70,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         
                         <Grid Grid.Column="0">
@@ -120,9 +121,18 @@
                                 </StackPanel>
                             </StackPanel>
                         </Grid>
+
+                        <!-- QRコード（点数の右） -->
+                        <Image Grid.Column="1"
+                               Source="pack://application:,,,/Mos%20PowerPoint%20Mogi%20App;component/Assets/qr_subete_no_saiten.png"
+                               Width="96" Height="96"
+                               Stretch="Uniform"
+                               VerticalAlignment="Center"
+                               Margin="24,0,0,0"
+                               ToolTip="https://subete-no-saiten.jp"/>
                         
                         <!-- ×の問題のみ表示ボタン -->
-                        <Button Grid.Column="1" Name="ShowWrongOnlyButton" Content="✖の問題のみ表示" 
+                        <Button Grid.Column="2" Name="ShowWrongOnlyButton" Content="✖の問題のみ表示" 
                                 Background="#DC2626" Foreground="White" 
                                 Padding="20,10" FontWeight="Medium" FontSize="14"
                                 BorderThickness="0" Click="ShowWrongOnlyButton_Click"

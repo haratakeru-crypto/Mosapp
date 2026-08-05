@@ -232,6 +232,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <Resource Include="Assets\qr_subete_no_saiten.png" />
     <Content Include="Reference\CSV\MOS模擬アプリ正誤判定表251120_.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

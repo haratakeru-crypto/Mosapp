@@ -297,52 +297,53 @@ namespace MOS_Word_app
 
                 try
                 {
-                    // 別プロジェクトへ切り替える前に編集内容をディスクへ保存してから閉じる
-                    SaveAndCloseAllWordDocuments();
+                    string targetPath = NormalizeDocumentPath(project.FilePath);
+                    bool switchingProject = CurrentProject != null
+                        && !string.Equals(NormalizeDocumentPath(CurrentProject.FilePath), targetPath, StringComparison.OrdinalIgnoreCase);
+
+                    // 別プロジェクトへ切り替えるときだけ全ドキュメントを保存・閉じる
+                    if (switchingProject)
+                        SaveAndCloseAllWordDocuments();
 
                     WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
 
-                    // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、常にフォルダから開き直す
-                    string pathLower = System.IO.Path.GetFullPath(project.FilePath).ToLowerInvariant();
-                    try
+                    if (!TryActivateOpenDocument(wordApp, targetPath))
                     {
-                        for (int i = wordApp.Documents.Count; i >= 1; i--)
+                        // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、フォルダから開き直す
+                        try
                         {
-                            WordDoc openDoc = wordApp.Documents[i];
-                            try
+                            for (int i = wordApp.Documents.Count; i >= 1; i--)
                             {
-                                string fullName = openDoc.FullName?.ToLowerInvariant() ?? "";
-                                string docFullPath = fullName;
-                                try { docFullPath = System.IO.Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
-                                if (fullName == pathLower || docFullPath == pathLower)
+                                WordDoc openDoc = wordApp.Documents[i];
+                                try
                                 {
-                                    if (!openDoc.Saved)
-                                        openDoc.Save();
-                                    openDoc.Close(SaveChanges: false);
-                                    break;
+                                    if (DocumentPathsEqual(openDoc.FullName, targetPath))
+                                    {
+                                        if (!openDoc.Saved)
+                                            openDoc.Save();
+                                        openDoc.Close(SaveChanges: false);
+                                        break;
+                                    }
+                                }
+                                finally
+                                {
+                                    if (openDoc != null) Marshal.ReleaseComObject(openDoc);
                                 }
                             }
-                            finally
-                            {
-                                if (openDoc != null) Marshal.ReleaseComObject(openDoc);
-                            }
                         }
-                    }
-                    catch (Exception exClose)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] 既存ドキュメント閉じる際のエラー: {exClose.Message}");
-                    }
+                        catch (Exception exClose)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] 既存ドキュメント閉じる際のエラー: {exClose.Message}");
+                        }
 
-                    // Wordドキュメントを開く（編集可能で開く・常にフォルダから）
-                    WordDoc doc = null;
-                    try
-                    {
-                        doc = wordApp.Documents.Open(project.FilePath, ReadOnly: false, Visible: true);
-                    }
-                    catch (Exception ex)
-                    {
-                        // ファイルが既に開いている場合は無視
-                        System.Diagnostics.Debug.WriteLine($"ドキュメントを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                        try
+                        {
+                            wordApp.Documents.Open(project.FilePath, ReadOnly: false, Visible: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"ドキュメントを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                        }
                     }
 
                     CurrentProject = project;
@@ -477,7 +478,61 @@ namespace MOS_Word_app
         {
             SaveAllWordDocuments();
             CloseAllWordDocuments();
-            Thread.Sleep(200);
+        }
+
+        private static string NormalizeDocumentPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return string.Empty;
+            try
+            {
+                return Path.GetFullPath(path).ToLowerInvariant();
+            }
+            catch
+            {
+                return path.ToLowerInvariant();
+            }
+        }
+
+        private static bool DocumentPathsEqual(string left, string rightNormalized)
+        {
+            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(rightNormalized))
+                return false;
+            return string.Equals(NormalizeDocumentPath(left), rightNormalized, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>対象ファイルが既に開いていればアクティブ化して true を返す。</summary>
+        private static bool TryActivateOpenDocument(WordApp wordApp, string targetPathNormalized)
+        {
+            if (wordApp == null || string.IsNullOrEmpty(targetPathNormalized))
+                return false;
+
+            try
+            {
+                for (int i = wordApp.Documents.Count; i >= 1; i--)
+                {
+                    WordDoc doc = wordApp.Documents[i];
+                    try
+                    {
+                        if (!DocumentPathsEqual(doc.FullName, targetPathNormalized))
+                            continue;
+
+                        doc.Activate();
+                        try { doc.ActiveWindow?.Activate(); } catch { }
+                        return true;
+                    }
+                    finally
+                    {
+                        try { if (doc != null) Marshal.ReleaseComObject(doc); } catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TryActivateOpenDocument] {ex.Message}");
+            }
+
+            return false;
         }
 
         /// <summary>
