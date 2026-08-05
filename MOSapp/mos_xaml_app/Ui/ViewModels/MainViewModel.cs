@@ -91,7 +91,6 @@ namespace Ui.ViewModels
         private bool _isExcelOverlayVisible;
         private bool _isShutdownWaitOverlayVisible;
         private bool _showScoreButton;
-        private bool _showPauseButton;
         private bool _showVariantButton;
         private int _variantSetNo = 1;
         private bool _isVariantMode;
@@ -601,13 +600,6 @@ namespace Ui.ViewModels
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
         }
 
-        /// <summary>一時停止ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
-        public bool ShowPauseButton
-        {
-            get => _showPauseButton;
-            set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
-        }
-
         /// <summary>類題切替ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
         public bool ShowVariantButton
         {
@@ -621,7 +613,7 @@ namespace Ui.ViewModels
             }
         }
 
-        /// <summary>類題セット番号（1〜5）。ComboBox と連動。</summary>
+        /// <summary>類題セット番号（1〜5）。初期値は1。アプリバーの類題切替で更新。</summary>
         public int VariantSetNo
         {
             get => _variantSetNo;
@@ -767,10 +759,10 @@ namespace Ui.ViewModels
         {
             var allProjects = _excelCheckerService.GetAllProjects();
             
-            // 模試①=Group2は非表示のためスキップ。Group1（演習）とGroup3（応用編）のみ追加
-            foreach (int groupId in new[] { 1, 3 })
+            // Group1（演習）のみ追加。模試①・応用編は非表示
+            foreach (int groupId in new[] { 1 })
             {
-                var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = groupId == 3 ? "応用編" : $"Group {groupId}" };
+                var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
                 
                 for (int projectId = 1; projectId <= 10; projectId++)
                 {

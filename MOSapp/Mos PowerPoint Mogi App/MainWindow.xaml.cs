@@ -67,7 +67,7 @@ namespace MOS_PowerPoint_app
                 var project = _viewModel.CurrentProject;
                 if (project != null)
                 {
-                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreResult, _viewModel.ShowPauseButton, () => _viewModel.ScoreCommand.Execute(null));
+                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, true, false, () => _viewModel.ScoreCommand.Execute(null));
                     _appBarWindow.Closed += (s, args) =>
                     {
                         // バーウィンドウが閉じられたらメインウィンドウを再表示

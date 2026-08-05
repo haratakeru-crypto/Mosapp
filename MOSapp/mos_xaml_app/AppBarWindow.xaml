@@ -186,7 +186,7 @@
                         </Button>
 
                         <Button Name="PauseButton" Content="一時停止" 
-                                Visibility="{Binding ShowPauseButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Visibility="Collapsed"
                                 Background="White" 
                                 Foreground="#1E40AF" 
                                 Padding="24,10" 

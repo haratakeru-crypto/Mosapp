@@ -30,8 +30,6 @@ namespace MOS_PowerPoint_app
         private int _selectedTabIndex;
         private string _resultMessage;
         private bool _showScoreButton;
-        private bool _showPauseButton;
-        private bool _showScoreResult = true;
         private ProjectViewModel _currentProject;
         private ObservableCollection<TaskResult> _taskResults;
         private int _totalScore;
@@ -89,20 +87,6 @@ namespace MOS_PowerPoint_app
         {
             get => _showScoreButton;
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
-        }
-
-        /// <summary>一時停止ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
-        public bool ShowPauseButton
-        {
-            get => _showPauseButton;
-            set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
-        }
-
-        /// <summary>採点結果（タスク別一覧）を表示するか。チェックONで採点ロジックを確認できる。</summary>
-        public bool ShowScoreResult
-        {
-            get => _showScoreResult;
-            set { _showScoreResult = value; OnPropertyChanged(nameof(ShowScoreResult)); }
         }
 
         public string CurrentProjectName => CurrentProject?.Name ?? "";
@@ -180,11 +164,11 @@ namespace MOS_PowerPoint_app
                     basePath = @"C:\MOSTest\PowerPoint365";
                 }
                 
-                // Tab1, Tab3のフォルダからプロジェクトを読み込む（模試①=Tab2は非表示のためスキップ）
-                foreach (int groupId in new[] { 1, 3 })
+                // Tab1（演習）のみ読み込む
+                foreach (int groupId in new[] { 1 })
                 {
                     string tabFolder = Path.Combine(basePath, $"Tab{groupId}");
-                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = groupId == 3 ? "応用編" : $"Group {groupId}" };
+                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
                     
                     if (Directory.Exists(tabFolder))
                     {
@@ -236,10 +220,10 @@ namespace MOS_PowerPoint_app
             {
                 // 例外をログに記録するが、アプリを継続させる
                 System.Diagnostics.Debug.WriteLine($"LoadProjectsエラー: {ex.Message}");
-                // 空のプロジェクトグループを作成してアプリを継続（模試①=Group2はスキップ）
-                foreach (int groupId in new[] { 1, 3 })
+                // 空のプロジェクトグループを作成してアプリを継続（演習のみ）
+                foreach (int groupId in new[] { 1 })
                 {
-                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = groupId == 3 ? "応用編" : $"Group {groupId}" };
+                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
                     for (int projectId = 1; projectId <= 10; projectId++)
                     {
                         group.Projects.Add(new ProjectViewModel

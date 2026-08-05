@@ -48,7 +48,7 @@ namespace MOS_Word_app
             for (int i = 0; i < args.Length - 2; i++)
             {
                 if (args[i] != "--openProject") continue;
-                if (!int.TryParse(args[i + 1], out int groupId) || groupId < 1 || groupId > 3) continue;
+                if (!int.TryParse(args[i + 1], out int groupId) || groupId != 1) continue;
                 if (!int.TryParse(args[i + 2], out int projectId) || projectId < 1 || projectId > 10) continue;
                 AutoOpenGroupId = groupId;
                 AutoOpenProjectId = projectId;

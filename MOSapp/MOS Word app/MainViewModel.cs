@@ -43,22 +43,16 @@ namespace MOS_Word_app
         private int _selectedTabIndex;
         private string _resultMessage;
         private bool _showScoreButton;
-        private bool _showPauseButton;
         private TabTaskInfo _currentTabTask;
         private ProjectViewModel _currentProject;
-        private ObservableCollection<TaskResult> _taskResults;
-        private int _totalScore;
-        private int _maxScore;
 
         public MainViewModel()
         {
             LoadProjects();
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
             TabSearchCommand = new RelayCommand(ExecuteTabSearch);
-            ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllInGroupCommand = new RelayCommand(ExecuteResetAllInGroup);
             TabTasks = new ObservableCollection<TabTaskInfo>();
-            TaskResults = new ObservableCollection<TaskResult>();
         }
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
@@ -70,12 +64,11 @@ namespace MOS_Word_app
             {
                 _selectedTabIndex = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(CurrentGroupIdForReset));
             }
         }
 
-        /// <summary>現在選択中のタブに対応するグループID（ヘッダーの「すべてリセット」用）。演習=1, 応用=3。</summary>
-        public int CurrentGroupIdForReset => SelectedTabIndex == 0 ? 1 : 3;
+        /// <summary>ヘッダーの「すべてリセット」用。演習(Group1)固定。</summary>
+        public int CurrentGroupIdForReset => 1;
 
         public string ResultMessage
         {
@@ -89,7 +82,6 @@ namespace MOS_Word_app
 
         public ICommand OpenProjectCommand { get; }
         public ICommand TabSearchCommand { get; }
-        public ICommand ScoreCommand { get; }
         public ICommand ResetAllInGroupCommand { get; }
 
         public ObservableCollection<TabTaskInfo> TabTasks { get; set; }
@@ -124,58 +116,19 @@ namespace MOS_Word_app
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
         }
 
-        /// <summary>一時停止ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
-        public bool ShowPauseButton
-        {
-            get => _showPauseButton;
-            set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
-        }
-
         public event EventHandler ShowAppBarRequested;
         public event EventHandler HideMainWindowRequested;
 #pragma warning disable 67 // イベントは MainWindow で購読されるため警告を抑制
         public event EventHandler ShowMainWindowRequested;
         public event EventHandler ExamEnded;
-        /// <summary>採点完了時に発火。採点結果ウィンドウの表示に使用する。</summary>
-        public event EventHandler ScoreCompleted;
 #pragma warning restore 67
-
-        public ObservableCollection<TaskResult> TaskResults
-        {
-            get => _taskResults;
-            set
-            {
-                _taskResults = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public int TotalScore
-        {
-            get => _totalScore;
-            set
-            {
-                _totalScore = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public int MaxScore
-        {
-            get => _maxScore;
-            set
-            {
-                _maxScore = value;
-                OnPropertyChanged();
-            }
-        }
 
         private void LoadProjects()
         {
             string basePath = @"C:\MOSTest\Word365";
 
-            // 保存先は Tab{groupId}\ 直下。一覧は Initial にファイルがあれば表示し、FilePath は作業フォルダ（Tab\）のパスにする
-            for (int groupId = 1; groupId <= 3; groupId++)
+            // Group1（演習）のみ。保存先は Tab{groupId}\ 直下。一覧は Initial にファイルがあれば表示し、FilePath は作業フォルダ（Tab\）のパスにする
+            for (int groupId = 1; groupId <= 1; groupId++)
             {
                 string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
                 string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
@@ -739,124 +692,6 @@ namespace MOS_Word_app
             catch (Exception ex)
             {
                 ResultMessage = $"エラー: {ex.Message}";
-            }
-        }
-
-        private bool CanExecuteScore(object parameter)
-        {
-            return CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.FilePath);
-        }
-
-        private void ExecuteScore(object parameter)
-        {
-            if (CurrentProject == null || string.IsNullOrEmpty(CurrentProject.FilePath))
-            {
-                ResultMessage = "エラー: プロジェクトが選択されていません";
-                return;
-            }
-
-            try
-            {
-                ResultMessage = "採点中...";
-                TaskResults.Clear();
-
-                int projectNumber = CurrentProject.ProjectId;
-                // exe と同じ bin\Debug または bin\Release 直下の Dlls サブフォルダのみから読み込む（obj や products は参照しない）
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string dllPath = Path.Combine(baseDir, "Dlls", $"WordChecker1_{projectNumber}.dll");
-
-                if (!File.Exists(dllPath))
-                {
-                    ResultMessage = $"エラー: チェッカーファイルが見つかりません: WordChecker1_{projectNumber}.dll (bin\\Debug\\Dlls または bin\\Release\\Dlls を確認してください)";
-                    return;
-                }
-
-                // DLLを読み込む
-                Assembly assembly = Assembly.LoadFrom(dllPath);
-                string className = $"Libraries.Group1.WordChecker1_{projectNumber}";
-                Type checkerType = assembly.GetType(className);
-
-                if (checkerType == null)
-                {
-                    ResultMessage = $"エラー: クラス '{className}' が見つかりません";
-                    return;
-                }
-
-                object checkerInstance = Activator.CreateInstance(checkerType);
-                int passedCount = 0;
-                int totalTasks = 0;
-
-                LogReader.RequestVstoEvidenceFlush();
-
-                // 各タスクをチェック（プロジェクトごとにタスク数が異なる）
-                int[] taskCounts = { 5, 5, 6, 7, 8, 7, 5, 7, 6, 5 }; // プロジェクト1-10のタスク数
-                int maxTasks = projectNumber <= taskCounts.Length ? taskCounts[projectNumber - 1] : 5;
-
-                for (int taskNum = 1; taskNum <= maxTasks; taskNum++)
-                {
-                    string methodName = $"CheckTask_1_{projectNumber}_{taskNum:D2}";
-                    MethodInfo method = checkerType.GetMethod(methodName);
-
-                    if (method != null)
-                    {
-                        totalTasks++;
-                        try
-                        {
-                            bool result = (bool)method.Invoke(checkerInstance, null);
-                            // 採点結果を共有ストアに記録（グループ1固定）
-                            ScoreResultStore.RecordResult(1, projectNumber, taskNum, result);
-                            
-                            TaskResults.Add(new TaskResult
-                            {
-                                TaskNumber = taskNum,
-                                IsPassed = result,
-                                TaskName = $"タスク{taskNum}"
-                            });
-
-                            if (result)
-                            {
-                                passedCount++;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            TaskResults.Add(new TaskResult
-                            {
-                                TaskNumber = taskNum,
-                                IsPassed = false,
-                                TaskName = $"タスク{taskNum} (エラー: {ex.Message})"
-                            });
-                        }
-                    }
-                }
-
-                TotalScore = passedCount;
-                MaxScore = totalTasks;
-
-                StringBuilder sb = new StringBuilder();
-                sb.AppendLine($"採点完了: {passedCount}/{totalTasks} タスク合格");
-                sb.AppendLine($"得点: {passedCount}点 / {totalTasks}点");
-                sb.AppendLine();
-                sb.AppendLine("詳細:");
-                foreach (var task in TaskResults)
-                {
-                    sb.AppendLine($"  {task.TaskName}: {(task.IsPassed ? "✓ 合格" : "✗ 不合格")}");
-                }
-
-                ResultMessage = sb.ToString();
-                ScoreCompleted?.Invoke(this, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ExecuteScore] 採点エラー: {ex.Message}\r\n{ex.StackTrace}");
-                var msg = new System.Text.StringBuilder();
-                msg.AppendLine($"エラー: 採点中にエラーが発生しました: {ex.Message}");
-                if (ex.InnerException != null)
-                    msg.AppendLine($"内部エラー: {ex.InnerException.Message}");
-                msg.AppendLine();
-                msg.AppendLine("※VSTOアドインが有効でログが記録されていないと不正解になります。");
-                msg.AppendLine($"ログファイル: {Path.Combine(Path.GetTempPath(), "mos_word_log.txt")}");
-                ResultMessage = msg.ToString();
             }
         }
 

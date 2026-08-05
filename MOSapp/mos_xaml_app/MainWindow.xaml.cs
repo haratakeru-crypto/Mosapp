@@ -117,16 +117,10 @@ namespace MOSExcelMogiApp
             System.Diagnostics.Debug.WriteLine("[ResetProject] ProjectResetButton_Click called");
             try
             {
-                // 現在選択されているタブを取得（0: 演習=Group1, 1: 応用編=Group3。模試①は非表示）
-                int selectedTabIndex = _viewModel?.SelectedTabIndex ?? 0;
-                int groupId = selectedTabIndex == 0 ? 1 : 3; // タブ0=演習(Group1), タブ1=応用編(Group3)
-                
-                string tabName = selectedTabIndex switch
-                {
-                    0 => "演習",
-                    1 => "応用編",
-                    _ => "選択中のタブ"
-                };
+                // 演習(Group1)のプロジェクトをリセット
+                const int groupId = 1;
+                const int selectedTabIndex = 0;
+                const string tabName = "演習";
                 
                 // 選択されているタブのプロジェクトをリセットするか確認
                 var result = MessageBox.Show(
@@ -135,7 +129,7 @@ namespace MOSExcelMogiApp
                     MessageBoxButton.YesNo, 
                     MessageBoxImage.Warning);
                 
-                System.Diagnostics.Debug.WriteLine($"[ResetProject] User response: {result}, SelectedTabIndex: {selectedTabIndex}, GroupId: {groupId}");
+                System.Diagnostics.Debug.WriteLine($"[ResetProject] User response: {result}, GroupId: {groupId}");
                 
                 if (result == MessageBoxResult.Yes)
                 {

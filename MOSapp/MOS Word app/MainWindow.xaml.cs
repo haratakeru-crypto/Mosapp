@@ -37,7 +37,6 @@ namespace MOS_Word_app
             _viewModel.HideMainWindowRequested += OnHideMainWindowRequested;
             _viewModel.ShowMainWindowRequested += OnShowMainWindowRequested;
             _viewModel.ExamEnded += OnExamEnded;
-            _viewModel.ScoreCompleted += OnScoreCompleted;
 
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
@@ -65,7 +64,7 @@ namespace MOS_Word_app
             if (needRecreate)
             {
                 var oldAppBar = _appBarWindow;
-                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, _viewModel.ShowPauseButton);
+                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, false);
                 _appBarWindow.Closed += OnAppBarWindowClosed;
                 oldAppBar?.Close();
             }
@@ -100,14 +99,6 @@ namespace MOS_Word_app
         private void OnExamEnded(object sender, EventArgs e)
         {
             _appBarWindow = null;
-        }
-
-        private void OnScoreCompleted(object sender, EventArgs e)
-        {
-            var results = _viewModel?.TaskResults;
-            if (results == null || results.Count == 0)
-                return;
-            Views.ScoreResultWindow.ShowResults(this, results);
         }
 
         protected override void OnClosed(EventArgs e)
