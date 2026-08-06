@@ -6,6 +6,9 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using MOSExcelMogiApp;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -19,6 +22,39 @@ namespace MOSExcelMogiApp.Views
         private int _currentProjectId = 1;
         private bool _isPaused = false;
         private bool _timerDisabled = false; // タイマー無効化フラグ
+
+        [DllImport("user32.dll")]
+        private static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        private const int SW_RESTORE = 9;
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
+        }
         
         public UiTestAppBarWindow()
         {
@@ -44,6 +80,76 @@ namespace MOSExcelMogiApp.Views
             
             // ウィンドウを最前面に表示
             this.Topmost = true;
+        }
+
+        private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetWindowPosition();
+            PositionExcelWindow();
+        }
+
+        private void PositionExcelWindow()
+        {
+            try
+            {
+                var excelProcess = Process.GetProcessesByName("EXCEL")
+                    .OrderByDescending(process =>
+                    {
+                        try { return process.StartTime; }
+                        catch { return DateTime.MinValue; }
+                    })
+                    .FirstOrDefault();
+                if (excelProcess == null)
+                    return;
+
+                IntPtr excelHwnd = IntPtr.Zero;
+                uint processId = (uint)excelProcess.Id;
+                try
+                {
+                    EnumWindows((windowHandle, _) =>
+                    {
+                        GetWindowThreadProcessId(windowHandle, out uint windowProcessId);
+                        if (windowProcessId != processId)
+                            return true;
+
+                        var className = new StringBuilder(256);
+                        GetClassName(windowHandle, className, className.Capacity);
+                        if (!className.ToString().Contains("XLMAIN"))
+                            return true;
+
+                        excelHwnd = windowHandle;
+                        return false;
+                    }, IntPtr.Zero);
+                }
+                finally
+                {
+                    excelProcess.Dispose();
+                }
+
+                if (excelHwnd == IntPtr.Zero)
+                    return;
+
+                ShowWindow(excelHwnd, SW_RESTORE);
+                GetWindowRect(excelHwnd, out RECT windowRect);
+                GetClientRect(excelHwnd, out RECT clientRect);
+
+                int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
+                int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
+                int screenWidth = (int)SystemParameters.PrimaryScreenWidth;
+                int screenHeight = (int)SystemParameters.PrimaryScreenHeight;
+
+                MoveWindow(
+                    excelHwnd,
+                    -borderWidth / 2,
+                    -borderHeight / 2,
+                    screenWidth + borderWidth,
+                    screenHeight - (int)this.Height + borderHeight,
+                    true);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[UiTestAppBarWindow] Error positioning Excel window: {ex.Message}");
+            }
         }
 
         protected override void OnContentRendered(EventArgs e)

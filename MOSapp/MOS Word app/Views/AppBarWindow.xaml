@@ -144,32 +144,22 @@
                             </Button.Style>
                         </Button>
                         
-                        <!-- アイコンボタン -->
-                        <Button Width="32" Height="32" 
+                        <Button Content="画面調整"
                                 Background="White" 
+                                Foreground="#1E40AF"
+                                Padding="24,10"
                                 BorderThickness="0"
-                                Margin="0,0,5,0">
-                            <TextBlock Text="↓" FontSize="14" Foreground="#1E40AF" FontWeight="Bold"/>
+                                FontWeight="Medium"
+                                FontSize="16"
+                                Click="AdjustScreenButton_Click">
                             <Button.Style>
                                 <Style TargetType="Button">
                                     <Style.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter Property="Background" Value="#F3F4F6"/>
                                         </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
-                        
-                        <Button Width="32" Height="32" 
-                                Background="White" 
-                                BorderThickness="0">
-                            <TextBlock Text="□" FontSize="14" Foreground="#1E40AF" FontWeight="Bold"/>
-                            <Button.Style>
-                                <Style TargetType="Button">
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#F3F4F6"/>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Background" Value="#E5E7EB"/>
                                         </Trigger>
                                     </Style.Triggers>
                                 </Style>

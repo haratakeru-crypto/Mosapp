@@ -35,6 +35,7 @@ namespace MOS_Word_app.Views
         private AppBarWindow _appBarWindow;
         private int _groupId = 1;
         private bool _isWindowClosed;
+        private bool _isScoring;
         
         public ReviewPageWindow(TimeSpan remainingTime, Dictionary<int, bool[]> completedStates, Dictionary<int, bool[]> flaggedStates, Dictionary<int, bool[]> viewedStates = null, AppBarWindow appBarWindow = null, int groupId = 1)
         {
@@ -304,6 +305,12 @@ namespace MOS_Word_app.Views
         
         private async void NavigateToTask(ReviewTaskInfo taskInfo)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Navigation ignored while scoring.");
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
 
             if (OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0)
@@ -365,6 +372,12 @@ namespace MOS_Word_app.Views
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("TaskButton_Click called");
+
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Task button ignored while scoring.");
+                return;
+            }
             
             var button = sender as Button;
             if (button != null && button.DataContext is ReviewTaskInfo)
@@ -451,6 +464,13 @@ namespace MOS_Word_app.Views
 
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Duplicate scoring request ignored.");
+                return;
+            }
+
+            _isScoring = true;
             Window scoringOverlay = null;
             DispatcherTimer overlayKeepOnTopTimer = null;
             try
@@ -465,6 +485,10 @@ namespace MOS_Word_app.Views
                 
                 // タイマーを停止
                 _timer?.Stop();
+
+                // 採点中にタスク番号を操作できないよう、採点開始時点でレビュー画面を隠す
+                if (!_isWindowClosed)
+                    this.Hide();
                 
                 // UI更新の機会を与える
                 await System.Threading.Tasks.Task.Delay(100);
@@ -540,12 +564,6 @@ namespace MOS_Word_app.Views
                     resultWindow.Activate();
                 }, DispatcherPriority.Normal);
                 
-                // ReviewPageWindowを非表示にする（閉じた後は Hide しない）
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (!_isWindowClosed)
-                        this.Hide();
-                }, DispatcherPriority.Normal);
             }
             catch (Exception ex)
             {
@@ -557,6 +575,19 @@ namespace MOS_Word_app.Views
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in EndExamButton_Click: {ex.Message}");
                 await Dispatcher.InvokeAsync(() =>
                 {
+                    _isScoring = false;
+                    if (sender is Button button)
+                    {
+                        button.IsEnabled = true;
+                        button.Content = "結果の表示";
+                    }
+                    if (!_isWindowClosed)
+                    {
+                        this.Show();
+                        this.Activate();
+                    }
+                    if (!MOS_Word_app.MainWindow.IsTimerDisabled)
+                        _timer?.Start();
                     MessageBox.Show($"試験終了処理中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 });
             }

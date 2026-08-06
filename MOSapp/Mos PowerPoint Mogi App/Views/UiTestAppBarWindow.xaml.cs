@@ -34,6 +34,11 @@ namespace MOS_PowerPoint_app.Views
         // Windows API用の定義
         [DllImport("user32.dll")]
         static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
         
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -147,6 +152,11 @@ namespace MOS_PowerPoint_app.Views
             // ウィンドウを最前面に表示
             this.Topmost = true;
         }
+
+        private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
+        }
         
         private void PositionPowerPointWindow()
         {
@@ -198,6 +208,8 @@ namespace MOS_PowerPoint_app.Views
 
                     if (pptHwnd != IntPtr.Zero)
                     {
+                        try { ShowWindow(pptHwnd, SW_RESTORE); } catch { }
+
                         GetWindowRect(pptHwnd, out RECT pptWindowRect);
                         GetClientRect(pptHwnd, out RECT pptClientRect);
 
@@ -398,6 +410,12 @@ namespace MOS_PowerPoint_app.Views
         /// </summary>
         private async void ShowResultWindowAsync()
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Duplicate scoring request ignored.");
+                return;
+            }
+
             Window overlay = null;
             DispatcherTimer overlayKeepOnTopTimer = null;
             try
@@ -537,6 +555,7 @@ namespace MOS_PowerPoint_app.Views
                 }
                 System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] Error showing result window: {ex.Message}");
                 MessageBox.Show($"結果画面の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowReviewPageWindow();
             }
             finally
             {
@@ -725,6 +744,12 @@ namespace MOS_PowerPoint_app.Views
         /// </summary>
         public async void NavigateToTask(int projectId, int taskId)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Navigation ignored while scoring.");
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={projectId}, TaskId={taskId}");
 
             try
@@ -1999,6 +2024,12 @@ namespace MOS_PowerPoint_app.Views
         
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Task button ignored while scoring.");
+                return;
+            }
+
             if (sender is System.Windows.Controls.Button button && button.Tag != null)
             {
                 int taskId = int.Parse(button.Tag.ToString());

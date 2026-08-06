@@ -128,6 +128,11 @@ namespace MOS_Word_app.Views
             SetWindowPosition();
         }
 
+        private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
+        }
+
         private void SetWindowPosition()
         {
             var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
