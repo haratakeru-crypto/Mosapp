@@ -564,9 +564,7 @@ namespace MOS_Word_app.Views
             try
             {
                 // 試験バーの問題文は Word 用 JSON（PowerPoint と独立）
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
+                string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
                 
                 if (!File.Exists(jsonPath))
                 {
@@ -614,9 +612,7 @@ namespace MOS_Word_app.Views
                 
                 // コピー対象問題JSON（入力・追加・変更・挿入の問題）を優先して読み込む
                 string copyTargetJsonName = "MOS模擬アプリ_入力追加変更挿入問題_Word.json";
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, copyTargetJsonName);
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", copyTargetJsonName);
+                string jsonPath = WordDataPathHelper.FindProblemJson(copyTargetJsonName);
                 if (File.Exists(jsonPath))
                 {
                     try
@@ -1581,61 +1577,10 @@ namespace MOS_Word_app.Views
             string filePath = null;
             try
             {
-                string basePath = @"C:\MOSTest\Word365";
-                string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-                string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
-                string initialInitialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial", "Initial");
-                string[] possibleNames = (groupId == 1 && projectId == 7)
-                    ? new[] { $"Project{projectId}.doc", $"project{projectId}.doc" }
-                    : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-                string workingFileName = (groupId == 1 && projectId == 7) ? "Project7.doc" : $"Project{projectId}.docx";
-                string workingFilePath = Path.Combine(workingFolder, workingFileName);
-
-                // 保存先は Tab\ 直下のみ。まず作業フォルダを参照
-                foreach (var fileName in possibleNames)
-                {
-                    string fullPath = Path.Combine(workingFolder, fileName);
-                    if (File.Exists(fullPath))
-                    {
-                        filePath = fullPath;
-                        break;
-                    }
-                }
-                // 作業フォルダに無ければ Initial からコピーしてから開く
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    string sourcePath = null;
-                    foreach (var fileName in possibleNames)
-                    {
-                        string fullPath = Path.Combine(initialFolder, fileName);
-                        if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                    }
-                    if (string.IsNullOrEmpty(sourcePath) && Directory.Exists(initialInitialFolder))
-                    {
-                        foreach (var fileName in possibleNames)
-                        {
-                            string fullPath = Path.Combine(initialInitialFolder, fileName);
-                            if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                        }
-                    }
-                    if (!string.IsNullOrEmpty(sourcePath))
-                    {
-                        try
-                        {
-                            if (!Directory.Exists(workingFolder))
-                                Directory.CreateDirectory(workingFolder);
-                            File.Copy(sourcePath, workingFilePath, overwrite: false);
-                            filePath = workingFilePath;
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] Initialからコピーエラー: {ex.Message}");
-                        }
-                    }
-                }
+                filePath = WordDataPathHelper.EnsureWorkingFile(groupId, projectId);
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のファイルが見つかりません: {workingFolder} または {initialFolder}");
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}の作業ファイルが見つかりません。");
                     PositionWordWindow();
                     return;
                 }

@@ -83,11 +83,8 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                if (!File.Exists(jsonPath))
-                {
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                }
+                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                    "MOS模擬アプリ問題文一覧_PowerPoint.json");
                 if (!File.Exists(jsonPath))
                 {
                     ProjectsItemsControl.ItemsSource = new List<ReviewProjectInfo>();

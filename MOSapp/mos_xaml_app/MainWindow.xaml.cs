@@ -18,10 +18,10 @@ using Core.Adapters;
 using Infrastructure;
 using System.IO;
 using System.Runtime.InteropServices;
-using Newtonsoft.Json.Linq;
 using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 using ExcelWorkbook = Microsoft.Office.Interop.Excel.Workbook;
 using Libraries;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp
 {
@@ -286,47 +286,9 @@ namespace MOSExcelMogiApp
                 ExcelLogReader.ClearOperationLogForProject(projectId);
                 ExcelLogReader.ClearDestructiveLogForProject(projectId);
 
-                // 実際に開いているファイルパスを取得
-                string projectFilePath = null;
-                
-                // 1. CurrentProjectから実際のファイルパスを取得（最優先）
-                if (_viewModel?.CurrentProject != null)
-                {
-                    projectFilePath = _viewModel.CurrentProject.FilePath;
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Current project file path: {projectFilePath}");
-                }
-                
-                // 2. CurrentProjectのFilePathがない場合、config.jsonから取得
-                if (string.IsNullOrEmpty(projectFilePath))
-                {
-                    string configPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
-                    if (File.Exists(configPath))
-                    {
-                        string jsonContent = File.ReadAllText(configPath);
-                        JObject config = JObject.Parse(jsonContent);
-                        
-                        var projectConfig = config["tabs"]?[groupId.ToString()]?["projects"]?[projectId.ToString()];
-                        if (projectConfig != null)
-                        {
-                            // initialDataFileを優先
-                            projectFilePath = projectConfig["initialDataFile"]?.ToString();
-                            
-                            // initialDataFileがない場合、excelFileを使用
-                            if (string.IsNullOrEmpty(projectFilePath))
-                            {
-                                projectFilePath = projectConfig["excelFile"]?.ToString();
-                            }
-                            
-                            // それでもない場合、Initialフォルダのパスを生成
-                            if (string.IsNullOrEmpty(projectFilePath))
-                            {
-                                projectFilePath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
-                            }
-                            
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] File path from config.json: {projectFilePath}");
-                        }
-                    }
-                }
+                // 正規作業ファイルを最優先し、旧 config/Initial 配置は移行元に限定する。
+                string projectFilePath = _viewModel?.GetProjectFilePath(groupId, projectId)
+                    ?? DataPathHelper.ResolveWorkingFilePath(groupId, projectId);
                 
                 if (string.IsNullOrEmpty(projectFilePath))
                 {
@@ -340,63 +302,11 @@ namespace MOSExcelMogiApp
                 
                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Resetting project file: {projectFilePath}");
                 
-                // Templatesフォルダからテンプレートファイルのパスを生成・検索
-                string templatesFolder = $"C:\\MOSTest\\Excel365\\Templates\\Tab{groupId}";
-                string templatePath = null;
+                string templatesFolder = System.IO.Path.GetDirectoryName(
+                    DataPathHelper.GetTemplateFilePath(groupId, projectId));
+                string templatePath = DataPathHelper.ResolveTemplateFilePath(groupId, projectId);
                 
-                // まず、Templates\Tab{groupId}フォルダ内のファイルを動的に検索
-                if (Directory.Exists(templatesFolder))
-                {
-                    System.Diagnostics.Debug.WriteLine($"Searching templates folder: {templatesFolder}");
-                    var excelFiles = Directory.GetFiles(templatesFolder, "*.xlsx", SearchOption.TopDirectoryOnly);
-                    System.Diagnostics.Debug.WriteLine($"Found {excelFiles.Length} Excel files in templates folder");
-                    
-                    // project{projectId}を含むファイル名を探す（大文字小文字を区別しない）
-                    string searchPattern = $"project{projectId}".ToLower();
-                    foreach (var file in excelFiles)
-                    {
-                        string fileName = System.IO.Path.GetFileNameWithoutExtension(file);
-                        System.Diagnostics.Debug.WriteLine($"Checking file: {fileName}");
-                        
-                        // 大文字小文字を区別しない比較
-                        string fileNameLower = fileName.ToLower();
-                        if (fileNameLower.Contains(searchPattern) || fileNameLower == searchPattern)
-                        {
-                            templatePath = file;
-                            System.Diagnostics.Debug.WriteLine($"Template file found in folder: {templatePath}");
-                            break;
-                        }
-                    }
-                }
-                
-                // 見つからない場合、固定パターンで検索
-                if (string.IsNullOrEmpty(templatePath))
-                {
-                    // パターン1: Templates\Tab{groupId}\project{projectId}.xlsx
-                    string templatePath1 = $"C:\\MOSTest\\Excel365\\Templates\\Tab{groupId}\\project{projectId}.xlsx";
-                    // パターン2: Templates\project{projectId}.xlsx
-                    string templatePath2 = $"C:\\MOSTest\\Excel365\\Templates\\project{projectId}.xlsx";
-                    // パターン3: Templates\Tab{groupId}\Tab{groupId}_project{projectId}.xlsx
-                    string templatePath3 = $"C:\\MOSTest\\Excel365\\Templates\\Tab{groupId}\\Tab{groupId}_project{projectId}.xlsx";
-                    
-                    if (File.Exists(templatePath1))
-                    {
-                        templatePath = templatePath1;
-                        System.Diagnostics.Debug.WriteLine($"Template file found (pattern 1): {templatePath}");
-                    }
-                    else if (File.Exists(templatePath2))
-                    {
-                        templatePath = templatePath2;
-                        System.Diagnostics.Debug.WriteLine($"Template file found (pattern 2): {templatePath}");
-                    }
-                    else if (File.Exists(templatePath3))
-                    {
-                        templatePath = templatePath3;
-                        System.Diagnostics.Debug.WriteLine($"Template file found (pattern 3): {templatePath}");
-                    }
-                }
-                
-                if (string.IsNullOrEmpty(templatePath))
+                if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
                 {
                     string errorMsg = $"テンプレートファイルが見つかりません。\n\nプロジェクト: Group{groupId}, Project{projectId}\n検索フォルダ: {templatesFolder}";
                     
@@ -419,16 +329,10 @@ namespace MOSExcelMogiApp
                 
                 System.Diagnostics.Debug.WriteLine($"Template file found: {templatePath}");
                 
+                // テンプレートが旧版で読み取り専用化されている場合は明示的に解除する。
+                DataPathHelper.ClearReadOnly(templatePath);
                 // テンプレートファイル自体の Zone.Identifier を削除（存在する場合）
                 RemoveZoneIdentifier(templatePath);
-
-                // テンプレートファイルを読み取り専用で保護（テンプレートを変更されないようにする）
-                FileInfo templateFileInfo = new FileInfo(templatePath);
-                if (!templateFileInfo.IsReadOnly)
-                {
-                    templateFileInfo.IsReadOnly = true;
-                    System.Diagnostics.Debug.WriteLine($"Template file set to read-only for protection: {templatePath}");
-                }
                 
                 // Excel を全ブック閉じたうえで終了し、ロック・二重オープンを防ぐ（共有 COM 参照もクリア）
                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Quitting Excel before reset");
@@ -491,8 +395,8 @@ namespace MOSExcelMogiApp
                     }
                     
                     // Initialフォルダのパスを生成
-                    string initialFolderPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial";
-                    string initialFilePath = System.IO.Path.Combine(initialFolderPath, $"project{projectId}.xlsx");
+                    string initialFilePath = DataPathHelper.GetInitialFilePath(groupId, projectId);
+                    string initialFolderPath = System.IO.Path.GetDirectoryName(initialFilePath);
                     
                     System.Diagnostics.Debug.WriteLine($"[ResetProject] Initial folder path: {initialFolderPath}");
                     System.Diagnostics.Debug.WriteLine($"[ResetProject] Initial file path: {initialFilePath}");
@@ -535,7 +439,8 @@ namespace MOSExcelMogiApp
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"[ResetProject] Error copying to Initial folder: {ex.Message}");
-                        // Initialフォルダへのコピーに失敗しても、プロジェクトファイルのリセットは成功しているので続行
+                        throw new IOException(
+                            $"採点用Initialファイルの更新に失敗しました: {initialFilePath}", ex);
                     }
                     
                     // リセット後、現在のプロジェクトなら Excel でブックを開き直す（シェル起動）
@@ -568,9 +473,8 @@ namespace MOSExcelMogiApp
                                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from project file before opening Excel");
                             }
 
-                            string pathToOpen = File.Exists(initialFilePath) ? initialFilePath : projectFilePath;
-                            _viewModel.OpenExcelWorkbookAfterResetByShell(pathToOpen);
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Reopened workbook via shell: {pathToOpen}");
+                            _viewModel.OpenExcelWorkbookAfterResetByShell(projectFilePath);
+                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Reopened workbook via shell: {projectFilePath}");
                         }
                     }
                     
@@ -647,6 +551,7 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Template: {templatePath}");
                 System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Working file: {projectFilePath}");
 
+                DataPathHelper.ClearReadOnly(templatePath);
                 RemoveZoneIdentifier(templatePath);
 
                 System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Quitting Excel before reset");
@@ -747,19 +652,12 @@ namespace MOSExcelMogiApp
             {
                 // 読み取り専用だと ADS 削除が失敗する場合があるため、一時的に属性を外す
                 FileInfo fi = new FileInfo(filePath);
-                bool wasReadOnly = fi.IsReadOnly;
-                if (wasReadOnly)
+                if (fi.IsReadOnly)
                 {
                     try { fi.IsReadOnly = false; } catch { }
                 }
 
                 DeleteFileW(filePath + ":Zone.Identifier");
-
-                // 読み取り専用だったファイルは元に戻す
-                if (wasReadOnly)
-                {
-                    try { new FileInfo(filePath).IsReadOnly = true; } catch { }
-                }
             }
             catch { }
         }

@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Text;
 using Libraries;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -231,7 +232,7 @@ namespace MOSExcelMogiApp.Views
                     _ => "MOS模擬アプリ問題文一覧.json"
                 };
                 
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", jsonFileName);
+                string jsonPath = DataPathHelper.ResolveJsonPath(jsonFileName);
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Loading from: {jsonFileName} (GroupId: {groupId})");
                 
                 string jsonContent = File.ReadAllText(jsonPath);
@@ -1853,50 +1854,17 @@ namespace MOSExcelMogiApp.Views
         {
             try
             {
-                // 優先順位1: Initialフォルダを最優先（採点対象を固定して結果ぶれを防ぐ）
-                string initialPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
-                if (File.Exists(initialPath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found Initial folder file: {initialPath}");
-                    return initialPath;
-                }
-                
-                // 優先順位2: config.jsonのinitialDataFileをチェック
-                string initialDataFile = projectConfig["initialDataFile"]?.ToString();
-                if (!string.IsNullOrEmpty(initialDataFile) && File.Exists(initialDataFile))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found initialDataFile in config: {initialDataFile}");
-                    return initialDataFile;
-                }
-                
-                // 優先順位3: config.jsonのexcelFileをチェック
                 string excelFile = projectConfig["excelFile"]?.ToString();
-                if (!string.IsNullOrEmpty(excelFile) && File.Exists(excelFile))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found excelFile in config: {excelFile}");
-                    return excelFile;
-                }
-                
-                // 優先順位4: 現在Excelで開いているファイルをチェック（最後のフォールバック）
-                string openFilePath = GetOpenExcelFileForProject(groupId, projectId);
-                if (!string.IsNullOrEmpty(openFilePath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found open Excel file (fallback): {openFilePath}");
-                    return openFilePath;
-                }
-                
-                // 優先順位5: Tabフォルダのパスを自動生成
-                string generatedPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\project{projectId}.xlsx";
-                System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Using generated path: {generatedPath}");
-                return generatedPath;
+                string initialDataFile = projectConfig["initialDataFile"]?.ToString();
+                string configuredFallback = !string.IsNullOrWhiteSpace(excelFile)
+                    ? excelFile
+                    : initialDataFile;
+                return DataPathHelper.ResolveWorkingFilePath(groupId, projectId, configuredFallback);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Error: {ex.Message}");
-                // フォールバック: Initialフォルダのパス
-                string fallbackPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
-                System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Using fallback path: {fallbackPath}");
-                return fallbackPath;
+                return DataPathHelper.GetWorkingFilePath(groupId, projectId);
             }
         }
         

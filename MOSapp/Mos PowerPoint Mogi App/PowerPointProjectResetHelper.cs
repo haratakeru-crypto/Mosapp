@@ -1,5 +1,4 @@
 using System;
-using System.Configuration;
 using System.IO;
 using System.Threading;
 using Libraries;
@@ -23,71 +22,19 @@ namespace MOS_PowerPoint_app
             PPLogReader.ClearSnapshot();
             PPTaskAttemptRegistry.ClearProject(projectId);
 
-            string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"]
-                ?? @"C:\MOSTest\PowerPoint365";
-            string tabFolder = Path.Combine(basePath, $"Tab{groupId}");
+            string projectFilePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
+            string templatePath = PowerPointDataPathHelper.GetTemplateProjectPath(groupId, projectId);
+            string initialFilePath = PowerPointDataPathHelper.GetInitialProjectPath(groupId, projectId);
 
-            string[] possibleNames = { $"Project{projectId}.pptx", $"Project{projectId}.ppt" };
-            string projectFilePath = null;
+            if (!File.Exists(templatePath))
+                throw new FileNotFoundException($"テンプレートファイルが見つかりません: {templatePath}");
 
-            foreach (var fileName in possibleNames)
-            {
-                string fullPath = Path.Combine(tabFolder, fileName);
-                if (File.Exists(fullPath))
-                {
-                    projectFilePath = fullPath;
-                    break;
-                }
-            }
+            string projectFolder = Path.GetDirectoryName(projectFilePath);
+            if (!Directory.Exists(projectFolder))
+                Directory.CreateDirectory(projectFolder);
 
-            if (string.IsNullOrEmpty(projectFilePath))
-            {
-                projectFilePath = Path.Combine(tabFolder, $"Project{projectId}.pptx");
-                System.Diagnostics.Debug.WriteLine($"[PowerPointProjectResetHelper] ファイルが見つかりません。作成します: {projectFilePath}");
-            }
-
-            string templatesFolder = Path.Combine(basePath, "Templates", $"Tab{groupId}");
-            string templatePath = null;
-            string fileExtension = ".pptx";
-
-            if (Directory.Exists(templatesFolder))
-            {
-                var files = Directory.GetFiles(templatesFolder, $"*{fileExtension}", SearchOption.TopDirectoryOnly);
-                string searchPattern = $"project{projectId}".ToLower();
-                foreach (var file in files)
-                {
-                    string fn = Path.GetFileNameWithoutExtension(file).ToLower();
-                    if (fn.Contains(searchPattern) || fn == searchPattern)
-                    {
-                        templatePath = file;
-                        break;
-                    }
-                }
-            }
-
-            if (string.IsNullOrEmpty(templatePath))
-            {
-                string[] patterns = {
-                    Path.Combine(basePath, "Templates", $"Tab{groupId}", $"project{projectId}{fileExtension}"),
-                    Path.Combine(basePath, "Templates", $"project{projectId}{fileExtension}"),
-                    Path.Combine(basePath, "Templates", $"Tab{groupId}", $"Tab{groupId}_project{projectId}{fileExtension}")
-                };
-                foreach (var pattern in patterns)
-                {
-                    if (File.Exists(pattern))
-                    {
-                        templatePath = pattern;
-                        break;
-                    }
-                }
-            }
-
-            if (string.IsNullOrEmpty(templatePath))
-                throw new FileNotFoundException($"テンプレートファイルが見つかりません: {templatesFolder}");
-
-            var templateFileInfo = new FileInfo(templatePath);
-            if (!templateFileInfo.IsReadOnly)
-                templateFileInfo.IsReadOnly = true;
+            // テンプレートは編集可能な状態を正とし、既存の読み取り専用属性も明示解除する。
+            PowerPointDataPathHelper.ClearReadOnly(templatePath, "テンプレート");
 
             if (File.Exists(projectFilePath))
             {
@@ -109,8 +56,7 @@ namespace MOS_PowerPoint_app
                 System.Diagnostics.Debug.WriteLine($"[PowerPointProjectResetHelper] 読み取り専用解除（プロジェクト）: {ex.Message}");
             }
 
-            string initialFolderPath = Path.Combine(tabFolder, "Initial");
-            string initialFilePath = Path.Combine(initialFolderPath, $"project{projectId}{fileExtension}");
+            string initialFolderPath = Path.GetDirectoryName(initialFilePath);
 
             if (!Directory.Exists(initialFolderPath))
                 Directory.CreateDirectory(initialFolderPath);

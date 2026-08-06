@@ -419,13 +419,8 @@ namespace Libraries.Group2
 
         private static string GetInitialDataFilePath(int tabId, int projectId)
         {
-            if (_config == null) return null;
-            try
-            {
-                var projectData = _config["tabs"]?[tabId.ToString()]?["projects"]?[projectId.ToString()];
-                return projectData?["initialDataFile"]?.ToString();
-            }
-            catch { return null; }
+            string configured = _config?["tabs"]?[tabId.ToString()]?["projects"]?[projectId.ToString()]?["initialDataFile"]?.ToString();
+            return MOSExcelMogiApp.Infrastructure.DataPathHelper.ResolveInitialFilePath(tabId, projectId, configured);
         }
 
         private static string GetCompletedDataFilePath(int tabId, int projectId)

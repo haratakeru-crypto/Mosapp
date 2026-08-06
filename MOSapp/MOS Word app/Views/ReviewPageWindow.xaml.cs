@@ -96,17 +96,11 @@ namespace MOS_Word_app.Views
             try
             {
                 // レビュー画面の問題文は Word 用 JSON（PowerPoint と独立）
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
+                string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
                 
                 if (!File.Exists(jsonPath))
                 {
-                    string path1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                    string path2 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] 正誤判定表JSONが見つかりません。BaseDirectory={AppDomain.CurrentDomain.BaseDirectory}");
-                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] 試したパス1: {path1}");
-                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] 試したパス2: {path2}");
                     MessageBox.Show($"問題文JSONファイルが見つかりません: {jsonPath}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }

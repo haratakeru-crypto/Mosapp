@@ -42,14 +42,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="MOSapp.exe" size="26536">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="MOSapp.exe" size="27048">
       <assemblyIdentity name="MOSapp" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>P27WRUpKvc7tG7mg21FqCOVjaTrLX1xurtvL0pWYIBc=</dsig:DigestValue>
+        <dsig:DigestValue>avuppiWVhogcyMGL5AU3AA3HJH2Q3JtcPtilVESA51k=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

@@ -136,6 +136,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="MainViewModel.cs" />
+    <Compile Include="WordDataPathHelper.cs" />
     <Compile Include="WordProjectResetHelper.cs" />
     <Compile Include="TabTaskInfo.cs" />
     <Compile Include="TabChecker.cs" />
@@ -232,6 +233,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <Content Include="Assets\config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Resource Include="Assets\qr_subete_no_saiten.png" />
     <Content Include="Reference\CSV\MOS模擬アプリ正誤判定表251120_.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -65,13 +65,8 @@ namespace MOS_PowerPoint_app.Views
                 // JSONファイルから全プロジェクトのデータを読み込む（全63問を考慮するため）
                 ProjectData projectData = await Task.Run(() =>
                 {
-                    // JSONファイルのパス（プロジェクトルートまたはReferences/JSON）
-                    string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                    
-                    if (!File.Exists(jsonPath))
-                    {
-                        jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                    }
+                    string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                        "MOS模擬アプリ問題文一覧_PowerPoint.json");
                     
                     System.Diagnostics.Debug.WriteLine($"[ResultWindow] Loading from: {jsonPath}");
                     
@@ -130,13 +125,8 @@ namespace MOS_PowerPoint_app.Views
                 // バックグラウンドでJSONファイルを読み込む
                 ProjectData projectData = await Task.Run(() =>
                 {
-                    // JSONファイルのパス（プロジェクトルートまたはReferences/JSON）
-                    string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                    
-                    if (!File.Exists(jsonPath))
-                    {
-                        jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                    }
+                    string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                        "MOS模擬アプリ問題文一覧_PowerPoint.json");
                     
                     System.Diagnostics.Debug.WriteLine($"[ResultWindow] Loading from: {jsonPath}");
                     
@@ -476,11 +466,8 @@ namespace MOS_PowerPoint_app.Views
         {
             return await Task.Run(() =>
             {
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                if (!File.Exists(jsonPath))
-                {
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                }
+                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                    "MOS模擬アプリ問題文一覧_PowerPoint.json");
                 if (!File.Exists(jsonPath))
                     return null;
                 string jsonContent = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);

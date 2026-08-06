@@ -179,6 +179,7 @@
     <Compile Include="Core\Ports\Secondary\IExcelCheckerRepository.cs" />
     <Compile Include="Core\Adapters\ExcelCheckerService.cs" />
     <Compile Include="Core\Models\ProjectInfo.cs" />
+    <Compile Include="Infrastructure\DataPathHelper.cs" />
     <Compile Include="Infrastructure\ExcelCheckerRepository.cs" />
     <Compile Include="Models\ExamResultStorage.cs" />
     <Compile Include="Ui\ViewModels\MainViewModel.cs" />

@@ -15,6 +15,7 @@ using System.Windows.Threading;
 using Core.Ports.Primary;
 using Libraries;
 using MOSExcelMogiApp;
+using MOSExcelMogiApp.Infrastructure;
 using MOSExcelMogiApp.Views;
 using Newtonsoft.Json.Linq;
 using System.Runtime.InteropServices;
@@ -1302,46 +1303,20 @@ namespace Ui.ViewModels
 
         public string GetProjectFilePath(int groupId, int projectId)
         {
-            // プロジェクトを開く場合は、必ずInitialフォルダから開く
-            string initialPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
-            
-            // Initialフォルダにファイルが存在する場合はそれを使用
-            if (File.Exists(initialPath))
-            {
-                System.Diagnostics.Debug.WriteLine($"Using Initial folder file: {initialPath}");
-                return initialPath;
-            }
-            
-            // Initialフォルダにファイルが存在しない場合のフォールバック処理
+            string configuredFallback = null;
             try
             {
-                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
-                if (File.Exists(configPath))
-                {
-                    string jsonContent = File.ReadAllText(configPath);
-                    JObject config = JObject.Parse(jsonContent);
-                    
-                    var projectConfig = config["tabs"]?[groupId.ToString()]?["projects"]?[projectId.ToString()];
-                    if (projectConfig != null)
-                    {
-                        // initialDataFileを試す
-                        string initialDataFile = projectConfig["initialDataFile"]?.ToString();
-                        if (!string.IsNullOrEmpty(initialDataFile) && File.Exists(initialDataFile))
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Using initialDataFile from config: {initialDataFile}");
-                            return initialDataFile;
-                        }
-                    }
-                }
+                var projectConfig = GetProjectConfig(LoadConfig(), groupId, projectId);
+                // 既存の絶対パスは正規パスがない場合だけ移行元として使う。
+                configuredFallback = projectConfig?["excelFile"]?.ToString()
+                    ?? projectConfig?["initialDataFile"]?.ToString();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error reading config.json: {ex.Message}");
             }
-            
-            // それでも見つからない場合は、Initialフォルダのパスを返す（ファイルが後で作成される可能性がある）
-            System.Diagnostics.Debug.WriteLine($"Using Initial folder path (file may not exist): {initialPath}");
-            return initialPath;
+
+            return DataPathHelper.ResolveWorkingFilePath(groupId, projectId, configuredFallback);
         }
 
         private string GetProjectFilePath(string projectId)
@@ -1404,20 +1379,20 @@ namespace Ui.ViewModels
 
         public string GetVariantProjectFilePath(int groupId, int projectId, int variantSetNo)
         {
+            string configuredFallback = null;
             try
             {
                 var config = LoadConfig();
                 var entry = GetPracticeVariantEntry(config, groupId, projectId, variantSetNo);
-                string configuredPath = entry?["excelFile"]?.ToString();
-                if (!string.IsNullOrWhiteSpace(configuredPath))
-                    return configuredPath;
+                configuredFallback = entry?["excelFile"]?.ToString();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[GetVariantProjectFilePath] config read failed: {ex.Message}");
             }
 
-            return $"C:\\MOSTest\\Excel365\\Tab{groupId}\\PracticeVariant{variantSetNo}\\project{projectId}.xlsx";
+            return DataPathHelper.ResolveVariantWorkingFilePath(
+                groupId, projectId, variantSetNo, configuredFallback);
         }
 
         /// <summary>類題の作業用 Excel パス（リセット復元先）。</summary>
@@ -1426,17 +1401,7 @@ namespace Ui.ViewModels
 
         /// <summary>類題リセット用テンプレート Excel パス。</summary>
         public string GetVariantTemplateFilePath(int groupId, int projectId, int variantSetNo)
-        {
-            string workingPath = GetVariantWorkingFilePath(groupId, projectId, variantSetNo);
-            if (!string.IsNullOrWhiteSpace(workingPath))
-            {
-                string dir = Path.GetDirectoryName(workingPath);
-                if (!string.IsNullOrEmpty(dir))
-                    return Path.Combine(dir, "Templates", $"project{projectId}.xlsx");
-            }
-
-            return $"C:\\MOSTest\\Excel365\\Tab{groupId}\\PracticeVariant{variantSetNo}\\Templates\\project{projectId}.xlsx";
-        }
+            => DataPathHelper.ResolveVariantTemplateFilePath(groupId, projectId, variantSetNo);
 
         public string GetActiveProjectFilePath(int groupId, int projectId)
         {

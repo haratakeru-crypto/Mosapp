@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -9,7 +8,6 @@ using System.Windows;
 using System.Windows.Input;
 using System.Runtime.InteropServices;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using PowerPointApp = Microsoft.Office.Interop.PowerPoint.Application;
 using PowerPointPresentation = Microsoft.Office.Interop.PowerPoint.Presentation;
 using Microsoft.Office.Interop.PowerPoint;
@@ -134,40 +132,10 @@ namespace MOS_PowerPoint_app
         {
             try
             {
-                // 優先順位1: Assets\config.json（mos_xaml_app と同様に、ClickOnceでも同梱しやすい）
-                // 優先順位2: App.config の appSettings
-                // 優先順位3: 既定値
-                string basePath = null;
-
-                try
-                {
-                    string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
-                    if (File.Exists(configPath))
-                    {
-                        string jsonContent = File.ReadAllText(configPath);
-                        JObject config = JObject.Parse(jsonContent);
-                        basePath = config["powerPointDataPath"]?.ToString();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Assets\\config.json 読み込みエラー: {ex.Message}");
-                }
-
-                if (string.IsNullOrWhiteSpace(basePath))
-                {
-                    basePath = ConfigurationManager.AppSettings["PowerPointDataPath"];
-                }
-
-                if (string.IsNullOrWhiteSpace(basePath))
-                {
-                    basePath = @"C:\MOSTest\PowerPoint365";
-                }
-                
                 // Tab1（演習）のみ読み込む
                 foreach (int groupId in new[] { 1 })
                 {
-                    string tabFolder = Path.Combine(basePath, $"Tab{groupId}");
+                    string tabFolder = PowerPointDataPathHelper.GetTabFolder(groupId);
                     var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
                     
                     if (Directory.Exists(tabFolder))
@@ -175,18 +143,12 @@ namespace MOS_PowerPoint_app
                         // Project1.pptxからProject10.pptxを検索
                         for (int projectId = 1; projectId <= 10; projectId++)
                         {
-                            // Project1.pptx, Project2.pptx, ... を検索
-                            string[] possibleNames = { $"Project{projectId}.pptx", $"Project{projectId}.ppt" };
-                            string filePath = null;
-                            
-                            foreach (var fileName in possibleNames)
+                            string filePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
+                            if (!File.Exists(filePath))
                             {
-                                string fullPath = Path.Combine(tabFolder, fileName);
-                                if (File.Exists(fullPath))
-                                {
-                                    filePath = fullPath;
-                                    break;
-                                }
+                                // .ppt は拡張子を変えてコピーせず、旧形式のまま互換利用する。
+                                string legacyPptPath = Path.Combine(tabFolder, $"Project{projectId}.ppt");
+                                filePath = File.Exists(legacyPptPath) ? legacyPptPath : null;
                             }
                             
                             group.Projects.Add(new ProjectViewModel
@@ -305,9 +267,8 @@ namespace MOS_PowerPoint_app
             TaskResults.Clear();
             ResultMessage = "採点中...";
 
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-            if (!File.Exists(jsonPath))
-                jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
+            string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                "MOS模擬アプリ問題文一覧_PowerPoint.json");
             if (!File.Exists(jsonPath))
             {
                 ResultMessage = "該当プロジェクトのタスクが見つかりません（問題文JSONがありません）。";

@@ -223,9 +223,7 @@ namespace Libraries
         {
             try
             {
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
+                string jsonPath = MOS_Word_app.WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
                 if (!File.Exists(jsonPath))
                     return null;
 
@@ -548,54 +546,15 @@ namespace Libraries
 
         private static string ResolveProjectFilePath(int projectId, int groupId)
         {
-            string basePath = @"C:\MOSTest\Word365";
-            string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-            string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
-            string initialInitialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial", "Initial");
-            string[] possibleNames = (groupId == 1 && projectId == 7)
-                ? new[] { $"Project{projectId}.doc", $"project{projectId}.doc" }
-                : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-            string workingFileName = (groupId == 1 && projectId == 7) ? "Project7.doc" : $"Project{projectId}.docx";
-            string workingFilePath = Path.Combine(workingFolder, workingFileName);
-
-            foreach (var fileName in possibleNames)
+            try
             {
-                string fullPath = Path.Combine(workingFolder, fileName);
-                if (File.Exists(fullPath))
-                    return fullPath;
+                return MOS_Word_app.WordDataPathHelper.EnsureWorkingFile(groupId, projectId);
             }
-
-            string sourcePath = null;
-            foreach (var fileName in possibleNames)
+            catch (Exception ex)
             {
-                string fullPath = Path.Combine(initialFolder, fileName);
-                if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Resolve project file failed: {ex.Message}");
+                return null;
             }
-            if (string.IsNullOrEmpty(sourcePath) && Directory.Exists(initialInitialFolder))
-            {
-                foreach (var fileName in possibleNames)
-                {
-                    string fullPath = Path.Combine(initialInitialFolder, fileName);
-                    if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                }
-            }
-
-            if (!string.IsNullOrEmpty(sourcePath))
-            {
-                try
-                {
-                    if (!Directory.Exists(workingFolder))
-                        Directory.CreateDirectory(workingFolder);
-                    File.Copy(sourcePath, workingFilePath, overwrite: false);
-                    return workingFilePath;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Copy from Initial failed: {ex.Message}");
-                }
-            }
-
-            return null;
         }
     }
 
@@ -1008,18 +967,7 @@ namespace Libraries
 
         private static string ResolveSnapshotProjectPath(int projectId, int groupId)
         {
-            string basePath = @"C:\MOSTest\Word365";
-            string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-            string[] possibleNames = (groupId == 1 && projectId == 7)
-                ? new[] { $"Project{projectId}.doc", $"project{projectId}.doc" }
-                : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-            foreach (var fileName in possibleNames)
-            {
-                string fullPath = Path.Combine(workingFolder, fileName);
-                if (File.Exists(fullPath))
-                    return fullPath;
-            }
-            return null;
+            return MOS_Word_app.WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
         }
 
         private static SnapshotData LoadSnapshot()

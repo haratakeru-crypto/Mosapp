@@ -20,6 +20,7 @@ using System.Windows.Interop;
 using System.Text;
 using System.Threading;
 using Libraries;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp
 {
@@ -649,7 +650,7 @@ namespace MOSExcelMogiApp
                         _ => "MOS模擬アプリ問題文一覧.json"
                     };
                 
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", jsonFileName);
+                string jsonPath = DataPathHelper.ResolveJsonPath(jsonFileName);
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Loading tasks from: {jsonFileName} (GroupId: {groupId})");
                 
                 string jsonContent = File.ReadAllText(jsonPath);

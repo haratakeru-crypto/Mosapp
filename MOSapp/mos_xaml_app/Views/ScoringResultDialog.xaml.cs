@@ -8,6 +8,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Newtonsoft.Json.Linq;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -199,10 +200,7 @@ namespace MOSExcelMogiApp.Views
         {
             _answerStepsByTaskId.Clear();
 
-            string jsonPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                "References",
-                "JSON",
+            string jsonPath = DataPathHelper.ResolveJsonPath(
                 $"MOS演習問題文一覧_PracticeVariant{_variantSetNo}.json");
 
             if (!File.Exists(jsonPath))

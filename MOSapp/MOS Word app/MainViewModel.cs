@@ -125,38 +125,23 @@ namespace MOS_Word_app
 
         private void LoadProjects()
         {
-            string basePath = @"C:\MOSTest\Word365";
-
-            // Group1（演習）のみ。保存先は Tab{groupId}\ 直下。一覧は Initial にファイルがあれば表示し、FilePath は作業フォルダ（Tab\）のパスにする
+            // Group1（演習）のみ。教材パスとファイル名は WordDataPathHelper の規約に従う。
             for (int groupId = 1; groupId <= 1; groupId++)
             {
-                string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-                string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
                 var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
 
                 for (int projectId = 1; projectId <= 10; projectId++)
                 {
-                    // 保存先（作業フォルダ）のパス。保存はここにのみ反映する
-                    string workingFileName = (groupId == 1 && projectId == 7) ? "Project7.doc" : $"Project{projectId}.docx";
-                    string workingFilePath = Path.Combine(workingFolder, workingFileName);
-                    string[] possibleNames = (groupId == 1 && projectId == 7)
-                        ? new[] { "Project7.doc", "project7.doc" }
-                        : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-
-                    bool existsInWorking = File.Exists(workingFilePath);
-                    bool existsInInitial = false;
-                    if (Directory.Exists(initialFolder))
+                    string filePath = WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
+                    if (string.IsNullOrEmpty(filePath))
                     {
-                        foreach (var fileName in possibleNames)
+                        try
                         {
-                            if (File.Exists(Path.Combine(initialFolder, fileName)))
-                            {
-                                existsInInitial = true;
-                                break;
-                            }
+                            WordDataPathHelper.EnsureCanonicalTemplate(groupId, projectId);
+                            filePath = WordDataPathHelper.GetWorkingFilePath(groupId, projectId);
                         }
+                        catch (FileNotFoundException) { }
                     }
-                    string filePath = (existsInWorking || existsInInitial) ? workingFilePath : null;
 
                     group.Projects.Add(new ProjectViewModel
                     {
@@ -184,42 +169,13 @@ namespace MOS_Word_app
                     ResultMessage = $"エラー: ファイルが見つかりません: {project.FilePath ?? "パスが設定されていません"}";
                     return;
                 }
-                // 作業フォルダ（Tab\）にファイルが無い場合は Initial からコピーしてから開く（保存は常に Tab\ にのみ反映）
+                // 作業ファイルが無い場合は正規テンプレート（互換元からの安全な生成を含む）から作成する。
                 if (!File.Exists(project.FilePath))
                 {
-                    string basePath = @"C:\MOSTest\Word365";
-                    int groupId = project.GroupId;
-                    int projectId = project.ProjectId;
-                    string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
-                    string initialInitialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial", "Initial");
-                    string[] possibleNames = (groupId == 1 && projectId == 7)
-                        ? new[] { "Project7.doc", "project7.doc" }
-                        : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-                    string sourcePath = null;
-                    foreach (var fileName in possibleNames)
-                    {
-                        string fullPath = Path.Combine(initialFolder, fileName);
-                        if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                    }
-                    if (string.IsNullOrEmpty(sourcePath) && Directory.Exists(initialInitialFolder))
-                    {
-                        foreach (var fileName in possibleNames)
-                        {
-                            string fullPath = Path.Combine(initialInitialFolder, fileName);
-                            if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                        }
-                    }
-                    if (string.IsNullOrEmpty(sourcePath))
-                    {
-                        ResultMessage = $"エラー: 参照元ファイルが見つかりません: {initialFolder}";
-                        return;
-                    }
                     try
                     {
-                        string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-                        if (!Directory.Exists(workingFolder))
-                            Directory.CreateDirectory(workingFolder);
-                        File.Copy(sourcePath, project.FilePath, overwrite: false);
+                        project.FilePath = WordDataPathHelper.EnsureWorkingFile(
+                            project.GroupId, project.ProjectId);
                     }
                     catch (Exception exCopy)
                     {

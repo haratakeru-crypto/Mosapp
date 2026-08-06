@@ -8,6 +8,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using MOSExcelMogiApp;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -190,7 +191,7 @@ namespace MOSExcelMogiApp.Views
                         _ => "MOS模擬アプリ問題文一覧.json"
                     };
                     
-                    string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", jsonFileName);
+                    string jsonPath = DataPathHelper.ResolveJsonPath(jsonFileName);
                     System.Diagnostics.Debug.WriteLine($"[ResultWindow] Loading from: {jsonFileName} (GroupId: {_groupId})");
                     
                     if (!File.Exists(jsonPath))

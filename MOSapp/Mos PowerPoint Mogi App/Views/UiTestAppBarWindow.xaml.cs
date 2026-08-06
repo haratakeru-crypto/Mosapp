@@ -1059,14 +1059,9 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
-                // JSONファイルから問題文を読み込む（プロジェクトルートのファイルを使用）
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                
-                // ファイルが存在しない場合は、References/JSONフォルダも試す
-                if (!File.Exists(jsonPath))
-                {
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                }
+                // References\JSON を正規配置とし、実行ファイル直下を互換フォールバックにする。
+                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                    "MOS模擬アプリ問題文一覧_PowerPoint.json");
                 
                 // ファイルが存在しない場合はエラー
                 if (!File.Exists(jsonPath))
@@ -1115,9 +1110,7 @@ namespace MOS_PowerPoint_app.Views
                 
                 // コピー対象問題JSON（入力・追加・変更・挿入の問題）を優先して読み込む
                 string copyTargetJsonName = "MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json";
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, copyTargetJsonName);
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", copyTargetJsonName);
+                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(copyTargetJsonName);
                 if (File.Exists(jsonPath))
                 {
                     try
@@ -2088,7 +2081,7 @@ namespace MOS_PowerPoint_app.Views
             if (enableProjectBackup)
             {
                 // 現在開いているプレゼンテーションを日付・時間付きバックアップフォルダに保存（MMdd_HHmm）
-                string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] ?? @"C:\MOSTest\PowerPoint365";
+                string basePath = PowerPointDataPathHelper.GetDataRoot();
                 string backupSubdir = DateTime.Now.ToString("MMdd_HHmm");
                 string backupFolder = Path.Combine(basePath, $"Tab{_groupId}", "backup", backupSubdir);
                 try
@@ -2243,24 +2236,12 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
-                // MainViewModelと同じロジックでファイルパスを構築
-                // App.configからパスを読み込む（存在しない場合はデフォルト値を使用）
-                string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] 
-                    ?? @"C:\MOSTest\PowerPoint365";
-                string tabFolder = Path.Combine(basePath, $"Tab{groupId}");
-                
-                // Project1.pptxからProject10.pptxを検索
-                string[] possibleNames = { $"Project{projectId}.pptx", $"Project{projectId}.ppt" };
-                string filePath = null;
-                
-                foreach (var fileName in possibleNames)
+                string tabFolder = PowerPointDataPathHelper.GetTabFolder(groupId);
+                string filePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
+                if (!File.Exists(filePath))
                 {
-                    string fullPath = Path.Combine(tabFolder, fileName);
-                    if (File.Exists(fullPath))
-                    {
-                        filePath = fullPath;
-                        break;
-                    }
+                    string legacyPptPath = Path.Combine(tabFolder, $"Project{projectId}.ppt");
+                    filePath = File.Exists(legacyPptPath) ? legacyPptPath : null;
                 }
                 
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))

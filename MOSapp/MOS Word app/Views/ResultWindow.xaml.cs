@@ -61,17 +61,11 @@ namespace MOS_Word_app.Views
         {
             try
             {
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
+                string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
 
                 if (!File.Exists(jsonPath))
                 {
-                    string path1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                    string path2 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
                     System.Diagnostics.Debug.WriteLine($"[ResultWindow] 正誤判定表JSONが見つかりません。BaseDirectory={AppDomain.CurrentDomain.BaseDirectory}");
-                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] 試したパス1: {path1}");
-                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] 試したパス2: {path2}");
                 }
 
                 var projectData = await System.Threading.Tasks.Task.Run(() =>
