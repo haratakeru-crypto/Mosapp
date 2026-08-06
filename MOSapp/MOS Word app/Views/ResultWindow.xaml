@@ -1,11 +1,16 @@
 <Window x:Class="MOS_Word_app.Views.ResultWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="試験結果" 
-        WindowState="Maximized"
+        Title="結果画面" 
+        Width="1200"
+        Height="800"
+        MinWidth="800"
+        MinHeight="600"
+        WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        ShowInTaskbar="False"
-        Background="#F5F5F5">
+        ResizeMode="CanResize"
+        Background="#F5F5F5"
+        Topmost="True">
     
     <Grid>
         <Grid.RowDefinitions>
@@ -22,7 +27,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
-                <TextBlock Grid.Column="0" Text="試験結果" 
+                <TextBlock Grid.Column="0" Text="結果画面" 
                            Foreground="White" FontSize="24" FontWeight="Bold"
                            VerticalAlignment="Center"/>
                 
@@ -48,9 +53,15 @@
         <!-- メインコンテンツ -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="20">
-                <!-- 結果サマリー -->
-                <Border Background="White" CornerRadius="8" Margin="0,0,0,20" 
-                        Padding="30" BorderBrush="#E5E7EB" BorderThickness="1">
+                <!-- タイトル -->
+                <TextBlock Text="試験結果" 
+                           FontSize="28" FontWeight="Bold" 
+                           Foreground="#1E40AF" 
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,30"/>
+
+                <!-- 統計情報 -->
+                <Border Background="White" CornerRadius="8" Padding="30" Margin="0,0,0,20">
                     <Border.Effect>
                         <DropShadowEffect Color="Black" Direction="315" ShadowDepth="2" Opacity="0.1" BlurRadius="8"/>
                     </Border.Effect>
@@ -59,47 +70,75 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="結果サマリー" 
-                                       FontSize="20" FontWeight="Bold" 
-                                       Foreground="#1E40AF" Margin="0,0,0,15"/>
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
                             
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <TextBlock Grid.Column="0" Text="✖の数: " 
-                                           FontSize="18" FontWeight="SemiBold" 
-                                           Foreground="#374151" Margin="0,0,10,0"/>
-                                <TextBlock Grid.Column="1" Name="WrongCountTextBlock" Text="0" 
-                                           FontSize="18" FontWeight="Bold" 
-                                           Foreground="#DC2626"/>
-                            </Grid>
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+                                <TextBlock Text="正答率: " 
+                                           FontSize="24" FontWeight="Bold" 
+                                           Foreground="#374151"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Name="AccuracyTextBlock"
+                                           Text="正答率: 初回 0.0% / 修正後 0.0%" 
+                                           FontSize="32" FontWeight="Bold"
+                                           Foreground="#1E40AF"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
                             
-                            <TextBlock Name="AccuracyTextBlock"
-                                       Text="正答率: 初回 0% / 修正後 0%"
-                                       FontSize="16" FontWeight="SemiBold"
-                                       Foreground="#10B981"
-                                       Margin="0,8,0,0"/>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="間違えた問題数: " 
+                                           FontSize="20" FontWeight="Medium" 
+                                           Foreground="#374151"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Name="WrongCountTextBlock" Text="0問" 
+                                           FontSize="24" FontWeight="Bold" 
+                                           Foreground="#DC2626"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
                             
-                            <TextBlock Name="SummaryTextBlock" 
-                                       Text="「あとで見直す」状態の問題と、50分以内に目を通せていない問題の合計数です。" 
-                                       FontSize="14" Foreground="#6B7280" 
-                                       Margin="0,10,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
+                            <TextBlock Name="SummaryTextBlock" Visibility="Collapsed"/>
+                        </Grid>
 
                         <!-- QRコード（点数の右） -->
-                        <Image Grid.Column="1"
-                               Source="pack://application:,,,/MOS%20Word%20app;component/Assets/qr_subete_no_saiten.png"
-                               Width="96" Height="96"
-                               Stretch="Uniform"
-                               VerticalAlignment="Center"
-                               Margin="24,0,0,0"
-                               ToolTip="https://subete-no-saiten.jp"/>
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Margin="24,0,0,0">
+                            <TextBlock Text="結果はこちらに"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8"/>
+                            <Image Source="pack://application:,,,/MOS%20Word%20app;component/Assets/qr_subete_no_saiten.png"
+                                   Width="255" Height="255"
+                                   Stretch="Uniform"
+                                   ToolTip="QRコードを読み取って結果を送信します"/>
+                        </StackPanel>
+
+                        <!-- 間違えた問題のみ表示ボタン -->
+                        <Button Grid.Column="2" Name="ShowWrongOnlyButton" Content="間違えた問題のみ表示" 
+                                Background="#DC2626" Foreground="White" 
+                                Padding="20,10" FontWeight="Medium" FontSize="14"
+                                BorderThickness="0" Click="ShowWrongOnlyButton_Click"
+                                VerticalAlignment="Center"
+                                Margin="30,0,0,0"
+                                Cursor="Hand">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#B91C1C"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                     </Grid>
                 </Border>
                 

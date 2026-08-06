@@ -18,10 +18,6 @@
     
     <!-- メインコンテナ -->
     <Border Background="#F5F5F5" CornerRadius="8">
-        <Border.Effect>
-            <DropShadowEffect Color="Black" Direction="315" ShadowDepth="8" Opacity="0.3" BlurRadius="15"/>
-        </Border.Effect>
-        
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

@@ -22,6 +22,8 @@ namespace MOS_Word_app.Views
         private Dictionary<int, bool[]> _projectTaskViewedStates;
         private int _groupId;
         private bool _isWindowClosed;
+        private List<ResultProjectInfo> _allProjects;
+        private bool _showingWrongOnly;
 
         public Action<int, int> OnNavigateToTask { get; set; }
 
@@ -103,7 +105,8 @@ namespace MOS_Word_app.Views
                             else task.ResultColor = Brushes.Transparent;
                         }
                     }
-                    ProjectsItemsControl.ItemsSource = resultProjects;
+                    _allProjects = resultProjects;
+                    ProjectsItemsControl.ItemsSource = _allProjects;
                 });
             }
             catch (Exception ex)
@@ -271,6 +274,32 @@ namespace MOS_Word_app.Views
             if ((text.StartsWith("\"") && text.EndsWith("\"")) || (text.StartsWith("'") && text.EndsWith("'")))
                 text = text.Substring(1, text.Length - 2);
             return text;
+        }
+
+        private void ShowWrongOnlyButton_Click(object sender, RoutedEventArgs e)
+        {
+            _showingWrongOnly = !_showingWrongOnly;
+            if (_showingWrongOnly)
+            {
+                ProjectsItemsControl.ItemsSource = (_allProjects ?? new List<ResultProjectInfo>())
+                    .Select(project => new ResultProjectInfo
+                    {
+                        ProjectTitle = project.ProjectTitle,
+                        Tasks = (project.Tasks ?? new List<ResultTaskInfo>())
+                            .Where(task => task.ResultMark == "✖" || task.ResultMark == "時間切れ")
+                            .ToList()
+                    })
+                    .Where(project => project.Tasks.Count > 0)
+                    .ToList();
+                ShowWrongOnlyButton.Content = "全て表示";
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(30, 64, 175));
+            }
+            else
+            {
+                ProjectsItemsControl.ItemsSource = _allProjects;
+                ShowWrongOnlyButton.Content = "間違えた問題のみ表示";
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38));
+            }
         }
 
         private async void TaskRow_MouseDown(object sender, RoutedEventArgs e)

@@ -74,62 +74,58 @@
                         </Grid.ColumnDefinitions>
                         
                         <Grid Grid.Column="0">
-                            <!-- 統計情報表示 -->
-                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                <!-- 正答率表示 -->
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
-                                    <TextBlock Text="正答率: " 
-                                               FontSize="20" FontWeight="Medium" 
-                                               Foreground="#374151"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="AccuracyTextBlock" Text="0%" 
-                                               FontSize="24" FontWeight="Bold" 
-                                               Foreground="#10B981"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <!-- ×の数表示 -->
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="✖の問題数: " 
-                                               FontSize="20" FontWeight="Medium" 
-                                               Foreground="#374151"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="WrongCountTextBlock" Text="0" 
-                                               FontSize="24" FontWeight="Bold" 
-                                               Foreground="#DC2626"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TotalCountTextBlock" Text="/ 0" 
-                                               FontSize="20" FontWeight="Medium" 
-                                               Foreground="#374151"
-                                               VerticalAlignment="Center"
-                                               Margin="5,0,0,0"/>
-                                </StackPanel>
-                                <!-- 正答数表示 -->
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-                                    <TextBlock Text="正答数: "
-                                               FontSize="20" FontWeight="Medium"
-                                               Foreground="#374151"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="CorrectCountTextBlock" Text="0"
-                                               FontSize="24" FontWeight="Bold"
-                                               Foreground="#10B981"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="CorrectTotalCountTextBlock" Text="/ 0"
-                                               FontSize="20" FontWeight="Medium"
-                                               Foreground="#374151"
-                                               VerticalAlignment="Center"
-                                               Margin="5,0,0,0"/>
-                                </StackPanel>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- 正答率表示 -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+                                <TextBlock Text="正答率: " 
+                                           FontSize="24" FontWeight="Bold" 
+                                           Foreground="#374151"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="AccuracyTextBlock" Text="正答率: 0.0%　復習後: 0.0%" 
+                                           FontSize="32" FontWeight="Bold" 
+                                           Foreground="#1E40AF"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
+                            <!-- ×の数表示 -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="間違えた問題数: " 
+                                           FontSize="20" FontWeight="Medium" 
+                                           Foreground="#374151"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="WrongCountTextBlock" Text="0問" 
+                                           FontSize="24" FontWeight="Bold" 
+                                           Foreground="#DC2626"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- 集計用の要素（画面には表示しない） -->
+                            <StackPanel Visibility="Collapsed">
+                                <TextBlock x:Name="TotalCountTextBlock"/>
+                                <TextBlock x:Name="CorrectCountTextBlock"/>
+                                <TextBlock x:Name="CorrectTotalCountTextBlock"/>
                             </StackPanel>
                         </Grid>
 
                         <!-- QRコード（点数の右） -->
-                        <Image Grid.Column="1"
-                               Source="pack://application:,,,/Mos%20PowerPoint%20Mogi%20App;component/Assets/qr_subete_no_saiten.png"
-                               Width="96" Height="96"
-                               Stretch="Uniform"
-                               VerticalAlignment="Center"
-                               Margin="24,0,0,0"
-                               ToolTip="https://subete-no-saiten.jp"/>
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Margin="24,0,0,0">
+                            <TextBlock Text="結果はこちらに"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8"/>
+                            <Image Source="pack://application:,,,/Mos%20PowerPoint%20Mogi%20App;component/Assets/qr_subete_no_saiten.png"
+                                   Width="255" Height="255"
+                                   Stretch="Uniform"
+                                   ToolTip="QRコードを読み取って結果を送信します"/>
+                        </StackPanel>
                         
                         <!-- ×の問題のみ表示ボタン -->
                         <Button Grid.Column="2" Name="ShowWrongOnlyButton" Content="✖の問題のみ表示" 

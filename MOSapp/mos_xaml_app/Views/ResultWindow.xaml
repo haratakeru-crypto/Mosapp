@@ -105,13 +105,20 @@
                         </Grid>
 
                         <!-- QRコード（点数の右） -->
-                        <Image Grid.Column="1"
-                               Source="pack://application:,,,/MOSExcelMogiApp;component/Assets/qr_subete_no_saiten.png"
-                               Width="96" Height="96"
-                               Stretch="Uniform"
-                               VerticalAlignment="Center"
-                               Margin="24,0,0,0"
-                               ToolTip="https://subete-no-saiten.jp"/>
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Margin="24,0,0,0">
+                            <TextBlock Text="結果はこちらに"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#374151"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8"/>
+                            <Image Source="pack://application:,,,/MOSExcelMogiApp;component/Assets/qr_subete_no_saiten.png"
+                                   Width="255" Height="255"
+                                   Stretch="Uniform"
+                                   ToolTip="QRコードを読み取って結果を送信します"/>
+                        </StackPanel>
                         
                         <!-- 間違えた問題のみ表示ボタン -->
                         <Button Grid.Column="2" Name="ShowWrongOnlyButton" Content="間違えた問題のみ表示" 
