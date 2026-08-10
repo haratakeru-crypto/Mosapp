@@ -179,6 +179,7 @@
     <Compile Include="Core\Ports\Secondary\IExcelCheckerRepository.cs" />
     <Compile Include="Core\Adapters\ExcelCheckerService.cs" />
     <Compile Include="Core\Models\ProjectInfo.cs" />
+    <Compile Include="Infrastructure\DataPathHelper.cs" />
     <Compile Include="Infrastructure\ExcelCheckerRepository.cs" />
     <Compile Include="Models\ExamResultStorage.cs" />
     <Compile Include="Ui\ViewModels\MainViewModel.cs" />
@@ -245,6 +246,7 @@
     <Content Include="Assets\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Resource Include="Assets\qr_subete_no_saiten.png" />
     <Content Include="References\JSON\MOS模擬アプリ問題文一覧.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

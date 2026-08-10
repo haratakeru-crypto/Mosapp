@@ -22,6 +22,7 @@ namespace MOS_PowerPoint_app.Views
         private Dictionary<int, bool[]> _projectTaskFlaggedStates;
         private Dictionary<int, bool[]> _projectTaskViewedStates;
         private int _groupId;
+        private bool _isScoring;
 
         public Action<int, int> OnNavigateToTask { get; set; }
         public Action OnShowResultRequested { get; set; }
@@ -83,11 +84,8 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                if (!File.Exists(jsonPath))
-                {
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                }
+                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                    "MOS模擬アプリ問題文一覧_PowerPoint.json");
                 if (!File.Exists(jsonPath))
                 {
                     ProjectsItemsControl.ItemsSource = new List<ReviewProjectInfo>();
@@ -257,6 +255,12 @@ namespace MOS_PowerPoint_app.Views
 
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Task button ignored while scoring.");
+                return;
+            }
+
             if (sender is Button btn && btn.DataContext is ReviewTaskInfo taskInfo)
             {
                 if (OnNavigateToTask != null && taskInfo.ProjectId > 0 && taskInfo.TaskId > 0)
@@ -269,7 +273,17 @@ namespace MOS_PowerPoint_app.Views
 
         private void ShowResultButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Duplicate scoring request ignored.");
+                return;
+            }
+
+            _isScoring = true;
+            if (sender is Button button)
+                button.IsEnabled = false;
             _timer?.Stop();
+            this.Hide();
             OnShowResultRequested?.Invoke();
             this.Close();
         }

@@ -11,72 +11,18 @@
     </Window.Resources>
     <Grid Background="#F5F5F5">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         
-        <!-- UI Test Button Bar -->
-        <Border Grid.Row="0" Background="#2563EB" Margin="0,0,0,10">
-            <Border.Effect>
-                <DropShadowEffect Color="Black" Direction="315" ShadowDepth="2" Opacity="0.3" BlurRadius="4"/>
-            </Border.Effect>
-            <Grid Margin="20,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                
-                <Button Grid.Column="0" Content="UIテスト" 
-                        Command="{Binding UiTestCommand}"
-                        HorizontalAlignment="Left"
-                        Padding="20,8" MinWidth="120">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Background" Value="White"/>
-                            <Setter Property="Foreground" Value="#2563EB"/>
-                            <Setter Property="FontWeight" Value="Medium"/>
-                            <Setter Property="BorderThickness" Value="0"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{TemplateBinding Background}" 
-                                                CornerRadius="6"
-                                                Margin="2">
-                                            <Border.Effect>
-                                                <DropShadowEffect Color="Black" Direction="315" ShadowDepth="1" Opacity="0.2" BlurRadius="2"/>
-                                            </Border.Effect>
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#F3F4F6"/>
-                                </Trigger>
-                                <Trigger Property="IsPressed" Value="True">
-                                    <Setter Property="Background" Value="#E5E7EB"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                
-                <TextBlock Grid.Column="1" Text="テストモード" 
-                           Foreground="White" FontSize="14" 
-                           VerticalAlignment="Center"/>
-            </Grid>
-        </Border>
-        
         <!-- Tab Control -->
-        <Grid Grid.Row="1" Margin="20">
+        <Grid Grid.Row="0" Margin="20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             
-            <!-- 右上に「プロジェクトリセット」ボタンと「タイマーなし」チェックボックスを配置 -->
+            <!-- 右上に「全プロジェクトリセット」ボタンなどを配置 -->
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -90,34 +36,15 @@
                           Margin="0,0,15,0"
                           VerticalAlignment="Center"
                           FontSize="14"/>
-                <!-- 一時停止ボタンの表示 -->
-                <CheckBox Content="一時停止ボタンの表示"
-                          IsChecked="{Binding ShowPauseButton, Mode=TwoWay}"
-                          Margin="0,0,15,0"
-                          VerticalAlignment="Center"
-                          FontSize="14"/>
                 <!-- 類題ボタンの表示 -->
-                <CheckBox Content="類題ボタン"
+                <CheckBox Content="類題ボタンの表示"
                           IsChecked="{Binding ShowVariantButton, Mode=TwoWay}"
                           Margin="0,0,15,0"
                           VerticalAlignment="Center"
                           FontSize="14"/>
-                <!-- 類題セット選択（教材モード中のみ変更可） -->
-                <ComboBox Width="90"
-                          Margin="0,0,15,0"
-                          VerticalAlignment="Center"
-                          FontSize="14"
-                          SelectedIndex="{Binding VariantSetIndex, Mode=TwoWay}"
-                          IsEnabled="{Binding CanSelectVariantSet}">
-                    <ComboBoxItem Content="類題1"/>
-                    <ComboBoxItem Content="類題2"/>
-                    <ComboBoxItem Content="類題3"/>
-                    <ComboBoxItem Content="類題4"/>
-                    <ComboBoxItem Content="類題5"/>
-                </ComboBox>
-                <!-- プロジェクトリセットボタン -->
+                <!-- 全プロジェクトリセットボタン -->
                 <Button Name="ProjectResetButton"
-                        Content="プロジェクトリセット"
+                        Content="全プロジェクトリセット"
                         Margin="0,0,15,0"
                         Padding="15,8"
                         MinWidth="140"
@@ -154,53 +81,9 @@
                         </Style>
                     </Button.Style>
                 </Button>
-                
-                <!-- タイマーを使用チェックボックス（デフォルト未チェック＝一時停止） -->
-                <CheckBox Name="TimerCheckBox" 
-                          Content="タイマーを使用"
-                          IsChecked="False"
-                          FontSize="14"
-                          Foreground="#374151"
-                          Checked="TimerCheckBox_Checked"
-                          Unchecked="TimerCheckBox_Unchecked">
-                    <CheckBox.Style>
-                        <Style TargetType="CheckBox">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="CheckBox">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" 
-                                                    Width="18" 
-                                                    Height="18" 
-                                                    BorderBrush="#9CA3AF" 
-                                                    BorderThickness="2" 
-                                                    Background="White"
-                                                    CornerRadius="2"
-                                                    Margin="0,0,8,0">
-                                                <TextBlock Text="✓" 
-                                                           FontSize="12" 
-                                                           Foreground="#1E40AF" 
-                                                           FontWeight="Bold"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Visibility="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                            </Border>
-                                            <ContentPresenter Grid.Column="1" 
-                                                              VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </CheckBox.Style>
-                </CheckBox>
             </StackPanel>
             
-            <!-- 2タブ構成: 演習(Group1) / 応用編(Group3)。模試①は非表示 -->
+            <!-- 演習(Group1) のみ表示 -->
             <Grid Grid.Column="0" Grid.ColumnSpan="2">
             <TabControl SelectedIndex="{Binding SelectedTabIndex}" Background="#F0F0F3">
             <TabControl.Resources>
@@ -346,107 +229,6 @@
                     </Grid>
                 </ScrollViewer>
             </TabItem>
-            
-            <TabItem Header="応用編">
-                <ScrollViewer Background="#F0F0F3">
-                    <Grid Margin="20">
-                        <ItemsControl ItemsSource="{Binding ProjectGroups[1].Projects}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Rows="5" Columns="2"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Content="{Binding Name}" 
-                                            Command="{Binding DataContext.OpenProjectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}"
-                                            Margin="12" Padding="20,15" MinWidth="140" MinHeight="60">
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="Background">
-                                                    <Setter.Value>
-                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                            <GradientStop Color="#00b865" Offset="0"/>
-                                                            <GradientStop Color="#4DC685" Offset="0.5"/>
-                                                            <GradientStop Color="#7FD4A5" Offset="1"/>
-                                                        </LinearGradientBrush>
-                                                    </Setter.Value>
-                                                </Setter>
-                                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                                                <Setter Property="FontWeight" Value="Medium"/>
-                                                <Setter Property="BorderThickness" Value="0"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}" 
-                                                                    CornerRadius="20"
-                                                                    Margin="4">
-                                                                <Border.Effect>
-                                                                    <DropShadowEffect Color="#005832" Direction="135" ShadowDepth="8" Opacity="0.4" BlurRadius="15"/>
-                                                                </Border.Effect>
-                                                                <Border CornerRadius="20" Margin="2">
-                                                                    <Border.Effect>
-                                                                        <DropShadowEffect Color="#B3E5D1" Direction="315" ShadowDepth="6" Opacity="0.8" BlurRadius="12"/>
-                                                                    </Border.Effect>
-                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                            </Border>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                                <Style.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Background">
-                                                            <Setter.Value>
-                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                                    <GradientStop Color="#0CC675" Offset="0"/>
-                                                                    <GradientStop Color="#5DD695" Offset="0.5"/>
-                                                                    <GradientStop Color="#8FE4B5" Offset="1"/>
-                                                                </LinearGradientBrush>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                    </Trigger>
-                                                    <Trigger Property="IsPressed" Value="True">
-                                                        <Setter Property="Background">
-                                                            <Setter.Value>
-                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                                    <GradientStop Color="#009A55" Offset="0"/>
-                                                                    <GradientStop Color="#3CB675" Offset="0.5"/>
-                                                                    <GradientStop Color="#6FC495" Offset="1"/>
-                                                                </LinearGradientBrush>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                        <Setter Property="Template">
-                                                            <Setter.Value>
-                                                                <ControlTemplate TargetType="Button">
-                                                                    <Border Background="{TemplateBinding Background}" 
-                                                                            CornerRadius="20"
-                                                                            Margin="4">
-                                                                        <Border.Effect>
-                                                                            <DropShadowEffect Color="#004622" Direction="135" ShadowDepth="4" Opacity="0.5" BlurRadius="8"/>
-                                                                        </Border.Effect>
-                                                                        <Border CornerRadius="20" Margin="2">
-                                                                            <Border.Effect>
-                                                                                <DropShadowEffect Color="#A3D9C1" Direction="315" ShadowDepth="2" Opacity="0.6" BlurRadius="6"/>
-                                                                            </Border.Effect>
-                                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                        </Border>
-                                                                    </Border>
-                                                                </ControlTemplate>
-                                                            </Setter.Value>
-                                                        </Setter>
-                                                    </Trigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-                </ScrollViewer>
-            </TabItem>
         </TabControl>
 
             <!-- 前試験の Excel 終了待ち（プロジェクト一覧エリアのみ。短い待機では ViewModel 側で表示しない） -->
@@ -475,7 +257,7 @@
         </Grid>
         
         <!-- Result Display -->
-        <Border Grid.Row="2" Margin="20,10" Background="#FFFFFF" BorderBrush="#A0A0A0" BorderThickness="2" CornerRadius="8">
+        <Border Grid.Row="1" Margin="20,10" Background="#FFFFFF" BorderBrush="#A0A0A0" BorderThickness="2" CornerRadius="8">
             <Border.Effect>
                 <DropShadowEffect Color="Black" Direction="315" ShadowDepth="3" Opacity="0.3" BlurRadius="5"/>
             </Border.Effect>

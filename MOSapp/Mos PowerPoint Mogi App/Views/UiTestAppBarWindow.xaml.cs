@@ -34,6 +34,11 @@ namespace MOS_PowerPoint_app.Views
         // Windows API用の定義
         [DllImport("user32.dll")]
         static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
         
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -49,6 +54,32 @@ namespace MOS_PowerPoint_app.Views
         
         [DllImport("user32.dll")]
         static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int nIndex);
+
+        private const int SM_CXSCREEN = 0;
+        private const int SM_CYSCREEN = 1;
+
+        // アプリバーの高さは 1920×1080 基準の設計値（物理ピクセル）。Excel と同値。
+        private const int APP_BAR_HEIGHT_BASE = 258;
+        private const int DESIGN_SCREEN_HEIGHT = 1080;
+
+        /// <summary>物理ピクセル単位の画面幅。</summary>
+        private static int PhysicalScreenWidth => GetSystemMetrics(SM_CXSCREEN);
+
+        /// <summary>物理ピクセル単位の画面高さ。</summary>
+        private static int PhysicalScreenHeight => GetSystemMetrics(SM_CYSCREEN);
+
+        /// <summary>
+        /// 実際の画面高さに合わせてスケールしたアプリバー高さ（物理ピクセル）。
+        /// Excel と同じ画面占有比率を維持する。
+        /// </summary>
+        private static int AppBarHeightPhysical =>
+            (int)Math.Round(PhysicalScreenHeight * (double)APP_BAR_HEIGHT_BASE / DESIGN_SCREEN_HEIGHT);
+
+        /// <summary>PowerPoint ウィンドウの高さ = 画面高さ − アプリバー高さ（物理ピクセル）。</summary>
+        private static int PowerPointHeightPhysical => PhysicalScreenHeight - AppBarHeightPhysical;
         
         delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
         
@@ -106,22 +137,38 @@ namespace MOS_PowerPoint_app.Views
             SetWindowPosition();
             // 注意: PowerPointプレゼンテーションはMainViewModelのExecuteOpenProjectで既に開かれている
             // ここでは開かない（PositionPowerPointWindowはSetWindowPositionで呼ばれる）
+            this.Activated += (s, e) =>
+            {
+                try { ScoreResultWindow.TryBringOpenToFront(); }
+                catch { }
+            };
+            this.PreviewMouseDown += (s, e) =>
+            {
+                try { ScoreResultWindow.TryBringOpenToFront(); }
+                catch { }
+            };
         }
         
         private void SetWindowPosition()
         {
             // PowerPointウィンドウを配置
             PositionPowerPointWindow();
+            ScoreResultWindow.TryBringOpenToFront();
+
+            int screenW = PhysicalScreenWidth;
+            int screenH = PhysicalScreenHeight;
+            int barH = AppBarHeightPhysical;
+            int barTop = screenH - barH;
             
             // ウィンドウハンドルを取得
             IntPtr hWnd = new WindowInteropHelper(this).Handle;
             if (hWnd == IntPtr.Zero)
             {
-                // ハンドルが取得できない場合はWPFプロパティで設定
-                this.Width = 1920;
-                this.Height = 258;
+                // ハンドルが取得できない場合は WPF プロパティで近似配置
+                this.Width = screenW;
+                this.Height = barH;
                 this.Left = 0;
-                this.Top = 774;
+                this.Top = barTop;
                 this.Topmost = true;
                 return;
             }
@@ -133,24 +180,30 @@ namespace MOS_PowerPoint_app.Views
             int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
             int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
 
-            // アプリバーのウィンドウを1920x258サイズで、PowerPointの下に配置
-            // 高さ: 258 (1032 / 4)
-            // 位置: Y=774 (PowerPointの下)
-            // 境界線を考慮して位置を調整
-            int x = -borderWidth / 2; // 左側の境界線を考慮
-            int y = 774 - borderHeight / 2; // 上側の境界線を考慮（PowerPointの下）
-            int width = 1920 + borderWidth; // 境界線を含めた幅
-            int height = 258 + borderHeight; // 境界線を含めた高さ
+            // アプリバーを画面下部に配置（Excel と同じ解像度連動）
+            int x = -borderWidth / 2;
+            int y = barTop - borderHeight / 2;
+            int width = screenW + borderWidth;
+            int height = barH + borderHeight;
 
             MoveWindow(hWnd, x, y, width, height, true);
             
             // ウィンドウを最前面に表示
             this.Topmost = true;
         }
+
+        private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
+        {
+            ScoreResultWindow.TryBringOpenToFront();
+            Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
+        }
         
         private void PositionPowerPointWindow()
         {
             // リトライ＋Sleep を UI スレッドで行うとフリーズするため、バックグラウンドで実行する
+            int screenW = PhysicalScreenWidth;
+            int pptHeight = PowerPointHeightPhysical;
+
             System.Threading.Tasks.Task.Run(() =>
             {
                 try
@@ -198,6 +251,8 @@ namespace MOS_PowerPoint_app.Views
 
                     if (pptHwnd != IntPtr.Zero)
                     {
+                        try { ShowWindow(pptHwnd, SW_RESTORE); } catch { }
+
                         GetWindowRect(pptHwnd, out RECT pptWindowRect);
                         GetClientRect(pptHwnd, out RECT pptClientRect);
 
@@ -206,11 +261,12 @@ namespace MOS_PowerPoint_app.Views
 
                         int pptX = -pptBorderWidth / 2;
                         int pptY = -pptBorderHeight / 2;
-                        int pptWidth = 1920 + pptBorderWidth;
-                        int pptHeight = 774 + pptBorderHeight;
+                        int pptWidth = screenW + pptBorderWidth;
+                        int pptHeightWithBorder = pptHeight + pptBorderHeight;
 
-                        MoveWindow(pptHwnd, pptX, pptY, pptWidth, pptHeight, true);
-                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] PowerPoint window positioned: {pptWidth}x{pptHeight} at ({pptX}, {pptY})");
+                        MoveWindow(pptHwnd, pptX, pptY, pptWidth, pptHeightWithBorder, true);
+                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] PowerPoint window positioned: {pptWidth}x{pptHeightWithBorder} at ({pptX}, {pptY})");
+                        ScoreResultWindow.TryBringOpenToFront();
                     }
                     else
                     {
@@ -398,6 +454,12 @@ namespace MOS_PowerPoint_app.Views
         /// </summary>
         private async void ShowResultWindowAsync()
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Duplicate scoring request ignored.");
+                return;
+            }
+
             Window overlay = null;
             DispatcherTimer overlayKeepOnTopTimer = null;
             try
@@ -537,6 +599,7 @@ namespace MOS_PowerPoint_app.Views
                 }
                 System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] Error showing result window: {ex.Message}");
                 MessageBox.Show($"結果画面の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowReviewPageWindow();
             }
             finally
             {
@@ -725,7 +788,14 @@ namespace MOS_PowerPoint_app.Views
         /// </summary>
         public async void NavigateToTask(int projectId, int taskId)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Navigation ignored while scoring.");
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={projectId}, TaskId={taskId}");
+            ScoreResultWindow.TryBringOpenToFront();
 
             try
             {
@@ -1059,14 +1129,9 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
-                // JSONファイルから問題文を読み込む（プロジェクトルートのファイルを使用）
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                
-                // ファイルが存在しない場合は、References/JSONフォルダも試す
-                if (!File.Exists(jsonPath))
-                {
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                }
+                // References\JSON を正規配置とし、実行ファイル直下を互換フォールバックにする。
+                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                    "MOS模擬アプリ問題文一覧_PowerPoint.json");
                 
                 // ファイルが存在しない場合はエラー
                 if (!File.Exists(jsonPath))
@@ -1115,9 +1180,7 @@ namespace MOS_PowerPoint_app.Views
                 
                 // コピー対象問題JSON（入力・追加・変更・挿入の問題）を優先して読み込む
                 string copyTargetJsonName = "MOS模擬アプリ_入力追加変更挿入問題_PowerPoint.json";
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, copyTargetJsonName);
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", copyTargetJsonName);
+                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(copyTargetJsonName);
                 if (File.Exists(jsonPath))
                 {
                     try
@@ -1986,6 +2049,7 @@ namespace MOS_PowerPoint_app.Views
         
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_currentTaskId > 1)
             {
                 _currentTaskId--;
@@ -1996,6 +2060,7 @@ namespace MOS_PowerPoint_app.Views
         
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_tasks != null && _currentTaskId < _tasks.Count)
             {
                 _currentTaskId++;
@@ -2006,6 +2071,13 @@ namespace MOS_PowerPoint_app.Views
         
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Task button ignored while scoring.");
+                return;
+            }
+
             if (sender is System.Windows.Controls.Button button && button.Tag != null)
             {
                 int taskId = int.Parse(button.Tag.ToString());
@@ -2047,6 +2119,7 @@ namespace MOS_PowerPoint_app.Views
         
         private async void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             await MoveToNextProjectAsync();
         }
         
@@ -2088,7 +2161,7 @@ namespace MOS_PowerPoint_app.Views
             if (enableProjectBackup)
             {
                 // 現在開いているプレゼンテーションを日付・時間付きバックアップフォルダに保存（MMdd_HHmm）
-                string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] ?? @"C:\MOSTest\PowerPoint365";
+                string basePath = PowerPointDataPathHelper.GetDataRoot();
                 string backupSubdir = DateTime.Now.ToString("MMdd_HHmm");
                 string backupFolder = Path.Combine(basePath, $"Tab{_groupId}", "backup", backupSubdir);
                 try
@@ -2243,24 +2316,12 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
-                // MainViewModelと同じロジックでファイルパスを構築
-                // App.configからパスを読み込む（存在しない場合はデフォルト値を使用）
-                string basePath = ConfigurationManager.AppSettings["PowerPointDataPath"] 
-                    ?? @"C:\MOSTest\PowerPoint365";
-                string tabFolder = Path.Combine(basePath, $"Tab{groupId}");
-                
-                // Project1.pptxからProject10.pptxを検索
-                string[] possibleNames = { $"Project{projectId}.pptx", $"Project{projectId}.ppt" };
-                string filePath = null;
-                
-                foreach (var fileName in possibleNames)
+                string tabFolder = PowerPointDataPathHelper.GetTabFolder(groupId);
+                string filePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
+                if (!File.Exists(filePath))
                 {
-                    string fullPath = Path.Combine(tabFolder, fileName);
-                    if (File.Exists(fullPath))
-                    {
-                        filePath = fullPath;
-                        break;
-                    }
+                    string legacyPptPath = Path.Combine(tabFolder, $"Project{projectId}.ppt");
+                    filePath = File.Exists(legacyPptPath) ? legacyPptPath : null;
                 }
                 
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))

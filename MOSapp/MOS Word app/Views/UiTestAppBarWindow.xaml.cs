@@ -16,6 +16,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Reflection;
+using System.Windows.Interop;
 using WordApp = Microsoft.Office.Interop.Word.Application;
 using WordDoc = Microsoft.Office.Interop.Word.Document;
 using WordWindow = Microsoft.Office.Interop.Word.Window;
@@ -115,7 +116,13 @@ namespace MOS_Word_app.Views
                 {
                     UpdateTaskButtons();
                     UpdateButtonTexts();
+                    ScoreResultWindow.TryBringOpenToFront();
                 }
+                catch { }
+            };
+            this.PreviewMouseDown += (s, e) =>
+            {
+                try { ScoreResultWindow.TryBringOpenToFront(); }
                 catch { }
             };
         }
@@ -126,27 +133,52 @@ namespace MOS_Word_app.Views
             SetWindowPosition();
         }
 
+        private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
+        {
+            ScoreResultWindow.TryBringOpenToFront();
+            Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
+        }
+
         private void SetWindowPosition()
         {
-            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
-            const double barHeight = WordWindowLayoutHelper.DefaultAppBarHeight;
+            // Excel 基準: GetSystemMetrics の物理ピクセル + アプリバー高さの解像度スケール
+            WordWindowLayoutHelper.PositionWordForExamMode();
+            ScoreResultWindow.TryBringOpenToFront();
 
-            WordWindowLayoutHelper.PositionWordForExamMode(barHeight, screenWidth, screenHeight);
+            int screenW = WordWindowLayoutHelper.PhysicalScreenWidth;
+            int screenH = WordWindowLayoutHelper.PhysicalScreenHeight;
+            int barH = WordWindowLayoutHelper.AppBarHeightPhysical;
+            int barTop = screenH - barH;
 
-            this.Width = screenWidth;
-            this.Height = barHeight;
-            this.Left = 0;
-            this.Top = screenHeight - barHeight;
+            IntPtr hWnd = new WindowInteropHelper(this).Handle;
+            if (hWnd == IntPtr.Zero)
+            {
+                this.Width = screenW;
+                this.Height = barH;
+                this.Left = 0;
+                this.Top = barTop;
+                this.Topmost = true;
+                return;
+            }
+
+            GetWindowRect(hWnd, out RECT windowRect);
+            GetClientRect(hWnd, out RECT clientRect);
+
+            int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
+            int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
+
+            int x = -borderWidth / 2;
+            int y = barTop - borderHeight / 2;
+            int width = screenW + borderWidth;
+            int height = barH + borderHeight;
+
+            MoveWindow(hWnd, x, y, width, height, true);
             this.Topmost = true;
         }
 
         private void PositionWordWindow()
         {
-            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
-            WordWindowLayoutHelper.PositionWordForExamMode(
-                WordWindowLayoutHelper.DefaultAppBarHeight, screenWidth, screenHeight);
+            WordWindowLayoutHelper.PositionWordForExamMode();
         }
 
         protected override void OnContentRendered(EventArgs e)
@@ -436,7 +468,7 @@ namespace MOS_Word_app.Views
                 SaveAndCloseAllWordDocuments();
                 this.Hide();
 
-                // 現在のタイマー残り時間と状態情報を渡す（閲覧状態も渡して結果画面で時間切れ表示・CSV出力に利用）
+                // 現在のタイマー残り時間と状態情報を渡す（閲覧状態も渡して結果画面で時間切れ表示に利用）
                 var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, null, _groupId);
                 reviewWindow.OnNavigateToTask = NavigateToTask;
                 reviewWindow.Closed += (s, args) =>
@@ -621,6 +653,7 @@ namespace MOS_Word_app.Views
         private void NavigateToTask(int projectId, int taskId)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called in main window: ProjectId={projectId}, TaskId={taskId}");
+            ScoreResultWindow.TryBringOpenToFront();
             
             try
             {
@@ -668,9 +701,7 @@ namespace MOS_Word_app.Views
             try
             {
                 // JSONファイルから問題文を読み込む（Word 用・PowerPoint と独立）
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
+                string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
                 
                 if (!File.Exists(jsonPath))
                 {
@@ -718,9 +749,7 @@ namespace MOS_Word_app.Views
                 
                 // コピー対象問題JSON（入力・追加・変更・挿入の問題）を優先して読み込む
                 string copyTargetJsonName = "MOS模擬アプリ_入力追加変更挿入問題_Word.json";
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, copyTargetJsonName);
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", copyTargetJsonName);
+                string jsonPath = WordDataPathHelper.FindProblemJson(copyTargetJsonName);
                 if (File.Exists(jsonPath))
                 {
                     try
@@ -1629,6 +1658,7 @@ namespace MOS_Word_app.Views
         
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_currentTaskId > 1)
             {
                 _currentTaskId--;
@@ -1638,6 +1668,7 @@ namespace MOS_Word_app.Views
         
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_tasks != null && _currentTaskId < _tasks.Count)
             {
                 _currentTaskId++;
@@ -1647,6 +1678,7 @@ namespace MOS_Word_app.Views
         
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             var button = sender as System.Windows.Controls.Button;
             if (button == null || button.Tag == null) return;
             int taskId = int.Parse(button.Tag.ToString());
@@ -1659,6 +1691,7 @@ namespace MOS_Word_app.Views
         
         private void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
             MoveToNextProject();
@@ -1755,60 +1788,10 @@ namespace MOS_Word_app.Views
             string filePath = null;
             try
             {
-                string basePath = @"C:\MOSTest\Word365";
-                string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-                string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
-                string initialInitialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial", "Initial");
-                string[] possibleNames = (groupId == 1 && projectId == 7)
-                    ? new[] { $"Project{projectId}.doc", $"project{projectId}.doc" }
-                    : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-                string workingFileName = (groupId == 1 && projectId == 7) ? "Project7.doc" : $"Project{projectId}.docx";
-                string workingFilePath = Path.Combine(workingFolder, workingFileName);
-
-                // 保存先は Tab\ 直下のみ。まず作業フォルダを参照
-                foreach (var fileName in possibleNames)
-                {
-                    string fullPath = Path.Combine(workingFolder, fileName);
-                    if (File.Exists(fullPath))
-                    {
-                        filePath = fullPath;
-                        break;
-                    }
-                }
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    string sourcePath = null;
-                    foreach (var fileName in possibleNames)
-                    {
-                        string fullPath = Path.Combine(initialFolder, fileName);
-                        if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                    }
-                    if (string.IsNullOrEmpty(sourcePath) && Directory.Exists(initialInitialFolder))
-                    {
-                        foreach (var fileName in possibleNames)
-                        {
-                            string fullPath = Path.Combine(initialInitialFolder, fileName);
-                            if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                        }
-                    }
-                    if (!string.IsNullOrEmpty(sourcePath))
-                    {
-                        try
-                        {
-                            if (!Directory.Exists(workingFolder))
-                                Directory.CreateDirectory(workingFolder);
-                            File.Copy(sourcePath, workingFilePath, overwrite: false);
-                            filePath = workingFilePath;
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] Initialからコピーエラー: {ex.Message}");
-                        }
-                    }
-                }
+                filePath = WordDataPathHelper.EnsureWorkingFile(groupId, projectId);
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のファイルが見つかりません: {workingFolder} または {initialFolder}");
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}の作業ファイルが見つかりません。");
                     return;
                 }
                 

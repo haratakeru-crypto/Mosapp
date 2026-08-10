@@ -15,6 +15,7 @@ using System.Windows.Threading;
 using Core.Ports.Primary;
 using Libraries;
 using MOSExcelMogiApp;
+using MOSExcelMogiApp.Infrastructure;
 using MOSExcelMogiApp.Views;
 using Newtonsoft.Json.Linq;
 using System.Runtime.InteropServices;
@@ -91,7 +92,6 @@ namespace Ui.ViewModels
         private bool _isExcelOverlayVisible;
         private bool _isShutdownWaitOverlayVisible;
         private bool _showScoreButton;
-        private bool _showPauseButton;
         private bool _showVariantButton;
         private int _variantSetNo = 1;
         private bool _isVariantMode;
@@ -215,7 +215,6 @@ namespace Ui.ViewModels
         public event EventHandler ShowAppBarRequested;
         public event EventHandler HideMainWindowRequested;
         public event EventHandler ShowMainWindowRequested;
-        public event EventHandler UiTestRequested;
         public event EventHandler CurrentProjectChanged;
         public event EventHandler OpenReviewPageRequested;
 
@@ -242,7 +241,6 @@ namespace Ui.ViewModels
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
             ResetExamCommand = new RelayCommand(ExecuteResetExam);
             NextProjectCommand = new RelayCommand(ExecuteNextProject);
-            UiTestCommand = new RelayCommand(ExecuteUiTest);
             GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode);
             GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant);
     }
@@ -286,7 +284,6 @@ namespace Ui.ViewModels
         public ICommand PauseExamCommand { get; }
         public ICommand ResetExamCommand { get; }
         public ICommand NextProjectCommand { get; }
-        public ICommand UiTestCommand { get; }
         /// <summary>類題モードから教材へ戻る。</summary>
         public ICommand GoToTextbookCommand { get; }
         /// <summary>教材→選択中の類題、または類題n→類題n+1 へ進む。</summary>
@@ -604,13 +601,6 @@ namespace Ui.ViewModels
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
         }
 
-        /// <summary>一時停止ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
-        public bool ShowPauseButton
-        {
-            get => _showPauseButton;
-            set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
-        }
-
         /// <summary>類題切替ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
         public bool ShowVariantButton
         {
@@ -624,7 +614,7 @@ namespace Ui.ViewModels
             }
         }
 
-        /// <summary>類題セット番号（1〜5）。ComboBox と連動。</summary>
+        /// <summary>類題セット番号（1〜5）。初期値は1。アプリバーの類題切替で更新。</summary>
         public int VariantSetNo
         {
             get => _variantSetNo;
@@ -770,10 +760,10 @@ namespace Ui.ViewModels
         {
             var allProjects = _excelCheckerService.GetAllProjects();
             
-            // 模試①=Group2は非表示のためスキップ。Group1（演習）とGroup3（応用編）のみ追加
-            foreach (int groupId in new[] { 1, 3 })
+            // Group1（演習）のみ追加。模試①・応用編は非表示
+            foreach (int groupId in new[] { 1 })
             {
-                var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = groupId == 3 ? "応用編" : $"Group {groupId}" };
+                var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
                 
                 for (int projectId = 1; projectId <= 10; projectId++)
                 {
@@ -1313,46 +1303,20 @@ namespace Ui.ViewModels
 
         public string GetProjectFilePath(int groupId, int projectId)
         {
-            // プロジェクトを開く場合は、必ずInitialフォルダから開く
-            string initialPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
-            
-            // Initialフォルダにファイルが存在する場合はそれを使用
-            if (File.Exists(initialPath))
-            {
-                System.Diagnostics.Debug.WriteLine($"Using Initial folder file: {initialPath}");
-                return initialPath;
-            }
-            
-            // Initialフォルダにファイルが存在しない場合のフォールバック処理
+            string configuredFallback = null;
             try
             {
-                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
-                if (File.Exists(configPath))
-                {
-                    string jsonContent = File.ReadAllText(configPath);
-                    JObject config = JObject.Parse(jsonContent);
-                    
-                    var projectConfig = config["tabs"]?[groupId.ToString()]?["projects"]?[projectId.ToString()];
-                    if (projectConfig != null)
-                    {
-                        // initialDataFileを試す
-                        string initialDataFile = projectConfig["initialDataFile"]?.ToString();
-                        if (!string.IsNullOrEmpty(initialDataFile) && File.Exists(initialDataFile))
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Using initialDataFile from config: {initialDataFile}");
-                            return initialDataFile;
-                        }
-                    }
-                }
+                var projectConfig = GetProjectConfig(LoadConfig(), groupId, projectId);
+                // 既存の絶対パスは正規パスがない場合だけ移行元として使う。
+                configuredFallback = projectConfig?["excelFile"]?.ToString()
+                    ?? projectConfig?["initialDataFile"]?.ToString();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error reading config.json: {ex.Message}");
             }
-            
-            // それでも見つからない場合は、Initialフォルダのパスを返す（ファイルが後で作成される可能性がある）
-            System.Diagnostics.Debug.WriteLine($"Using Initial folder path (file may not exist): {initialPath}");
-            return initialPath;
+
+            return DataPathHelper.ResolveWorkingFilePath(groupId, projectId, configuredFallback);
         }
 
         private string GetProjectFilePath(string projectId)
@@ -1415,20 +1379,20 @@ namespace Ui.ViewModels
 
         public string GetVariantProjectFilePath(int groupId, int projectId, int variantSetNo)
         {
+            string configuredFallback = null;
             try
             {
                 var config = LoadConfig();
                 var entry = GetPracticeVariantEntry(config, groupId, projectId, variantSetNo);
-                string configuredPath = entry?["excelFile"]?.ToString();
-                if (!string.IsNullOrWhiteSpace(configuredPath))
-                    return configuredPath;
+                configuredFallback = entry?["excelFile"]?.ToString();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[GetVariantProjectFilePath] config read failed: {ex.Message}");
             }
 
-            return $"C:\\MOSTest\\Excel365\\Tab{groupId}\\PracticeVariant{variantSetNo}\\project{projectId}.xlsx";
+            return DataPathHelper.ResolveVariantWorkingFilePath(
+                groupId, projectId, variantSetNo, configuredFallback);
         }
 
         /// <summary>類題の作業用 Excel パス（リセット復元先）。</summary>
@@ -1437,17 +1401,7 @@ namespace Ui.ViewModels
 
         /// <summary>類題リセット用テンプレート Excel パス。</summary>
         public string GetVariantTemplateFilePath(int groupId, int projectId, int variantSetNo)
-        {
-            string workingPath = GetVariantWorkingFilePath(groupId, projectId, variantSetNo);
-            if (!string.IsNullOrWhiteSpace(workingPath))
-            {
-                string dir = Path.GetDirectoryName(workingPath);
-                if (!string.IsNullOrEmpty(dir))
-                    return Path.Combine(dir, "Templates", $"project{projectId}.xlsx");
-            }
-
-            return $"C:\\MOSTest\\Excel365\\Tab{groupId}\\PracticeVariant{variantSetNo}\\Templates\\project{projectId}.xlsx";
-        }
+            => DataPathHelper.ResolveVariantTemplateFilePath(groupId, projectId, variantSetNo);
 
         public string GetActiveProjectFilePath(int groupId, int projectId)
         {
@@ -2781,6 +2735,7 @@ namespace Ui.ViewModels
                 IsVariantMode = false;
 
                 TryReplaceExcelWorkbook(nextFilePath, "[ExecuteNextProject]");
+                ScoringResultDialog.TryBringOpenToFront();
 
                 CurrentProject = new ProjectInfo
                 {
@@ -3004,22 +2959,6 @@ namespace Ui.ViewModels
                     try { Marshal.ReleaseComObject(excelApp); } catch { }
                 }
             }
-        }
-        
-        private void ExecuteUiTest(object parameter)
-        {
-            // UIテスト用のアプリバーウィンドウを表示
-            var uiTestAppBar = new MOSExcelMogiApp.Views.UiTestAppBarWindow();
-            uiTestAppBar.Show();
-            
-            // アプリバーの実高さを取得してから Excel を配置
-            uiTestAppBar.ContentRendered += (s, e) =>
-            {
-                int barHeight = (int)Math.Round(uiTestAppBar.ActualHeight > 0 ? uiTestAppBar.ActualHeight : uiTestAppBar.Height);
-                LaunchAndPositionExcel(barHeight);
-            };
-
-            UiTestRequested?.Invoke(this, EventArgs.Empty);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

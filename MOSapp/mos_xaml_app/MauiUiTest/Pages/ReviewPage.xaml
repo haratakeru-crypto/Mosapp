@@ -164,44 +164,37 @@
         </ScrollView>
         
         <!-- フッター -->
-        <Frame Grid.Row="2" 
-                BackgroundColor="White" 
-                BorderColor="#E5E7EB" 
+        <Frame Grid.Row="2"
+                BackgroundColor="White"
+                BorderColor="#E5E7EB"
                 HasShadow="False"
                 Padding="20,15">
-            <Grid ColumnDefinitions="*,Auto,*,Auto">
-                <Label Grid.Column="0" 
-                       Text="全問題を確認できます" 
-                       TextColor="#6B7280" 
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0"
+                       Text="全問題を確認できます"
+                       TextColor="#6B7280"
                        FontSize="14"
                        VerticalOptions="Center"/>
-                
-                <!-- 試験終了ボタンを中央に配置 -->
-                <Button Grid.Column="1" 
-                        x:Name="EndExamButton" 
-                        Text="試験終了" 
-                        BackgroundColor="#DC2626" 
-                        TextColor="White" 
-                        Padding="25,10" 
-                        FontAttributes="Bold" 
-                        FontSize="14"
-                        Clicked="EndExamButton_Clicked"
-                        VerticalOptions="Center"
-                        Margin="0,0,10,0"/>
-                
-                <!-- スペーサー -->
-                <Grid Grid.Column="2"/>
-                
-                <!-- 終了ボタンを右側に配置 -->
-                <Button Grid.Column="3" 
-                        x:Name="CloseButtonFooter" 
-                        Text="終了" 
-                        BackgroundColor="#1E40AF" 
-                        TextColor="White" 
-                        Padding="20,10" 
-                        FontAttributes="None"
-                        Clicked="CloseButton_Clicked"
-                        VerticalOptions="Center"/>
+
+                <HorizontalStackLayout Grid.Column="1" Spacing="10">
+                    <Button x:Name="EndExamButton"
+                            Text="結果の表示"
+                            BackgroundColor="#DC2626"
+                            TextColor="White"
+                            Padding="20,10"
+                            FontAttributes="None"
+                            Clicked="EndExamButton_Clicked"
+                            VerticalOptions="Center"/>
+                    <Button x:Name="CloseButtonFooter"
+                            Text="終了"
+                            BackgroundColor="#1E40AF"
+                            TextColor="White"
+                            Padding="20,10"
+                            FontAttributes="None"
+                            Clicked="CloseButton_Clicked"
+                            VerticalOptions="Center"
+                            IsVisible="False"/>
+                </HorizontalStackLayout>
             </Grid>
         </Frame>
     </Grid>

@@ -14,16 +14,16 @@ using Libraries;
 namespace MOS_Word_app.Views
 {
     /// <summary>
-    /// ResultWindow.xaml の相互作用ロジック（Wordアプリ用・後で見直す・時間切れ・CSV出力）
+    /// ResultWindow.xaml の相互作用ロジック（Wordアプリ用・後で見直す・時間切れ）
     /// </summary>
     public partial class ResultWindow : System.Windows.Window
     {
         private Dictionary<int, bool[]> _projectTaskFlaggedStates;
         private Dictionary<int, bool[]> _projectTaskViewedStates;
         private int _groupId;
-        private List<ResultProjectInfo> _allProjects;
-        private bool _csvExported;
         private bool _isWindowClosed;
+        private List<ResultProjectInfo> _allProjects;
+        private bool _showingWrongOnly;
 
         public Action<int, int> OnNavigateToTask { get; set; }
 
@@ -34,7 +34,6 @@ namespace MOS_Word_app.Views
             _projectTaskFlaggedStates = projectTaskFlaggedStates ?? new Dictionary<int, bool[]>();
             _projectTaskViewedStates = projectTaskViewedStates ?? new Dictionary<int, bool[]>();
             _groupId = groupId;
-            _csvExported = false;
             this.Loaded += ResultWindow_Loaded;
             // 結果画面を閉じたときは、アプリバー側の「結果に戻る」モードも解除する
             this.Closed += (s, args) =>
@@ -64,17 +63,11 @@ namespace MOS_Word_app.Views
         {
             try
             {
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
+                string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
 
                 if (!File.Exists(jsonPath))
                 {
-                    string path1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                    string path2 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
                     System.Diagnostics.Debug.WriteLine($"[ResultWindow] 正誤判定表JSONが見つかりません。BaseDirectory={AppDomain.CurrentDomain.BaseDirectory}");
-                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] 試したパス1: {path1}");
-                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] 試したパス2: {path2}");
                 }
 
                 var projectData = await System.Threading.Tasks.Task.Run(() =>
@@ -112,23 +105,9 @@ namespace MOS_Word_app.Views
                             else task.ResultColor = Brushes.Transparent;
                         }
                     }
-                    ProjectsItemsControl.ItemsSource = resultProjects;
                     _allProjects = resultProjects;
+                    ProjectsItemsControl.ItemsSource = _allProjects;
                 });
-
-                if (!_csvExported && _allProjects != null)
-                {
-                    try
-                    {
-                        int latestWrong = CountWrongTasks(projectData, useInitialSnapshot: false);
-                        await System.Threading.Tasks.Task.Run(() => ExportScoringCsvToDesktop(latestWrong, _allProjects));
-                        _csvExported = true;
-                    }
-                    catch (Exception csvEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] CSV export error: {csvEx.Message}");
-                    }
-                }
             }
             catch (Exception ex)
             {
@@ -297,79 +276,30 @@ namespace MOS_Word_app.Views
             return text;
         }
 
-        private void ExportScoringCsvToDesktop(int totalWrongTasks, List<ResultProjectInfo> resultProjects)
+        private void ShowWrongOnlyButton_Click(object sender, RoutedEventArgs e)
         {
-            if (resultProjects == null) return;
-            var taskToValue = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var project in resultProjects)
+            _showingWrongOnly = !_showingWrongOnly;
+            if (_showingWrongOnly)
             {
-                foreach (var task in project.Tasks ?? Enumerable.Empty<ResultTaskInfo>())
-                {
-                    string key = $"{task.ProjectId}-{task.TaskId}";
-                    string value = task.ResultMark == "✖" ? "×" : (task.ResultMark == "時間切れ" ? "時間切れ" : "");
-                    taskToValue[key] = value;
-                }
+                ProjectsItemsControl.ItemsSource = (_allProjects ?? new List<ResultProjectInfo>())
+                    .Select(project => new ResultProjectInfo
+                    {
+                        ProjectTitle = project.ProjectTitle,
+                        Tasks = (project.Tasks ?? new List<ResultTaskInfo>())
+                            .Where(task => task.ResultMark == "✖" || task.ResultMark == "時間切れ")
+                            .ToList()
+                    })
+                    .Where(project => project.Tasks.Count > 0)
+                    .ToList();
+                ShowWrongOnlyButton.Content = "全て表示";
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(30, 64, 175));
             }
-
-            string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOSWord教材用採点表.csv");
-            var lines = new List<string>();
-            if (File.Exists(templatePath))
-                lines.AddRange(File.ReadAllLines(templatePath, Encoding.UTF8));
             else
             {
-                lines.Add("教材用プロジェクト,,採点１回目,採点２回目");
-                int[] taskCounts = { 7, 5, 7, 4, 6, 4, 7, 6, 7, 8 };
-                for (int p = 1; p <= taskCounts.Length; p++)
-                {
-                    int taskCount = p <= taskCounts.Length ? taskCounts[p - 1] : 7;
-                    for (int t = 1; t <= taskCount; t++)
-                        lines.Add($",{p}-{t},,");
-                }
-                lines.Add(",×の数,,");
-                lines.Add(",▲の数,,");
-                lines.Add(",,,");
-                lines.Add(",56問,,");
+                ProjectsItemsControl.ItemsSource = _allProjects;
+                ShowWrongOnlyButton.Content = "間違えた問題のみ表示";
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38));
             }
-
-            const int scoreColumnIndex = 2;
-            for (int i = 0; i < lines.Count; i++)
-            {
-                string[] parts = lines[i].Split(',');
-                if (parts.Length <= scoreColumnIndex) continue;
-                string col1 = parts[1].Trim();
-                if (taskToValue.TryGetValue(col1, out string value))
-                    parts[scoreColumnIndex] = value;
-                else if (col1 == "×の数")
-                    parts[scoreColumnIndex] = totalWrongTasks.ToString();
-                lines[i] = string.Join(",", parts);
-            }
-
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string fileName = $"MOSWord教材用採点表_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            string outPath = Path.Combine(desktop, fileName);
-            File.WriteAllLines(outPath, lines, new UTF8Encoding(true));
-
-            ExportWrongAnswersCsvToDesktop(resultProjects);
-        }
-
-        private void ExportWrongAnswersCsvToDesktop(List<ResultProjectInfo> resultProjects)
-        {
-            if (resultProjects == null) return;
-            var csvLines = new List<string> { "プロジェクトID,タスク番号,問題文,正誤" };
-            foreach (var project in resultProjects)
-            {
-                foreach (var task in project.Tasks ?? Enumerable.Empty<ResultTaskInfo>())
-                {
-                    if (string.IsNullOrEmpty(task.ResultMark)) continue;
-                    string desc = (task.Description ?? "").Replace("\"", "\"\"");
-                    if (desc.Contains(",") || desc.Contains("\n")) desc = "\"" + desc + "\"";
-                    csvLines.Add($"{task.ProjectId},{task.TaskId},{desc},{task.ResultMark}");
-                }
-            }
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string fileName = $"MOSWord_間違えた問題_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-            string outPath = Path.Combine(desktop, fileName);
-            File.WriteAllLines(outPath, csvLines, new UTF8Encoding(true));
         }
 
         private async void TaskRow_MouseDown(object sender, RoutedEventArgs e)

@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Text;
 using Libraries;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -33,6 +34,7 @@ namespace MOSExcelMogiApp.Views
         private DispatcherTimer _timer;
         private TimeSpan _remainingTime;
         private int _groupId = 1; // Group番号（1=模擬①, 2=模擬②, 3=演習）
+        private bool _isScoring;
 
         /// <summary>採点ワークフロー（STAスレッド）内で取得した Excel。Task.Run(MTA) からの COM 呼び出し失敗を避けるため共有する。</summary>
         private ExcelApp _scoringExcelApp;
@@ -231,7 +233,7 @@ namespace MOSExcelMogiApp.Views
                     _ => "MOS模擬アプリ問題文一覧.json"
                 };
                 
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", jsonFileName);
+                string jsonPath = DataPathHelper.ResolveJsonPath(jsonFileName);
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Loading from: {jsonFileName} (GroupId: {groupId})");
                 
                 string jsonContent = File.ReadAllText(jsonPath);
@@ -477,6 +479,12 @@ namespace MOSExcelMogiApp.Views
         
         private async void NavigateToTask(ReviewTaskInfo taskInfo)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Navigation ignored while scoring.");
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
 
             if (OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0)
@@ -553,6 +561,12 @@ namespace MOSExcelMogiApp.Views
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("TaskButton_Click called");
+
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Task button ignored while scoring.");
+                return;
+            }
             
             if (sender is Button button && button.DataContext is ReviewTaskInfo taskInfo)
             {
@@ -577,6 +591,15 @@ namespace MOSExcelMogiApp.Views
         
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Duplicate scoring request ignored.");
+                return;
+            }
+
+            _isScoring = true;
+            Window scoringOverlay = null;
+            DispatcherTimer overlayTopmostTimer = null;
             try
             {
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] EndExamButton_Click called");
@@ -590,12 +613,14 @@ namespace MOSExcelMogiApp.Views
                 
                 // タイマーを停止
                 _timer?.Stop();
+
+                // 採点中にタスク番号を操作できないよう、採点開始時点でレビュー画面を隠す
+                this.Hide();
                 
                 // UI更新の機会を与える
                 await Task.Delay(100);
 
                 // 「採点中です」オーバーレイを表示（即座にフィードバックを出す）
-                Window scoringOverlay = null;
                 await Dispatcher.InvokeAsync(() =>
                 {
                     scoringOverlay = new Window
@@ -605,7 +630,6 @@ namespace MOSExcelMogiApp.Views
                         Height = 140,
                         WindowStyle = WindowStyle.None,
                         WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                        Owner = this,
                         ShowInTaskbar = false,
                         ResizeMode = ResizeMode.NoResize,
                         Topmost = true,
@@ -647,7 +671,7 @@ namespace MOSExcelMogiApp.Views
                 });
 
                 // Excel などに前面を奪われることがあるため、短時間だけ最前面を維持する
-                var overlayTopmostTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+                overlayTopmostTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
                 int overlayRetryCount = 0;
                 overlayTopmostTimer.Tick += (s, args) =>
                 {
@@ -837,21 +861,15 @@ namespace MOSExcelMogiApp.Views
 
                     System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] ResultWindow initial presentation gate passed");
                     
-                    // ReviewPageWindowを非表示にする（閉じるとResultWindowに影響する可能性があるため）
+                    // Application.Current.MainWindowをResultWindowへ切り替える
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Hiding ReviewPageWindow");
-                        
-                        // Application.Current.MainWindowをResultWindowに設定（ReviewPageWindowを非表示にする前に）
                         var resultWindow = Application.Current.Windows.OfType<ResultWindow>().FirstOrDefault();
                         if (resultWindow != null)
                         {
                             Application.Current.MainWindow = resultWindow;
                             System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Set Application.Current.MainWindow to ResultWindow");
                         }
-                        
-                        // Closeの代わりにHideを使用（ResultWindowの終了ボタンで完全に閉じる）
-                        this.Hide();
                     }, DispatcherPriority.Normal);
                 }
                 catch (Exception ex)
@@ -859,14 +877,10 @@ namespace MOSExcelMogiApp.Views
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in EndExamButton_Click: {ex.Message}\n{ex.StackTrace}");
                     await Dispatcher.InvokeAsync(() =>
                     {
+                        try { overlayTopmostTimer?.Stop(); } catch { }
+                        try { scoringOverlay?.Close(); } catch { }
+                        RestoreAfterScoringFailure(sender);
                         MessageBox.Show($"試験終了処理中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                        
-                        // ボタンを再有効化
-                        if (sender is Button btn)
-                        {
-                            btn.IsEnabled = true;
-                            btn.Content = "試験終了";
-                        }
                     });
                 }
             }
@@ -875,9 +889,27 @@ namespace MOSExcelMogiApp.Views
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in EndExamButton_Click: {ex.Message}\n{ex.StackTrace}");
                 await Dispatcher.InvokeAsync(() =>
                 {
+                    try { overlayTopmostTimer?.Stop(); } catch { }
+                    try { scoringOverlay?.Close(); } catch { }
+                    RestoreAfterScoringFailure(sender);
                     MessageBox.Show($"試験終了処理中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 });
             }
+        }
+
+        private void RestoreAfterScoringFailure(object sender)
+        {
+            _isScoring = false;
+            if (sender is Button button)
+            {
+                button.IsEnabled = true;
+                button.Content = "結果の表示";
+            }
+
+            this.Show();
+            this.Activate();
+            if (!MainWindow.IsTimerDisabled)
+                _timer?.Start();
         }
 
         /// <summary>Excel COM 用に専用 STA スレッドで処理を実行する（MTA からの呼び出しは不安定）。</summary>
@@ -1853,50 +1885,17 @@ namespace MOSExcelMogiApp.Views
         {
             try
             {
-                // 優先順位1: Initialフォルダを最優先（採点対象を固定して結果ぶれを防ぐ）
-                string initialPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
-                if (File.Exists(initialPath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found Initial folder file: {initialPath}");
-                    return initialPath;
-                }
-                
-                // 優先順位2: config.jsonのinitialDataFileをチェック
-                string initialDataFile = projectConfig["initialDataFile"]?.ToString();
-                if (!string.IsNullOrEmpty(initialDataFile) && File.Exists(initialDataFile))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found initialDataFile in config: {initialDataFile}");
-                    return initialDataFile;
-                }
-                
-                // 優先順位3: config.jsonのexcelFileをチェック
                 string excelFile = projectConfig["excelFile"]?.ToString();
-                if (!string.IsNullOrEmpty(excelFile) && File.Exists(excelFile))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found excelFile in config: {excelFile}");
-                    return excelFile;
-                }
-                
-                // 優先順位4: 現在Excelで開いているファイルをチェック（最後のフォールバック）
-                string openFilePath = GetOpenExcelFileForProject(groupId, projectId);
-                if (!string.IsNullOrEmpty(openFilePath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Found open Excel file (fallback): {openFilePath}");
-                    return openFilePath;
-                }
-                
-                // 優先順位5: Tabフォルダのパスを自動生成
-                string generatedPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\project{projectId}.xlsx";
-                System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Using generated path: {generatedPath}");
-                return generatedPath;
+                string initialDataFile = projectConfig["initialDataFile"]?.ToString();
+                string configuredFallback = !string.IsNullOrWhiteSpace(excelFile)
+                    ? excelFile
+                    : initialDataFile;
+                return DataPathHelper.ResolveWorkingFilePath(groupId, projectId, configuredFallback);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Error: {ex.Message}");
-                // フォールバック: Initialフォルダのパス
-                string fallbackPath = $"C:\\MOSTest\\Excel365\\Tab{groupId}\\Initial\\project{projectId}.xlsx";
-                System.Diagnostics.Debug.WriteLine($"[GetProjectFilePath] Using fallback path: {fallbackPath}");
-                return fallbackPath;
+                return DataPathHelper.GetWorkingFilePath(groupId, projectId);
             }
         }
         

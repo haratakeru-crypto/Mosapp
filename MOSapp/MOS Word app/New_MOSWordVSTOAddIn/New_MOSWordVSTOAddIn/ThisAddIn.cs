@@ -347,6 +347,22 @@ namespace New_MOSWordVSTOAddIn
                 if (app == null || app.Documents.Count == 0)
                     return;
 
+                Word.Document doc = app.ActiveDocument;
+                if (app.ActiveWindow?.View != null)
+                    _lastShowAllState = app.ActiveWindow.View.ShowAll;
+
+                // 4-3: コメントペイン操作中も未解決件数の遷移を追跡（軽量のため Preserve より前）
+                try { UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc)); }
+                catch { }
+
+                // 置換ダイアログ・代替テキスト・リボン入力中は ScreenUpdating / SetRange を触らない
+                if (ShouldDeferIntrusiveDocumentCom(app))
+                    return;
+
+                // 図形 / SmartArt 編集中は Preserve / heavy ベースライン更新を避ける
+                if (IsEditingInShapeOrSmartArt(app))
+                    return;
+
                 PreserveSelectionDuring(app, () => RefreshBaselineFromActiveDocumentNoLogCore(app));
             }
             catch
@@ -360,14 +376,11 @@ namespace New_MOSWordVSTOAddIn
             // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
             Word.Document doc = app.ActiveDocument;
 
-                if (app.ActiveWindow?.View != null)
-                    _lastShowAllState = app.ActiveWindow.View.ShowAll;
-
-                // 4-3: コメントペイン操作中も未解決件数の遷移を追跡（軽量のため defer より前に実行）
-                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
-
-                // ナビペイン・検索ダイアログ・コメントペイン操作中は侵入的 COM をスキップ
+                // ナビペイン・検索ダイアログ・コメントペイン操作中は侵入的 COM をスキップ（二重ガード）
                 if (ShouldDeferIntrusiveDocumentCom(app))
+                    return;
+
+                if (IsEditingInShapeOrSmartArt(app))
                     return;
 
                 _lastColumnBreakCount = CountColumnBreaks(doc);
@@ -692,6 +705,22 @@ namespace New_MOSWordVSTOAddIn
                 if (app?.ActiveWindow?.View == null || app.Documents.Count == 0)
                     return;
 
+                Word.Document doc = app.ActiveDocument;
+
+                // 軽量のみ（Preserve なし）— フォーカス外 UI でも証跡を落とさない
+                try { UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc)); }
+                catch { }
+                try { UpdateP7CompanyPolling(doc, allowCatchUpLog: false); }
+                catch { }
+
+                // 置換・代替テキスト・リボン入力中は ScreenUpdating / SetRange を触らない
+                if (ShouldDeferIntrusiveDocumentCom(app))
+                    return;
+
+                // 図形 / SmartArt 編集中は Preserve（SetRange）を避け、heavy もスキップ
+                if (IsEditingInShapeOrSmartArt(app))
+                    return;
+
                 PreserveSelectionDuring(app, () => ShowAllPoll_TickCore(app));
             }
             catch
@@ -705,15 +734,11 @@ namespace New_MOSWordVSTOAddIn
             // ActiveDocument は Word が管理する参照のため ReleaseComObject しない
             Word.Document doc = app.ActiveDocument;
 
-            // 4-3: コメントペイン操作中も未解決件数の遷移を追跡
-            UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
-
-            // 7-2: ［ファイル］→［情報］の会社設定は編集ペイン外。フォーカス defer より前に軽量ポーリング。
-            try { UpdateP7CompanyPolling(doc, allowCatchUpLog: false); }
-            catch { }
-
-            // ナビペイン・Ctrl+F 検索・コメントペイン操作中は heavy Find 等の侵入的 COM を止める
+            // ナビペイン・Ctrl+F 検索・コメントペイン操作中は heavy Find 等の侵入的 COM を止める（二重ガード）
             if (ShouldDeferIntrusiveDocumentCom(app))
+                return;
+
+            if (IsEditingInShapeOrSmartArt(app))
                 return;
 
                 // 7-4/7-5: FullName のみの軽量検知（毎ティック≈1.2秒）。重いポーリング（約6秒）だと次プロジェクト押下前に取りこぼす。
@@ -1170,6 +1195,49 @@ namespace New_MOSWordVSTOAddIn
         private static bool ShouldDeferIntrusiveDocumentCom(Word.Application app)
         {
             return ShouldSkipDocumentComBecauseFocusNotInEditingPane();
+        }
+
+        /// <summary>
+        /// 図形 / SmartArt 内の文字編集中は true。
+        /// フォーカスは _WwG 上のため defer では保護できないため、Preserve / heavy COM を別途止める。
+        /// </summary>
+        private static bool IsEditingInShapeOrSmartArt(Word.Application app)
+        {
+            try
+            {
+                Word.Selection sel = app?.Selection;
+                if (sel == null)
+                    return false;
+
+                try
+                {
+                    if (sel.ShapeRange != null && sel.ShapeRange.Count > 0)
+                        return true;
+                }
+                catch { /* ShapeRange が取れない選択もある */ }
+
+                try
+                {
+                    if (sel.HasChildShapeRange)
+                        return true;
+                }
+                catch { /* ignore */ }
+
+                try
+                {
+                    Word.WdSelectionType type = sel.Type;
+                    if (type == Word.WdSelectionType.wdSelectionShape ||
+                        type == Word.WdSelectionType.wdSelectionInlineShape)
+                        return true;
+                }
+                catch { /* ignore */ }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool IsProject4CommentTaskActive()

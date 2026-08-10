@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using Libraries;
 
@@ -11,15 +10,10 @@ namespace MOS_Word_app
     /// </summary>
     public static class WordProjectResetHelper
     {
-        private const string BasePath = @"C:\MOSTest\Word365";
-
         private static readonly string[] WordFileExtensions =
         {
             ".doc", ".docx", ".docm", ".dot", ".dotx", ".dotm", ".rtf", ".txt"
         };
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern bool DeleteFileW(string lpFileName);
 
         public static void ResetProject(int groupId, int projectId)
         {
@@ -30,50 +24,25 @@ namespace MOS_Word_app
             LogReader.ClearCurrentTaskFile();
             WordTaskAttemptRegistry.ClearProject(projectId);
 
-            // 保存先（作業フォルダ）: Tab{groupId}\ 直下のみ。参照元: Tab{groupId}\Initial（Templates は使わない）
-            string workingFolder = Path.Combine(BasePath, $"Tab{groupId}");
-            string initialFolder = Path.Combine(BasePath, $"Tab{groupId}", "Initial");
-            string initialInitialFolder = Path.Combine(BasePath, $"Tab{groupId}", "Initial", "Initial");
+            string workingFolder = WordDataPathHelper.GetWorkingFolder(groupId);
+            string templateFolder = WordDataPathHelper.GetTemplateFolder(groupId);
+            string initialFolder = WordDataPathHelper.GetInitialFolder(groupId);
+            string initialInitialFolder = Path.Combine(initialFolder, "Initial");
 
             // リセット参照フォルダ内の Word データから Zone.Identifier を削除（保護ビュー防止）
             UnblockWordFilesInFolder(workingFolder);
+            UnblockWordFilesInFolder(templateFolder);
             UnblockWordFilesInFolder(initialFolder);
             UnblockWordFilesInFolder(initialInitialFolder);
 
-            string[] possibleNames = (groupId == 1 && projectId == 7)
-                ? new[] { $"Project{projectId}.doc", $"project{projectId}.doc" }
-                : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
+            // 正規テンプレートを最優先。未配置時は旧 Initial 配置から
+            // 既存ファイルをコピーし、正規テンプレートを作成する。
+            string sourceFilePath = WordDataPathHelper.EnsureCanonicalTemplate(groupId, projectId);
+            WordDataPathHelper.MakeWritable(sourceFilePath);
+            WordDataPathHelper.RemoveZoneIdentifier(sourceFilePath);
 
-            // 参照元: Initial 直下、なければ Initial\Initial
-            string sourceFilePath = null;
-            foreach (var fileName in possibleNames)
-            {
-                string fullPath = Path.Combine(initialFolder, fileName);
-                if (File.Exists(fullPath))
-                {
-                    sourceFilePath = fullPath;
-                    break;
-                }
-            }
-            if (string.IsNullOrEmpty(sourceFilePath) && Directory.Exists(initialInitialFolder))
-            {
-                foreach (var fileName in possibleNames)
-                {
-                    string fullPath = Path.Combine(initialInitialFolder, fileName);
-                    if (File.Exists(fullPath))
-                    {
-                        sourceFilePath = fullPath;
-                        break;
-                    }
-                }
-            }
-            if (string.IsNullOrEmpty(sourceFilePath))
-                throw new FileNotFoundException($"リセット用ファイルが見つかりません: {initialFolder} に Project{projectId}.docx 等を配置してください。");
-
-            RemoveZoneIdentifier(sourceFilePath);
-
-            string fileExtension = Path.GetExtension(sourceFilePath);
-            string projectFilePath = Path.Combine(workingFolder, $"Project{projectId}{fileExtension}");
+            string projectFilePath = WordDataPathHelper.GetWorkingFilePathForSource(
+                groupId, projectId, sourceFilePath);
             if (!Directory.Exists(workingFolder))
                 Directory.CreateDirectory(workingFolder);
 
@@ -81,9 +50,7 @@ namespace MOS_Word_app
             {
                 try
                 {
-                    var projectFileInfo = new FileInfo(projectFilePath);
-                    if (projectFileInfo.IsReadOnly)
-                        projectFileInfo.IsReadOnly = false;
+                    WordDataPathHelper.MakeWritable(projectFilePath);
                 }
                 catch (Exception ex)
                 {
@@ -99,14 +66,23 @@ namespace MOS_Word_app
                 {
                     File.Copy(sourceFilePath, projectFilePath, overwrite: true);
                     // File.Copy は Zone.Identifier ADS も引き継ぐため、コピー直後に削除して保護ビューを防ぐ
-                    RemoveZoneIdentifier(projectFilePath);
+                    WordDataPathHelper.RemoveZoneIdentifier(projectFilePath);
                     try
                     {
-                        var destInfo = new FileInfo(projectFilePath);
-                        if (destInfo.IsReadOnly)
-                            destInfo.IsReadOnly = false;
+                        WordDataPathHelper.MakeWritable(projectFilePath);
                     }
                     catch { }
+
+                    // 3アプリ共通規約: リセット後の作業ファイルを採点用 Initial に反映する。
+                    string initialFilePath = WordDataPathHelper.GetInitialFilePathForSource(
+                        groupId, projectId, sourceFilePath);
+                    string initialDirectory = Path.GetDirectoryName(initialFilePath);
+                    if (!Directory.Exists(initialDirectory))
+                        Directory.CreateDirectory(initialDirectory);
+                    WordDataPathHelper.MakeWritable(initialFilePath);
+                    File.Copy(projectFilePath, initialFilePath, overwrite: true);
+                    WordDataPathHelper.MakeWritable(initialFilePath);
+                    WordDataPathHelper.RemoveZoneIdentifier(initialFilePath);
 
                     if (groupId == 1 && projectId == 7)
                         TryDeleteP7DerivativeOutputs(workingFolder);
@@ -132,29 +108,7 @@ namespace MOS_Word_app
         /// </summary>
         private static void RemoveZoneIdentifier(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-                return;
-
-            try
-            {
-                var fi = new FileInfo(filePath);
-                bool wasReadOnly = fi.IsReadOnly;
-                if (wasReadOnly)
-                {
-                    try { fi.IsReadOnly = false; } catch { }
-                }
-
-                DeleteFileW(filePath + ":Zone.Identifier");
-
-                if (wasReadOnly)
-                {
-                    try { new FileInfo(filePath).IsReadOnly = true; } catch { }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] Zone.Identifier 削除スキップ ({filePath}): {ex.Message}");
-            }
+            WordDataPathHelper.RemoveZoneIdentifier(filePath);
         }
 
         /// <summary>リセット参照フォルダ内の Word 関連ファイルから Zone.Identifier を一括削除する。</summary>

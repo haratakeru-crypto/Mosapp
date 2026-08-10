@@ -35,6 +35,7 @@ namespace MOS_Word_app.Views
         private AppBarWindow _appBarWindow;
         private int _groupId = 1;
         private bool _isWindowClosed;
+        private bool _isScoring;
         
         public ReviewPageWindow(TimeSpan remainingTime, Dictionary<int, bool[]> completedStates, Dictionary<int, bool[]> flaggedStates, Dictionary<int, bool[]> viewedStates = null, AppBarWindow appBarWindow = null, int groupId = 1)
         {
@@ -96,17 +97,11 @@ namespace MOS_Word_app.Views
             try
             {
                 // レビュー画面の問題文は Word 用 JSON（PowerPoint と独立）
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                if (!File.Exists(jsonPath))
-                    jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
+                string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
                 
                 if (!File.Exists(jsonPath))
                 {
-                    string path1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_Word.json");
-                    string path2 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_Word.json");
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] 正誤判定表JSONが見つかりません。BaseDirectory={AppDomain.CurrentDomain.BaseDirectory}");
-                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] 試したパス1: {path1}");
-                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] 試したパス2: {path2}");
                     MessageBox.Show($"問題文JSONファイルが見つかりません: {jsonPath}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
@@ -310,6 +305,12 @@ namespace MOS_Word_app.Views
         
         private async void NavigateToTask(ReviewTaskInfo taskInfo)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Navigation ignored while scoring.");
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={taskInfo.ProjectId}, TaskId={taskInfo.TaskId}");
 
             if (OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0)
@@ -371,6 +372,12 @@ namespace MOS_Word_app.Views
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("TaskButton_Click called");
+
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Task button ignored while scoring.");
+                return;
+            }
             
             var button = sender as Button;
             if (button != null && button.DataContext is ReviewTaskInfo)
@@ -457,6 +464,13 @@ namespace MOS_Word_app.Views
 
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoring)
+            {
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Duplicate scoring request ignored.");
+                return;
+            }
+
+            _isScoring = true;
             Window scoringOverlay = null;
             DispatcherTimer overlayKeepOnTopTimer = null;
             try
@@ -471,6 +485,10 @@ namespace MOS_Word_app.Views
                 
                 // タイマーを停止
                 _timer?.Stop();
+
+                // 採点中にタスク番号を操作できないよう、採点開始時点でレビュー画面を隠す
+                if (!_isWindowClosed)
+                    this.Hide();
                 
                 // UI更新の機会を与える
                 await System.Threading.Tasks.Task.Delay(100);
@@ -510,7 +528,7 @@ namespace MOS_Word_app.Views
                 // Wordアプリケーションを閉じる
                 await System.Threading.Tasks.Task.Run(() => CloseWordApplication());
                 
-                // 結果画面ウィンドウを表示（flaggedStates, viewedStates, groupId を渡して時間切れ・CSV対応）
+                // 結果画面ウィンドウを表示（flaggedStates, viewedStates, groupId を渡して時間切れ対応）
                 ResultWindow resultWindow = null;
                 await Dispatcher.InvokeAsync(() =>
                 {
@@ -546,12 +564,6 @@ namespace MOS_Word_app.Views
                     resultWindow.Activate();
                 }, DispatcherPriority.Normal);
                 
-                // ReviewPageWindowを非表示にする（閉じた後は Hide しない）
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    if (!_isWindowClosed)
-                        this.Hide();
-                }, DispatcherPriority.Normal);
             }
             catch (Exception ex)
             {
@@ -560,10 +572,42 @@ namespace MOS_Word_app.Views
                     overlayKeepOnTopTimer?.Stop();
                     try { scoringOverlay.Close(); } catch { }
                 }
+                string logPath = Path.Combine(Path.GetTempPath(), "mos_word_scoring_errors.log");
+                try
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] EndExamButton_Click");
+                    sb.AppendLine($"Message: {ex.Message}");
+                    if (ex is COMException comEx)
+                        sb.AppendLine($"HResult: 0x{comEx.ErrorCode:X8}");
+                    else
+                        sb.AppendLine($"HResult: 0x{ex.HResult:X8}");
+                    sb.AppendLine(ex.ToString());
+                    sb.AppendLine("---");
+                    File.AppendAllText(logPath, sb.ToString(), Encoding.UTF8);
+                }
+                catch { /* ignore log failure */ }
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in EndExamButton_Click: {ex.Message}");
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    MessageBox.Show($"試験終了処理中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _isScoring = false;
+                    if (sender is Button button)
+                    {
+                        button.IsEnabled = true;
+                        button.Content = "結果の表示";
+                    }
+                    if (!_isWindowClosed)
+                    {
+                        this.Show();
+                        this.Activate();
+                    }
+                    if (!MOS_Word_app.MainWindow.IsTimerDisabled)
+                        _timer?.Start();
+                    MessageBox.Show(
+                        $"採点中にエラーが発生しました: {ex.Message}\n\nログ: {logPath}",
+                        "エラー",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
                 });
             }
         }

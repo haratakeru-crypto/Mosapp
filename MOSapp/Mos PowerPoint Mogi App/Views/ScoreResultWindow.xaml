@@ -4,6 +4,8 @@
         Title="採点結果"
         SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterScreen"
+        Topmost="True"
+        ShowInTaskbar="True"
         ResizeMode="NoResize"
         Background="White">
     <Border BorderBrush="#A0A0A0" BorderThickness="1" Padding="24" Margin="0">

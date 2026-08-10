@@ -67,7 +67,7 @@ namespace MOS_PowerPoint_app
                 var project = _viewModel.CurrentProject;
                 if (project != null)
                 {
-                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreResult, _viewModel.ShowPauseButton, () => _viewModel.ScoreCommand.Execute(null));
+                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, true, false, () => _viewModel.ScoreCommand.Execute(null));
                     _appBarWindow.Closed += (s, args) =>
                     {
                         // バーウィンドウが閉じられたらメインウィンドウを再表示
@@ -116,21 +116,7 @@ namespace MOS_PowerPoint_app
                     System.Diagnostics.Debug.WriteLine($"[OnScoreCompleted] ApplyScoreResults error: {ex.Message}");
                 }
             }
-            var dialog = new Views.ScoreResultWindow(results);
-            dialog.Owner = this;
-            dialog.ShowDialog();
-        }
-
-        private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = false; // チェックが入っている = タイマー有効
-            System.Diagnostics.Debug.WriteLine($"MainWindow: TimerCheckBox checked, IsTimerDisabled = {IsTimerDisabled}");
-        }
-        
-        private void TimerCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = true; // チェックが外れている = タイマー無効
-            System.Diagnostics.Debug.WriteLine($"MainWindow: TimerCheckBox unchecked, IsTimerDisabled = {IsTimerDisabled}");
+            Views.ScoreResultWindow.ShowResults(_appBarWindow ?? (Window)this, results);
         }
 
         protected override void OnClosed(EventArgs e)

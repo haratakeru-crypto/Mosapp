@@ -7,7 +7,8 @@ namespace Libraries.Group1
 {
     public class ExcelChecker1_8
     {
-        private const string TARGET_FILE_PATH = @"C:\\MOSTest\\Excel365\\project8.xlsx";
+        private static readonly string TARGET_FILE_PATH =
+            MOSExcelMogiApp.Infrastructure.DataPathHelper.GetWorkingFilePath(1, 8);
 
         // Public wrappers
         public bool CheckTask_1_8_01() => RunCheck(CheckTask_1_8_01_Impl);

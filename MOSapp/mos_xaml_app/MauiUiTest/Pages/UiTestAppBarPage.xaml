@@ -86,20 +86,13 @@
                             Clicked="NextProject_Clicked"
                             FontAttributes="None"
                             FontSize="16"/>
-                    <Button Text="↓" 
-                            WidthRequest="32" 
-                            HeightRequest="32" 
+                    <Button Text="画面調整"
                             BackgroundColor="White" 
                             TextColor="#1E40AF" 
-                            FontAttributes="Bold"
-                            FontSize="14"/>
-                    <Button Text="□" 
-                            WidthRequest="32" 
-                            HeightRequest="32" 
-                            BackgroundColor="White" 
-                            TextColor="#1E40AF" 
-                            FontAttributes="Bold"
-                            FontSize="14"/>
+                            Padding="24,10"
+                            FontAttributes="None"
+                            FontSize="16"
+                            Clicked="AdjustScreenButton_Clicked"/>
                 </HorizontalStackLayout>
             </Grid>
         </Border>

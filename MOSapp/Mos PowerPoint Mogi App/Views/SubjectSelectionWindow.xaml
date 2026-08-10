@@ -45,9 +45,6 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}" CornerRadius="12" Padding="20">
-                                        <Border.Effect>
-                                            <DropShadowEffect Color="#1B5E38" Direction="135" ShadowDepth="6" Opacity="0.4" BlurRadius="12"/>
-                                        </Border.Effect>
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                 </ControlTemplate>
@@ -90,9 +87,6 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}" CornerRadius="12" Padding="20">
-                                        <Border.Effect>
-                                            <DropShadowEffect Color="#1E3A6E" Direction="135" ShadowDepth="6" Opacity="0.4" BlurRadius="12"/>
-                                        </Border.Effect>
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                 </ControlTemplate>
@@ -135,9 +129,6 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="{TemplateBinding Background}" CornerRadius="12" Padding="20">
-                                        <Border.Effect>
-                                            <DropShadowEffect Color="#8B2E16" Direction="135" ShadowDepth="6" Opacity="0.4" BlurRadius="12"/>
-                                        </Border.Effect>
                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                 </ControlTemplate>

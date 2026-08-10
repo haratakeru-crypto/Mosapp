@@ -23,7 +23,7 @@ namespace MOS_Word_app
         private MainViewModel _viewModel;
         private Views.UiTestAppBarWindow _appBarWindow;
 
-        /// <summary>タイマー無効化フラグ。デフォルトは一時停止。プロジェクト一覧で「タイマーを使用」にチェックで有効。</summary>
+        /// <summary>タイマー無効化フラグ。デフォルトは一時停止（常時停止）。</summary>
         public static bool IsTimerDisabled { get; private set; } = true;
 
         public MainWindow()
@@ -37,7 +37,6 @@ namespace MOS_Word_app
             _viewModel.HideMainWindowRequested += OnHideMainWindowRequested;
             _viewModel.ShowMainWindowRequested += OnShowMainWindowRequested;
             _viewModel.ExamEnded += OnExamEnded;
-            _viewModel.ScoreCompleted += OnScoreCompleted;
 
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
@@ -65,7 +64,7 @@ namespace MOS_Word_app
             if (needRecreate)
             {
                 var oldAppBar = _appBarWindow;
-                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, _viewModel.ShowPauseButton);
+                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, false);
                 _appBarWindow.Closed += OnAppBarWindowClosed;
                 oldAppBar?.Close();
             }
@@ -100,24 +99,6 @@ namespace MOS_Word_app
         private void OnExamEnded(object sender, EventArgs e)
         {
             _appBarWindow = null;
-        }
-
-        private void OnScoreCompleted(object sender, EventArgs e)
-        {
-            var results = _viewModel?.TaskResults;
-            if (results == null || results.Count == 0)
-                return;
-            Views.ScoreResultWindow.ShowResults(this, results);
-        }
-
-        private void TimerCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = false;
-        }
-
-        private void TimerCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            IsTimerDisabled = true;
         }
 
         protected override void OnClosed(EventArgs e)

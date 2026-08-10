@@ -1,6 +1,8 @@
 using System;
 using System.Timers;
 using System.Threading.Tasks;
+using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Maui.Devices;
 using Microsoft.Maui.Controls;
 
@@ -13,6 +15,31 @@ public partial class UiTestAppBarPage : ContentPage
     private int _currentProjectId = 1;
     private bool _isPaused = false;
     private bool _timerDisabled = false;
+
+#if WINDOWS
+    [DllImport("user32.dll")]
+    private static extern bool MoveWindow(IntPtr hWnd, int x, int y, int width, int height, bool repaint);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int command);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr hWnd, out RECT rect);
+
+    private const int SW_RESTORE = 9;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
+#endif
 
     public UiTestAppBarPage()
     {
@@ -206,6 +233,63 @@ public partial class UiTestAppBarPage : ContentPage
             Navigation.PopAsync();
         }
     }
+
+    private void AdjustScreenButton_Clicked(object sender, EventArgs e)
+    {
+        SetPageSize();
+#if WINDOWS
+        RestoreAndPositionExcelWindow();
+#endif
+    }
+
+#if WINDOWS
+    private static void RestoreAndPositionExcelWindow()
+    {
+        try
+        {
+            var excelProcess = System.Diagnostics.Process.GetProcessesByName("EXCEL")
+                .OrderByDescending(process =>
+                {
+                    try { return process.StartTime; }
+                    catch { return DateTime.MinValue; }
+                })
+                .FirstOrDefault();
+            if (excelProcess == null || excelProcess.MainWindowHandle == IntPtr.Zero)
+                return;
+
+            try
+            {
+                IntPtr excelHwnd = excelProcess.MainWindowHandle;
+                ShowWindow(excelHwnd, SW_RESTORE);
+                GetWindowRect(excelHwnd, out RECT windowRect);
+                GetClientRect(excelHwnd, out RECT clientRect);
+
+                int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
+                int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
+                var displayInfo = DeviceDisplay.MainDisplayInfo;
+                int screenWidth = (int)displayInfo.Width;
+                int screenHeight = (int)displayInfo.Height;
+                int appBarHeight = screenHeight / 3;
+
+                MoveWindow(
+                    excelHwnd,
+                    -borderWidth / 2,
+                    -borderHeight / 2,
+                    screenWidth + borderWidth,
+                    screenHeight - appBarHeight + borderHeight,
+                    true);
+            }
+            finally
+            {
+                excelProcess.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"RestoreAndPositionExcelWindow error: {ex.Message}");
+        }
+    }
+#endif
 
     private async void ReviewPageButton_Clicked(object sender, EventArgs e)
     {

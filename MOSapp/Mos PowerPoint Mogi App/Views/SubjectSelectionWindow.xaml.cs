@@ -27,10 +27,10 @@ namespace MOS_PowerPoint_app.Views
                 MessageBox.Show("Excel アプリが見つかりません。\n" + (excelExePath ?? ""), "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            string excelInitialPath = GetExcelInitialPath();
-            if (!string.IsNullOrEmpty(excelInitialPath) && !Directory.Exists(excelInitialPath))
+            string excelWorkingPath = GetExcelWorkingPath();
+            if (!string.IsNullOrEmpty(excelWorkingPath) && !Directory.Exists(excelWorkingPath))
             {
-                excelInitialPath = null;
+                excelWorkingPath = null;
             }
             try
             {
@@ -38,7 +38,7 @@ namespace MOS_PowerPoint_app.Views
                 {
                     FileName = excelExePath,
                     UseShellExecute = false,
-                    WorkingDirectory = string.IsNullOrEmpty(excelInitialPath) ? Path.GetDirectoryName(excelExePath) : excelInitialPath
+                    WorkingDirectory = string.IsNullOrEmpty(excelWorkingPath) ? Path.GetDirectoryName(excelExePath) : excelWorkingPath
                 };
                 var process = Process.Start(startInfo);
                 if (process != null)
@@ -55,18 +55,19 @@ namespace MOS_PowerPoint_app.Views
         }
 
         /// <summary>
-        /// Excel の初期フォルダの絶対パスを取得する（Assets\config.json の excelInitialPath。未設定時は C:\MOSTest\Excel365\Tab1\Initial）。
+        /// Excel の作業フォルダの絶対パスを取得する。
         /// </summary>
-        private static string GetExcelInitialPath()
+        private static string GetExcelWorkingPath()
         {
-            const string defaultPath = @"C:\MOSTest\Excel365\Tab1\Initial";
+            const string defaultPath = @"C:\MOSTest\Excel365\Tab1";
             try
             {
                 string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
                 if (!File.Exists(configPath)) return Path.GetFullPath(defaultPath);
                 string json = File.ReadAllText(configPath);
                 var config = JObject.Parse(json);
-                var path = config["excelInitialPath"]?.ToString();
+                var path = config["excelWorkingPath"]?.ToString()
+                    ?? config["excelInitialPath"]?.ToString();
                 if (string.IsNullOrWhiteSpace(path)) return Path.GetFullPath(defaultPath);
                 path = path.Trim();
                 return Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path));
@@ -135,10 +136,10 @@ namespace MOS_PowerPoint_app.Views
                 MessageBox.Show("Word アプリが見つかりません。\n" + (wordExePath ?? ""), "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            string wordInitialPath = GetWordInitialPath();
-            if (!string.IsNullOrEmpty(wordInitialPath) && !Directory.Exists(wordInitialPath))
+            string wordWorkingPath = GetWordWorkingPath();
+            if (!string.IsNullOrEmpty(wordWorkingPath) && !Directory.Exists(wordWorkingPath))
             {
-                MessageBox.Show($"Word の初期フォルダが見つかりません。\n{wordInitialPath}", "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Word の作業フォルダが見つかりません。\n{wordWorkingPath}", "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             try
@@ -147,7 +148,7 @@ namespace MOS_PowerPoint_app.Views
                 {
                     FileName = wordExePath,
                     UseShellExecute = false,
-                    WorkingDirectory = string.IsNullOrEmpty(wordInitialPath) ? Path.GetDirectoryName(wordExePath) : wordInitialPath
+                    WorkingDirectory = string.IsNullOrEmpty(wordWorkingPath) ? Path.GetDirectoryName(wordExePath) : wordWorkingPath
                 };
                 // #region agent log
                 try
@@ -173,18 +174,19 @@ namespace MOS_PowerPoint_app.Views
         }
 
         /// <summary>
-        /// Word の初期フォルダの絶対パスを取得する（Assets\config.json の wordInitialPath。未設定時は C:\MOSTest\Word365\Tab1\Initial）。
+        /// Word の作業フォルダの絶対パスを取得する。
         /// </summary>
-        private static string GetWordInitialPath()
+        private static string GetWordWorkingPath()
         {
-            const string defaultPath = @"C:\MOSTest\Word365\Tab1\Initial";
+            const string defaultPath = @"C:\MOSTest\Word365\Tab1";
             try
             {
                 string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
                 if (!File.Exists(configPath)) return Path.GetFullPath(defaultPath);
                 string json = File.ReadAllText(configPath);
                 var config = JObject.Parse(json);
-                var path = config["wordInitialPath"]?.ToString();
+                var path = config["wordWorkingPath"]?.ToString()
+                    ?? config["wordInitialPath"]?.ToString();
                 if (string.IsNullOrWhiteSpace(path)) return Path.GetFullPath(defaultPath);
                 path = path.Trim();
                 return Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path));

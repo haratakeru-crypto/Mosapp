@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -9,7 +8,6 @@ using System.Windows;
 using System.Windows.Input;
 using System.Runtime.InteropServices;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using PowerPointApp = Microsoft.Office.Interop.PowerPoint.Application;
 using PowerPointPresentation = Microsoft.Office.Interop.PowerPoint.Presentation;
 using Microsoft.Office.Interop.PowerPoint;
@@ -30,8 +28,6 @@ namespace MOS_PowerPoint_app
         private int _selectedTabIndex;
         private string _resultMessage;
         private bool _showScoreButton;
-        private bool _showPauseButton;
-        private bool _showScoreResult = true;
         private ProjectViewModel _currentProject;
         private ObservableCollection<TaskResult> _taskResults;
         private int _totalScore;
@@ -41,7 +37,6 @@ namespace MOS_PowerPoint_app
         {
             LoadProjects();
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
-            UiTestCommand = new RelayCommand(ExecuteUiTest);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllProjectsCommand = new RelayCommand(ExecuteResetAllProjects);
             TaskResults = new ObservableCollection<TaskResult>();
@@ -70,7 +65,6 @@ namespace MOS_PowerPoint_app
         }
 
         public ICommand OpenProjectCommand { get; }
-        public ICommand UiTestCommand { get; }
         public ICommand ScoreCommand { get; }
         public ICommand ResetAllProjectsCommand { get; }
 
@@ -91,20 +85,6 @@ namespace MOS_PowerPoint_app
         {
             get => _showScoreButton;
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
-        }
-
-        /// <summary>一時停止ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
-        public bool ShowPauseButton
-        {
-            get => _showPauseButton;
-            set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
-        }
-
-        /// <summary>採点結果（タスク別一覧）を表示するか。チェックONで採点ロジックを確認できる。</summary>
-        public bool ShowScoreResult
-        {
-            get => _showScoreResult;
-            set { _showScoreResult = value; OnPropertyChanged(nameof(ShowScoreResult)); }
         }
 
         public string CurrentProjectName => CurrentProject?.Name ?? "";
@@ -152,59 +132,23 @@ namespace MOS_PowerPoint_app
         {
             try
             {
-                // 優先順位1: Assets\config.json（mos_xaml_app と同様に、ClickOnceでも同梱しやすい）
-                // 優先順位2: App.config の appSettings
-                // 優先順位3: 既定値
-                string basePath = null;
-
-                try
+                // Tab1（演習）のみ読み込む
+                foreach (int groupId in new[] { 1 })
                 {
-                    string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
-                    if (File.Exists(configPath))
-                    {
-                        string jsonContent = File.ReadAllText(configPath);
-                        JObject config = JObject.Parse(jsonContent);
-                        basePath = config["powerPointDataPath"]?.ToString();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Assets\\config.json 読み込みエラー: {ex.Message}");
-                }
-
-                if (string.IsNullOrWhiteSpace(basePath))
-                {
-                    basePath = ConfigurationManager.AppSettings["PowerPointDataPath"];
-                }
-
-                if (string.IsNullOrWhiteSpace(basePath))
-                {
-                    basePath = @"C:\MOSTest\PowerPoint365";
-                }
-                
-                // Tab1, Tab3のフォルダからプロジェクトを読み込む（模試①=Tab2は非表示のためスキップ）
-                foreach (int groupId in new[] { 1, 3 })
-                {
-                    string tabFolder = Path.Combine(basePath, $"Tab{groupId}");
-                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = groupId == 3 ? "応用編" : $"Group {groupId}" };
+                    string tabFolder = PowerPointDataPathHelper.GetTabFolder(groupId);
+                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
                     
                     if (Directory.Exists(tabFolder))
                     {
                         // Project1.pptxからProject10.pptxを検索
                         for (int projectId = 1; projectId <= 10; projectId++)
                         {
-                            // Project1.pptx, Project2.pptx, ... を検索
-                            string[] possibleNames = { $"Project{projectId}.pptx", $"Project{projectId}.ppt" };
-                            string filePath = null;
-                            
-                            foreach (var fileName in possibleNames)
+                            string filePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
+                            if (!File.Exists(filePath))
                             {
-                                string fullPath = Path.Combine(tabFolder, fileName);
-                                if (File.Exists(fullPath))
-                                {
-                                    filePath = fullPath;
-                                    break;
-                                }
+                                // .ppt は拡張子を変えてコピーせず、旧形式のまま互換利用する。
+                                string legacyPptPath = Path.Combine(tabFolder, $"Project{projectId}.ppt");
+                                filePath = File.Exists(legacyPptPath) ? legacyPptPath : null;
                             }
                             
                             group.Projects.Add(new ProjectViewModel
@@ -238,10 +182,10 @@ namespace MOS_PowerPoint_app
             {
                 // 例外をログに記録するが、アプリを継続させる
                 System.Diagnostics.Debug.WriteLine($"LoadProjectsエラー: {ex.Message}");
-                // 空のプロジェクトグループを作成してアプリを継続（模試①=Group2はスキップ）
-                foreach (int groupId in new[] { 1, 3 })
+                // 空のプロジェクトグループを作成してアプリを継続（演習のみ）
+                foreach (int groupId in new[] { 1 })
                 {
-                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = groupId == 3 ? "応用編" : $"Group {groupId}" };
+                    var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
                     for (int projectId = 1; projectId <= 10; projectId++)
                     {
                         group.Projects.Add(new ProjectViewModel
@@ -307,11 +251,6 @@ namespace MOS_PowerPoint_app
             }
         }
 
-        private void ExecuteUiTest(object parameter)
-        {
-            ResultMessage = "UIテスト機能は準備中です";
-        }
-
         private bool CanExecuteScore(object parameter)
         {
             return CurrentProject != null;
@@ -328,9 +267,8 @@ namespace MOS_PowerPoint_app
             TaskResults.Clear();
             ResultMessage = "採点中...";
 
-            string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MOS模擬アプリ問題文一覧_PowerPoint.json");
-            if (!File.Exists(jsonPath))
-                jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", "MOS模擬アプリ問題文一覧_PowerPoint.json");
+            string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                "MOS模擬アプリ問題文一覧_PowerPoint.json");
             if (!File.Exists(jsonPath))
             {
                 ResultMessage = "該当プロジェクトのタスクが見つかりません（問題文JSONがありません）。";

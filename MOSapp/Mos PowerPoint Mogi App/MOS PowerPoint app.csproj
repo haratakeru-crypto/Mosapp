@@ -169,6 +169,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="MainViewModel.cs" />
+    <Compile Include="PowerPointDataPathHelper.cs" />
     <Compile Include="PowerPointProjectResetHelper.cs" />
     <Compile Include="PowerPointGrader.cs" />
     <Page Include="Views\UiTestAppBarWindow.xaml">
@@ -262,6 +263,7 @@
     <Content Include="Assets\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Resource Include="Assets\qr_subete_no_saiten.png" />
     <Content Include="References\JSON\MOS模擬アプリ問題文一覧_PowerPoint.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

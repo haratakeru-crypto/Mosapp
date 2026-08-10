@@ -43,23 +43,16 @@ namespace MOS_Word_app
         private int _selectedTabIndex;
         private string _resultMessage;
         private bool _showScoreButton;
-        private bool _showPauseButton;
         private TabTaskInfo _currentTabTask;
         private ProjectViewModel _currentProject;
-        private ObservableCollection<TaskResult> _taskResults;
-        private int _totalScore;
-        private int _maxScore;
 
         public MainViewModel()
         {
             LoadProjects();
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
-            UiTestCommand = new RelayCommand(ExecuteUiTest);
             TabSearchCommand = new RelayCommand(ExecuteTabSearch);
-            ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllInGroupCommand = new RelayCommand(ExecuteResetAllInGroup);
             TabTasks = new ObservableCollection<TabTaskInfo>();
-            TaskResults = new ObservableCollection<TaskResult>();
         }
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
@@ -71,12 +64,11 @@ namespace MOS_Word_app
             {
                 _selectedTabIndex = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(CurrentGroupIdForReset));
             }
         }
 
-        /// <summary>現在選択中のタブに対応するグループID（ヘッダーの「すべてリセット」用）。演習=1, 応用=3。</summary>
-        public int CurrentGroupIdForReset => SelectedTabIndex == 0 ? 1 : 3;
+        /// <summary>ヘッダーの「すべてリセット」用。演習(Group1)固定。</summary>
+        public int CurrentGroupIdForReset => 1;
 
         public string ResultMessage
         {
@@ -89,9 +81,7 @@ namespace MOS_Word_app
         }
 
         public ICommand OpenProjectCommand { get; }
-        public ICommand UiTestCommand { get; }
         public ICommand TabSearchCommand { get; }
-        public ICommand ScoreCommand { get; }
         public ICommand ResetAllInGroupCommand { get; }
 
         public ObservableCollection<TabTaskInfo> TabTasks { get; set; }
@@ -126,86 +116,32 @@ namespace MOS_Word_app
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
         }
 
-        /// <summary>一時停止ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
-        public bool ShowPauseButton
-        {
-            get => _showPauseButton;
-            set { _showPauseButton = value; OnPropertyChanged(nameof(ShowPauseButton)); }
-        }
-
         public event EventHandler ShowAppBarRequested;
         public event EventHandler HideMainWindowRequested;
 #pragma warning disable 67 // イベントは MainWindow で購読されるため警告を抑制
         public event EventHandler ShowMainWindowRequested;
         public event EventHandler ExamEnded;
-        /// <summary>採点完了時に発火。採点結果ウィンドウの表示に使用する。</summary>
-        public event EventHandler ScoreCompleted;
 #pragma warning restore 67
-
-        public ObservableCollection<TaskResult> TaskResults
-        {
-            get => _taskResults;
-            set
-            {
-                _taskResults = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public int TotalScore
-        {
-            get => _totalScore;
-            set
-            {
-                _totalScore = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public int MaxScore
-        {
-            get => _maxScore;
-            set
-            {
-                _maxScore = value;
-                OnPropertyChanged();
-            }
-        }
 
         private void LoadProjects()
         {
-            string basePath = @"C:\MOSTest\Word365";
-
-            // 保存先は Tab{groupId}\ 直下。一覧は Initial にファイルがあれば表示し、FilePath は作業フォルダ（Tab\）のパスにする
-            for (int groupId = 1; groupId <= 3; groupId++)
+            // Group1（演習）のみ。教材パスとファイル名は WordDataPathHelper の規約に従う。
+            for (int groupId = 1; groupId <= 1; groupId++)
             {
-                string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-                string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
                 var group = new ProjectGroupViewModel { GroupId = groupId, GroupName = $"Group {groupId}" };
 
                 for (int projectId = 1; projectId <= 10; projectId++)
                 {
-                    // 保存先（作業フォルダ）のパス。保存はここにのみ反映する
-                    string workingFileName = (groupId == 1 && projectId == 7) ? "Project7.doc" : $"Project{projectId}.docx";
-                    string workingFilePath = Path.Combine(workingFolder, workingFileName);
-                    string[] possibleNames = (groupId == 1 && projectId == 7)
-                        ? new[] { "Project7.doc", "project7.doc" }
-                        : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-
-                    bool existsInWorking = File.Exists(workingFilePath);
-                    bool existsInInitial = false;
-                    if (Directory.Exists(initialFolder))
+                    string filePath = WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
+                    if (string.IsNullOrEmpty(filePath))
                     {
-                        foreach (var fileName in possibleNames)
+                        try
                         {
-                            if (File.Exists(Path.Combine(initialFolder, fileName)))
-                            {
-                                existsInInitial = true;
-                                break;
-                            }
+                            WordDataPathHelper.EnsureCanonicalTemplate(groupId, projectId);
+                            filePath = WordDataPathHelper.GetWorkingFilePath(groupId, projectId);
                         }
+                        catch (FileNotFoundException) { }
                     }
-                    string filePath = (existsInWorking || existsInInitial) ? workingFilePath : null;
 
                     group.Projects.Add(new ProjectViewModel
                     {
@@ -233,42 +169,13 @@ namespace MOS_Word_app
                     ResultMessage = $"エラー: ファイルが見つかりません: {project.FilePath ?? "パスが設定されていません"}";
                     return;
                 }
-                // 作業フォルダ（Tab\）にファイルが無い場合は Initial からコピーしてから開く（保存は常に Tab\ にのみ反映）
+                // 作業ファイルが無い場合は正規テンプレート（互換元からの安全な生成を含む）から作成する。
                 if (!File.Exists(project.FilePath))
                 {
-                    string basePath = @"C:\MOSTest\Word365";
-                    int groupId = project.GroupId;
-                    int projectId = project.ProjectId;
-                    string initialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial");
-                    string initialInitialFolder = Path.Combine(basePath, $"Tab{groupId}", "Initial", "Initial");
-                    string[] possibleNames = (groupId == 1 && projectId == 7)
-                        ? new[] { "Project7.doc", "project7.doc" }
-                        : new[] { $"Project{projectId}.docx", $"Project{projectId}.doc", $"project{projectId}.docx", $"project{projectId}.doc" };
-                    string sourcePath = null;
-                    foreach (var fileName in possibleNames)
-                    {
-                        string fullPath = Path.Combine(initialFolder, fileName);
-                        if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                    }
-                    if (string.IsNullOrEmpty(sourcePath) && Directory.Exists(initialInitialFolder))
-                    {
-                        foreach (var fileName in possibleNames)
-                        {
-                            string fullPath = Path.Combine(initialInitialFolder, fileName);
-                            if (File.Exists(fullPath)) { sourcePath = fullPath; break; }
-                        }
-                    }
-                    if (string.IsNullOrEmpty(sourcePath))
-                    {
-                        ResultMessage = $"エラー: 参照元ファイルが見つかりません: {initialFolder}";
-                        return;
-                    }
                     try
                     {
-                        string workingFolder = Path.Combine(basePath, $"Tab{groupId}");
-                        if (!Directory.Exists(workingFolder))
-                            Directory.CreateDirectory(workingFolder);
-                        File.Copy(sourcePath, project.FilePath, overwrite: false);
+                        project.FilePath = WordDataPathHelper.EnsureWorkingFile(
+                            project.GroupId, project.ProjectId);
                     }
                     catch (Exception exCopy)
                     {
@@ -297,52 +204,53 @@ namespace MOS_Word_app
 
                 try
                 {
-                    // 別プロジェクトへ切り替える前に編集内容をディスクへ保存してから閉じる
-                    SaveAndCloseAllWordDocuments();
+                    string targetPath = NormalizeDocumentPath(project.FilePath);
+                    bool switchingProject = CurrentProject != null
+                        && !string.Equals(NormalizeDocumentPath(CurrentProject.FilePath), targetPath, StringComparison.OrdinalIgnoreCase);
+
+                    // 別プロジェクトへ切り替えるときだけ全ドキュメントを保存・閉じる
+                    if (switchingProject)
+                        SaveAndCloseAllWordDocuments();
 
                     WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
 
-                    // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、常にフォルダから開き直す
-                    string pathLower = System.IO.Path.GetFullPath(project.FilePath).ToLowerInvariant();
-                    try
+                    if (!TryActivateOpenDocument(wordApp, targetPath))
                     {
-                        for (int i = wordApp.Documents.Count; i >= 1; i--)
+                        // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、フォルダから開き直す
+                        try
                         {
-                            WordDoc openDoc = wordApp.Documents[i];
-                            try
+                            for (int i = wordApp.Documents.Count; i >= 1; i--)
                             {
-                                string fullName = openDoc.FullName?.ToLowerInvariant() ?? "";
-                                string docFullPath = fullName;
-                                try { docFullPath = System.IO.Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
-                                if (fullName == pathLower || docFullPath == pathLower)
+                                WordDoc openDoc = wordApp.Documents[i];
+                                try
                                 {
-                                    if (!openDoc.Saved)
-                                        openDoc.Save();
-                                    openDoc.Close(SaveChanges: false);
-                                    break;
+                                    if (DocumentPathsEqual(openDoc.FullName, targetPath))
+                                    {
+                                        if (!openDoc.Saved)
+                                            openDoc.Save();
+                                        openDoc.Close(SaveChanges: false);
+                                        break;
+                                    }
+                                }
+                                finally
+                                {
+                                    if (openDoc != null) Marshal.ReleaseComObject(openDoc);
                                 }
                             }
-                            finally
-                            {
-                                if (openDoc != null) Marshal.ReleaseComObject(openDoc);
-                            }
                         }
-                    }
-                    catch (Exception exClose)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] 既存ドキュメント閉じる際のエラー: {exClose.Message}");
-                    }
+                        catch (Exception exClose)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] 既存ドキュメント閉じる際のエラー: {exClose.Message}");
+                        }
 
-                    // Wordドキュメントを開く（編集可能で開く・常にフォルダから）
-                    WordDoc doc = null;
-                    try
-                    {
-                        doc = wordApp.Documents.Open(project.FilePath, ReadOnly: false, Visible: true);
-                    }
-                    catch (Exception ex)
-                    {
-                        // ファイルが既に開いている場合は無視
-                        System.Diagnostics.Debug.WriteLine($"ドキュメントを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                        try
+                        {
+                            wordApp.Documents.Open(project.FilePath, ReadOnly: false, Visible: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"ドキュメントを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                        }
                     }
 
                     CurrentProject = project;
@@ -477,7 +385,61 @@ namespace MOS_Word_app
         {
             SaveAllWordDocuments();
             CloseAllWordDocuments();
-            Thread.Sleep(200);
+        }
+
+        private static string NormalizeDocumentPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return string.Empty;
+            try
+            {
+                return Path.GetFullPath(path).ToLowerInvariant();
+            }
+            catch
+            {
+                return path.ToLowerInvariant();
+            }
+        }
+
+        private static bool DocumentPathsEqual(string left, string rightNormalized)
+        {
+            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(rightNormalized))
+                return false;
+            return string.Equals(NormalizeDocumentPath(left), rightNormalized, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>対象ファイルが既に開いていればアクティブ化して true を返す。</summary>
+        private static bool TryActivateOpenDocument(WordApp wordApp, string targetPathNormalized)
+        {
+            if (wordApp == null || string.IsNullOrEmpty(targetPathNormalized))
+                return false;
+
+            try
+            {
+                for (int i = wordApp.Documents.Count; i >= 1; i--)
+                {
+                    WordDoc doc = wordApp.Documents[i];
+                    try
+                    {
+                        if (!DocumentPathsEqual(doc.FullName, targetPathNormalized))
+                            continue;
+
+                        doc.Activate();
+                        try { doc.ActiveWindow?.Activate(); } catch { }
+                        return true;
+                    }
+                    finally
+                    {
+                        try { if (doc != null) Marshal.ReleaseComObject(doc); } catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TryActivateOpenDocument] {ex.Message}");
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -577,11 +539,6 @@ namespace MOS_Word_app
             {
                 foreach (var p in wordProcesses) p.Dispose();
             }
-        }
-
-        private void ExecuteUiTest(object parameter)
-        {
-            ResultMessage = "UIテスト機能は準備中です";
         }
 
         private void ExecuteTabSearch(object parameter)
@@ -691,124 +648,6 @@ namespace MOS_Word_app
             catch (Exception ex)
             {
                 ResultMessage = $"エラー: {ex.Message}";
-            }
-        }
-
-        private bool CanExecuteScore(object parameter)
-        {
-            return CurrentProject != null && !string.IsNullOrEmpty(CurrentProject.FilePath);
-        }
-
-        private void ExecuteScore(object parameter)
-        {
-            if (CurrentProject == null || string.IsNullOrEmpty(CurrentProject.FilePath))
-            {
-                ResultMessage = "エラー: プロジェクトが選択されていません";
-                return;
-            }
-
-            try
-            {
-                ResultMessage = "採点中...";
-                TaskResults.Clear();
-
-                int projectNumber = CurrentProject.ProjectId;
-                // exe と同じ bin\Debug または bin\Release 直下の Dlls サブフォルダのみから読み込む（obj や products は参照しない）
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string dllPath = Path.Combine(baseDir, "Dlls", $"WordChecker1_{projectNumber}.dll");
-
-                if (!File.Exists(dllPath))
-                {
-                    ResultMessage = $"エラー: チェッカーファイルが見つかりません: WordChecker1_{projectNumber}.dll (bin\\Debug\\Dlls または bin\\Release\\Dlls を確認してください)";
-                    return;
-                }
-
-                // DLLを読み込む
-                Assembly assembly = Assembly.LoadFrom(dllPath);
-                string className = $"Libraries.Group1.WordChecker1_{projectNumber}";
-                Type checkerType = assembly.GetType(className);
-
-                if (checkerType == null)
-                {
-                    ResultMessage = $"エラー: クラス '{className}' が見つかりません";
-                    return;
-                }
-
-                object checkerInstance = Activator.CreateInstance(checkerType);
-                int passedCount = 0;
-                int totalTasks = 0;
-
-                LogReader.RequestVstoEvidenceFlush();
-
-                // 各タスクをチェック（プロジェクトごとにタスク数が異なる）
-                int[] taskCounts = { 5, 5, 6, 7, 8, 7, 5, 7, 6, 5 }; // プロジェクト1-10のタスク数
-                int maxTasks = projectNumber <= taskCounts.Length ? taskCounts[projectNumber - 1] : 5;
-
-                for (int taskNum = 1; taskNum <= maxTasks; taskNum++)
-                {
-                    string methodName = $"CheckTask_1_{projectNumber}_{taskNum:D2}";
-                    MethodInfo method = checkerType.GetMethod(methodName);
-
-                    if (method != null)
-                    {
-                        totalTasks++;
-                        try
-                        {
-                            bool result = (bool)method.Invoke(checkerInstance, null);
-                            // 採点結果を共有ストアに記録（グループ1固定）
-                            ScoreResultStore.RecordResult(1, projectNumber, taskNum, result);
-                            
-                            TaskResults.Add(new TaskResult
-                            {
-                                TaskNumber = taskNum,
-                                IsPassed = result,
-                                TaskName = $"タスク{taskNum}"
-                            });
-
-                            if (result)
-                            {
-                                passedCount++;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            TaskResults.Add(new TaskResult
-                            {
-                                TaskNumber = taskNum,
-                                IsPassed = false,
-                                TaskName = $"タスク{taskNum} (エラー: {ex.Message})"
-                            });
-                        }
-                    }
-                }
-
-                TotalScore = passedCount;
-                MaxScore = totalTasks;
-
-                StringBuilder sb = new StringBuilder();
-                sb.AppendLine($"採点完了: {passedCount}/{totalTasks} タスク合格");
-                sb.AppendLine($"得点: {passedCount}点 / {totalTasks}点");
-                sb.AppendLine();
-                sb.AppendLine("詳細:");
-                foreach (var task in TaskResults)
-                {
-                    sb.AppendLine($"  {task.TaskName}: {(task.IsPassed ? "✓ 合格" : "✗ 不合格")}");
-                }
-
-                ResultMessage = sb.ToString();
-                ScoreCompleted?.Invoke(this, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ExecuteScore] 採点エラー: {ex.Message}\r\n{ex.StackTrace}");
-                var msg = new System.Text.StringBuilder();
-                msg.AppendLine($"エラー: 採点中にエラーが発生しました: {ex.Message}");
-                if (ex.InnerException != null)
-                    msg.AppendLine($"内部エラー: {ex.InnerException.Message}");
-                msg.AppendLine();
-                msg.AppendLine("※VSTOアドインが有効でログが記録されていないと不正解になります。");
-                msg.AppendLine($"ログファイル: {Path.Combine(Path.GetTempPath(), "mos_word_log.txt")}");
-                ResultMessage = msg.ToString();
             }
         }
 

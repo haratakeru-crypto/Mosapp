@@ -49,16 +49,16 @@ namespace MOSapp.Views
                 MessageBox.Show("Excel アプリが見つかりません。\n" + (excelExePath ?? ""), "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            string excelInitialPath = GetExcelInitialPath();
-            if (!string.IsNullOrEmpty(excelInitialPath) && !Directory.Exists(excelInitialPath))
-                excelInitialPath = null;
+            string excelWorkingPath = GetExcelWorkingPath();
+            if (!string.IsNullOrEmpty(excelWorkingPath) && !Directory.Exists(excelWorkingPath))
+                excelWorkingPath = null;
             try
             {
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = excelExePath,
                     UseShellExecute = false,
-                    WorkingDirectory = string.IsNullOrEmpty(excelInitialPath) ? Path.GetDirectoryName(excelExePath) : excelInitialPath
+                    WorkingDirectory = string.IsNullOrEmpty(excelWorkingPath) ? Path.GetDirectoryName(excelExePath) : excelWorkingPath
                 };
                 var process = Process.Start(startInfo);
                 if (process != null)
@@ -74,15 +74,17 @@ namespace MOSapp.Views
             }
         }
 
-        private static string GetExcelInitialPath()
+        private static string GetExcelWorkingPath()
         {
-            const string defaultPath = @"C:\MOSTest\Excel365\Tab1\Initial";
+            const string defaultPath = @"C:\MOSTest\Excel365\Tab1";
             try
             {
                 string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
                 if (!File.Exists(configPath)) return Path.GetFullPath(defaultPath);
                 string json = File.ReadAllText(configPath);
-                var path = GetJsonStringValue(json, "excelInitialPath");
+                var path = GetJsonStringValue(json, "excelWorkingPath");
+                if (string.IsNullOrWhiteSpace(path))
+                    path = GetJsonStringValue(json, "excelInitialPath");
                 if (string.IsNullOrWhiteSpace(path)) return Path.GetFullPath(defaultPath);
                 path = path.Trim();
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -143,10 +145,10 @@ namespace MOSapp.Views
                 MessageBox.Show("Word アプリが見つかりません。\n" + (wordExePath ?? ""), "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            string wordInitialPath = GetWordInitialPath();
-            if (!string.IsNullOrEmpty(wordInitialPath) && !Directory.Exists(wordInitialPath))
+            string wordWorkingPath = GetWordWorkingPath();
+            if (!string.IsNullOrEmpty(wordWorkingPath) && !Directory.Exists(wordWorkingPath))
             {
-                MessageBox.Show($"Word の初期フォルダが見つかりません。\n{wordInitialPath}", "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Word の作業フォルダが見つかりません。\n{wordWorkingPath}", "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             try
@@ -155,7 +157,7 @@ namespace MOSapp.Views
                 {
                     FileName = wordExePath,
                     UseShellExecute = false,
-                    WorkingDirectory = string.IsNullOrEmpty(wordInitialPath) ? Path.GetDirectoryName(wordExePath) : wordInitialPath
+                    WorkingDirectory = string.IsNullOrEmpty(wordWorkingPath) ? Path.GetDirectoryName(wordExePath) : wordWorkingPath
                 };
                 var process = Process.Start(startInfo);
                 if (process != null)
@@ -171,15 +173,17 @@ namespace MOSapp.Views
             }
         }
 
-        private static string GetWordInitialPath()
+        private static string GetWordWorkingPath()
         {
-            const string defaultPath = @"C:\MOSTest\Word365\Tab1\Initial";
+            const string defaultPath = @"C:\MOSTest\Word365\Tab1";
             try
             {
                 string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
                 if (!File.Exists(configPath)) return Path.GetFullPath(defaultPath);
                 string json = File.ReadAllText(configPath);
-                var path = GetJsonStringValue(json, "wordInitialPath");
+                var path = GetJsonStringValue(json, "wordWorkingPath");
+                if (string.IsNullOrWhiteSpace(path))
+                    path = GetJsonStringValue(json, "wordInitialPath");
                 if (string.IsNullOrWhiteSpace(path)) return Path.GetFullPath(defaultPath);
                 path = path.Trim();
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -246,6 +250,9 @@ namespace MOSapp.Views
                 MessageBox.Show("PowerPoint アプリが見つかりません。\n" + (pptExePath ?? ""), "科目選択", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+            string powerPointWorkingPath = GetPowerPointWorkingPath();
+            if (!string.IsNullOrEmpty(powerPointWorkingPath) && !Directory.Exists(powerPointWorkingPath))
+                powerPointWorkingPath = null;
             try
             {
                 var startInfo = new ProcessStartInfo
@@ -253,7 +260,7 @@ namespace MOSapp.Views
                     FileName = pptExePath,
                     Arguments = "--direct",
                     UseShellExecute = false,
-                    WorkingDirectory = Path.GetDirectoryName(pptExePath)
+                    WorkingDirectory = string.IsNullOrEmpty(powerPointWorkingPath) ? Path.GetDirectoryName(pptExePath) : powerPointWorkingPath
                 };
                 var process = Process.Start(startInfo);
                 if (process != null)
@@ -266,6 +273,26 @@ namespace MOSapp.Views
             catch (Exception ex)
             {
                 MessageBox.Show($"PowerPoint アプリの起動に失敗しました: {ex.Message}", "科目選択", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private static string GetPowerPointWorkingPath()
+        {
+            const string defaultPath = @"C:\MOSTest\PowerPoint365\Tab1";
+            try
+            {
+                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "config.json");
+                if (!File.Exists(configPath)) return Path.GetFullPath(defaultPath);
+                string json = File.ReadAllText(configPath);
+                var path = GetJsonStringValue(json, "powerPointWorkingPath");
+                if (string.IsNullOrWhiteSpace(path)) return Path.GetFullPath(defaultPath);
+                path = path.Trim();
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                return Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(Path.Combine(baseDir, path));
+            }
+            catch
+            {
+                return Path.GetFullPath(defaultPath);
             }
         }
 

@@ -20,6 +20,7 @@ using System.Windows.Interop;
 using System.Text;
 using System.Threading;
 using Libraries;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp
 {
@@ -150,6 +151,17 @@ namespace MOSExcelMogiApp
             // シェル起動後の共有 Excel 接続完了時に Excel ウィンドウを再配置（起動直後のずれを解消）
             _viewModel.SharedExcelApplicationAttached += OnSharedExcelApplicationAttached;
 
+            this.Activated += (s, e) =>
+            {
+                try { ScoringResultDialog.TryBringOpenToFront(); }
+                catch { }
+            };
+            this.PreviewMouseDown += (s, e) =>
+            {
+                try { ScoringResultDialog.TryBringOpenToFront(); }
+                catch { }
+            };
+
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] Constructor completed");
         }
 
@@ -161,6 +173,7 @@ namespace MOSExcelMogiApp
                 var sharedExcel = _viewModel?.TryGetSharedExcelApplication();
                 if (sharedExcel != null)
                     PositionExcelWindow();
+                ScoringResultDialog.TryBringOpenToFront();
             }
             catch
             {
@@ -208,6 +221,7 @@ namespace MOSExcelMogiApp
         /// </summary>
         private void PositionWindowButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             var delayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
             delayTimer.Tick += (s, args) =>
             {
@@ -318,6 +332,7 @@ namespace MOSExcelMogiApp
                     // 最大化/最小化状態だと MoveWindow が効かず比率が崩れることがあるため、必ず復元してから移動/リサイズする
                     try { ShowWindow(excelHwnd, SW_RESTORE); } catch { }
                     MoveWindow(excelHwnd, excelX, excelY, excelWidth, excelHeight, true);
+                    ScoringResultDialog.TryBringOpenToFront();
                     return true;
                 }
 
@@ -649,7 +664,7 @@ namespace MOSExcelMogiApp
                         _ => "MOS模擬アプリ問題文一覧.json"
                     };
                 
-                string jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "References", "JSON", jsonFileName);
+                string jsonPath = DataPathHelper.ResolveJsonPath(jsonFileName);
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Loading tasks from: {jsonFileName} (GroupId: {groupId})");
                 
                 string jsonContent = File.ReadAllText(jsonPath);
@@ -985,6 +1000,7 @@ namespace MOSExcelMogiApp
 
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             if (_currentTaskId > 1)
             {
                 _currentTaskId--;
@@ -994,6 +1010,7 @@ namespace MOSExcelMogiApp
 
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             if (_tasks != null && _currentTaskId < _tasks.Count)
             {
                 _currentTaskId++;
@@ -1003,6 +1020,7 @@ namespace MOSExcelMogiApp
 
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             if (sender is Button button && button.Tag != null)
             {
                 int taskId = int.Parse(button.Tag.ToString());
@@ -1265,6 +1283,7 @@ namespace MOSExcelMogiApp
         public void NavigateToTask(int projectId, int taskId, int? groupIdOverride = null)
         {
             System.Diagnostics.Debug.WriteLine($"[AppBarWindow] NavigateToTask called: ProjectId={projectId}, TaskId={taskId}");
+            ScoringResultDialog.TryBringOpenToFront();
 
             if (_isNavigatingToTask)
             {

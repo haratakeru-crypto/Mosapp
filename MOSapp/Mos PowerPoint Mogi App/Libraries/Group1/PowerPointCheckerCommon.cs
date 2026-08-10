@@ -86,7 +86,7 @@ namespace Libraries.Group1
         }
 
         /// <summary>
-        /// 作業中 pptx（TabN\ProjectM.pptx）から、対応する初期ファイル（TabN\Initial\projectM.pptx）のパスを解決する。
+        /// 作業中 pptx（TabN\ProjectM.pptx）から、対応する初期ファイル（TabN\Initial\ProjectM.pptx）のパスを解決する。
         /// </summary>
         public static bool TryResolveInitialPptxPath(string activePptxPath, out string initialPptxPath)
         {
@@ -112,8 +112,27 @@ namespace Libraries.Group1
             if (string.IsNullOrEmpty(ext))
                 ext = ".pptx";
 
-            initialPptxPath = Path.Combine(tabFolder, "Initial", $"project{projectId}{ext}");
-            return File.Exists(initialPptxPath);
+            initialPptxPath = Path.Combine(tabFolder, "Initial", $"Project{projectId}{ext}");
+            if (File.Exists(initialPptxPath))
+                return true;
+
+            // 旧小文字名は互換入力として扱い、可能なら正規名を安全に作成する。
+            string legacyPath = Path.Combine(tabFolder, "Initial", $"project{projectId}{ext}");
+            if (!File.Exists(legacyPath))
+                return false;
+
+            try
+            {
+                File.Copy(legacyPath, initialPptxPath, overwrite: false);
+                var fileInfo = new FileInfo(initialPptxPath);
+                if (fileInfo.IsReadOnly)
+                    fileInfo.IsReadOnly = false;
+                return true;
+            }
+            catch (IOException)
+            {
+                return File.Exists(initialPptxPath);
+            }
         }
 
         /// <summary>
