@@ -2735,6 +2735,7 @@ namespace Ui.ViewModels
                 IsVariantMode = false;
 
                 TryReplaceExcelWorkbook(nextFilePath, "[ExecuteNextProject]");
+                ScoringResultDialog.TryBringOpenToFront();
 
                 CurrentProject = new ProjectInfo
                 {

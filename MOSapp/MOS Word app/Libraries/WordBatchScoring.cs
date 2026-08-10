@@ -106,6 +106,15 @@ namespace Libraries
                             ScoreResultStore.RecordResult(groupId, project.ProjectId, i + 1, passed);
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[WordBatchScoring] Project {project.ProjectId} failed: {ex.Message}");
+                        AppendScoringErrorLog(
+                            $"ScoreAllProjects group={groupId} project={project.ProjectId}", ex);
+                        for (int t = 1; t <= taskCount; t++)
+                            ScoreResultStore.RecordResult(groupId, project.ProjectId, t, false);
+                    }
                     finally
                     {
                         CloseAllOpenDocumentsForBatch(wordApp);
@@ -373,6 +382,28 @@ namespace Libraries
             }
 
             return wordApp.Documents.Count < countBefore;
+        }
+
+        private static void AppendScoringErrorLog(string context, Exception ex)
+        {
+            try
+            {
+                string logPath = Path.Combine(Path.GetTempPath(), "mos_word_scoring_errors.log");
+                var sb = new StringBuilder();
+                sb.AppendLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {context}");
+                sb.AppendLine($"Message: {ex.Message}");
+                if (ex is COMException comEx)
+                    sb.AppendLine($"HResult: 0x{comEx.ErrorCode:X8}");
+                else
+                    sb.AppendLine($"HResult: 0x{ex.HResult:X8}");
+                sb.AppendLine(ex.ToString());
+                sb.AppendLine("---");
+                File.AppendAllText(logPath, sb.ToString(), Encoding.UTF8);
+            }
+            catch
+            {
+                // ignore log failure
+            }
         }
 
         /// <summary>

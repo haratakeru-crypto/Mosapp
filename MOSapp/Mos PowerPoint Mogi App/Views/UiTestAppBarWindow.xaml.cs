@@ -54,6 +54,32 @@ namespace MOS_PowerPoint_app.Views
         
         [DllImport("user32.dll")]
         static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int nIndex);
+
+        private const int SM_CXSCREEN = 0;
+        private const int SM_CYSCREEN = 1;
+
+        // アプリバーの高さは 1920×1080 基準の設計値（物理ピクセル）。Excel と同値。
+        private const int APP_BAR_HEIGHT_BASE = 258;
+        private const int DESIGN_SCREEN_HEIGHT = 1080;
+
+        /// <summary>物理ピクセル単位の画面幅。</summary>
+        private static int PhysicalScreenWidth => GetSystemMetrics(SM_CXSCREEN);
+
+        /// <summary>物理ピクセル単位の画面高さ。</summary>
+        private static int PhysicalScreenHeight => GetSystemMetrics(SM_CYSCREEN);
+
+        /// <summary>
+        /// 実際の画面高さに合わせてスケールしたアプリバー高さ（物理ピクセル）。
+        /// Excel と同じ画面占有比率を維持する。
+        /// </summary>
+        private static int AppBarHeightPhysical =>
+            (int)Math.Round(PhysicalScreenHeight * (double)APP_BAR_HEIGHT_BASE / DESIGN_SCREEN_HEIGHT);
+
+        /// <summary>PowerPoint ウィンドウの高さ = 画面高さ − アプリバー高さ（物理ピクセル）。</summary>
+        private static int PowerPointHeightPhysical => PhysicalScreenHeight - AppBarHeightPhysical;
         
         delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
         
@@ -111,22 +137,38 @@ namespace MOS_PowerPoint_app.Views
             SetWindowPosition();
             // 注意: PowerPointプレゼンテーションはMainViewModelのExecuteOpenProjectで既に開かれている
             // ここでは開かない（PositionPowerPointWindowはSetWindowPositionで呼ばれる）
+            this.Activated += (s, e) =>
+            {
+                try { ScoreResultWindow.TryBringOpenToFront(); }
+                catch { }
+            };
+            this.PreviewMouseDown += (s, e) =>
+            {
+                try { ScoreResultWindow.TryBringOpenToFront(); }
+                catch { }
+            };
         }
         
         private void SetWindowPosition()
         {
             // PowerPointウィンドウを配置
             PositionPowerPointWindow();
+            ScoreResultWindow.TryBringOpenToFront();
+
+            int screenW = PhysicalScreenWidth;
+            int screenH = PhysicalScreenHeight;
+            int barH = AppBarHeightPhysical;
+            int barTop = screenH - barH;
             
             // ウィンドウハンドルを取得
             IntPtr hWnd = new WindowInteropHelper(this).Handle;
             if (hWnd == IntPtr.Zero)
             {
-                // ハンドルが取得できない場合はWPFプロパティで設定
-                this.Width = 1920;
-                this.Height = 258;
+                // ハンドルが取得できない場合は WPF プロパティで近似配置
+                this.Width = screenW;
+                this.Height = barH;
                 this.Left = 0;
-                this.Top = 774;
+                this.Top = barTop;
                 this.Topmost = true;
                 return;
             }
@@ -138,14 +180,11 @@ namespace MOS_PowerPoint_app.Views
             int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
             int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
 
-            // アプリバーのウィンドウを1920x258サイズで、PowerPointの下に配置
-            // 高さ: 258 (1032 / 4)
-            // 位置: Y=774 (PowerPointの下)
-            // 境界線を考慮して位置を調整
-            int x = -borderWidth / 2; // 左側の境界線を考慮
-            int y = 774 - borderHeight / 2; // 上側の境界線を考慮（PowerPointの下）
-            int width = 1920 + borderWidth; // 境界線を含めた幅
-            int height = 258 + borderHeight; // 境界線を含めた高さ
+            // アプリバーを画面下部に配置（Excel と同じ解像度連動）
+            int x = -borderWidth / 2;
+            int y = barTop - borderHeight / 2;
+            int width = screenW + borderWidth;
+            int height = barH + borderHeight;
 
             MoveWindow(hWnd, x, y, width, height, true);
             
@@ -155,12 +194,16 @@ namespace MOS_PowerPoint_app.Views
 
         private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
         }
         
         private void PositionPowerPointWindow()
         {
             // リトライ＋Sleep を UI スレッドで行うとフリーズするため、バックグラウンドで実行する
+            int screenW = PhysicalScreenWidth;
+            int pptHeight = PowerPointHeightPhysical;
+
             System.Threading.Tasks.Task.Run(() =>
             {
                 try
@@ -218,11 +261,12 @@ namespace MOS_PowerPoint_app.Views
 
                         int pptX = -pptBorderWidth / 2;
                         int pptY = -pptBorderHeight / 2;
-                        int pptWidth = 1920 + pptBorderWidth;
-                        int pptHeight = 774 + pptBorderHeight;
+                        int pptWidth = screenW + pptBorderWidth;
+                        int pptHeightWithBorder = pptHeight + pptBorderHeight;
 
-                        MoveWindow(pptHwnd, pptX, pptY, pptWidth, pptHeight, true);
-                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] PowerPoint window positioned: {pptWidth}x{pptHeight} at ({pptX}, {pptY})");
+                        MoveWindow(pptHwnd, pptX, pptY, pptWidth, pptHeightWithBorder, true);
+                        System.Diagnostics.Debug.WriteLine($"[AppBarWindow] PowerPoint window positioned: {pptWidth}x{pptHeightWithBorder} at ({pptX}, {pptY})");
+                        ScoreResultWindow.TryBringOpenToFront();
                     }
                     else
                     {
@@ -751,6 +795,7 @@ namespace MOS_PowerPoint_app.Views
             }
 
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called: ProjectId={projectId}, TaskId={taskId}");
+            ScoreResultWindow.TryBringOpenToFront();
 
             try
             {
@@ -2004,6 +2049,7 @@ namespace MOS_PowerPoint_app.Views
         
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_currentTaskId > 1)
             {
                 _currentTaskId--;
@@ -2014,6 +2060,7 @@ namespace MOS_PowerPoint_app.Views
         
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_tasks != null && _currentTaskId < _tasks.Count)
             {
                 _currentTaskId++;
@@ -2024,6 +2071,7 @@ namespace MOS_PowerPoint_app.Views
         
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_isScoring)
             {
                 System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Task button ignored while scoring.");
@@ -2071,6 +2119,7 @@ namespace MOS_PowerPoint_app.Views
         
         private async void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             await MoveToNextProjectAsync();
         }
         

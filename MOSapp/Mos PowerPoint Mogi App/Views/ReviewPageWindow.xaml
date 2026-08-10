@@ -162,46 +162,44 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+                
                 <TextBlock Grid.Column="0" Text="全問題を確認できます"
                            Foreground="#6B7280" FontSize="14"
                            VerticalAlignment="Center"/>
-                <Button Grid.Column="1" Name="ShowResultButton" Content="結果の表示"
-                        Background="#DC2626" Foreground="White"
-                        Padding="25,10" FontWeight="Bold" FontSize="14"
-                        BorderThickness="0" Click="ShowResultButton_Click"
-                        VerticalAlignment="Center"
-                        Margin="0,0,10,0">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#B91C1C"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <Grid Grid.Column="2"/>
-                <!-- 閉じる系ボタンは非表示（結果の表示のみ表示） -->
-                <Button Grid.Column="3" Name="BackButton" Content="戻る"
-                        Background="#1E40AF" Foreground="White"
-                        Padding="20,10" FontWeight="Medium"
-                        BorderThickness="0" Click="BackButton_Click"
-                        VerticalAlignment="Center"
-                        Visibility="Collapsed">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#1D4ED8"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Name="ShowResultButton" Content="結果の表示"
+                            Background="#DC2626" Foreground="White"
+                            Padding="20,10" FontWeight="Medium"
+                            BorderThickness="0" Click="ShowResultButton_Click">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#B91C1C"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <!-- 閉じる系ボタンは非表示（結果の表示のみ表示） -->
+                    <Button Name="BackButton" Content="戻る"
+                            Background="#1E40AF" Foreground="White"
+                            Padding="20,10" FontWeight="Medium"
+                            BorderThickness="0" Click="BackButton_Click"
+                            Visibility="Collapsed">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#1D4ED8"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

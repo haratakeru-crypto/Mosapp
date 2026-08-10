@@ -109,7 +109,13 @@ namespace MOS_Word_app.Views
                 {
                     UpdateTaskButtons();
                     UpdateButtonTexts();
+                    ScoreResultWindow.TryBringOpenToFront();
                 }
+                catch { }
+            };
+            this.PreviewMouseDown += (s, e) =>
+            {
+                try { ScoreResultWindow.TryBringOpenToFront(); }
                 catch { }
             };
             // 注意: WordドキュメントはMainViewModelのExecuteOpenProjectで既に開かれている
@@ -130,25 +136,29 @@ namespace MOS_Word_app.Views
 
         private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
         }
 
         private void SetWindowPosition()
         {
-            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
-            const double barHeight = WordWindowLayoutHelper.DefaultAppBarHeight;
-            int wordTop = (int)(screenHeight - barHeight);
+            // Excel 基準: GetSystemMetrics の物理ピクセル + アプリバー高さの解像度スケール
+            WordWindowLayoutHelper.PositionWordForExamMode();
+            ScoreResultWindow.TryBringOpenToFront();
 
-            WordWindowLayoutHelper.PositionWordForExamMode(barHeight, screenWidth, screenHeight);
+            int screenW = WordWindowLayoutHelper.PhysicalScreenWidth;
+            int screenH = WordWindowLayoutHelper.PhysicalScreenHeight;
+            int barH = WordWindowLayoutHelper.AppBarHeightPhysical;
+            int barTop = screenH - barH;
 
             IntPtr hWnd = new WindowInteropHelper(this).Handle;
             if (hWnd == IntPtr.Zero)
             {
-                this.Width = screenWidth;
-                this.Height = barHeight;
+                // ハンドル未取得時は WPF プロパティで近似配置（物理px と DIP の差は無視）
+                this.Width = screenW;
+                this.Height = barH;
                 this.Left = 0;
-                this.Top = wordTop;
+                this.Top = barTop;
                 this.Topmost = true;
                 return;
             }
@@ -160,9 +170,9 @@ namespace MOS_Word_app.Views
             int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
 
             int x = -borderWidth / 2;
-            int y = wordTop - borderHeight / 2;
-            int width = screenWidth + borderWidth;
-            int height = (int)barHeight + borderHeight;
+            int y = barTop - borderHeight / 2;
+            int width = screenW + borderWidth;
+            int height = barH + borderHeight;
 
             MoveWindow(hWnd, x, y, width, height, true);
             this.Topmost = true;
@@ -170,10 +180,7 @@ namespace MOS_Word_app.Views
 
         private void PositionWordWindow()
         {
-            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
-            WordWindowLayoutHelper.PositionWordForExamMode(
-                WordWindowLayoutHelper.DefaultAppBarHeight, screenWidth, screenHeight);
+            WordWindowLayoutHelper.PositionWordForExamMode();
         }
 
         protected override void OnContentRendered(EventArgs e)
@@ -517,6 +524,7 @@ namespace MOS_Word_app.Views
         private void NavigateToTask(int projectId, int taskId)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called in main window: ProjectId={projectId}, TaskId={taskId}");
+            ScoreResultWindow.TryBringOpenToFront();
             
             try
             {
@@ -1448,6 +1456,7 @@ namespace MOS_Word_app.Views
         
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_currentTaskId > 1)
             {
                 _currentTaskId--;
@@ -1457,6 +1466,7 @@ namespace MOS_Word_app.Views
         
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (_tasks != null && _currentTaskId < _tasks.Count)
             {
                 _currentTaskId++;
@@ -1466,6 +1476,7 @@ namespace MOS_Word_app.Views
         
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             var button = sender as System.Windows.Controls.Button;
             if (button == null || button.Tag == null) return;
             int taskId = int.Parse(button.Tag.ToString());
@@ -1478,6 +1489,7 @@ namespace MOS_Word_app.Views
         
         private void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            ScoreResultWindow.TryBringOpenToFront();
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
             MoveToNextProject();

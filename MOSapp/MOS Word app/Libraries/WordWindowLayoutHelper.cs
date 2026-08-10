@@ -8,8 +8,8 @@ using WordApp = Microsoft.Office.Interop.Word.Application;
 namespace Libraries
 {
     /// <summary>
-    /// 一括採点時の Word ウィンドウ配置（PowerPoint の PositionPowerPointWindow に相当）。
-    /// 最大化を解除し、画面上部に小さめ固定サイズで前面表示する。
+    /// Word ウィンドウ配置ヘルパー。
+    /// 試験レイアウトは Excel AppBarWindow と同じ物理ピクセル基準（GetSystemMetrics + 258/1080 スケール）。
     /// </summary>
     public static class WordWindowLayoutHelper
     {
@@ -17,13 +17,35 @@ namespace Libraries
         private const int SmCyScreen = 1;
         private const int SwRestore = 9;
 
-        // PowerPoint 一括採点時の高さ 774 を基準に、Word は幅も抑えた固定サイズ
+        // 一括採点用: 幅も抑えた固定サイズ
         private const int TargetClientWidth = 1280;
         private const int TargetClientHeight = 650;
         private const int TopMargin = 40;
 
-        /// <summary>試験用アプリバー高さ（UiTestAppBarWindow と一致）。</summary>
-        public const double DefaultAppBarHeight = 258;
+        /// <summary>アプリバー高さの設計基準（1920×1080 時の物理ピクセル）。Excel と同値。</summary>
+        public const int AppBarHeightBase = 258;
+
+        /// <summary>設計画面高さ（物理ピクセル）。Excel と同値。</summary>
+        public const int DesignScreenHeight = 1080;
+
+        /// <summary>後方互換: 設計基準のアプリバー高さ。</summary>
+        public const double DefaultAppBarHeight = AppBarHeightBase;
+
+        /// <summary>物理ピクセル単位の画面幅。</summary>
+        public static int PhysicalScreenWidth => GetSystemMetrics(SmCxScreen);
+
+        /// <summary>物理ピクセル単位の画面高さ。</summary>
+        public static int PhysicalScreenHeight => GetSystemMetrics(SmCyScreen);
+
+        /// <summary>
+        /// 画面高さに合わせてスケールしたアプリバー高さ（物理ピクセル）。
+        /// 1080p 以外でも Excel と同じ画面占有比率を維持する。
+        /// </summary>
+        public static int AppBarHeightPhysical =>
+            (int)Math.Round(PhysicalScreenHeight * (double)AppBarHeightBase / DesignScreenHeight);
+
+        /// <summary>試験時の Word 高さ = 画面高さ − アプリバー高さ（物理ピクセル）。</summary>
+        public static int OfficeHeightPhysical => PhysicalScreenHeight - AppBarHeightPhysical;
 
         [DllImport("user32.dll")]
         private static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
@@ -87,8 +109,8 @@ namespace Libraries
                 int borderWidth = (windowRect.right - windowRect.left) - clientRect.right;
                 int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
 
-                int screenWidth = GetSystemMetrics(SmCxScreen);
-                int screenHeight = GetSystemMetrics(SmCyScreen);
+                int screenWidth = PhysicalScreenWidth;
+                int screenHeight = PhysicalScreenHeight;
 
                 int clientWidth = Math.Min(TargetClientWidth, Math.Max(800, screenWidth - 80));
                 int clientHeight = Math.Min(TargetClientHeight, Math.Max(480, screenHeight - 200));
@@ -100,6 +122,7 @@ namespace Libraries
 
                 MoveWindow(wordHwnd, x, y, width, height, true);
                 SetForegroundWindow(wordHwnd);
+                TryBringScoreResultToFront();
 
                 System.Diagnostics.Debug.WriteLine(
                     $"[WordWindowLayoutHelper] Positioned for batch: {width}x{height} at ({x},{y})");
@@ -112,12 +135,13 @@ namespace Libraries
 
         /// <summary>
         /// 試験用: 最大化を解除し、画面上部にアプリバー分を除いた領域へ Word を配置する。
+        /// Excel と同じく GetSystemMetrics の物理ピクセルと 258/1080 スケールを使う。
         /// </summary>
-        /// <param name="appBarHeight">下部アプリバー高さ（px）。</param>
+        /// <param name="appBarHeight">0 以下のときスケール済み高さを使用。正の値は上書き（物理ピクセル想定）。</param>
         /// <param name="screenWidth">0 のとき GetSystemMetrics を使用。</param>
         /// <param name="screenHeight">0 のとき GetSystemMetrics を使用。</param>
         public static void PositionWordForExamMode(
-            double appBarHeight = DefaultAppBarHeight,
+            double appBarHeight = 0,
             int screenWidth = 0,
             int screenHeight = 0)
         {
@@ -141,11 +165,14 @@ namespace Libraries
                 int borderHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
 
                 if (screenWidth <= 0)
-                    screenWidth = GetSystemMetrics(SmCxScreen);
+                    screenWidth = PhysicalScreenWidth;
                 if (screenHeight <= 0)
-                    screenHeight = GetSystemMetrics(SmCyScreen);
+                    screenHeight = PhysicalScreenHeight;
 
-                int wordHeight = (int)Math.Max(400, screenHeight - appBarHeight);
+                int barH = appBarHeight > 0
+                    ? (int)Math.Round(appBarHeight)
+                    : (int)Math.Round(screenHeight * (double)AppBarHeightBase / DesignScreenHeight);
+                int wordHeight = Math.Max(1, screenHeight - barH);
                 int wordX = -borderWidth / 2;
                 int wordY = -borderHeight / 2;
                 int wordWidth = screenWidth + borderWidth;
@@ -153,6 +180,7 @@ namespace Libraries
 
                 MoveWindow(wordHwnd, wordX, wordY, wordWidth, wordHeightWithBorder, true);
                 SetForegroundWindow(wordHwnd);
+                TryBringScoreResultToFront();
 
                 System.Diagnostics.Debug.WriteLine(
                     $"[WordWindowLayoutHelper] Positioned for exam: {wordWidth}x{wordHeightWithBorder} at ({wordX},{wordY})");
@@ -161,6 +189,16 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[WordWindowLayoutHelper] Exam layout error: {ex.Message}");
             }
+        }
+
+        /// <summary>Word を前面にした直後に、開いている採点結果があれば最前面へ戻す。</summary>
+        private static void TryBringScoreResultToFront()
+        {
+            try
+            {
+                MOS_Word_app.Views.ScoreResultWindow.TryBringOpenToFront();
+            }
+            catch { }
         }
 
         private static void TryNormalizeWordWindowState(WordApp wordApp)

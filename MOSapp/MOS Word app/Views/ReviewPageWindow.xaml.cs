@@ -572,6 +572,21 @@ namespace MOS_Word_app.Views
                     overlayKeepOnTopTimer?.Stop();
                     try { scoringOverlay.Close(); } catch { }
                 }
+                string logPath = Path.Combine(Path.GetTempPath(), "mos_word_scoring_errors.log");
+                try
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] EndExamButton_Click");
+                    sb.AppendLine($"Message: {ex.Message}");
+                    if (ex is COMException comEx)
+                        sb.AppendLine($"HResult: 0x{comEx.ErrorCode:X8}");
+                    else
+                        sb.AppendLine($"HResult: 0x{ex.HResult:X8}");
+                    sb.AppendLine(ex.ToString());
+                    sb.AppendLine("---");
+                    File.AppendAllText(logPath, sb.ToString(), Encoding.UTF8);
+                }
+                catch { /* ignore log failure */ }
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error in EndExamButton_Click: {ex.Message}");
                 await Dispatcher.InvokeAsync(() =>
                 {
@@ -588,7 +603,11 @@ namespace MOS_Word_app.Views
                     }
                     if (!MOS_Word_app.MainWindow.IsTimerDisabled)
                         _timer?.Start();
-                    MessageBox.Show($"試験終了処理中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(
+                        $"採点中にエラーが発生しました: {ex.Message}\n\nログ: {logPath}",
+                        "エラー",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
                 });
             }
         }

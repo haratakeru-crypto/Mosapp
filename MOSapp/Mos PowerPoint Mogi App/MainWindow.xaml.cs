@@ -116,9 +116,7 @@ namespace MOS_PowerPoint_app
                     System.Diagnostics.Debug.WriteLine($"[OnScoreCompleted] ApplyScoreResults error: {ex.Message}");
                 }
             }
-            var dialog = new Views.ScoreResultWindow(results);
-            dialog.Owner = this;
-            dialog.ShowDialog();
+            Views.ScoreResultWindow.ShowResults(_appBarWindow ?? (Window)this, results);
         }
 
         protected override void OnClosed(EventArgs e)

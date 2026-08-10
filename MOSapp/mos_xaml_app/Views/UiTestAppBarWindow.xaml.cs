@@ -62,6 +62,16 @@ namespace MOSExcelMogiApp.Views
             InitializeTimer();
             UpdateProjectTitle();
             SetWindowPosition();
+            this.Activated += (s, e) =>
+            {
+                try { ScoringResultDialog.TryBringOpenToFront(); }
+                catch { }
+            };
+            this.PreviewMouseDown += (s, e) =>
+            {
+                try { ScoringResultDialog.TryBringOpenToFront(); }
+                catch { }
+            };
         }
         
         private void SetWindowPosition()
@@ -80,10 +90,12 @@ namespace MOSExcelMogiApp.Views
             
             // ウィンドウを最前面に表示
             this.Topmost = true;
+            ScoringResultDialog.TryBringOpenToFront();
         }
 
         private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             SetWindowPosition();
             PositionExcelWindow();
         }
@@ -145,6 +157,7 @@ namespace MOSExcelMogiApp.Views
                     screenWidth + borderWidth,
                     screenHeight - (int)this.Height + borderHeight,
                     true);
+                ScoringResultDialog.TryBringOpenToFront();
             }
             catch (Exception ex)
             {
@@ -545,6 +558,7 @@ namespace MOSExcelMogiApp.Views
         
         private void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             // 次のプロジェクトに移動
             if (_currentProjectId < 10)
             {
@@ -560,12 +574,14 @@ namespace MOSExcelMogiApp.Views
         
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             // 前のタスクに移動する処理
             MessageBox.Show("前のタスクに移動します。", "情報", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             // タスクボタンがクリックされたときの処理
             if (sender is System.Windows.Controls.Button button && button.Tag != null)
             {
@@ -576,6 +592,7 @@ namespace MOSExcelMogiApp.Views
 
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
+            ScoringResultDialog.TryBringOpenToFront();
             // 次のタスクに移動する処理
             MessageBox.Show("次のタスクに移動します。", "情報", MessageBoxButton.OK, MessageBoxImage.Information);
         }

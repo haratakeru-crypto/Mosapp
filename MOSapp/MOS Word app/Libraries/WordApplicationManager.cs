@@ -358,11 +358,14 @@ namespace Libraries
 
                 {
 
+                    // /n: 文書を開かずに起動（空の Document1 を作らない）
                     var psi = new ProcessStartInfo
 
                     {
 
                         FileName = path,
+
+                        Arguments = "/n",
 
                         UseShellExecute = true
 

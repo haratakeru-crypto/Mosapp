@@ -200,52 +200,28 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
                 <TextBlock Grid.Column="0" Text="全問題を確認できます" 
                            Foreground="#6B7280" FontSize="14"
                            VerticalAlignment="Center"/>
                 
-                <!-- 結果の表示ボタンのみ表示 -->
-                <Button Grid.Column="1" Name="EndExamButton" Content="結果の表示" 
-                        Background="#DC2626" Foreground="White" 
-                        Padding="25,10" FontWeight="Bold" FontSize="14"
-                        BorderThickness="0" Click="EndExamButton_Click"
-                        VerticalAlignment="Center"
-                        Margin="0,0,10,0">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#B91C1C"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                
-                <!-- スペーサー -->
-                <Grid Grid.Column="2"/>
-                
-                <!-- 閉じるボタンは非表示（結果の表示のみ表示） -->
-                <Button Grid.Column="3" Name="CloseButtonFooter" Content="終了" 
-                        Background="#1E40AF" Foreground="White" 
-                        Padding="20,10" FontWeight="Medium"
-                        BorderThickness="0" Click="CloseButton_Click"
-                        VerticalAlignment="Center"
-                        Visibility="Collapsed">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#1D4ED8"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Name="EndExamButton" Content="結果の表示" 
+                            Background="#DC2626" Foreground="White" 
+                            Padding="20,10" FontWeight="Medium"
+                            BorderThickness="0" Click="EndExamButton_Click">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#B91C1C"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>
