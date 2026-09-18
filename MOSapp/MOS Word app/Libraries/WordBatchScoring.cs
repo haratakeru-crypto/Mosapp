@@ -43,9 +43,9 @@ namespace Libraries
         }
 
         /// <summary>
-        /// 問題文 JSON を読み込み、全プロジェクトを採点して ScoreResultStore に保存する。
+        /// 問題文 JSON を読み込み、指定プロジェクト（未指定時は全件）を採点して ScoreResultStore に保存する。
         /// </summary>
-        public static void ScoreAllProjects(int groupId)
+        public static void ScoreAllProjects(int groupId, ISet<int> projectIds = null)
         {
             var projectData = LoadProjectData();
             if (projectData?.Projects == null || projectData.Projects.Count == 0)
@@ -80,6 +80,9 @@ namespace Libraries
 
                 foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
                 {
+                    if (projectIds != null && projectIds.Count > 0 && !projectIds.Contains(project.ProjectId))
+                        continue;
+
                     int taskCount = project.Tasks?.Count ?? 0;
                     if (taskCount == 0)
                         continue;

@@ -1,0 +1,44 @@
+<UserControl x:Class="MosPracticeClient.UniversityRegistrationControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#F0F0F3">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24" MaxWidth="560" HorizontalAlignment="Left">
+            <TextBlock Text="大学名・氏名の登録"
+                       FontSize="22" FontWeight="Bold" Foreground="#1F2937" Margin="0,0,0,8"/>
+            <TextBlock TextWrapping="Wrap" FontSize="13" Foreground="#4B5563" Margin="0,0,0,20"
+                       Text="座席表と同じ漢字表記で入力してください。登録するとプロジェクト一覧へ進みます。"/>
+
+            <TextBlock Text="大学名" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBox x:Name="UniversityBox" FontSize="16" Padding="8,6"
+                     TextChanged="UniversityBox_TextChanged"/>
+            <ListBox x:Name="UniversitySuggestions" MaxHeight="140" Margin="0,4,0,16"
+                     Visibility="Collapsed" MouseDoubleClick="UniversitySuggestions_MouseDoubleClick"
+                     PreviewMouseLeftButtonUp="UniversitySuggestions_PreviewMouseLeftButtonUp"/>
+
+            <TextBlock Text="お名前" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBox x:Name="NameBox" FontSize="16" Padding="8,6"/>
+            <TextBlock Text="座席表に載っている氏名（漢字）を入力してください。"
+                       FontSize="12" Foreground="#6B7280" Margin="0,4,0,16"/>
+
+            <StackPanel x:Name="ClassroomPanel" Visibility="Collapsed">
+                <TextBlock Text="教室" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <ComboBox x:Name="ClassroomCombo" FontSize="16" MinHeight="36"
+                          IsEditable="False" IsTextSearchEnabled="False"/>
+                <TextBlock x:Name="ClassroomHint" FontSize="12" Foreground="#6B7280"
+                           Margin="0,4,0,16" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <Button x:Name="RegisterButton" Content="登録" Width="140" Height="40" FontSize="16" FontWeight="SemiBold"
+                        Click="RegisterButton_Click" Cursor="Hand"
+                        Background="#028760" Foreground="White" BorderThickness="0" Margin="0,0,12,0"/>
+                <Button Content="大学情報を削除" Width="160" Height="40" FontSize="14"
+                        Click="DeleteButton_Click" Cursor="Hand"
+                        Background="#E5E7EB" Foreground="#111827" BorderThickness="0"/>
+            </StackPanel>
+            <TextBlock x:Name="EditLockHint" Margin="0,12,0,0" FontSize="12" Foreground="#4B5563" TextWrapping="Wrap"/>
+            <TextBlock x:Name="StatusText" Margin="0,16,0,0" TextWrapping="Wrap" Foreground="#B91C1C"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -4,6 +4,10 @@ VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mos PowerPoint Mogi App", "MOS PowerPoint app.csproj", "{4F05FAFA-71AD-413C-9043-25E55E2FA083}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MosPracticeClient", "..\MosPracticeClient\MosPracticeClient.csproj", "{A8C3E2B1-4D5F-6A78-90B1-C2D3E4F50617}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MosPracticeSessionWatch", "..\MosPracticeSessionWatch\MosPracticeSessionWatch.csproj", "{B9D4F3C2-5E60-7B89-01C2-D3E4F5061728}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerPointCheckerCommon", "Libraries\Group1\PowerPointCheckerCommon.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678902}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerPointChecker1_1", "Libraries\Group1\PowerPointChecker1_1.csproj", "{C3D4E5F6-A7B8-9012-CDEF-123456789012}"
@@ -38,6 +42,14 @@ Global
 		{4F05FAFA-71AD-413C-9043-25E55E2FA083}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4F05FAFA-71AD-413C-9043-25E55E2FA083}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4F05FAFA-71AD-413C-9043-25E55E2FA083}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8C3E2B1-4D5F-6A78-90B1-C2D3E4F50617}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8C3E2B1-4D5F-6A78-90B1-C2D3E4F50617}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8C3E2B1-4D5F-6A78-90B1-C2D3E4F50617}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8C3E2B1-4D5F-6A78-90B1-C2D3E4F50617}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9D4F3C2-5E60-7B89-01C2-D3E4F5061728}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9D4F3C2-5E60-7B89-01C2-D3E4F5061728}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9D4F3C2-5E60-7B89-01C2-D3E4F5061728}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9D4F3C2-5E60-7B89-01C2-D3E4F5061728}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678902}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678902}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678902}.Release|Any CPU.ActiveCfg = Release|Any CPU

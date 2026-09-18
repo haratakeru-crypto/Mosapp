@@ -3,5 +3,10 @@
   "wordWorkingPath": "C:\\MOSTest\\Word365\\Tab1",
   "excelWorkingPath": "C:\\MOSTest\\Excel365\\Tab1",
   "excelExePath": "C:\\Users\\kouza\\source\\repos\\MOS PowerPoint app\\mos_xaml_app\\bin\\Release\\MOSExcelMogiApp.exe",
-  "wordExePath": "C:\\Users\\kouza\\source\\repos\\MOS PowerPoint app\\MOS Word app\\bin\\Release\\MOS Word app.exe"
+  "wordExePath": "C:\\Users\\kouza\\source\\repos\\MOS PowerPoint app\\MOS Word app\\bin\\Release\\MOS Word app.exe",
+  "practiceSubmit": {
+    "baseUrl": "https://kouzakanri.netlify.app",
+    "ingestKey": "3fbdbe9e66ccbd2a81d984fbaadd9a7f99d80a2d2bbaa8c74f5d58cbcba20d8d",
+    "qrPathId": "5cabe93ea53c64713796ac05fab9239f"
+  }
 }

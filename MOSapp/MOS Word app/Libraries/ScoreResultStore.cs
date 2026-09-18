@@ -88,6 +88,48 @@ namespace Libraries
         }
 
         /// <summary>
+        /// 指定グループで採点済みのプロジェクトID一覧。
+        /// </summary>
+        public static HashSet<int> GetScoredProjectIds(int groupId)
+        {
+            return new HashSet<int>(GetProjectResults(groupId).Keys);
+        }
+
+        /// <summary>
+        /// 指定グループの採点結果を projectId → タスク順の正否リスト で返す。
+        /// </summary>
+        public static Dictionary<int, List<bool>> GetProjectResults(int groupId)
+        {
+            string prefix = $"{groupId}-";
+            var byProject = new Dictionary<int, SortedDictionary<int, bool>>();
+            lock (_lock)
+            {
+                foreach (var kv in _taskResults)
+                {
+                    if (!kv.Key.StartsWith(prefix, StringComparison.Ordinal))
+                        continue;
+                    var rest = kv.Key.Substring(prefix.Length);
+                    var parts = rest.Split('-');
+                    if (parts.Length != 2)
+                        continue;
+                    if (!int.TryParse(parts[0], out int projectId) || !int.TryParse(parts[1], out int taskNumber))
+                        continue;
+                    if (!byProject.TryGetValue(projectId, out var tasks))
+                    {
+                        tasks = new SortedDictionary<int, bool>();
+                        byProject[projectId] = tasks;
+                    }
+                    tasks[taskNumber] = kv.Value;
+                }
+            }
+
+            var results = new Dictionary<int, List<bool>>();
+            foreach (var kv in byProject)
+                results[kv.Key] = kv.Value.Values.ToList();
+            return results;
+        }
+
+        /// <summary>
         /// 1 問分の採点結果を記録する。
         /// </summary>
         public static void RecordResult(int groupId, int projectId, int taskNumber, bool isPassed)

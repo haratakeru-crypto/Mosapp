@@ -44,6 +44,8 @@ namespace MOS_PowerPoint_app
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
 
+        public string[] VariantPlaceholderSets { get; } = { "類題1", "類題2", "類題3", "類題4", "類題5" };
+
         public int SelectedTabIndex
         {
             get => _selectedTabIndex;
@@ -203,6 +205,9 @@ namespace MOS_PowerPoint_app
 
         private void ExecuteOpenProject(object parameter)
         {
+            if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
+                return;
+
             if (parameter is ProjectViewModel project)
             {
                 if (string.IsNullOrEmpty(project.FilePath) || !File.Exists(project.FilePath))

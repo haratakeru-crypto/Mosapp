@@ -26,21 +26,33 @@ namespace MOSExcelMogiApp.Views
         public event EventHandler InitialPresentationCompleted;
         // 採点直後のスナップショット（復習前の正答率計算用）
         private Dictionary<int, List<bool>> _initialProjectResults;
+        private bool _seatChartSubmitStarted;
+        private readonly bool _fromScoringLog;
 
-        public ResultWindow(Dictionary<int, List<bool>> allProjectResults = null, int groupId = 1)
+        public ResultWindow(Dictionary<int, List<bool>> allProjectResults = null, int groupId = 1, bool fromScoringLog = false)
         {
             InitializeComponent();
             _allProjectResults = allProjectResults ?? new Dictionary<int, List<bool>>();
             _groupId = groupId;
-            // 採点直後のスナップショットを取得（存在しない場合は null または空のディクショナリ）
-            _initialProjectResults = MOSExcelMogiApp.Models.ExamResultStorage.GetInitialResults();
-            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_allProjectResults?.Count ?? 0} projects, groupId: {_groupId}");
+            _fromScoringLog = fromScoringLog;
+            _initialProjectResults = fromScoringLog
+                ? CloneResults(_allProjectResults)
+                : MOSExcelMogiApp.Models.ExamResultStorage.GetInitialResults();
+            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_allProjectResults?.Count ?? 0} projects, groupId: {_groupId}, fromLog: {_fromScoringLog}");
             
-            // ウィンドウが読み込まれた後にデータを読み込む（非同期）
             this.Loaded += ResultWindow_Loaded;
 
-            // 復習採点で結果が更新されたら即時反映
-            MOSExcelMogiApp.Models.ExamResultStorage.ResultsChanged += OnResultsChanged;
+            if (!_fromScoringLog)
+                MOSExcelMogiApp.Models.ExamResultStorage.ResultsChanged += OnResultsChanged;
+        }
+
+        private static Dictionary<int, List<bool>> CloneResults(Dictionary<int, List<bool>> source)
+        {
+            var clone = new Dictionary<int, List<bool>>();
+            if (source == null) return clone;
+            foreach (var kv in source)
+                clone[kv.Key] = kv.Value != null ? new List<bool>(kv.Value) : new List<bool>();
+            return clone;
         }
 
         private async void OnResultsChanged(int projectId)
@@ -94,7 +106,8 @@ namespace MOSExcelMogiApp.Views
         {
             try
             {
-                MOSExcelMogiApp.Models.ExamResultStorage.ResultsChanged -= OnResultsChanged;
+                if (!_fromScoringLog)
+                    MOSExcelMogiApp.Models.ExamResultStorage.ResultsChanged -= OnResultsChanged;
             }
             catch { }
             base.OnClosed(e);
@@ -119,12 +132,13 @@ namespace MOSExcelMogiApp.Views
                     ? _initialProjectResults
                     : _allProjectResults;
                 double initialCorrectRate;
-                int _ = 0;
-                int __ = 0;
-                CalculateRate(initialResults, out initialCorrectRate, out _, out __);
+                int initialWrongTasks;
+                CalculateRate(initialResults, out initialCorrectRate, out _, out initialWrongTasks);
 
                 // 現在（復習後）の正答率を計算（保存されている最新結果を使用）
-                var currentResults = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                var currentResults = _fromScoringLog
+                    ? _allProjectResults
+                    : MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
                 if (currentResults == null || currentResults.Count == 0)
                 {
                     currentResults = _allProjectResults;
@@ -142,6 +156,8 @@ namespace MOSExcelMogiApp.Views
                     CorrectRateTextBlock.Text = $"正答率：{initialCorrectRate:F1}％　復習後：{currentCorrectRate:F1}％";
                     WrongCountTextBlock.Text = $"{currentWrongTasks}問";
                 });
+
+                await StartSeatChartSubmitAsync(initialWrongTasks);
 
                 // 結果を表示（非同期で読み込む）
                 await LoadProjectDataAsync();
@@ -164,6 +180,8 @@ namespace MOSExcelMogiApp.Views
                 CorrectRateTextBlock.Text = "正答率：100.0％　復習後：100.0％";
                 WrongCountTextBlock.Text = "0問";
             });
+
+            await StartSeatChartSubmitAsync(0);
             
             // 問題文データを読み込んで表示（全問正解として）
             await LoadProjectDataAsync();
@@ -261,6 +279,21 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
+        private async Task StartSeatChartSubmitAsync(int initialWrongTasks)
+        {
+            if (_fromScoringLog || _seatChartSubmitStarted) return;
+            _seatChartSubmitStarted = true;
+            try
+            {
+                await MosPracticeClient.ResultSubmitBinder.BindAsync(
+                    SeatChartSubmitStatusText, SeatChartQrImage, initialWrongTasks, "Excel");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
+            }
+        }
+
         /// <summary>
         /// 指定された結果ディクショナリから正答率と合計問題数・誤答数を計算するヘルパー。
         /// </summary>
@@ -296,6 +329,13 @@ namespace MOSExcelMogiApp.Views
             correctRate = totalTasks > 0 ? (double)correctTasks / totalTasks * 100.0 : 100.0;
         }
 
+        private bool IsIncludedProject(int projectId)
+        {
+            if (_allProjectResults == null || _allProjectResults.Count == 0)
+                return true;
+            return _allProjectResults.ContainsKey(projectId);
+        }
+
         // バックグラウンドで実行するバージョン（Brushesを使わない）
         private List<ResultProjectInfo> ProcessProjectDataRaw(ProjectData projectData)
         {
@@ -307,6 +347,9 @@ namespace MOSExcelMogiApp.Views
                 {
                     foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
                     {
+                        if (!IsIncludedProject(project.ProjectId))
+                            continue;
+
                         // 採点結果を取得
                         var projectResults = _allProjectResults.ContainsKey(project.ProjectId) 
                             ? _allProjectResults[project.ProjectId] 
@@ -358,6 +401,9 @@ namespace MOSExcelMogiApp.Views
                 {
                     foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
                     {
+                        if (!IsIncludedProject(project.ProjectId))
+                            continue;
+
                         // 採点結果を取得
                         var projectResults = _allProjectResults.ContainsKey(project.ProjectId) 
                             ? _allProjectResults[project.ProjectId] 

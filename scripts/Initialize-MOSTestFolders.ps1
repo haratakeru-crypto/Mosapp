@@ -12,7 +12,8 @@
   データルート。既定は C:\MOSTest
 
 .PARAMETER IncludePracticeVariants
-  Excel Tab1 向けの PracticeVariant1〜5 フォルダ（各 Templates 含む）も作成します。
+  3 科目（Excel / Word / PowerPoint）の Tab1 向けに、類題用の
+  PracticeVariant1〜5 フォルダ（各 Templates 含む）も作成します。
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\scripts\Initialize-MOSTestFolders.ps1
@@ -77,16 +78,18 @@ foreach ($subject in $subjects) {
 }
 
 if ($IncludePracticeVariants) {
-    Write-Host '[Excel365 PracticeVariant]'
-    for ($variant = 1; $variant -le 5; $variant++) {
-        $variantRoot = Join-Path $RootPath "Excel365\Tab1\PracticeVariant$variant"
-        $variantTemplates = Join-Path $variantRoot 'Templates'
-        Ensure-Directory -Path $variantRoot
-        Ensure-Directory -Path $variantTemplates
-        $created += $variantRoot
-        $created += $variantTemplates
+    foreach ($subject in $subjects) {
+        Write-Host "[$($subject.Name) PracticeVariant]"
+        for ($variant = 1; $variant -le 5; $variant++) {
+            $variantRoot = Join-Path $RootPath "$($subject.Name)\Tab1\PracticeVariant$variant"
+            $variantTemplates = Join-Path $variantRoot 'Templates'
+            Ensure-Directory -Path $variantRoot
+            Ensure-Directory -Path $variantTemplates
+            $created += $variantRoot
+            $created += $variantTemplates
+        }
+        Write-Host ''
     }
-    Write-Host ''
 }
 
 Write-Host '=== 手動配置チェックリスト（Tab1 / Project1〜10） ==='
@@ -110,6 +113,27 @@ for ($projectId = 1; $projectId -le 10; $projectId++) {
     Write-Host "               $RootPath\PowerPoint365\Tab1\Project$projectId.pptx"
     Write-Host "               $RootPath\PowerPoint365\Tab1\Initial\Project$projectId.pptx"
     Write-Host ''
+}
+
+if ($IncludePracticeVariants) {
+    Write-Host '=== 類題ファイルの配置先（Tab1 / 類題1〜5 / Project1〜10） ==='
+    Write-Host ''
+    Write-Host '類題は教材と別ファイルです。各セットで 2 か所へ配置してください:'
+    Write-Host '  1. Tab1\PracticeVariant{n}\Templates\Project{N}.{ext}  （類題リセット元）'
+    Write-Host '  2. Tab1\PracticeVariant{n}\Project{N}.{ext}            （作業ファイル）'
+    Write-Host '教材の Initial は類題リセットでは更新されません。'
+    Write-Host ''
+
+    for ($variant = 1; $variant -le 5; $variant++) {
+        Write-Host "類題$variant :"
+        Write-Host "  Excel      : $RootPath\Excel365\Tab1\PracticeVariant$variant\Templates\Project{N}.xlsx"
+        Write-Host "               $RootPath\Excel365\Tab1\PracticeVariant$variant\Project{N}.xlsx"
+        Write-Host "  Word       : $RootPath\Word365\Tab1\PracticeVariant$variant\Templates\Project{N}$(Get-WordExtension -ProjectId 1)（Project7 は $(Get-WordExtension -ProjectId 7)）"
+        Write-Host "               $RootPath\Word365\Tab1\PracticeVariant$variant\Project{N}$(Get-WordExtension -ProjectId 1)"
+        Write-Host "  PowerPoint : $RootPath\PowerPoint365\Tab1\PracticeVariant$variant\Templates\Project{N}.pptx"
+        Write-Host "               $RootPath\PowerPoint365\Tab1\PracticeVariant$variant\Project{N}.pptx"
+        Write-Host ''
+    }
 }
 
 Write-Host '=== 配置後の確認手順 ==='
