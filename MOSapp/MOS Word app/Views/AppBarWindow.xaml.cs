@@ -1551,42 +1551,47 @@ namespace MOS_Word_app.Views
         
         private void MoveToNextProject()
         {
-            LogReader.RequestCloseNavigationPaneIfOpen();
-            SaveAndCloseAllWordDocuments();
+            PreparingWindow.Run(this, () =>
+            {
+                // 先に Word を隠し、保存・閉じの待ち中も準備ダイアログだけが見えるようにする
+                WordApplicationManager.SetWordVisible(false);
+                PreparingWindow.BringActiveToFront();
 
-            // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
-            int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
-            
-            // 次のプロジェクトに移動
-            _currentProjectId++;
-            
-            if (_currentProjectId > maxProjectId)
-            {
-                // 最後のプロジェクトを超えた場合はレビューページに移動
-                System.Diagnostics.Debug.WriteLine($"プロジェクト{maxProjectId}を超えたため、レビューページに移動します");
-                ReviewPageButton_Click(null, null);
-                return;
-            }
-            
-            // 新しいプロジェクトのWordドキュメントを開く
-            OpenProjectDocument(_currentProjectId, _groupId);
-            
-            // プロジェクト変更時は状態をリセットしない（Dictionaryで管理）
-            
-            // 新しいプロジェクトのタスクを読み込み
-            LoadCurrentProjectTasks();
-            UpdateTaskDisplay();
-            
-            // プロジェクトタイマーをリセット
-            ResetProjectTimer();
-            
-            // プロジェクトの初回閲覧時刻を記録
-            if (!_projectFirstViewTime.ContainsKey(_currentProjectId))
-            {
-                _projectFirstViewTime[_currentProjectId] = DateTime.Now;
-            }
-            
-            System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
+                LogReader.RequestCloseNavigationPaneIfOpen();
+                SaveAndCloseAllWordDocuments();
+
+                // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
+                int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
+
+                // 次のプロジェクトに移動
+                _currentProjectId++;
+
+                if (_currentProjectId > maxProjectId)
+                {
+                    // 最後のプロジェクトを超えた場合はレビューページに移動
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{maxProjectId}を超えたため、レビューページに移動します");
+                    ReviewPageButton_Click(null, null);
+                    return;
+                }
+
+                // 新しいプロジェクトのWordドキュメントを開く（内側の PreparingWindow は入れ子実行）
+                OpenProjectDocument(_currentProjectId, _groupId);
+
+                // 新しいプロジェクトのタスクを読み込み
+                LoadCurrentProjectTasks();
+                UpdateTaskDisplay();
+
+                // プロジェクトタイマーをリセット
+                ResetProjectTimer();
+
+                // プロジェクトの初回閲覧時刻を記録
+                if (!_projectFirstViewTime.ContainsKey(_currentProjectId))
+                {
+                    _projectFirstViewTime[_currentProjectId] = DateTime.Now;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
+            });
         }
         
         private void OpenProjectDocument(int projectId, int groupId)
@@ -1602,55 +1607,21 @@ namespace MOS_Word_app.Views
                     return;
                 }
                 
-                WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
-                bool wordWasNotRunning = false;
-                
-                if (wordApp == null) return;
-                
-                // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、常にフォルダから開き直す
-                string pathLower = System.IO.Path.GetFullPath(filePath).ToLowerInvariant();
-                try
+                // 同じパスが開いていれば一度閉じ、ハイブリッド Open（心拍即利用 / 拒否リトライ）
+                PreparingWindow.Run(this, () =>
                 {
-                    for (int i = wordApp.Documents.Count; i >= 1; i--)
+                    WordApplicationManager.TryCloseOpenDocumentByPath(filePath);
+                    if (!WordApplicationManager.TryOpenExamDocument(filePath, out _, makeVisible: false))
                     {
-                        WordDoc doc = wordApp.Documents[i];
-                        try
-                        {
-                            string fullName = doc.FullName?.ToLowerInvariant() ?? "";
-                            string docFullPath = fullName;
-                            try { docFullPath = System.IO.Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
-                            if (fullName == pathLower || docFullPath == pathLower)
-                            {
-                                if (!doc.Saved)
-                                    doc.Save();
-                                doc.Close(SaveChanges: false);
-                                break;
-                            }
-                        }
-                        finally
-                        {
-                            if (doc != null) Marshal.ReleaseComObject(doc);
-                        }
+                        System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] ドキュメントを開けませんでした: {filePath}");
+                        PositionWordWindow();
+                        return;
                     }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] 既存ドキュメント閉じる際のエラー: {ex.Message}");
-                }
 
-                try
-                {
-                    wordApp.Documents.Open(filePath, ReadOnly: false, Visible: true); // 常にフォルダから開く
-                    if (wordWasNotRunning)
-                        System.Threading.Thread.Sleep(300);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Documents.Open エラー: {ex.Message}");
-                }
-                
-                ApplyExamWindowLayout();
-                System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
+                    WordApplicationManager.SetWordVisible(true);
+                    ApplyExamWindowLayout();
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
+                });
             }
             catch (Exception ex)
             {

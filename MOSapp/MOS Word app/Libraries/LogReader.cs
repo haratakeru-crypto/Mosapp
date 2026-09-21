@@ -59,6 +59,21 @@ namespace Libraries
             }
         }
 
+        /// <summary>Word 再起動前に古い心拍を消し、前セッションの誤検知を防ぐ。</summary>
+        public static void ClearVstoHeartbeat()
+        {
+            try
+            {
+                string path = GetVstoHeartbeatPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearVstoHeartbeat: {ex.Message}");
+            }
+        }
+
         /// <summary>互換: 旧証跡ファイル名。移行後は使用しない。</summary>
         [Obsolete("採点ログは GetLogFilePath() のみを使用してください。")]
         public static string GetTaskEvidenceLogPath()

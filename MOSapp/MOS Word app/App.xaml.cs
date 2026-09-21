@@ -36,7 +36,6 @@ namespace MOS_Word_app
             {
                 CheckVSTOAddInStatus();
                 VSTOInstallerHelper.StartBackgroundPrepForExam();
-                WordApplicationManager.StartBackgroundWordWarmup();
             }), DispatcherPriority.ApplicationIdle);
         }
 
