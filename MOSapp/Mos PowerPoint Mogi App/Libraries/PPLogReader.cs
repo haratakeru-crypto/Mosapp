@@ -39,6 +39,66 @@ namespace Libraries
             return Path.Combine(Path.GetTempPath(), "mos_ppt_log.txt");
         }
 
+        /// <summary>VSTO アドインが PowerPoint 内で動作中であることを示すハートビートファイル。</summary>
+        public static string GetVstoHeartbeatPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_vsto_heartbeat.txt");
+        }
+
+        /// <summary>直近で VSTO がハートビートを更新していれば true（既定 5 分以内）。</summary>
+        public static bool IsVstoHeartbeatFresh(int maxAgeSeconds = 300)
+        {
+            try
+            {
+                string path = GetVstoHeartbeatPath();
+                if (!File.Exists(path))
+                    return false;
+
+                string text = File.ReadAllText(path, Encoding.UTF8).Trim();
+                if (!long.TryParse(text, out long unixMs))
+                    return false;
+
+                double ageSec = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - unixMs) / 1000.0;
+                return ageSec >= 0 && ageSec <= maxAgeSeconds;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PPLogReader] IsVstoHeartbeatFresh: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>PowerPoint 再起動前に古い心拍を消し、前セッションの誤検知を防ぐ。</summary>
+        public static void ClearVstoHeartbeat()
+        {
+            try
+            {
+                string path = GetVstoHeartbeatPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PPLogReader] ClearVstoHeartbeat: {ex.Message}");
+            }
+        }
+
+        /// <summary>指定時間内に新鮮な心拍が来るまで待つ。成功で true。</summary>
+        public static bool WaitForVstoHeartbeat(int timeoutMs, int maxAgeSeconds = 15, int pollIntervalMs = 100)
+        {
+            if (IsVstoHeartbeatFresh(maxAgeSeconds))
+                return true;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                if (IsVstoHeartbeatFresh(maxAgeSeconds))
+                    return true;
+                Thread.Sleep(pollIntervalMs);
+            }
+            return IsVstoHeartbeatFresh(maxAgeSeconds);
+        }
+
         /// <summary>
         /// 採点用証跡ログのパス（%TEMP%\mos_ppt_task_evidence.txt）。
         /// 1-2/1-3/1-4/1-8/4-3/5-1/10-4/11-7 など、単体プロジェクトリセット後も採点に必要な行だけを VSTO が追記する。

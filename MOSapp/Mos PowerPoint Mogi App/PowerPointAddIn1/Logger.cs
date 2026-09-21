@@ -349,5 +349,22 @@ namespace PowerPointAddIn1
         {
             return LogFilePath;
         }
+
+        /// <summary>PowerPoint 内で VSTO が稼働中であることを %TEMP% に記録する。</summary>
+        public static void WriteVstoHeartbeat()
+        {
+            try
+            {
+                lock (_lockObject)
+                {
+                    string path = Path.Combine(Path.GetTempPath(), "mos_ppt_vsto_heartbeat.txt");
+                    File.WriteAllText(path, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Encoding.UTF8);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] WriteVstoHeartbeat: {ex.Message}");
+            }
+        }
     }
 }

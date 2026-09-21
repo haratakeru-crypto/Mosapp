@@ -626,6 +626,16 @@ namespace MOS_PowerPoint_app.Views
 
         /// <summary>プレゼンを開き直す処理が 300ms 以上かかる場合のみ「準備中」オーバーレイを表示する（速い遷移ではチラつきを抑える）。</summary>
         private const int PrepareProjectOverlayDelayMs = 300;
+        private const int VstoHeartbeatWaitMs = 8000;
+        private const int ActiveVstoHeartbeatMaxAgeSeconds = 15;
+
+        /// <summary>VSTO 心拍が新鮮になるまで待つ。失敗時は false。</summary>
+        private static bool EnsureVstoReady(int timeoutMs = VstoHeartbeatWaitMs)
+        {
+            if (PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds))
+                return true;
+            return PPLogReader.WaitForVstoHeartbeat(timeoutMs, ActiveVstoHeartbeatMaxAgeSeconds);
+        }
 
         private static Window CreatePrepareProjectOverlayWindow()
         {
@@ -740,6 +750,17 @@ namespace MOS_PowerPoint_app.Views
             var results = new Dictionary<int, List<bool>>();
             if (_projectData?.Projects == null || _projectData.Projects.Count == 0)
                 return results;
+
+            if (!EnsureVstoReady())
+            {
+                System.Diagnostics.Debug.WriteLine("[ScoreAllProjects] VSTO heartbeat not ready; scoring aborted to avoid all-X false fails");
+                MessageBox.Show(
+                    "PowerPoint 用 VSTO アドインが応答していないため採点できません。\nアドインを有効にしてから再度実行してください。",
+                    "VSTO 未準備",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return results;
+            }
             
             PowerPointGrader grader = null;
             try
@@ -2366,6 +2387,7 @@ namespace MOS_PowerPoint_app.Views
                     }
                     catch
                     {
+                        PPLogReader.ClearVstoHeartbeat();
                         pptApp = new PowerPointApp();
                         pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
                     }
@@ -2411,6 +2433,18 @@ namespace MOS_PowerPoint_app.Views
                     }
 
                     if (presentation == null) return;
+
+                    // 起動経路は Presentations.Open のまま。VSTO 心拍が来るまで待ってから続行する。
+                    if (!EnsureVstoReady())
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] VSTO heartbeat not ready after opening Project {projectId}");
+                        MessageBox.Show(
+                            "PowerPoint 用 VSTO アドインが応答していません。\nアドインを有効にしてから再度お試しください。",
+                            "VSTO 未準備",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return;
+                    }
 
                     try
                     {
@@ -2809,6 +2843,16 @@ namespace MOS_PowerPoint_app.Views
             BeginScoringSession();
             try
             {
+                if (!EnsureVstoReady())
+                {
+                    MessageBox.Show(
+                        "PowerPoint 用 VSTO アドインが応答していないため再採点できません。\nアドインを有効にしてから再度実行してください。",
+                        "VSTO 未準備",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
                 foreach (var key in keysToScore)
                 {
                     if (!TryParseTaskKey(key, out int projectId, out int taskId))

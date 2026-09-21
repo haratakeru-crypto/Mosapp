@@ -126,6 +126,8 @@ namespace PowerPointAddIn1
         {
             System.Diagnostics.Debug.WriteLine("[PowerPointAddIn1] Add-in started. Log file: " + Logger.GetLogFilePath());
 
+            Logger.WriteVstoHeartbeat();
+
             _lastBlackAndWhite = false;
             _grayscalePollTimer = new Timer();
             _grayscalePollTimer.Interval = 500;
@@ -212,6 +214,8 @@ namespace PowerPointAddIn1
         {
             try
             {
+                Logger.WriteVstoHeartbeat();
+
                 if (!File.Exists(CurrentTaskFilePath))
                 {
                     // 最終タスク（11-7 / P6-7）でレビュー遷移時に current_task が消えるケースでも、

@@ -181,6 +181,14 @@
     <Compile Include="PowerPointDataPathHelper.cs" />
     <Compile Include="PowerPointProjectResetHelper.cs" />
     <Compile Include="PowerPointGrader.cs" />
+    <Page Include="Views\PreparingWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="Views\PreparingWindow.xaml.cs">
+      <DependentUpon>PreparingWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Page Include="Views\UiTestAppBarWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

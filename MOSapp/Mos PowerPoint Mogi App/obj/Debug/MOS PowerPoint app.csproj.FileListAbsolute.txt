@@ -148,3 +148,5 @@ C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bi
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe.manifest
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.application
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS Powe.03856F61.Up2Date
+c:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.baml
+c:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.g.cs

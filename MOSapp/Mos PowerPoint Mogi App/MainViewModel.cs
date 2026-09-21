@@ -203,6 +203,10 @@ namespace MOS_PowerPoint_app
             }
         }
 
+        private const int ExistingPptHeartbeatWaitMs = 400;
+        private const int VstoHeartbeatWaitAfterLaunchMs = 8000;
+        private const int ActiveVstoHeartbeatMaxAgeSeconds = 15;
+
         private void ExecuteOpenProject(object parameter)
         {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
@@ -216,43 +220,65 @@ namespace MOS_PowerPoint_app
                     return;
                 }
 
-                try
+                var preparingOwner = System.Windows.Application.Current?.MainWindow;
+                Views.PreparingWindow.Run(preparingOwner, () =>
                 {
-                    // プロジェクト起動前にタスク情報をクリアし、アドイン側の古いスナップショットとの比較を防止
-                    Libraries.PPLogReader.ClearCurrentTaskFile();
-
-                    // PowerPointアプリケーションを取得または作成
-                    PowerPointApp pptApp = null;
                     try
                     {
-                        pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
-                    }
-                    catch
-                    {
-                        pptApp = new PowerPointApp();
-                        pptApp.Visible = MsoTriState.msoTrue;
-                    }
+                        // プロジェクト起動前にタスク情報をクリアし、アドイン側の古いスナップショットとの比較を防止
+                        Libraries.PPLogReader.ClearCurrentTaskFile();
 
-                    try
-                    {
-                        pptApp.Presentations.Open(project.FilePath, WithWindow: MsoTriState.msoTrue);
-                        Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
+                        // PowerPointアプリケーションを取得または作成（起動経路は従来どおり Presentations.Open）
+                        PowerPointApp pptApp = null;
+                        bool launchedNew = false;
+                        try
+                        {
+                            pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                        }
+                        catch
+                        {
+                            Libraries.PPLogReader.ClearVstoHeartbeat();
+                            pptApp = new PowerPointApp();
+                            pptApp.Visible = MsoTriState.msoTrue;
+                            launchedNew = true;
+                        }
+
+                        try
+                        {
+                            pptApp.Presentations.Open(project.FilePath, WithWindow: MsoTriState.msoTrue);
+                            Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                        }
+
+                        int waitMs = launchedNew ? VstoHeartbeatWaitAfterLaunchMs : ExistingPptHeartbeatWaitMs;
+                        if (!Libraries.PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds)
+                            && !Libraries.PPLogReader.WaitForVstoHeartbeat(waitMs, ActiveVstoHeartbeatMaxAgeSeconds)
+                            && (launchedNew
+                                || !Libraries.PPLogReader.WaitForVstoHeartbeat(VstoHeartbeatWaitAfterLaunchMs, ActiveVstoHeartbeatMaxAgeSeconds)))
+                        {
+                            ResultMessage = "エラー: PowerPoint 用 VSTO アドインが応答していません。アドインを有効にしてから再度開いてください。";
+                            MessageBox.Show(
+                                ResultMessage,
+                                "VSTO 未準備",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        CurrentProject = project;
+                        HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
+                        ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
+                        ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(project.FilePath)}";
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                        ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
+                        System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
                     }
-
-                    CurrentProject = project;
-                    HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
-                    ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
-                    ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(project.FilePath)}";
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
-                    System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
-                }
+                });
             }
         }
 
@@ -266,6 +292,14 @@ namespace MOS_PowerPoint_app
             if (CurrentProject == null)
             {
                 ResultMessage = "プロジェクトを開いてから実行してください。";
+                return;
+            }
+
+            if (!Libraries.PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds)
+                && !Libraries.PPLogReader.WaitForVstoHeartbeat(VstoHeartbeatWaitAfterLaunchMs, ActiveVstoHeartbeatMaxAgeSeconds))
+            {
+                ResultMessage = "PowerPoint 用 VSTO アドインが応答していないため採点できません。アドインを有効にしてから再度実行してください。";
+                MessageBox.Show(ResultMessage, "VSTO 未準備", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
