@@ -54,7 +54,37 @@ namespace MOSExcelMogiApp
             _viewModel.ShowMainWindowRequested += OnShowMainWindowRequested;
             _viewModel.ExamEnded += OnExamEnded;
 
+            ApplyExamineeTabState();
             Closing += MainWindow_Closing;
+        }
+
+        private void ApplyExamineeTabState()
+        {
+            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.IsRegistered ? 1 : 0;
+        }
+
+        private void UniversityRegistration_Registered(object sender, EventArgs e)
+        {
+            _viewModel.SelectedTabIndex = 1;
+        }
+
+        private void UniversityRegistration_Deleted(object sender, EventArgs e)
+        {
+            _viewModel.SelectedTabIndex = 0;
+        }
+
+        private void VariantPlaceholderButton_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.ResultMessage = "類題は後から接続します";
+        }
+
+        private void ScoringLog_EntryClicked(object sender, MosPracticeClient.ScoringLogEntry entry)
+        {
+            if (entry == null) return;
+            var window = new Views.ResultWindow(entry.ProjectResults, entry.GroupId, fromScoringLog: true);
+            window.Owner = this;
+            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            window.Show();
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)

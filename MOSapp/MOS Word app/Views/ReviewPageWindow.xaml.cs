@@ -462,12 +462,39 @@ namespace MOS_Word_app.Views
             return timer;
         }
 
+        private List<int> GetAvailableProjectIds()
+        {
+            var projects = ProjectsItemsControl.ItemsSource as IEnumerable<ReviewProjectInfo>;
+            if (projects == null)
+                return new List<int>();
+
+            return projects
+                .SelectMany(p => p.Tasks ?? Enumerable.Empty<ReviewTaskInfo>())
+                .Select(t => t.ProjectId)
+                .Where(id => id > 0)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+        }
+
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isScoring)
             {
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Duplicate scoring request ignored.");
                 return;
+            }
+
+            HashSet<int> scoringProjectIds = null;
+            string scoringRangeLabel = "すべてのプロジェクト";
+            var availableIds = GetAvailableProjectIds();
+            if (availableIds.Count > 0)
+            {
+                if (!MosPracticeClient.ScoringRangeDialog.TrySelect(this, availableIds, out var selectedIds, out var rangeLabel))
+                    return;
+                scoringProjectIds = new HashSet<int>(selectedIds);
+                if (!string.IsNullOrWhiteSpace(rangeLabel))
+                    scoringRangeLabel = rangeLabel;
             }
 
             _isScoring = true;
@@ -510,8 +537,25 @@ namespace MOS_Word_app.Views
                 await System.Threading.Tasks.Task.Yield();
                 
                 // 全プロジェクト一括採点（結果画面の 〇/✖ 表示用）
-                await System.Threading.Tasks.Task.Run(() => WordBatchScoring.ScoreAllProjects(_groupId));
+                await System.Threading.Tasks.Task.Run(() => WordBatchScoring.ScoreAllProjects(_groupId, scoringProjectIds));
                 ScoreResultStore.SnapshotGroup(_groupId);
+                try
+                {
+                    var logResults = ScoreResultStore.GetProjectResults(_groupId);
+                    if (logResults.Count > 0)
+                    {
+                        MosPracticeClient.ScoringLogStore.Append(
+                            MosPracticeClient.ScoringLogStore.SubjectWord,
+                            MosPracticeClient.ScoringLogEntry.Create(
+                                scoringRangeLabel,
+                                _groupId,
+                                logResults));
+                    }
+                }
+                catch (Exception logEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Scoring log save: " + logEx.Message);
+                }
 
                 // 一括採点用の小窓レイアウトから試験用へ戻す（Word を閉じる前）
                 await System.Threading.Tasks.Task.Run(() =>

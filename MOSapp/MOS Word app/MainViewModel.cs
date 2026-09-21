@@ -57,6 +57,8 @@ namespace MOS_Word_app
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
 
+        public string[] VariantPlaceholderSets { get; } = { "類題1", "類題2", "類題3", "類題4", "類題5" };
+
         public int SelectedTabIndex
         {
             get => _selectedTabIndex;
@@ -158,6 +160,9 @@ namespace MOS_Word_app
 
         private void ExecuteOpenProject(object parameter)
         {
+            if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
+                return;
+
             if (!(parameter is ProjectViewModel))
             {
                 return;

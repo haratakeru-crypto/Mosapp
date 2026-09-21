@@ -246,6 +246,10 @@
     <Content Include="Assets\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\MosPracticeClient\Assets\universities.json">
+      <Link>Assets\universities.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Resource Include="Assets\qr_subete_no_saiten.png" />
     <Content Include="References\JSON\MOS模擬アプリ問題文一覧.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -296,8 +300,23 @@
       <Project>{6A7617F7-8A21-464D-9EE8-7964AFA06EF3}</Project>
       <Name>ExcelAddIn1</Name>
     </ProjectReference>
+    <ProjectReference Include="..\MosPracticeClient\MosPracticeClient.csproj">
+      <Project>{A8C3E2B1-4D5F-6A78-90B1-C2D3E4F50617}</Project>
+      <Name>MosPracticeClient</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\MosPracticeSessionWatch\MosPracticeSessionWatch.csproj">
+      <Project>{B9D4F3C2-5E60-7B89-01C2-D3E4F5061728}</Project>
+      <Name>MosPracticeSessionWatch</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CopyMosPracticeSessionWatch" AfterTargets="Build">
+    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
+  </Target>
   <Target Name="AfterPublish">
     <PropertyGroup>
       <_AddInOutDir>$(ProjectDir)ExcelAddIn1\bin\$(Configuration)\</_AddInOutDir>

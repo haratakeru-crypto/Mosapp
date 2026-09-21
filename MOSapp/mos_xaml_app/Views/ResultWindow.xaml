@@ -104,20 +104,25 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- QRコード（点数の右） -->
+                        <!-- 座席表送信 / QR（点数の右） -->
                         <StackPanel Grid.Column="1"
                                     VerticalAlignment="Center"
                                     Margin="24,0,0,0">
-                            <TextBlock Text="結果はこちらに"
+                            <TextBlock x:Name="SeatChartSubmitStatusText"
+                                       Text="座席表へ送信中…"
                                        FontSize="16"
                                        FontWeight="SemiBold"
                                        Foreground="#374151"
                                        HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       MaxWidth="280"
                                        Margin="0,0,0,8"/>
-                            <Image Source="pack://application:,,,/MOSExcelMogiApp;component/Assets/qr_subete_no_saiten.png"
+                            <Image x:Name="SeatChartQrImage"
                                    Width="255" Height="255"
                                    Stretch="Uniform"
-                                   ToolTip="QRコードを読み取って結果を送信します"/>
+                                   Visibility="Collapsed"
+                                   ToolTip="QRコードを読み取って座席表に送ってください"/>
                         </StackPanel>
                         
                         <!-- 間違えた問題のみ表示ボタン -->

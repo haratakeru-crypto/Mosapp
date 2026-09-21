@@ -42,6 +42,7 @@ namespace MOS_PowerPoint_app
                 _viewModel.ExamEnded += OnExamEnded;
                 _viewModel.ScoreCompleted += OnScoreCompleted;
 
+                ApplyExamineeTabState();
                 Closing += MainWindow_Closing;
             }
             catch (Exception ex)
@@ -51,6 +52,41 @@ namespace MOS_PowerPoint_app
                 System.Diagnostics.Debug.WriteLine($"MainWindow初期化エラー: {ex}");
                 throw;
             }
+        }
+
+        private void ApplyExamineeTabState()
+        {
+            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.IsRegistered ? 1 : 0;
+        }
+
+        private void UniversityRegistration_Registered(object sender, EventArgs e)
+        {
+            _viewModel.SelectedTabIndex = 1;
+        }
+
+        private void UniversityRegistration_Deleted(object sender, EventArgs e)
+        {
+            _viewModel.SelectedTabIndex = 0;
+        }
+
+        private void VariantPlaceholderButton_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.ResultMessage = "類題は後から接続します";
+        }
+
+        private void ScoringLog_EntryClicked(object sender, MosPracticeClient.ScoringLogEntry entry)
+        {
+            if (entry == null) return;
+            var window = new Views.ResultWindow(
+                null,
+                null,
+                null,
+                entry.GroupId,
+                entry.ProjectResults ?? new Dictionary<int, List<bool>>(),
+                fromScoringLog: true);
+            window.Owner = this;
+            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            window.Show();
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)

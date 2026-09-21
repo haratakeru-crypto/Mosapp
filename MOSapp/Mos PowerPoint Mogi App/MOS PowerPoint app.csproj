@@ -69,6 +69,15 @@
       <Project>{B2C3D4E5-F6A7-8901-BCDE-F12345678902}</Project>
       <Name>PowerPointCheckerCommon</Name>
     </ProjectReference>
+    <ProjectReference Include="..\MosPracticeClient\MosPracticeClient.csproj">
+      <Project>{A8C3E2B1-4D5F-6A78-90B1-C2D3E4F50617}</Project>
+      <Name>MosPracticeClient</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\MosPracticeSessionWatch\MosPracticeSessionWatch.csproj">
+      <Project>{B9D4F3C2-5E60-7B89-01C2-D3E4F5061728}</Project>
+      <Name>MosPracticeSessionWatch</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="Libraries\Group1\PowerPointChecker1_1.csproj">
       <Project>{C3D4E5F6-A7B8-9012-CDEF-123456789012}</Project>
       <Name>PowerPointChecker1_1</Name>
@@ -263,6 +272,10 @@
     <Content Include="Assets\config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\MosPracticeClient\Assets\universities.json">
+      <Link>Assets\universities.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Resource Include="Assets\qr_subete_no_saiten.png" />
     <Content Include="References\JSON\MOS模擬アプリ問題文一覧_PowerPoint.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -293,6 +306,12 @@
     <PreBuildEvent>taskkill /IM "Mos PowerPoint Mogi App.exe" /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CopyMosPracticeSessionWatch" AfterTargets="Build">
+    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
+  </Target>
   <!-- 発行時に VSTO アドインの出力を publish\PowerPointAddIn1 にコピーする（Import の後に定義して確実に実行されるようにする） -->
   <Target Name="AfterPublish">
     <PropertyGroup>

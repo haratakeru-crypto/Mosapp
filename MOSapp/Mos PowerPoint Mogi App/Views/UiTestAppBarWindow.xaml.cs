@@ -428,9 +428,9 @@ namespace MOS_PowerPoint_app.Views
                         appBar.NavigateToTask(projectId, taskId);
                     }
                 };
-                reviewWindow.OnShowResultRequested = () =>
+                reviewWindow.OnShowResultRequested = (selectedIds, rangeLabel) =>
                 {
-                    ShowResultWindowAsync();
+                    ShowResultWindowAsync(selectedIds, rangeLabel);
                 };
                 reviewWindow.OnBackRequested = () =>
                 {
@@ -452,7 +452,7 @@ namespace MOS_PowerPoint_app.Views
         /// <summary>
         /// 結果画面を表示する（方式A: 表示前に全プロジェクトを採点してから結果を渡す）
         /// </summary>
-        private async void ShowResultWindowAsync()
+        private async void ShowResultWindowAsync(IReadOnlyCollection<int> projectIds = null, string rangeLabel = null)
         {
             if (_isScoring)
             {
@@ -524,11 +524,14 @@ namespace MOS_PowerPoint_app.Views
                 
                 // 全プロジェクトを採点（バックグラウンドで実行）
                 Dictionary<int, List<bool>> allResults = null;
+                HashSet<int> scoringIds = projectIds != null && projectIds.Count > 0
+                    ? new HashSet<int>(projectIds)
+                    : null;
                 await Task.Run(() =>
                 {
                     try
                     {
-                        allResults = ScoreAllProjects();
+                        allResults = ScoreAllProjects(scoringIds);
                     }
                     catch (Exception ex)
                     {
@@ -545,6 +548,20 @@ namespace MOS_PowerPoint_app.Views
                 
                 if (allResults == null)
                     allResults = new Dictionary<int, List<bool>>();
+
+                if (!string.IsNullOrWhiteSpace(rangeLabel) && allResults.Count > 0)
+                {
+                    try
+                    {
+                        MosPracticeClient.ScoringLogStore.Append(
+                            MosPracticeClient.ScoringLogStore.SubjectPowerPoint,
+                            MosPracticeClient.ScoringLogEntry.Create(rangeLabel, _groupId, allResults));
+                    }
+                    catch (Exception logEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Scoring log save: " + logEx.Message);
+                    }
+                }
                 
                 // 結果画面を作成（採点結果を渡す）
                 var resultWindow = new ResultWindow(_projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, _groupId, allResults);
@@ -718,7 +735,7 @@ namespace MOS_PowerPoint_app.Views
         /// <summary>
         /// 全プロジェクトを採点し、projectId → タスクごとの正否リスト を返す（方式A用）
         /// </summary>
-        private Dictionary<int, List<bool>> ScoreAllProjects()
+        private Dictionary<int, List<bool>> ScoreAllProjects(ISet<int> projectIds = null)
         {
             var results = new Dictionary<int, List<bool>>();
             if (_projectData?.Projects == null || _projectData.Projects.Count == 0)
@@ -730,6 +747,8 @@ namespace MOS_PowerPoint_app.Views
                 grader = new PowerPointGrader();
                 foreach (var project in _projectData.Projects.OrderBy(p => p.ProjectId))
                 {
+                    if (projectIds != null && projectIds.Count > 0 && !projectIds.Contains(project.ProjectId))
+                        continue;
                     if (project.Tasks == null || project.Tasks.Count == 0)
                         continue;
                     var list = new List<bool>();

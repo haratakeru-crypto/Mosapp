@@ -247,6 +247,8 @@ namespace Ui.ViewModels
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
 
+        public string[] VariantPlaceholderSets { get; } = { "類題1", "類題2", "類題3", "類題4", "類題5" };
+
         public int SelectedTabIndex
         {
             get => _selectedTabIndex;
@@ -790,6 +792,9 @@ namespace Ui.ViewModels
 
         private void ExecuteOpenProject(object parameter)
         {
+            if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
+                return;
+
             // Excel重複起動チェックを無効化（修正）
             // if (IsExcelRunning())
             // {

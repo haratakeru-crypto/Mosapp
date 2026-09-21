@@ -25,7 +25,7 @@ namespace MOS_PowerPoint_app.Views
         private bool _isScoring;
 
         public Action<int, int> OnNavigateToTask { get; set; }
-        public Action OnShowResultRequested { get; set; }
+        public Action<IReadOnlyCollection<int>, string> OnShowResultRequested { get; set; }
         public Action OnBackRequested { get; set; }
 
         public ReviewPageWindow(TimeSpan remainingTime,
@@ -271,6 +271,21 @@ namespace MOS_PowerPoint_app.Views
             }
         }
 
+        private List<int> GetAvailableProjectIds()
+        {
+            var projects = ProjectsItemsControl.ItemsSource as IEnumerable<ReviewProjectInfo>;
+            if (projects == null)
+                return new List<int>();
+
+            return projects
+                .SelectMany(p => p.Tasks ?? Enumerable.Empty<ReviewTaskInfo>())
+                .Select(t => t.ProjectId)
+                .Where(id => id > 0)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+        }
+
         private void ShowResultButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isScoring)
@@ -279,12 +294,24 @@ namespace MOS_PowerPoint_app.Views
                 return;
             }
 
+            IReadOnlyCollection<int> selectedIds = null;
+            string rangeLabel = "すべてのプロジェクト";
+            var availableIds = GetAvailableProjectIds();
+            if (availableIds.Count > 0)
+            {
+                if (!MosPracticeClient.ScoringRangeDialog.TrySelect(this, availableIds, out var chosenIds, out var chosenLabel))
+                    return;
+                selectedIds = chosenIds;
+                if (!string.IsNullOrWhiteSpace(chosenLabel))
+                    rangeLabel = chosenLabel;
+            }
+
             _isScoring = true;
             if (sender is Button button)
                 button.IsEnabled = false;
             _timer?.Stop();
             this.Hide();
-            OnShowResultRequested?.Invoke();
+            OnShowResultRequested?.Invoke(selectedIds, rangeLabel);
             this.Close();
         }
 

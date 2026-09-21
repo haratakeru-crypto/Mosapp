@@ -24,25 +24,43 @@ namespace MOS_Word_app.Views
         private bool _isWindowClosed;
         private List<ResultProjectInfo> _allProjects;
         private bool _showingWrongOnly;
+        private bool _seatChartSubmitStarted;
+        private HashSet<int> _includedProjectIds;
+        private readonly bool _fromScoringLog;
+        private Dictionary<int, List<bool>> _snapshotResults;
 
         public Action<int, int> OnNavigateToTask { get; set; }
 
         public ResultWindow(Dictionary<int, bool[]> projectTaskFlaggedStates = null, Dictionary<int, bool[]> projectTaskViewedStates = null, int groupId = 1)
+            : this(projectTaskFlaggedStates, projectTaskViewedStates, groupId, null, false)
+        {
+        }
+
+        public ResultWindow(Dictionary<int, List<bool>> snapshotResults, int groupId, bool fromScoringLog)
+            : this(null, null, groupId, snapshotResults, fromScoringLog)
+        {
+        }
+
+        public ResultWindow(Dictionary<int, bool[]> projectTaskFlaggedStates, Dictionary<int, bool[]> projectTaskViewedStates, int groupId, Dictionary<int, List<bool>> snapshotResults, bool fromScoringLog)
         {
             InitializeComponent();
             this.Closed += (s, args) => { _isWindowClosed = true; };
             _projectTaskFlaggedStates = projectTaskFlaggedStates ?? new Dictionary<int, bool[]>();
             _projectTaskViewedStates = projectTaskViewedStates ?? new Dictionary<int, bool[]>();
             _groupId = groupId;
+            _snapshotResults = snapshotResults;
+            _fromScoringLog = fromScoringLog;
             this.Loaded += ResultWindow_Loaded;
-            // 結果画面を閉じたときは、アプリバー側の「結果に戻る」モードも解除する
-            this.Closed += (s, args) =>
+            if (!_fromScoringLog)
             {
-                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
-                    appBar.ClearReturnToResultMode();
-                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
-                    appBar.ClearReturnToResultMode();
-            };
+                this.Closed += (s, args) =>
+                {
+                    foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
+                        appBar.ClearReturnToResultMode();
+                    foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
+                        appBar.ClearReturnToResultMode();
+                };
+            }
         }
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
@@ -89,6 +107,7 @@ namespace MOS_Word_app.Views
                 }
 
                 System.Diagnostics.Debug.WriteLine($"[ResultWindow] 問題文JSONを読み込みました: {jsonPath}");
+                RefreshIncludedProjectIds(projectData);
                 await UpdateSummaryAsync(projectData);
 
                 var resultProjects = await System.Threading.Tasks.Task.Run(() => ProcessProjectDataRaw(projectData));
@@ -119,7 +138,9 @@ namespace MOS_Word_app.Views
         {
             if (projectData?.Projects == null) return;
 
-            int totalTasks = projectData.Projects.Sum(p => p.Tasks?.Count ?? 0);
+            int totalTasks = projectData.Projects
+                .Where(p => IsIncludedProject(p.ProjectId))
+                .Sum(p => p.Tasks?.Count ?? 0);
             int initialWrong = CountWrongTasks(projectData, useInitialSnapshot: true);
             int latestWrong = CountWrongTasks(projectData, useInitialSnapshot: false);
             double initialAccuracy = totalTasks > 0 ? (double)(totalTasks - initialWrong) / totalTasks * 100.0 : 0.0;
@@ -133,6 +154,23 @@ namespace MOS_Word_app.Views
                 if (SummaryTextBlock != null)
                     SummaryTextBlock.Text = $"「あとで見直す」と未閲覧（時間切れ）の合計: {latestWrong}問";
             });
+
+            await StartSeatChartSubmitAsync(initialWrong);
+        }
+
+        private async Task StartSeatChartSubmitAsync(int initialWrongTasks)
+        {
+            if (_fromScoringLog || _seatChartSubmitStarted) return;
+            _seatChartSubmitStarted = true;
+            try
+            {
+                await MosPracticeClient.ResultSubmitBinder.BindAsync(
+                    SeatChartSubmitStatusText, SeatChartQrImage, initialWrongTasks, "Word");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
+            }
         }
 
         private int CountWrongTasks(ProjectData projectData, bool useInitialSnapshot)
@@ -141,6 +179,7 @@ namespace MOS_Word_app.Views
             GetFirstUnviewedWithoutScoringTask(projectData, out int firstProjectId, out int firstTaskId);
             foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
             {
+                if (!IsIncludedProject(project.ProjectId)) continue;
                 if (project.Tasks == null) continue;
                 bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId)
                     ? _projectTaskFlaggedStates[project.ProjectId] : new bool[0];
@@ -177,6 +216,7 @@ namespace MOS_Word_app.Views
             if (projectData?.Projects == null) return;
             foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
             {
+                if (!IsIncludedProject(project.ProjectId)) continue;
                 if (project.Tasks == null) continue;
                 bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) ? _projectTaskViewedStates[project.ProjectId] : new bool[0];
                 foreach (var task in project.Tasks.OrderBy(t => t.TaskId))
@@ -199,6 +239,14 @@ namespace MOS_Word_app.Views
             int firstUnviewedProjectId, int firstUnviewedTaskId, out bool countsAsWrong, bool useInitialSnapshot = false)
         {
             countsAsWrong = false;
+            if (_fromScoringLog)
+            {
+                bool? passed = TryGetSnapshotPassed(projectId, taskId);
+                if (!passed.HasValue)
+                    return "";
+                countsAsWrong = !passed.Value;
+                return passed.Value ? "〇" : "✖";
+            }
             if (isFlagged)
             {
                 countsAsWrong = true;
@@ -238,6 +286,7 @@ namespace MOS_Word_app.Views
             if (projectData?.Projects == null) return resultProjects;
             foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
             {
+                if (!IsIncludedProject(project.ProjectId)) continue;
                 bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(project.ProjectId) ? _projectTaskFlaggedStates[project.ProjectId] : new bool[0];
                 bool[] viewedStates = _projectTaskViewedStates.ContainsKey(project.ProjectId) ? _projectTaskViewedStates[project.ProjectId] : new bool[0];
 
@@ -265,6 +314,48 @@ namespace MOS_Word_app.Views
                 resultProjects.Add(resultProject);
             }
             return resultProjects;
+        }
+
+        private void RefreshIncludedProjectIds(ProjectData projectData)
+        {
+            if (_fromScoringLog)
+            {
+                _includedProjectIds = _snapshotResults != null
+                    ? new HashSet<int>(_snapshotResults.Keys)
+                    : new HashSet<int>();
+                return;
+            }
+
+            var scored = ScoreResultStore.GetScoredProjectIds(_groupId);
+            if (scored.Count > 0)
+            {
+                _includedProjectIds = scored;
+                return;
+            }
+
+            _includedProjectIds = new HashSet<int>();
+            if (projectData?.Projects != null)
+            {
+                foreach (var project in projectData.Projects)
+                    _includedProjectIds.Add(project.ProjectId);
+            }
+        }
+
+        private bool IsIncludedProject(int projectId)
+        {
+            if (_includedProjectIds == null || _includedProjectIds.Count == 0)
+                return true;
+            return _includedProjectIds.Contains(projectId);
+        }
+
+        private bool? TryGetSnapshotPassed(int projectId, int taskId)
+        {
+            if (_snapshotResults == null || !_snapshotResults.TryGetValue(projectId, out var list) || list == null)
+                return null;
+            int index = taskId - 1;
+            if (index < 0 || index >= list.Count)
+                return null;
+            return list[index];
         }
 
         private static string RemoveQuotes(string text)

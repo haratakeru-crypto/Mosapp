@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MOS_PowerPoint_app"
+        xmlns:mos="clr-namespace:MosPracticeClient;assembly=MosPracticeClient"
         mc:Ignorable="d"
         Title="MOS PowerPoint App" Height="700" Width="1000"
         WindowStartupLocation="CenterScreen"
@@ -121,6 +122,10 @@
                 </Style>
             </TabControl.Resources>
             
+            <TabItem Header="大学名">
+                <mos:UniversityRegistrationControl Registered="UniversityRegistration_Registered"
+                                                   Deleted="UniversityRegistration_Deleted"/>
+            </TabItem>
             <TabItem Header="演習">
                 <ScrollViewer Background="#F0F0F3">
                     <Grid Margin="20">
@@ -201,6 +206,63 @@
                         </ItemsControl>
                     </Grid>
                 </ScrollViewer>
+            </TabItem>
+            <TabItem Header="類題">
+                <ScrollViewer Background="#F0F0F3">
+                    <Grid Margin="20">
+                        <ItemsControl ItemsSource="{Binding VariantPlaceholderSets}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="3" Columns="2"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding}"
+                                            Click="VariantPlaceholderButton_Click"
+                                            Margin="12" Padding="20,15" MinWidth="140" MinHeight="60">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Background">
+                                                    <Setter.Value>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                            <GradientStop Color="#D04423" Offset="0"/>
+                                                            <GradientStop Color="#FF6B35" Offset="0.5"/>
+                                                            <GradientStop Color="#FF8C65" Offset="1"/>
+                                                        </LinearGradientBrush>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                                                <Setter Property="FontWeight" Value="Medium"/>
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" CornerRadius="20" Margin="4">
+                                                                <Border.Effect>
+                                                                    <DropShadowEffect Color="#8B2E16" Direction="135" ShadowDepth="8" Opacity="0.4" BlurRadius="15"/>
+                                                                </Border.Effect>
+                                                                <Border CornerRadius="20" Margin="2">
+                                                                    <Border.Effect>
+                                                                        <DropShadowEffect Color="#FFD4C4" Direction="315" ShadowDepth="6" Opacity="0.8" BlurRadius="12"/>
+                                                                    </Border.Effect>
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="採点ログ">
+                <mos:ScoringLogListControl Subject="PowerPoint" EntryClicked="ScoringLog_EntryClicked"/>
             </TabItem>
         </TabControl>
             </Grid>

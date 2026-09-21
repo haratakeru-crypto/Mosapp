@@ -589,12 +589,39 @@ namespace MOSExcelMogiApp.Views
             System.Diagnostics.Debug.WriteLine("Mouse left task button");
         }
         
+        private List<int> GetAvailableProjectIds()
+        {
+            var projects = ProjectsItemsControl.ItemsSource as IEnumerable<ReviewProjectInfo>;
+            if (projects == null)
+                return new List<int>();
+
+            return projects
+                .SelectMany(p => p.Tasks ?? Enumerable.Empty<ReviewTaskInfo>())
+                .Select(t => t.ProjectId)
+                .Where(id => id > 0)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+        }
+
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isScoring)
             {
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Duplicate scoring request ignored.");
                 return;
+            }
+
+            HashSet<int> scoringProjectIds = null;
+            string scoringRangeLabel = "すべてのプロジェクト";
+            var availableIds = GetAvailableProjectIds();
+            if (availableIds.Count > 0)
+            {
+                if (!MosPracticeClient.ScoringRangeDialog.TrySelect(this, availableIds, out var selectedIds, out var rangeLabel))
+                    return;
+                scoringProjectIds = new HashSet<int>(selectedIds);
+                if (!string.IsNullOrWhiteSpace(rangeLabel))
+                    scoringRangeLabel = rangeLabel;
             }
 
             _isScoring = true;
@@ -714,7 +741,7 @@ namespace MOSExcelMogiApp.Views
                     System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Starting to score all projects (STA)...");
                     await RunStaAsync(() =>
                     {
-                        ScoreAllProjects();
+                        ScoreAllProjects(scoringProjectIds);
                         CloseExcelApplication();
                     });
                     
@@ -744,6 +771,20 @@ namespace MOSExcelMogiApp.Views
                     
                     // 採点直後のスナップショットを保存（復習前の正答率用）
                     MOSExcelMogiApp.Models.ExamResultStorage.SaveInitialResultsIfEmpty(allResults);
+
+                    try
+                    {
+                        if (allResults != null && allResults.Count > 0)
+                        {
+                            MosPracticeClient.ScoringLogStore.Append(
+                                MosPracticeClient.ScoringLogStore.SubjectExcel,
+                                MosPracticeClient.ScoringLogEntry.Create(scoringRangeLabel, _groupId, allResults));
+                        }
+                    }
+                    catch (Exception logEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Scoring log save: " + logEx.Message);
+                    }
                     
                     // UI更新の機会を与える
                     await Task.Delay(50);
@@ -1112,7 +1153,7 @@ namespace MOSExcelMogiApp.Views
             }
         }
         
-        private void ScoreAllProjects()
+        private void ScoreAllProjects(ISet<int> projectIds = null)
         {
             try
             {
@@ -1169,6 +1210,9 @@ namespace MOSExcelMogiApp.Views
                         projectList.Add((projectId, taskCount, libraryName, filePath));
                     }
                 }
+
+                if (projectIds != null && projectIds.Count > 0)
+                    projectList = projectList.Where(p => projectIds.Contains(p.projectId)).ToList();
                 
                 // ステップ1: 既に開いているファイルを確認し、必要に応じて開く
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Step 1: Checking Excel files...");
