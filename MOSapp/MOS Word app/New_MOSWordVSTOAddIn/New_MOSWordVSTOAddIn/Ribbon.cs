@@ -22,6 +22,12 @@ namespace New_MOSWordVSTOAddIn
         public string GetCustomUI(string ribbonID)
         {
             System.Diagnostics.Debug.WriteLine($"[Ribbon] GetCustomUI called, ribbonID={ribbonID}");
+            if (!DiagMode.EnableRibbonCommands())
+            {
+                DiagMode.Write("GetCustomUI: ribbon shell only (no idMso commands)");
+                // IRibbonExtensibility は載せるがコマンドフックは無し（stage 8）
+                return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><customUI xmlns=\"http://schemas.microsoft.com/office/2009/07/customui\" onLoad=\"Ribbon_Load\"><ribbon/></customUI>";
+            }
             string xml = GetResourceText("New_MOSWordVSTOAddIn.Ribbon.xml");
             System.Diagnostics.Debug.WriteLine($"[Ribbon] GetCustomUI returning {xml?.Length ?? 0} chars");
             return xml;

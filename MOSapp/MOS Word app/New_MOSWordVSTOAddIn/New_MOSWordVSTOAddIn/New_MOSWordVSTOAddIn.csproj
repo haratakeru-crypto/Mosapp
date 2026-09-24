@@ -234,6 +234,7 @@
     <Compile Include="ThisAddIn.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DiagMode.cs" />
     <Compile Include="Logger.cs">
       <SubType>Code</SubType>
     </Compile>
