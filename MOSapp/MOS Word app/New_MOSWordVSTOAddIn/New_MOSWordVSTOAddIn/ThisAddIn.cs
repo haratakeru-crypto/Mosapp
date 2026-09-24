@@ -198,6 +198,85 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>
+        /// 5-1 離脱時の保険: 対象画像がまだ「上下」なら WrapTopBottom を補記する。
+        /// 通常は 5-1 完了→次へ→5-2 の順なので、離脱時点では「上下」のまま残っている想定。
+        /// （5-1 画面のまま「狭く」まで進めた場合は補記せず、既存ポーリング頼み／未記録なら ×）
+        /// </summary>
+        internal void EnsureTask51WrapEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 5 || previousTaskId != 1)
+                return;
+            if (nextProjectId == 5 && nextTaskId == 1)
+                return;
+
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(5);
+                if (doc == null)
+                    return;
+                if (IsLaptopParagraphWrapTopBottom(doc))
+                    WordEvidenceHelper.LogCommandWithEvidence("WrapTopBottom");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask51WrapEvidenceBeforeLeave: " + ex.Message);
+            }
+        }
+
+        /// <summary>「5月21日より5日間の」段落付近の浮動画像が折り返し「上下」か。</summary>
+        private static bool IsLaptopParagraphWrapTopBottom(Word.Document doc)
+        {
+            if (doc == null)
+                return false;
+
+            Word.Range searchRange = null;
+            Word.Find find = null;
+            Word.Range paraRange = null;
+            try
+            {
+                searchRange = doc.Content.Duplicate;
+                find = searchRange.Find;
+                find.ClearFormatting();
+                find.Text = "5月21日より5日間の";
+                find.Format = false;
+                find.Replacement.Text = "";
+                find.Wrap = Word.WdFindWrap.wdFindStop;
+                if (!find.Execute())
+                    return false;
+
+                paraRange = searchRange.Paragraphs[1].Range;
+                int paraStart = paraRange.Start;
+                int paraEnd = paraRange.End;
+
+                if (paraRange.InlineShapes.Count > 0)
+                    return false;
+
+                foreach (Word.Shape sh in doc.Shapes)
+                {
+                    try
+                    {
+                        int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
+                        if (anchor < paraStart || anchor > paraEnd)
+                            continue;
+                        return sh.WrapFormat.Type == Word.WdWrapType.wdWrapTopBottom;
+                    }
+                    finally { Marshal.ReleaseComObject(sh); }
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (paraRange != null) Marshal.ReleaseComObject(paraRange);
+                if (find != null) Marshal.ReleaseComObject(find);
+                if (searchRange != null) Marshal.ReleaseComObject(searchRange);
+            }
+        }
+
         private void ApplyWatermarkPollingBaseline(Word.Document doc, string preloadedNormalizedXml = null)
         {
             if (doc == null)
@@ -2299,7 +2378,10 @@ namespace New_MOSWordVSTOAddIn
 
                     string ensureXml = (_projectId == 4 && projectId == 4) ? normalizedXml : null;
                     if (taskChanged)
+                    {
                         _addIn.EnsureTask45WatermarkEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId, ensureXml);
+                        _addIn.EnsureTask51WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    }
 
                     bool doLeaveCompare = sameProject && _taskId >= 0 && !forceSnapshot;
                     SnapshotData captured = null;
