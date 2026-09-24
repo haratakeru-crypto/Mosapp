@@ -106,7 +106,7 @@ namespace MOS_PowerPoint_app.Views
         private Dictionary<int, Dictionary<int, string>> _clipboardTargets = new Dictionary<int, Dictionary<int, string>>(); // クリップボード対象（プロジェクトID → タスクID → 問題文）
         private bool _isPaused = false; // 一時停止状態
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
-        private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
+        private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（9番目以降）
         private readonly Action _onScoreClick; // 採点ボタン押下時（プロジェクト一覧の採点と同じ処理を実行）
         private bool _fromResultWindow = false; // 結果画面からタスクに飛んできたかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
@@ -1836,8 +1836,8 @@ namespace MOS_PowerPoint_app.Views
             bool[] flaggedStates = _projectTaskFlaggedStates.ContainsKey(_currentProjectId) ? 
                 _projectTaskFlaggedStates[_currentProjectId] : new bool[Math.Max(maxTaskCount, 1)];
 
-            // XAMLで定義されているタスクボタンの数（7つ）まで処理
-            int maxStaticButtonCount = 7; // XAMLで定義されているボタンの数
+            // XAMLで定義されているタスクボタンの数（8つ）まで処理
+            int maxStaticButtonCount = 8; // XAMLで定義されているボタンの数（最大8想定）
             for (int i = 1; i <= maxStaticButtonCount; i++)
             {
                 var button = FindName($"TaskButton{i}") as System.Windows.Controls.Button;
@@ -1854,7 +1854,7 @@ namespace MOS_PowerPoint_app.Views
                 }
             }
             
-            // 8つ目以降のタスクボタンを動的に生成（タスク数が7より多い場合）
+            // 9つ目以降のタスクボタンを動的に生成（タスク数が8より多い場合の保険）
             var container = FindName("TaskButtonsContainer") as System.Windows.Controls.StackPanel;
             if (container != null && maxTaskCount > maxStaticButtonCount)
             {
@@ -1865,24 +1865,24 @@ namespace MOS_PowerPoint_app.Views
                 }
                 _dynamicTaskButtons.Clear();
                 
-                // TaskButton7のインデックスを取得
-                var taskButton7 = FindName("TaskButton7") as System.Windows.Controls.Button;
-                int insertIndex = taskButton7 != null ? container.Children.IndexOf(taskButton7) + 1 : container.Children.Count - 1;
+                // TaskButton8のインデックスを取得
+                var taskButton8 = FindName("TaskButton8") as System.Windows.Controls.Button;
+                int insertIndex = taskButton8 != null ? container.Children.IndexOf(taskButton8) + 1 : container.Children.Count - 1;
                 
-                // 8つ目以降のボタンを生成
+                // 9つ目以降のボタンを生成
                 for (int i = maxStaticButtonCount + 1; i <= maxTaskCount; i++)
                 {
                     var button = CreateTaskButton(i);
                     _dynamicTaskButtons.Add(button);
                     
-                    // TaskButton7の後に挿入
+                    // TaskButton8の後に挿入
                     container.Children.Insert(insertIndex, button);
                     insertIndex++; // 次の挿入位置を更新
                 }
             }
             else if (container != null && maxTaskCount <= maxStaticButtonCount)
             {
-                // タスク数が7以下になった場合は動的ボタンを削除
+                // タスク数が8以下になった場合は動的ボタンを削除
                 foreach (var btn in _dynamicTaskButtons)
                 {
                     container.Children.Remove(btn);
