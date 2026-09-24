@@ -603,6 +603,73 @@ namespace Libraries
             }
         }
 
+        /// <summary>
+        /// 模試アプリ終了時: 未保存文書を保存して Word を終了し、残プロセスがあれば待機／強制終了する。
+        /// サインアウト阻害のゾンビ COM / WINWORD 残りを防ぐ。
+        /// </summary>
+        public static void CloseWordApplicationForAppExit()
+        {
+            WordApp app = null;
+            try
+            {
+                app = TryGetActiveWordApplication();
+                if (app == null)
+                    return;
+
+                try
+                {
+                    app.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone;
+                }
+                catch { /* ignore */ }
+
+                try
+                {
+                    for (int i = app.Documents.Count; i >= 1; i--)
+                    {
+                        WordDoc doc = null;
+                        try
+                        {
+                            doc = app.Documents[i];
+                            if (doc.Saved == false)
+                                doc.Save();
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                "[CloseWordApplicationForAppExit] Save: " + ex.Message);
+                        }
+                        finally
+                        {
+                            if (doc != null)
+                            {
+                                try { Marshal.ReleaseComObject(doc); } catch { /* ignore */ }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        "[CloseWordApplicationForAppExit] Documents: " + ex.Message);
+                }
+
+                TryQuitWordAndWait(app);
+                app = null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[CloseWordApplicationForAppExit] " + ex.Message);
+            }
+            finally
+            {
+                if (app != null)
+                {
+                    try { Marshal.ReleaseComObject(app); } catch { /* ignore */ }
+                }
+            }
+        }
+
         private static WordApp TryGetActiveWordApplication()
         {
             try

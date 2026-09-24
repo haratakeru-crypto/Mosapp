@@ -169,6 +169,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Libraries\PowerPointViewHelper.cs" />
+    <Compile Include="Libraries\PowerPointApplicationManager.cs" />
     <Compile Include="Libraries\VSTOInstallerHelper.cs" />
     <Compile Include="Libraries\PPTaskAttemptRegistry.cs" />
     <Compile Include="Libraries\PPTaskValidationConfig.cs" />

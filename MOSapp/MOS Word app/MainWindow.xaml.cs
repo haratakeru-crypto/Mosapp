@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Libraries;
 
 namespace MOS_Word_app
 {
@@ -22,6 +23,7 @@ namespace MOS_Word_app
     {
         private MainViewModel _viewModel;
         private Views.UiTestAppBarWindow _appBarWindow;
+        private bool _isExiting;
 
         /// <summary>タイマー無効化フラグ。デフォルトは一時停止（常時停止）。</summary>
         public static bool IsTimerDisabled { get; private set; } = true;
@@ -74,9 +76,43 @@ namespace MOS_Word_app
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (_isExiting)
+                return;
+
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
+            {
                 e.Cancel = true;
+                return;
+            }
+
+            _isExiting = true;
+            try
+            {
+                Cursor = Cursors.Wait;
+                CloseAppBarForExit();
+                WordApplicationManager.CloseWordApplicationForAppExit();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainWindow] Exit cleanup: " + ex.Message);
+            }
+            finally
+            {
+                Cursor = Cursors.Arrow;
+            }
+        }
+
+        /// <summary>終了時に AppBar を閉じる（Closed で MainWindow を再表示しない）。</summary>
+        private void CloseAppBarForExit()
+        {
+            var bar = _appBarWindow;
+            _appBarWindow = null;
+            if (bar == null)
+                return;
+
+            try { bar.Closed -= OnAppBarWindowClosed; } catch { /* ignore */ }
+            try { bar.Close(); } catch { /* ignore */ }
         }
 
         private void OnShowAppBarRequested(object sender, EventArgs e)
@@ -110,9 +146,11 @@ namespace MOS_Word_app
         {
             if (!ReferenceEquals(sender, _appBarWindow))
                 return;
+            _appBarWindow = null;
+            if (_isExiting)
+                return;
             this.Show();
             this.Activate();
-            _appBarWindow = null;
         }
 
         private void OnHideMainWindowRequested(object sender, EventArgs e)
@@ -140,7 +178,8 @@ namespace MOS_Word_app
                 _viewModel.ShowMainWindowRequested -= OnShowMainWindowRequested;
                 _viewModel.ExamEnded -= OnExamEnded;
             }
-            _appBarWindow?.Close();
+            if (!_isExiting)
+                CloseAppBarForExit();
             base.OnClosed(e);
         }
 

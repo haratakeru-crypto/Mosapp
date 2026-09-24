@@ -2201,12 +2201,10 @@ namespace Ui.ViewModels
         public void CloseExcelApplication()
         {
             ExcelApp excelApp = null;
-            ExcelWorkbook activeWorkbook = null;
             int excelPid = -1;
 
             try
             {
-                // Excel COMオブジェクトを使用して保存してから閉じる
                 try
                 {
                     // アプリが保持しているインスタンスを優先して閉じる
@@ -2214,22 +2212,53 @@ namespace Ui.ViewModels
                     if (excelApp != null)
                     {
                         excelPid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
-                        activeWorkbook = excelApp.ActiveWorkbook;
-                        if (activeWorkbook != null)
+
+                        try { excelApp.DisplayAlerts = false; } catch { /* ignore */ }
+
+                        // 全ブックを保存してから閉じる（アクティブのみだと他ブックで Quit が止まることがある）
+                        try
                         {
-                            System.Diagnostics.Debug.WriteLine($"[CloseExcelApplication] Saving workbook: {activeWorkbook.Name}");
-                            // ワークブックを保存
-                            activeWorkbook.Save();
-                            System.Diagnostics.Debug.WriteLine("[CloseExcelApplication] Workbook saved successfully");
-                            
-                            // ワークブックを閉じる
-                            activeWorkbook.Close(SaveChanges: false);
-                            Marshal.ReleaseComObject(activeWorkbook);
-                            activeWorkbook = null;
+                            for (int i = excelApp.Workbooks.Count; i >= 1; i--)
+                            {
+                                ExcelWorkbook wb = null;
+                                try
+                                {
+                                    wb = excelApp.Workbooks[i];
+                                    try
+                                    {
+                                        if (wb.Saved == false)
+                                            wb.Save();
+                                    }
+                                    catch (Exception saveEx)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine(
+                                            "[CloseExcelApplication] Save workbook: " + saveEx.Message);
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine(
+                                        "[CloseExcelApplication] Workbook access: " + ex.Message);
+                                }
+                                finally
+                                {
+                                    if (wb != null)
+                                    {
+                                        try { Marshal.ReleaseComObject(wb); } catch { /* ignore */ }
+                                    }
+                                }
+                            }
                         }
-                        // 結果へ戻る経路と同様に、Excel インスタンス自体を終了する。
-                        try { excelApp.Quit(); } catch { }
-                        Marshal.ReleaseComObject(excelApp);
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                "[CloseExcelApplication] Save all: " + ex.Message);
+                        }
+
+                        CloseAllWorkbooks(excelApp, "[CloseExcelApplication]");
+
+                        try { excelApp.Quit(); } catch { /* ignore */ }
+                        try { Marshal.ReleaseComObject(excelApp); } catch { /* ignore */ }
                         excelApp = null;
                     }
                 }
@@ -2258,14 +2287,9 @@ namespace Ui.ViewModels
             }
             finally
             {
-                // リソースのクリーンアップ
-                if (activeWorkbook != null)
-                {
-                    try { Marshal.ReleaseComObject(activeWorkbook); } catch { }
-                }
                 if (excelApp != null)
                 {
-                    try { Marshal.ReleaseComObject(excelApp); } catch { }
+                    try { Marshal.ReleaseComObject(excelApp); } catch { /* ignore */ }
                 }
                 _sharedExcelApp = null;
             }

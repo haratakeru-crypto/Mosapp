@@ -32,6 +32,7 @@ namespace MOSExcelMogiApp
     {
         private MainViewModel _viewModel;
         private AppBarWindow _appBarWindow;
+        private bool _isExiting;
         public static bool IsTimerDisabled { get; private set; } = true; // タイマー無効化フラグ（静的プロパティ）。デフォルトは一時停止。
         
         public MainWindow()
@@ -89,6 +90,9 @@ namespace MOSExcelMogiApp
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (_isExiting)
+                return;
+
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
             {
@@ -96,11 +100,15 @@ namespace MOSExcelMogiApp
                 return;
             }
 
+            _isExiting = true;
             try
             {
                 // 終了処理中にカーソルを待機状態にする
                 this.Cursor = Cursors.Wait;
-                
+
+                // AppBar が残ると OnLastWindowClose でプロセスが残ることがある
+                CloseAppBarForExit();
+
                 // Excel を確実に閉じる（同期実行して完了を待つことでゾンビプロセスを防止）
                 _viewModel?.CloseExcelApplication();
             }
@@ -108,10 +116,27 @@ namespace MOSExcelMogiApp
             {
                 System.Diagnostics.Debug.WriteLine($"[MainWindow] Error during closing cleanup: {ex.Message}");
             }
+            finally
+            {
+                this.Cursor = Cursors.Arrow;
+            }
+        }
+
+        /// <summary>終了時に AppBar を閉じる。</summary>
+        private void CloseAppBarForExit()
+        {
+            var bar = _appBarWindow;
+            _appBarWindow = null;
+            if (bar == null)
+                return;
+            try { bar.Close(); } catch { /* ignore */ }
         }
         
         private void OnShowAppBarRequested(object sender, EventArgs e)
         {
+            if (_isExiting)
+                return;
+
             if (_appBarWindow == null || !_appBarWindow.IsLoaded)
             {
                 _appBarWindow = new AppBarWindow(_viewModel);
@@ -780,8 +805,11 @@ namespace MOSExcelMogiApp
                 _viewModel.ExamEnded -= OnExamEnded;
             }
             
-            // アプリバーウィンドウを閉じる
-            _appBarWindow?.Close();
+            // アプリバーウィンドウを閉じる（Closing で済んでいれば no-op）
+            if (!_isExiting)
+                CloseAppBarForExit();
+            else
+                _appBarWindow = null;
             
             base.OnClosed(e);
         }
