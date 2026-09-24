@@ -5,6 +5,8 @@ using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
+using Libraries;
 
 namespace MOS_PowerPoint_app
 {
@@ -27,6 +29,12 @@ namespace MOS_PowerPoint_app
             var mainWindow = new MainWindow();
             Application.Current.MainWindow = mainWindow;
             mainWindow.Show();
+
+            // UI をブロックせず VSTO 準備（開発/MSI キーの排他）
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                VSTOInstallerHelper.StartBackgroundPrepForExam();
+            }), DispatcherPriority.ApplicationIdle);
         }
         
         private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)

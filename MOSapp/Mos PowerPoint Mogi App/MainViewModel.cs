@@ -225,6 +225,20 @@ namespace MOS_PowerPoint_app
                 {
                     try
                     {
+                        // 開発用 / MSI 用レジストリの二重読み込みを防ぐ
+                        string vstoIssue;
+                        if (!Libraries.VSTOInstallerHelper.EnsureAddInReadyForExam(out vstoIssue))
+                        {
+                            ResultMessage = "エラー: PowerPoint 用 VSTO アドインを準備できません。"
+                                + (string.IsNullOrEmpty(vstoIssue) ? "" : ("\n" + vstoIssue));
+                            MessageBox.Show(
+                                ResultMessage,
+                                "VSTO 未準備",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                            return;
+                        }
+
                         // プロジェクト起動前にタスク情報をクリアし、アドイン側の古いスナップショットとの比較を防止
                         Libraries.PPLogReader.ClearCurrentTaskFile();
 

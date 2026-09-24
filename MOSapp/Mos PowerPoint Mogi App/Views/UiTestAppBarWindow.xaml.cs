@@ -629,9 +629,14 @@ namespace MOS_PowerPoint_app.Views
         private const int VstoHeartbeatWaitMs = 8000;
         private const int ActiveVstoHeartbeatMaxAgeSeconds = 15;
 
-        /// <summary>VSTO 心拍が新鮮になるまで待つ。失敗時は false。</summary>
+        /// <summary>レジストリ排他のうえ、VSTO 心拍が新鮮になるまで待つ。失敗時は false。</summary>
         private static bool EnsureVstoReady(int timeoutMs = VstoHeartbeatWaitMs)
         {
+            string issue;
+            Libraries.VSTOInstallerHelper.EnsureAddInReadyForExam(out issue);
+            if (!string.IsNullOrEmpty(issue))
+                System.Diagnostics.Debug.WriteLine("[EnsureVstoReady] " + issue);
+
             if (PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds))
                 return true;
             return PPLogReader.WaitForVstoHeartbeat(timeoutMs, ActiveVstoHeartbeatMaxAgeSeconds);
