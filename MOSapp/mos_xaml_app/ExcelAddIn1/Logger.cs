@@ -112,6 +112,26 @@ namespace ExcelAddIn1
                         : "";
                     AppendToFile($"[{timestamp}] {taskPrefix}[Op] {operationType} {detail}".TrimEnd());
                 }
+
+                // 単語帳: gallery/menu は Ribbon フック不可のため、操作ログからキーを補完
+                try
+                {
+                    if (string.Equals(operationType, "AddConditionalFormat", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(operationType, "SetConditionalFormat", StringComparison.OrdinalIgnoreCase))
+                        VocabLogger.LogKey("ConditionalFormattingMenu");
+                    else if (string.Equals(operationType, "SetPageMargins", StringComparison.OrdinalIgnoreCase))
+                        VocabLogger.LogKey("PageMarginsGallery");
+                    else if (string.Equals(operationType, "ManageNamedRange", StringComparison.OrdinalIgnoreCase))
+                        VocabLogger.LogKey("NameUseInFormula");
+                    else if (string.Equals(operationType, "SetFreezePanes", StringComparison.OrdinalIgnoreCase))
+                        VocabLogger.LogKey("FreezePanes");
+                    else if (string.Equals(operationType, "SortOrFilter", StringComparison.OrdinalIgnoreCase))
+                    {
+                        VocabLogger.LogKey("SortDialog");
+                        VocabLogger.LogKey("SortAscendingExcel");
+                    }
+                }
+                catch { }
             }
             catch (Exception ex)
             {

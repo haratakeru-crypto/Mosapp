@@ -1,0 +1,1 @@
+(('テストに出るキーワード', None, None, None, None, None, None, None, '答えの関数'), ('空白を数える', None, None, None, None, None, None, None, 'COUNTBLANK'))

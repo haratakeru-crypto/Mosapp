@@ -148,6 +148,9 @@ namespace MOSExcelMogiApp
             // レビューページ表示要求イベントを購読
             _viewModel.OpenReviewPageRequested += OnOpenReviewPageRequested;
 
+            _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            ApplyVocabularyModeUi();
+
             // シェル起動後の共有 Excel 接続完了時に Excel ウィンドウを再配置（起動直後のずれを解消）
             _viewModel.SharedExcelApplicationAttached += OnSharedExcelApplicationAttached;
 
@@ -752,6 +755,12 @@ namespace MOSExcelMogiApp
 
         private void UpdateTaskDisplay()
         {
+            if (_viewModel != null && _viewModel.IsVocabularyMode)
+            {
+                ApplyVocabularyModeUi();
+                return;
+            }
+
             // 現在のプロジェクト番号/総プロジェクト数を表示
             int totalProjects = _projectData?.Projects?.Count ?? 0;
             var projectInfoTextBlock = FindName("ProjectInfoTextBlock") as TextBlock;
@@ -760,6 +769,13 @@ namespace MOSExcelMogiApp
 
             // タスク説明の表示を更新
             var taskDescriptionTextBlock = FindName("TaskDescriptionTextBlock") as TextBlock;
+            if (taskDescriptionTextBlock != null)
+            {
+                taskDescriptionTextBlock.FontSize = 16;
+                taskDescriptionTextBlock.FontWeight = FontWeights.Normal;
+                taskDescriptionTextBlock.TextAlignment = TextAlignment.Left;
+                taskDescriptionTextBlock.HorizontalAlignment = HorizontalAlignment.Stretch;
+            }
             if (taskDescriptionTextBlock != null && _tasks != null && _tasks.Any(t => t.TaskId == _currentTaskId))
             {
                 var currentTask = _tasks.Find(t => t.TaskId == _currentTaskId);
@@ -783,6 +799,63 @@ namespace MOSExcelMogiApp
 
             // VSTO 連携用に現在タスクを共有ファイルへ書き出す
             WriteCurrentTaskFile();
+        }
+
+        void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsVocabularyMode)
+                || e.PropertyName == nameof(MainViewModel.VocabularyKeywordText)
+                || e.PropertyName == nameof(MainViewModel.VocabularyProgressText))
+            {
+                ApplyVocabularyModeUi();
+            }
+        }
+
+        void ApplyVocabularyModeUi()
+        {
+            if (_viewModel == null || !_viewModel.IsVocabularyMode)
+            {
+                if (CompleteButton != null) CompleteButton.Visibility = Visibility.Visible;
+                if (FlagButton != null) FlagButton.Visibility = Visibility.Visible;
+                if (ReviewPageButton != null) ReviewPageButton.Visibility = Visibility.Visible;
+                if (ProjectResetButton != null) ProjectResetButton.Visibility = Visibility.Visible;
+                try
+                {
+                    if (TaskButton1?.Parent is FrameworkElement row)
+                        row.Visibility = Visibility.Visible;
+                }
+                catch { }
+                return;
+            }
+
+            if (ReviewPageButton != null) ReviewPageButton.Visibility = Visibility.Collapsed;
+            if (CompleteButton != null) CompleteButton.Visibility = Visibility.Collapsed;
+            if (FlagButton != null) FlagButton.Visibility = Visibility.Collapsed;
+            if (ProjectResetButton != null) ProjectResetButton.Visibility = Visibility.Collapsed;
+
+            var projectInfoTextBlock = FindName("ProjectInfoTextBlock") as TextBlock;
+            if (projectInfoTextBlock != null)
+                projectInfoTextBlock.Text = string.IsNullOrEmpty(_viewModel.VocabularyProgressText)
+                    ? "単語帳"
+                    : _viewModel.VocabularyProgressText;
+
+            var taskDescriptionTextBlock = FindName("TaskDescriptionTextBlock") as TextBlock;
+            if (taskDescriptionTextBlock != null)
+            {
+                taskDescriptionTextBlock.Inlines.Clear();
+                taskDescriptionTextBlock.Text = _viewModel.VocabularyKeywordText ?? "";
+                taskDescriptionTextBlock.FontSize = 36;
+                taskDescriptionTextBlock.FontWeight = FontWeights.Bold;
+                taskDescriptionTextBlock.TextAlignment = TextAlignment.Center;
+                taskDescriptionTextBlock.HorizontalAlignment = HorizontalAlignment.Center;
+            }
+
+            try
+            {
+                if (TaskButton1?.Parent is FrameworkElement row)
+                    row.Visibility = Visibility.Collapsed;
+            }
+            catch { }
         }
 
         /// <summary>
@@ -1785,6 +1858,7 @@ namespace MOSExcelMogiApp
                 _viewModel.ExamEnded -= OnExamEnded;
                 _viewModel.CurrentProjectChanged -= OnCurrentProjectChanged;
                 _viewModel.VariantModeChanged -= OnVariantModeChanged;
+                _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
                 _viewModel.OpenReviewPageRequested -= OnOpenReviewPageRequested;
                 _viewModel.SharedExcelApplicationAttached -= OnSharedExcelApplicationAttached;
             }

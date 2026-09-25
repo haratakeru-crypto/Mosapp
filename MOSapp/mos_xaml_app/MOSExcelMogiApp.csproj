@@ -93,6 +93,8 @@
     <Reference Include="PresentationFramework" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
@@ -216,6 +218,22 @@
     <Compile Include="Libraries\ExcelLogReader.cs" />
     <Compile Include="Libraries\ExcelApplicationManager.cs" />
     <Compile Include="Libraries\ExcelTaskValidationConfig.cs" />
+    <Compile Include="Vocabulary\VocabularyCatalog.cs" />
+    <Compile Include="Vocabulary\VocabularyEventWatcher.cs" />
+    <Compile Include="Vocabulary\VocabularyWorkbookFactory.cs" />
+    <Compile Include="Vocabulary\VocabularySessionController.cs" />
+    <Compile Include="Vocabulary\VocabularyHwndHelper.cs" />
+    <Compile Include="Vocabulary\VocabularyHighlightHelper.cs" />
+    <Compile Include="Vocabulary\VocabularyRibbonTabProbe.cs" />
+    <Compile Include="Vocabulary\CoachMarkOverlayWindow.xaml.cs">
+      <DependentUpon>CoachMarkOverlayWindow.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="Vocabulary\CoachMarkOverlayWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -244,6 +262,9 @@
   <ItemGroup>
     <None Include="App.config" />
     <Content Include="Assets\config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Vocabulary\vocab_workbook.xlsx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="..\MosPracticeClient\Assets\universities.json">
@@ -276,6 +297,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\JSON\MOS演習問題文一覧_PracticeVariant5.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\ExcelVocabularyKeywords.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\CSV\解答手順あり模擬試験①問題文.csv">

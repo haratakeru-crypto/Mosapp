@@ -1,0 +1,20 @@
+# 関数 | rows=19 maxcol=4
+R3			最高	Max
+R4			最大	Max
+R5			数値の個数スウチコスウ	COUNT
+R6			空白を数える	COUNTBLANK
+R7			文字を数える	COUNTA
+R8			ランダムに表示	RANDBETWEEN
+R9			最初の文字を表示	LEFT
+R10			左の文字を表示	LEFT
+R11			最後の文字を表示	RIGHT
+R12			右の文字を表示	RIGHT
+R13			重複しない	UNIQUE
+R14			ひとつずつ表示	UNIQUE
+R15			合計を表示	SUM
+R16			付け加えて	CONCAT
+R17			組み合わせて	CONCAT
+R18			～であれば、そうでなければ	IF
+R19			並べ替えて表示	SORT
+R20			連続で表示	SEQUENCE
+R21			～ごとに表示	SEQUENCE

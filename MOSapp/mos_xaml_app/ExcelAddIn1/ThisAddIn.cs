@@ -18,6 +18,10 @@ namespace ExcelAddIn1
         private bool _ignoreNextAutoLayoutChangeAfterTaskStart;
         private string _lastRangeSelectionAddress;
 
+        // 単語帳: 選択種別の重複ログ防止
+        private string _lastVocabSelectionKey;
+        private bool _vocabModeWasEnabled;
+
         // ダブルクリック編集モード→確定（実値変更なし）でも SheetChange が飛ぶケース対策
         private string _pendingDoubleClickEditKey;
         private string _pendingDoubleClickEditOldValue;
@@ -135,6 +139,11 @@ namespace ExcelAddIn1
                 {
                     Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
                     WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
+                    if (string.Equals(operationType, "EditCellFormula", StringComparison.Ordinal))
+                    {
+                        try { VocabLogger.LogFormulaIfAny(SafeRangeFormulaText(target)); }
+                        catch { }
+                    }
                 }
 
                 ClearPendingDoubleClickCapture();
@@ -160,8 +169,60 @@ namespace ExcelAddIn1
 
                 // 選択変更のたびにハイパーリンク集合を照合（ダイアログ挿入後に別セルを選ぶまで SheetChange が無いケースの補足）
                 TryDetectHyperlinkChangeAfterSheetChange(sheet);
+                TryEmitVocabSelectionFromRange(target);
             }
             catch { }
+        }
+
+        void TryEmitVocabSelectionFromRange(Excel.Range target)
+        {
+            if (!VocabLogger.IsVocabModeEnabled() || target == null) return;
+            try
+            {
+                Excel.ListObject lo = null;
+                try { lo = target.ListObject; } catch { }
+                if (lo != null)
+                    EmitVocabSelectionOnce("SelectTable");
+            }
+            catch { }
+        }
+
+        void TryEmitVocabSelectionFromApplication()
+        {
+            if (!VocabLogger.IsVocabModeEnabled()) return;
+            try
+            {
+                object sel = Application.Selection;
+                if (sel == null) return;
+
+                if (sel is Excel.Chart || sel is Excel.ChartObject)
+                {
+                    EmitVocabSelectionOnce("SelectChart");
+                    return;
+                }
+
+                // Chart の PlotArea / ChartArea など
+                string typeName = "";
+                try { typeName = sel.GetType().Name ?? ""; } catch { }
+                if (typeName.IndexOf("Chart", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    EmitVocabSelectionOnce("SelectChart");
+                    return;
+                }
+
+                var range = sel as Excel.Range;
+                if (range != null)
+                    TryEmitVocabSelectionFromRange(range);
+            }
+            catch { }
+        }
+
+        void EmitVocabSelectionOnce(string key)
+        {
+            if (string.Equals(_lastVocabSelectionKey, key, StringComparison.OrdinalIgnoreCase))
+                return;
+            _lastVocabSelectionKey = key;
+            VocabLogger.LogKey(key);
         }
 
         private void Application_SheetBeforeDoubleClick(object sh, Excel.Range target, ref bool cancel)
@@ -330,6 +391,15 @@ namespace ExcelAddIn1
         {
             try
             {
+                // 単語帳: チャート選択など Range 以外の選択を補足検知
+                bool vocabOn = VocabLogger.IsVocabModeEnabled();
+                if (vocabOn && !_vocabModeWasEnabled)
+                    _lastVocabSelectionKey = null;
+                if (!vocabOn)
+                    _lastVocabSelectionKey = null;
+                _vocabModeWasEnabled = vocabOn;
+                TryEmitVocabSelectionFromApplication();
+
                 if (!File.Exists(CurrentTaskFilePath)) return;
 
                 string line;

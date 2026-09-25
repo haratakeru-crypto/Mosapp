@@ -159,7 +159,7 @@
 
                         <Button Name="ScoreButton" Content="採点" 
                                 Command="{Binding ScoreCommand}"
-                                Visibility="{Binding ShowScoreButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Visibility="{Binding ShowScoreButtonEffective, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Background="White" 
                                 Foreground="#1E40AF" 
                                 Padding="24,10" 
@@ -229,7 +229,7 @@
                             </Button.Style>
                         </Button>
                         
-                        <Button Content="次のプロジェクト" 
+                        <Button Content="{Binding NextProjectButtonLabel}" 
                                 Command="{Binding NextProjectCommand}"
                                 Visibility="{Binding IsNextProjectVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Background="White" 

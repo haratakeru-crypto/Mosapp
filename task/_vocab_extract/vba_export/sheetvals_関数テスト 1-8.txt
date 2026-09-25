@@ -1,0 +1,1 @@
+(('テストに出るキーワード', None, None, None, None, None, None, None, '答えの関数'), ('組み合わせて', None, None, None, None, None, None, None, 'CONCAT'))

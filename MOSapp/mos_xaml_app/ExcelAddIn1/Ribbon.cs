@@ -34,6 +34,23 @@ namespace ExcelAddIn1
             System.Diagnostics.Debug.WriteLine("[ExcelAddIn1.Ribbon] Ribbon_Load completed");
         }
 
+        /// <summary>単語帳モード用: リボン idMso クリックを Vocab イベントとして記録し、既定動作は継続する。</summary>
+        public void VocabCommandOnAction(IRibbonControl control, ref bool cancelDefault)
+        {
+            cancelDefault = false;
+            try
+            {
+                string id = control?.Id ?? "";
+                if (!string.IsNullOrEmpty(id))
+                    VocabLogger.LogKey(id);
+                Logger.LogCommand(id);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExcelAddIn1.Ribbon] VocabCommandOnAction: " + ex.Message);
+            }
+        }
+
         /// <summary>Backstage 表示開始。追跡対象の文書プロパティの基準とタスク文脈を記録。</summary>
         /// <remarks>
         /// Office の backstage の onShow/onHide は <see cref="IRibbonControl"/> ではなく <c>object contextObject</c> 1 個（公式リファレンス）。
@@ -57,6 +74,8 @@ namespace ExcelAddIn1
                 _backstagePropertySnapshot = CaptureWorkbookProperties(wb);
                 _backstageCaptureActive = true;
                 System.Diagnostics.Debug.WriteLine($"[ExcelAddIn1.Ribbon] OnBackstageShow wb={_backstageWorkbookKey} task={p}-{t}-{a}");
+                VocabLogger.LogKey("BackstageInfo");
+                VocabLogger.LogKey("FileInfo");
             }
             catch (Exception ex)
             {
@@ -329,6 +348,22 @@ namespace ExcelAddIn1
         {
             return @"<?xml version=""1.0"" encoding=""UTF-8""?>
 <customUI xmlns=""http://schemas.microsoft.com/office/2009/07/customui"" onLoad=""Ribbon_Load"">
+  <commands>
+    <command idMso=""SortAscendingExcel"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""SortDescendingExcel"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""SortDialog"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""SortCustomExcel"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""FreezePanes"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""HyperlinkInsert"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""ShowFormulas"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""SparklineLineInsert"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""SparklineColumnInsert"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""HeaderFooterInsert"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""TextBoxInsertExcel"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""PageSetupPageDialog"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""FilePrint"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""AccessibilityChecker"" onAction=""VocabCommandOnAction"" />
+  </commands>
   <ribbon>
     <tabs>
       <tab id=""MosLogTab"" label=""ログ"" insertAfterMso=""TabHelp"">

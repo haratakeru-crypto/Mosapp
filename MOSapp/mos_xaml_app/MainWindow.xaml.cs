@@ -78,6 +78,17 @@ namespace MOSExcelMogiApp
             _viewModel.ResultMessage = "類題は後から接続します";
         }
 
+        private void VocabularyTab_StartRequested(object sender, MosPracticeClient.VocabularyStartEventArgs e)
+        {
+            if (e.Mode != MosPracticeClient.VocabularyStartMode.KeywordOnly)
+            {
+                MessageBox.Show("「問題文から」モードは準備中です。", "単語帳", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            _viewModel.StartVocabularySession(e.Category);
+        }
+
         private void ScoringLog_EntryClicked(object sender, MosPracticeClient.ScoringLogEntry entry)
         {
             if (entry == null) return;

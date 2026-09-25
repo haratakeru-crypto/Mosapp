@@ -1,0 +1,807 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Windows;
+using System.Windows.Threading;
+using MosPracticeClient;
+using ExcelApp = Microsoft.Office.Interop.Excel.Application;
+
+namespace MOSExcelMogiApp.Vocabulary
+{
+    public sealed class VocabularySessionController : IDisposable
+    {
+        public enum Phase
+        {
+            Idle,
+            Tutorial,
+            Quiz,
+            Finished
+        }
+
+        readonly Dispatcher _dispatcher;
+        readonly Action<string> _setKeywordDisplay;
+        readonly Action<string> _setProgressDisplay;
+        readonly Action _onFinished;
+        readonly Func<IntPtr> _getExcelHwnd;
+        readonly Func<ExcelApp> _getExcelApp;
+
+        VocabularyEventWatcher _watcher;
+        DispatcherTimer _pollTimer;
+        CoachMarkOverlayWindow _coach;
+        List<VocabularyKeywordItem> _queue = new List<VocabularyKeywordItem>();
+        int _index;
+        bool _awaitingDismiss;
+        bool _tutorialMode;
+        VocabularyCategory _category;
+        Phase _phase = Phase.Idle;
+        readonly HashSet<string> _acceptedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>順次 detectKeys（SelectTable → TableDesignTab 等）の達成済みキー。</summary>
+        readonly HashSet<string> _sequentialProgress = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        VocabularyKeywordItem _current;
+        bool _currentSolved;
+
+        /// <summary>テーブル／グラフのチュートリアル2段階目（デザインタブ）待ち。</summary>
+        int _tutorialSubStep;
+        DateTime _suppressSelectionPollUntil = DateTime.MinValue;
+        bool _tutorialAdvanceBusy;
+        /// <summary>ポーリングは「未選択→選択」の立ち上がりのみ進行（既選択でのスキップ防止）。</summary>
+        bool _prevPollTargetSelected;
+        /// <summary>1/2 で選択解除に失敗したとき、ポーリングでは進めずイベント待ちにする。</summary>
+        bool _step0IgnorePoll;
+
+        public VocabularySessionController(
+            Dispatcher dispatcher,
+            Action<string> setKeywordDisplay,
+            Action<string> setProgressDisplay,
+            Action onFinished,
+            Func<IntPtr> getExcelHwnd,
+            Func<ExcelApp> getExcelApp = null)
+        {
+            _dispatcher = dispatcher;
+            _setKeywordDisplay = setKeywordDisplay;
+            _setProgressDisplay = setProgressDisplay;
+            _onFinished = onFinished;
+            _getExcelHwnd = getExcelHwnd;
+            _getExcelApp = getExcelApp;
+        }
+
+        public Phase CurrentPhase => _phase;
+        public VocabularyKeywordItem Current => _current;
+        public bool IsActive => _phase == Phase.Tutorial || _phase == Phase.Quiz;
+        public bool CurrentSolved => _currentSolved;
+
+        public void Start(VocabularyCategory category)
+        {
+            StopWatcher();
+            VocabularyEventWatcher.ClearEvents();
+
+            _category = category;
+            var catalog = VocabularyCatalog.Load();
+            var quizItems = VocabularyCatalog.Filter(category).OrderBy(_ => Guid.NewGuid()).ToList();
+
+            var tutorial = new List<VocabularyKeywordItem>();
+            if (category == VocabularyCategory.TabButton || category == VocabularyCategory.Both)
+            {
+                var tab = VocabularyCatalog.FindById(catalog.TutorialTabKeywordId)
+                          ?? quizItems.FirstOrDefault(i => !i.IsFunction);
+                if (tab != null) tutorial.Add(tab);
+            }
+            if (category == VocabularyCategory.Function || category == VocabularyCategory.Both)
+            {
+                var fn = VocabularyCatalog.FindById(catalog.TutorialFunctionKeywordId)
+                         ?? quizItems.FirstOrDefault(i => i.IsFunction);
+                if (fn != null) tutorial.Add(fn);
+            }
+
+            _queue = tutorial.Count > 0
+                ? tutorial.Concat(quizItems).ToList()
+                : quizItems;
+
+            if (_queue.Count == 0)
+            {
+                MessageBox.Show("出題するキーワードがありません。", "単語帳", MessageBoxButton.OK, MessageBoxImage.Information);
+                _phase = Phase.Finished;
+                _onFinished?.Invoke();
+                return;
+            }
+
+            _index = 0;
+            _tutorialMode = tutorial.Count > 0;
+            _phase = _tutorialMode ? Phase.Tutorial : Phase.Quiz;
+            WriteVocabModeFlag(true);
+            StartWatcher();
+            ShowCurrent(showTutorialCoach: _tutorialMode);
+        }
+
+        public void GoNext()
+        {
+            if (_awaitingDismiss) return;
+
+            _index++;
+            if (_index >= _queue.Count)
+            {
+                Finish();
+                return;
+            }
+
+            bool stillTutorial = _tutorialMode && _index < CountLeadingTutorial();
+            _phase = stillTutorial ? Phase.Tutorial : Phase.Quiz;
+            ShowCurrent(showTutorialCoach: stillTutorial);
+        }
+
+        int CountLeadingTutorial()
+        {
+            int n = 0;
+            if (_category == VocabularyCategory.TabButton || _category == VocabularyCategory.Both) n++;
+            if (_category == VocabularyCategory.Function || _category == VocabularyCategory.Both) n++;
+            return Math.Min(n, _queue.Count);
+        }
+
+        void ShowCurrent(bool showTutorialCoach)
+        {
+            _current = _queue[_index];
+            _currentSolved = false;
+            _tutorialSubStep = 0;
+            _tutorialAdvanceBusy = false;
+            _sequentialProgress.Clear();
+            _prevPollTargetSelected = true; // 既選択のまま即進行しない
+            _step0IgnorePoll = false;
+            RebuildAcceptedKeys();
+            VocabularyEventWatcher.ClearEvents();
+            WriteVocabModeFlag(false);
+            WriteVocabModeFlag(true);
+
+            string prefix = _phase == Phase.Tutorial ? "【チュートリアル】" : "";
+            _setKeywordDisplay?.Invoke(prefix + _current.Keyword);
+            _setProgressDisplay?.Invoke($"{_index + 1}/{_queue.Count}");
+
+            if (showTutorialCoach && NeedsTwoStepTutorial(_current))
+            {
+                // 1/2: 選択解除後に少し待ってからコーチ表示（COM 座標取得を安定させる）
+                PrepareTutorialStep1();
+                var delay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+                delay.Tick += (s, e) =>
+                {
+                    delay.Stop();
+                    if (_currentSolved || _tutorialSubStep != 0) return;
+                    ShowTutorialCoachStep();
+                };
+                delay.Start();
+                return;
+            }
+
+            if (showTutorialCoach)
+                ShowTutorialCoachStep();
+        }
+
+        /// <summary>1/2 開始: 既にテーブル選択済みだと即 2/2 になるため、選択を外す。</summary>
+        void PrepareTutorialStep1()
+        {
+            try
+            {
+                var excel = _getExcelApp?.Invoke();
+                if (excel != null)
+                {
+                    ExcelApp xl = excel;
+                    try
+                    {
+                        var ws = xl.ActiveSheet as Microsoft.Office.Interop.Excel.Worksheet;
+                        ws?.Range["A1"]?.Select();
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            _prevPollTargetSelected = true;
+            _step0IgnorePoll = false;
+            _suppressSelectionPollUntil = DateTime.UtcNow.AddMilliseconds(800);
+            // 抑制明けにベースラインを取り直す
+            _dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_tutorialSubStep != 0 || _currentSolved) return;
+                CapturePollBaseline();
+                // まだテーブル上ならポーリングでは進めない（クリック／イベント待ち）
+                if (_prevPollTargetSelected)
+                    _step0IgnorePoll = true;
+            }), DispatcherPriority.ApplicationIdle);
+        }
+
+        /// <summary>2/2 開始: デザインタブが既に選択されていても即正解にしない。</summary>
+        void PrepareTutorialStep2()
+        {
+            IntPtr hwnd = IntPtr.Zero;
+            try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+            try { VocabularyRibbonTabProbe.TryActivateHomeTab(hwnd); } catch { }
+
+            _prevPollTargetSelected = true;
+            _suppressSelectionPollUntil = DateTime.UtcNow.AddMilliseconds(600);
+            _dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_tutorialSubStep != 1 || _currentSolved) return;
+                CapturePollBaseline();
+            }), DispatcherPriority.ApplicationIdle);
+        }
+
+        void CapturePollBaseline()
+        {
+            try
+            {
+                IntPtr hwnd = IntPtr.Zero;
+                try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+                var excel = _getExcelApp?.Invoke();
+                _prevPollTargetSelected = IsTutorialTargetCurrentlyMet(excel, hwnd);
+            }
+            catch
+            {
+                _prevPollTargetSelected = false;
+            }
+        }
+
+        bool IsTutorialTargetCurrentlyMet(ExcelApp excel, IntPtr hwnd)
+        {
+            if (_tutorialSubStep == 0)
+            {
+                if (IsTableKeyword(_current))
+                    return excel != null && VocabularyHighlightHelper.IsTableCurrentlySelected(excel);
+                if (IsChartKeyword(_current))
+                    return excel != null && VocabularyHighlightHelper.IsChartCurrentlySelected(excel);
+                return false;
+            }
+
+            if (_tutorialSubStep == 1)
+            {
+                if (IsTableKeyword(_current))
+                    return VocabularyRibbonTabProbe.IsTableDesignTabSelected(hwnd);
+                if (IsChartKeyword(_current))
+                    return VocabularyRibbonTabProbe.IsChartDesignTabSelected(hwnd);
+            }
+
+            return false;
+        }
+
+        void ShowTutorialCoachStep()
+        {
+            if (_current == null) return;
+
+            // テーブル／グラフ: 1) 対象を選択 → 2) デザインタブをクリック
+            if (NeedsTwoStepTutorial(_current))
+            {
+                if (_tutorialSubStep == 0)
+                {
+                    bool isTable = IsTableKeyword(_current);
+                    ShowCoach(
+                        title: "チュートリアル（1/2）",
+                        message: isTable
+                            ? "ハイライトされたテーブルをクリックして選択してください。"
+                            : "ハイライトされたグラフをクリックして選択してください。",
+                        hintOverride: isTable ? "Table" : "Chart",
+                        allowDismiss: false,
+                        clickThrough: true,
+                        onDismiss: null);
+                    return;
+                }
+
+                bool table = IsTableKeyword(_current);
+                ShowCoach(
+                    title: "チュートリアル（2/2）",
+                    message: table
+                        ? "リボンの『テーブルデザイン』タブをクリックしてください。"
+                        : "リボンの『グラフのデザイン』タブをクリックしてください。",
+                    hintOverride: table ? "TableDesignTab" : "ChartDesignTab",
+                    allowDismiss: false,
+                    clickThrough: true,
+                    onDismiss: null);
+                return;
+            }
+
+            ShowCoach(
+                title: "チュートリアル",
+                message: (_current.CoachMessage ?? ("キーワード「" + _current.Keyword + "」の場所を探しましょう。"))
+                         + "\n（正しい場所を操作すると次へ進みます）",
+                hintOverride: null,
+                allowDismiss: false,
+                clickThrough: true,
+                onDismiss: null);
+        }
+
+        static bool NeedsTwoStepTutorial(VocabularyKeywordItem item)
+        {
+            if (item == null) return false;
+            return IsTableKeyword(item) || IsChartKeyword(item);
+        }
+
+        static bool IsTableKeyword(VocabularyKeywordItem item)
+        {
+            return item != null && (
+                string.Equals(item.Id, "tab_table", StringComparison.OrdinalIgnoreCase)
+                || (item.Keyword ?? "").Contains("テーブル")
+                || string.Equals(item.HighlightHint, "Table", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.HighlightHint, "TableThenDesignTab", StringComparison.OrdinalIgnoreCase));
+        }
+
+        static bool IsChartKeyword(VocabularyKeywordItem item)
+        {
+            return item != null && (
+                string.Equals(item.Id, "tab_chart", StringComparison.OrdinalIgnoreCase)
+                || (item.Keyword ?? "").Contains("グラフ")
+                || string.Equals(item.HighlightHint, "Chart", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.HighlightHint, "ChartThenDesignTab", StringComparison.OrdinalIgnoreCase));
+        }
+
+        bool UsesSequentialDetect()
+        {
+            return _current?.DetectKeys != null
+                   && _current.DetectKeys.Count >= 2
+                   && (IsTableKeyword(_current) || IsChartKeyword(_current));
+        }
+
+        void RebuildAcceptedKeys()
+        {
+            _acceptedKeys.Clear();
+            if (_current?.DetectKeys == null) return;
+            foreach (var k in _current.DetectKeys)
+            {
+                if (!string.IsNullOrWhiteSpace(k))
+                    _acceptedKeys.Add(k.Trim());
+            }
+        }
+
+        void StartWatcher()
+        {
+            _watcher = new VocabularyEventWatcher();
+            _watcher.EventReceived += OnVocabEvent;
+            _pollTimer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(300)
+            };
+            _pollTimer.Tick += (_, __) =>
+            {
+                _watcher?.Drain();
+                PollExcelState();
+            };
+            _pollTimer.Start();
+        }
+
+        /// <summary>
+        /// テーブル選択・デザインタブ選択を Excel / UIA で直接見て進行する。
+        /// </summary>
+        void PollExcelState()
+        {
+            if (!IsActive || _current == null || _currentSolved) return;
+            if (DateTime.UtcNow < _suppressSelectionPollUntil) return;
+
+            try
+            {
+                IntPtr hwnd = IntPtr.Zero;
+                try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+                var excel = _getExcelApp?.Invoke();
+
+                if (_phase == Phase.Tutorial && NeedsTwoStepTutorial(_current))
+                {
+                    bool now = IsTutorialTargetCurrentlyMet(excel, hwnd);
+
+                    if (_tutorialSubStep == 0 && _step0IgnorePoll)
+                    {
+                        // 選択が一度外れたら立ち上がり検知に切り替え
+                        if (!now)
+                        {
+                            _step0IgnorePoll = false;
+                            _prevPollTargetSelected = false;
+                        }
+                        return;
+                    }
+
+                    bool rising = now && !_prevPollTargetSelected;
+                    _prevPollTargetSelected = now;
+                    if (!rising) return;
+
+                    if (_tutorialSubStep == 0)
+                    {
+                        if (IsTableKeyword(_current))
+                            TryAdvanceTutorialBySelection("SelectTable");
+                        else if (IsChartKeyword(_current))
+                            TryAdvanceTutorialBySelection("SelectChart");
+                    }
+                    else if (_tutorialSubStep == 1)
+                    {
+                        if (IsTableKeyword(_current))
+                            TryAdvanceTutorialBySelection("TableDesignTab");
+                        else if (IsChartKeyword(_current))
+                            TryAdvanceTutorialBySelection("ChartDesignTab");
+                    }
+                    return;
+                }
+
+                // クイズ: 順次条件をポーリングでも進める
+                if (_phase == Phase.Quiz && UsesSequentialDetect())
+                {
+                    if (excel != null && IsTableKeyword(_current)
+                        && VocabularyHighlightHelper.IsTableCurrentlySelected(excel))
+                    {
+                        ApplyQuizKey("SelectTable");
+                    }
+                    if (excel != null && IsChartKeyword(_current)
+                        && VocabularyHighlightHelper.IsChartCurrentlySelected(excel))
+                    {
+                        ApplyQuizKey("SelectChart");
+                    }
+
+                    if (IsTableKeyword(_current) && VocabularyRibbonTabProbe.IsTableDesignTabSelected(hwnd))
+                        ApplyQuizKey("TableDesignTab");
+                    if (IsChartKeyword(_current) && VocabularyRibbonTabProbe.IsChartDesignTabSelected(hwnd))
+                        ApplyQuizKey("ChartDesignTab");
+                }
+            }
+            catch { }
+        }
+
+        void StopWatcher()
+        {
+            try { _pollTimer?.Stop(); } catch { }
+            _pollTimer = null;
+            if (_watcher != null)
+            {
+                _watcher.EventReceived -= OnVocabEvent;
+                _watcher.Dispose();
+                _watcher = null;
+            }
+        }
+
+        void OnVocabEvent(string key)
+        {
+            if (!IsActive || _current == null) return;
+            if (string.IsNullOrWhiteSpace(key)) return;
+
+            _dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!IsActive || _current == null) return;
+
+                if (_phase == Phase.Tutorial && TryAdvanceTutorialBySelection(key))
+                    return;
+
+                if (_awaitingDismiss && _phase != Phase.Tutorial)
+                    return;
+
+                if (_phase == Phase.Quiz)
+                {
+                    ApplyQuizKey(key);
+                    return;
+                }
+
+                // 非チュートリアルで単一キーの場合
+                if (IsMatch(key))
+                    MarkCorrect();
+                else if (IsRelevantWrongAttempt(key))
+                    ShowWrongCoach();
+            }));
+        }
+
+        void ApplyQuizKey(string key)
+        {
+            if (_currentSolved || string.IsNullOrWhiteSpace(key)) return;
+
+            if (UsesSequentialDetect())
+            {
+                var keys = _current.DetectKeys;
+                string first = keys[0];
+                string second = keys[1];
+
+                if (string.Equals(key, first, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_sequentialProgress.Add(first))
+                    {
+                        // テーブル選択後はデザインタブを案内
+                        ShowCoach(
+                            title: "次の操作",
+                            message: IsTableKeyword(_current)
+                                ? "リボンの『テーブルデザイン』タブをクリックしてください。"
+                                : "リボンの『グラフのデザイン』タブをクリックしてください。",
+                            hintOverride: IsTableKeyword(_current) ? "TableDesignTab" : "ChartDesignTab",
+                            allowDismiss: false,
+                            clickThrough: true,
+                            onDismiss: null);
+                    }
+                    return;
+                }
+
+                if (string.Equals(key, second, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_sequentialProgress.Contains(first))
+                    {
+                        MarkCorrect();
+                        return;
+                    }
+
+                    // デザインタブだけ先に来た場合はテーブル選択を促す
+                    ShowWrongCoach();
+                    return;
+                }
+
+                if (IsRelevantWrongAttempt(key))
+                    ShowWrongCoach();
+                return;
+            }
+
+            if (IsMatch(key))
+                MarkCorrect();
+            else if (IsRelevantWrongAttempt(key))
+                ShowWrongCoach();
+        }
+
+        void ShowWrongCoach()
+        {
+            string hint = _current.HighlightHint;
+            string msg = _current.CoachMessage ?? ("正解は「" + _current.Answer + "」です。");
+            if (IsTableKeyword(_current))
+            {
+                hint = "TableThenDesignTab";
+                msg = "まずテーブルを選択すると、「テーブルデザイン」タブが表示されます。";
+            }
+            else if (IsChartKeyword(_current))
+            {
+                hint = "ChartThenDesignTab";
+                msg = "まずグラフを選択すると、「グラフのデザイン」タブが表示されます。";
+            }
+
+            ShowCoach(
+                title: "不正解です。",
+                message: msg + "\n（正しい場所を選択／操作すると進みます）",
+                hintOverride: hint,
+                allowDismiss: false,
+                clickThrough: true,
+                onDismiss: null);
+        }
+
+        void MarkCorrect()
+        {
+            if (_currentSolved) return;
+            _currentSolved = true;
+            CloseCoach();
+            MessageBox.Show("正解です！", "単語帳", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>チュートリアル中の選択でステップ進行。処理したら true。</summary>
+        bool TryAdvanceTutorialBySelection(string key)
+        {
+            if (_currentSolved || _tutorialAdvanceBusy) return true;
+            if (NeedsTwoStepTutorial(_current) && DateTime.UtcNow < _suppressSelectionPollUntil)
+                return false;
+
+            if (!NeedsTwoStepTutorial(_current))
+            {
+                if (IsMatch(key))
+                {
+                    MarkCorrect();
+                    return true;
+                }
+                return false;
+            }
+
+            // 1/2: テーブル／グラフ選択
+            if (_tutorialSubStep == 0)
+            {
+                bool selectOk =
+                    (IsTableKeyword(_current) && string.Equals(key, "SelectTable", StringComparison.OrdinalIgnoreCase))
+                    || (IsChartKeyword(_current) && string.Equals(key, "SelectChart", StringComparison.OrdinalIgnoreCase));
+
+                if (!selectOk) return false;
+
+                _tutorialAdvanceBusy = true;
+                _tutorialSubStep = 1;
+                _step0IgnorePoll = false;
+                CloseCoach();
+                PrepareTutorialStep2();
+                ShowTutorialCoachStep();
+                _tutorialAdvanceBusy = false;
+                return true;
+            }
+
+            // 2/2: デザインタブ選択（タイマー自動正解はしない）
+            if (_tutorialSubStep == 1)
+            {
+                bool tabOk =
+                    (IsTableKeyword(_current) && string.Equals(key, "TableDesignTab", StringComparison.OrdinalIgnoreCase))
+                    || (IsChartKeyword(_current) && string.Equals(key, "ChartDesignTab", StringComparison.OrdinalIgnoreCase));
+
+                if (!tabOk) return false;
+
+                _tutorialAdvanceBusy = false;
+                _currentSolved = true;
+                CloseCoach();
+                MessageBox.Show(
+                    IsTableKeyword(_current)
+                        ? "正解です！\nテーブルを選ぶと「テーブルデザイン」タブが表示されます。"
+                        : "正解です！\nグラフを選ぶと「グラフのデザイン」タブが表示されます。",
+                    "単語帳",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return true;
+            }
+
+            return false;
+        }
+
+        bool IsMatch(string key)
+        {
+            if (UsesSequentialDetect())
+            {
+                // 順次は ApplyQuizKey 側で完了判定
+                return false;
+            }
+
+            if (_acceptedKeys.Contains(key)) return true;
+
+            if (key.StartsWith("Formula:", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrEmpty(_current.FormulaName))
+            {
+                string name = key.Substring("Formula:".Length);
+                return string.Equals(name, _current.FormulaName, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
+        }
+
+        bool IsRelevantWrongAttempt(string key)
+        {
+            if (key.StartsWith("Formula:", StringComparison.OrdinalIgnoreCase))
+                return _current.IsFunction;
+            if (key.StartsWith("Select", StringComparison.OrdinalIgnoreCase))
+                return !_current.IsFunction;
+            if (key.IndexOf("Tab", StringComparison.OrdinalIgnoreCase) >= 0)
+                return !_current.IsFunction;
+            return !_current.IsFunction;
+        }
+
+        void ShowCoach(string title, string message, string hintOverride, bool allowDismiss, bool clickThrough, Action onDismiss)
+        {
+            try
+            {
+                CloseCoach();
+                _awaitingDismiss = allowDismiss;
+                IntPtr hwnd = IntPtr.Zero;
+                try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+
+                string hint = hintOverride ?? _current?.HighlightHint;
+                ExcelApp excel = null;
+                try { excel = _getExcelApp?.Invoke(); } catch { }
+
+                // テーブル強調: シート上のオレンジ枠 + オーバーレイ穴
+                if (hint != null &&
+                    (hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
+                     || hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase)))
+                {
+                    try { VocabularyHighlightHelper.ApplyNativeTableHighlight(excel); } catch { }
+                }
+                else
+                {
+                    try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
+                }
+
+                var holes = VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, hint);
+
+                _coach = new CoachMarkOverlayWindow();
+                Action dismissAction = () =>
+                {
+                    _awaitingDismiss = false;
+                    _coach = null;
+                    try
+                    {
+                        var xl = _getExcelApp?.Invoke();
+                        VocabularyHighlightHelper.ClearNativeTableHighlight(xl);
+                    }
+                    catch { }
+                    onDismiss?.Invoke();
+                };
+                _coach.Dismissed += dismissAction;
+                _coach.ShowCoachMark(hwnd, holes, title, message, allowDismiss, clickThrough);
+
+                // 座標が空なら遅延再取得して穴を差し替え
+                if (holes.Count == 0
+                    && hint != null
+                    && (hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
+                        || hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase)))
+                {
+                    ScheduleTableHighlightRefresh(hint);
+                }
+            }
+            catch (Exception ex)
+            {
+                _awaitingDismiss = false;
+                System.Diagnostics.Debug.WriteLine("[ShowCoach] " + ex.Message);
+                MessageBox.Show((title ?? "") + "\n\n" + (message ?? ""), "単語帳", MessageBoxButton.OK, MessageBoxImage.Information);
+                onDismiss?.Invoke();
+            }
+        }
+
+        void ScheduleTableHighlightRefresh(string hint)
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            int tries = 0;
+            timer.Tick += (s, e) =>
+            {
+                tries++;
+                if (_coach == null || _currentSolved)
+                {
+                    timer.Stop();
+                    return;
+                }
+
+                IntPtr hwnd = IntPtr.Zero;
+                try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+                try
+                {
+                    var excel = _getExcelApp?.Invoke();
+                    VocabularyHighlightHelper.ApplyNativeTableHighlight(excel);
+                }
+                catch { }
+
+                var holes = VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, hint);
+                if (holes.Count > 0)
+                {
+                    try { _coach.UpdateHighlights(holes); } catch { }
+                    timer.Stop();
+                    return;
+                }
+
+                if (tries >= 5)
+                    timer.Stop();
+            };
+            timer.Start();
+        }
+
+        void CloseCoach()
+        {
+            try
+            {
+                if (_coach != null)
+                {
+                    _coach.Close();
+                    _coach = null;
+                }
+            }
+            catch { }
+            _awaitingDismiss = false;
+            try
+            {
+                var excel = _getExcelApp?.Invoke();
+                VocabularyHighlightHelper.ClearNativeTableHighlight(excel);
+            }
+            catch { }
+        }
+
+        void Finish()
+        {
+            _phase = Phase.Finished;
+            CloseCoach();
+            StopWatcher();
+            WriteVocabModeFlag(false);
+            MessageBox.Show("単語帳を終了します。", "単語帳", MessageBoxButton.OK, MessageBoxImage.Information);
+            _onFinished?.Invoke();
+        }
+
+        public void Cancel()
+        {
+            CloseCoach();
+            StopWatcher();
+            WriteVocabModeFlag(false);
+            _phase = Phase.Idle;
+        }
+
+        public static void WriteVocabModeFlag(bool enabled)
+        {
+            try
+            {
+                string path = Path.Combine(Path.GetTempPath(), "mos_excel_vocab_mode.txt");
+                File.WriteAllText(path, enabled ? "1" : "0");
+            }
+            catch { }
+        }
+
+        public void Dispose()
+        {
+            Cancel();
+        }
+    }
+}
