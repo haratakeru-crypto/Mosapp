@@ -298,7 +298,7 @@ namespace Libraries
 
                     try
                     {
-                        int attemptNo = 0;
+                        int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskNum);
                         if (!WordGradingGate.TryPass(groupId, projectId, taskNum, attemptNo, out _))
                         {
                             results.Add(false);

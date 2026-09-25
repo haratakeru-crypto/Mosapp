@@ -537,4 +537,64 @@ namespace Libraries
             }
         }
     }
+
+    /// <summary>
+    /// タスク単位の再挑戦番号。未登録は 1。結果画面から×のタスクに戻ったときだけ増やす。
+    /// </summary>
+    public static class ExcelTaskAttemptRegistry
+    {
+        private static readonly object Sync = new object();
+        private static readonly Dictionary<string, int> Attempts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        private static string Key(int projectId, int taskId) => $"{projectId}-{taskId}";
+
+        public static int GetAttempt(int projectId, int taskId)
+        {
+            lock (Sync)
+            {
+                if (Attempts.TryGetValue(Key(projectId, taskId), out int v) && v >= 1)
+                    return v;
+                return 1;
+            }
+        }
+
+        public static void SetAttempt(int projectId, int taskId, int attemptNo)
+        {
+            if (attemptNo < 1) attemptNo = 1;
+            lock (Sync)
+            {
+                Attempts[Key(projectId, taskId)] = attemptNo;
+            }
+        }
+
+        public static int Increment(int projectId, int taskId)
+        {
+            lock (Sync)
+            {
+                string key = Key(projectId, taskId);
+                int current = 1;
+                if (Attempts.TryGetValue(key, out int v) && v >= 1)
+                    current = v;
+                int next = current + 1;
+                Attempts[key] = next;
+                return next;
+            }
+        }
+
+        public static void ClearProject(int projectId)
+        {
+            string prefix = projectId + "-";
+            lock (Sync)
+            {
+                var keys = new List<string>();
+                foreach (var key in Attempts.Keys)
+                {
+                    if (key.StartsWith(prefix, StringComparison.Ordinal))
+                        keys.Add(key);
+                }
+                foreach (var key in keys)
+                    Attempts.Remove(key);
+            }
+        }
+    }
 }

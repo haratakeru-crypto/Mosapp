@@ -109,7 +109,7 @@ namespace Libraries.Group1
 
                     // 作成時の選択範囲をチェック (プロジェクト4, タスク2)
                     string targetSheet = "5年間売上";
-                    string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 2, 1, chart.Name, targetSheet);
+                    string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 2, ExcelTaskAttemptRegistry.GetAttempt(4, 2), chart.Name, targetSheet);
                     if (loggedSelection == null) return false;
 
                     if (!IsSelectionCorrect(loggedSelection, targetSheet, "A4:C10"))
@@ -151,7 +151,7 @@ namespace Libraries.Group1
                     {
                         // 作成時の選択範囲をチェック (プロジェクト4, タスク3)
                         string targetSheet = "下半期売上";
-                        string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 3, 1, chart.Name, targetSheet);
+                        string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 3, ExcelTaskAttemptRegistry.GetAttempt(4, 3), chart.Name, targetSheet);
                         if (loggedSelection == null)
                         {
                             Console.WriteLine($"[DEBUG] Task 4-3 Failed: Chart creation log not found for {chart.Name}.");

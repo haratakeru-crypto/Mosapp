@@ -919,6 +919,7 @@ namespace MOSExcelMogiApp.Views
                         // 結果画面から来たことを記録
                         appBarWindow.SetFromResultWindow(true);
                         appBarWindow.SetResultWindow(this);
+                        appBarWindow.PrepareResultRetry(taskInfo.ProjectId, taskInfo.TaskId, taskInfo.ResultMark == "×");
                         
                         // AppBarWindowを表示
                         if (!appBarWindow.IsVisible)
@@ -947,6 +948,31 @@ namespace MOSExcelMogiApp.Views
                     }
                 }
             }
+        }
+
+        /// <summary>結果一覧のコールバックから、×のタスクへ戻るときだけ再挑戦番号を予約する。</summary>
+        public void PrepareAppBarForResultRetry(AppBarWindow appBar, int projectId, int taskId)
+        {
+            if (appBar == null)
+                return;
+            appBar.PrepareResultRetry(projectId, taskId, IsTaskCurrentlyWrong(projectId, taskId));
+        }
+
+        private bool IsTaskCurrentlyWrong(int projectId, int taskId)
+        {
+            Dictionary<int, List<bool>> results = _allProjectResults;
+            if (!_fromScoringLog)
+            {
+                var stored = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                if (stored != null && stored.Count > 0)
+                    results = stored;
+            }
+            if (results == null || !results.TryGetValue(projectId, out var list) || list == null)
+                return false;
+            int index = taskId - 1;
+            if (index < 0 || index >= list.Count)
+                return false;
+            return !list[index];
         }
     }
 

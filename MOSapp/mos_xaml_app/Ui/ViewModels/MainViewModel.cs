@@ -2168,23 +2168,25 @@ namespace Ui.ViewModels
             {
                 ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
 
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
                 if (ExcelLogReader.TryGetFirstNonExemptViolation(
                         projectId,
                         taskId,
-                        1,
+                        attemptNo,
                         exemptFlags,
                         out string violationMsg))
                 {
                     string line = $"P{projectId}-T{taskId} {violationMsg}";
                     System.Diagnostics.Debug.WriteLine($"[MainViewModel] Destructive validation failed: {line}");
-                    ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, line);
+                    ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, line);
                     return false;
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[MainViewModel] ApplyDestructiveValidationForTask error: {ex.Message}");
-                ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, $"P{projectId}-T{taskId} 例外: {ex.Message}");
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
+                ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, $"P{projectId}-T{taskId} 例外: {ex.Message}");
                 return false;
             }
 

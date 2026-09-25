@@ -45,6 +45,10 @@ namespace MOSExcelMogiApp
         private DispatcherTimer _excelPositionRetryTimer;
         private DateTime _excelPositionRetryDeadline;
         private bool _isNavigatingToTask = false; // 連続クリックで多重起動しないためのガード
+        private bool _pendingResultRetry;
+        private int _resultRetryProjectId;
+        private int _resultRetryTaskId;
+        private bool _resultRetryIsWrong;
 
         // Win32 API
         [DllImport("user32.dll", SetLastError = true)]
@@ -1297,6 +1301,7 @@ namespace MOSExcelMogiApp
             {
                 _isNavigatingToTask = false;
                 _pendingTaskId = null;
+                ClearPendingResultRetry();
                 return;
             }
             
@@ -1329,6 +1334,7 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error showing window (may be closing): {ex.Message}");
                 _isNavigatingToTask = false;
                 _pendingTaskId = null;
+                ClearPendingResultRetry();
                 return; // NavigateToTaskを中断
             }
             
@@ -1547,6 +1553,7 @@ namespace MOSExcelMogiApp
                 }
                 
                 // タスク表示を更新（問題文とボタンの選択状態を含む）
+                ConsumeResultRetry(projectId, taskId);
                 UpdateTaskDisplay();
                 
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Task display updated: Project={_currentProjectId}, Task={_currentTaskId}");
@@ -1554,6 +1561,7 @@ namespace MOSExcelMogiApp
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"タスクナビゲーションエラー: {ex.Message}");
+                ClearPendingResultRetry();
                 MessageBox.Show($"エラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -1796,13 +1804,41 @@ namespace MOSExcelMogiApp
             try
             {
                 if (_currentProjectId <= 0 || _currentTaskId <= 0) return;
-                string content = $"{_currentProjectId},{_currentTaskId},1";
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                string content = $"{_currentProjectId},{_currentTaskId},{attemptNo}";
                 File.WriteAllText(ExcelLogReader.GetCurrentTaskFilePath(), content, Encoding.UTF8);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[AppBarWindow] WriteCurrentTaskFile: " + ex.Message);
             }
+        }
+
+        /// <summary>結果画面で選んだタスクが×なら、作業画面に入ったとき番号を1つ上げる。</summary>
+        public void PrepareResultRetry(int projectId, int taskId, bool isWrong)
+        {
+            _resultRetryProjectId = projectId;
+            _resultRetryTaskId = taskId;
+            _resultRetryIsWrong = isWrong;
+            _pendingResultRetry = true;
+        }
+
+        private void ConsumeResultRetry(int projectId, int taskId)
+        {
+            if (!_pendingResultRetry)
+                return;
+            if (_resultRetryProjectId != projectId || _resultRetryTaskId != taskId)
+                return;
+            _pendingResultRetry = false;
+            if (!_resultRetryIsWrong)
+                return;
+            int attemptNo = ExcelTaskAttemptRegistry.Increment(projectId, taskId);
+            System.Diagnostics.Debug.WriteLine($"[ResultRetry] P{projectId} T{taskId} attempt={attemptNo}");
+        }
+
+        private void ClearPendingResultRetry()
+        {
+            _pendingResultRetry = false;
         }
 
         private void ClearCurrentTaskFile()

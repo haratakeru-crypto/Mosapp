@@ -825,6 +825,7 @@ namespace MOSExcelMogiApp.Views
                                     // 結果画面から来たことを記録
                                     appBarWindow.SetFromResultWindow(true);
                                     appBarWindow.SetResultWindow(resultWindow);
+                                    resultWindow.PrepareAppBarForResultRetry(appBarWindow, projectId, taskId);
                                     if (!appBarWindow.IsVisible)
                                     {
                                         appBarWindow.Show();
@@ -864,6 +865,7 @@ namespace MOSExcelMogiApp.Views
                                     // 結果画面から来たことを記録
                                     appBarWindow.SetFromResultWindow(true);
                                     appBarWindow.SetResultWindow(resultWindow);
+                                    resultWindow.PrepareAppBarForResultRetry(appBarWindow, projectId, taskId);
                                     if (!appBarWindow.IsVisible)
                                     {
                                         appBarWindow.Show();
@@ -1794,23 +1796,25 @@ namespace MOSExcelMogiApp.Views
                 ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
 
                 // 方式A: 免除以外の操作はすべて違反。許可範囲があるタスクは TryGetFirstNonExemptViolation 内で範囲判定する。
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
                 if (ExcelLogReader.TryGetFirstNonExemptViolation(
                         projectId,
                         taskId,
-                        1,
+                        attemptNo,
                         exemptFlags,
                         out string violationMsgA))
                 {
                     string line = $"P{projectId}-T{taskId} {violationMsgA}";
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Destructive validation failed (mode A): {line}");
-                    ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, line);
+                    ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, line);
                     return false;
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] ApplyDestructiveValidation error: {ex.Message}");
-                ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, $"P{projectId}-T{taskId} 例外: {ex.Message}");
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
+                ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, $"P{projectId}-T{taskId} 例外: {ex.Message}");
                 return false;
             }
 
