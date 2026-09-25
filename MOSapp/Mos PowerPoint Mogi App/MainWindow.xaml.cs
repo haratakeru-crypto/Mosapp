@@ -189,6 +189,7 @@ namespace MOS_PowerPoint_app
             {
                 try
                 {
+                    _appBarWindow.CloseInstantScoringOverlay();
                     _appBarWindow.ApplyScoreResults(_viewModel.CurrentProject.ProjectId, results);
                 }
                 catch (Exception ex)

@@ -114,6 +114,7 @@ namespace MOS_PowerPoint_app.Views
         private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private bool _isScoring;
+        private Window _instantScoringOverlay;
 
         public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null)
         {
@@ -1010,30 +1011,90 @@ namespace MOS_PowerPoint_app.Views
         
         private void ScoreButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoring)
+                return;
+
+            var scoreButton = sender as System.Windows.Controls.Button;
+            if (scoreButton != null)
+                scoreButton.IsEnabled = false;
+
             try
             {
                 SyncProjectToMainViewModel();
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint)");
 
                 BeginScoringSession();
-                try
-                {
-                    // プロジェクト一覧画面の採点と同じ処理を実行（MainViewModel.ExecuteScore → 採点結果ダイアログ表示）
-                    if (_onScoreClick != null)
-                        _onScoreClick();
-                    else
-                        MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                finally
-                {
-                    EndScoringSession(restartTimers: true);
-                }
+                _instantScoringOverlay = CreateInstantScoringOverlay();
+                _instantScoringOverlay.Show();
+
+                // プロジェクト一覧画面の採点と同じ処理を実行（MainViewModel.ExecuteScore → 採点結果ダイアログ表示）
+                if (_onScoreClick != null)
+                    _onScoreClick();
+                else
+                    MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] Error: {ex.Message}");
                 MessageBox.Show($"採点中にエラーが発生しました:\n{ex.Message}", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally
+            {
+                EndScoringSession(restartTimers: true);
+                CloseInstantScoringOverlay();
+                if (scoreButton != null)
+                    scoreButton.IsEnabled = true;
+            }
+        }
+
+        /// <summary>結果ダイアログの直前に呼ぶ。採点中表示が結果を覆わないようにする。</summary>
+        public void CloseInstantScoringOverlay()
+        {
+            var overlay = _instantScoringOverlay;
+            _instantScoringOverlay = null;
+            if (overlay == null)
+                return;
+            try { overlay.Close(); } catch { }
+        }
+
+        private static Window CreateInstantScoringOverlay()
+        {
+            var overlay = new Window
+            {
+                Title = "採点中",
+                Width = 320,
+                Height = 140,
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
+                BorderThickness = new Thickness(2)
+            };
+            var stack = new StackPanel
+            {
+                Margin = new Thickness(24),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "採点中です",
+                FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 12),
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
+            });
+            stack.Children.Add(new ProgressBar
+            {
+                IsIndeterminate = true,
+                Height = 20,
+                Width = 260
+            });
+            overlay.Content = stack;
+            return overlay;
         }
         
         /// <summary>

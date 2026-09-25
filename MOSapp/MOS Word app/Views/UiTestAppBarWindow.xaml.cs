@@ -320,11 +320,10 @@ namespace MOS_Word_app.Views
                 scoreButton.IsEnabled = false;
             }
 
+            Window scoringOverlay = null;
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId}");
-
-                LogReader.RequestVstoEvidenceFlush();
 
                 // 現在のプロジェクトのタスク数を取得
                 int taskCount = _tasks != null ? _tasks.Count : 0;
@@ -345,8 +344,14 @@ namespace MOS_Word_app.Views
                     return;
                 }
 
+                scoringOverlay = CreateInstantScoringOverlay();
+                scoringOverlay.Show();
+                await System.Threading.Tasks.Task.Delay(80);
+
                 var result = await System.Threading.Tasks.Task.Run(() =>
                 {
+                    LogReader.RequestVstoEvidenceFlush();
+
                     // DLLを読み込む
                     Assembly assembly = Assembly.LoadFrom(dllPath);
                     string className = $"Libraries.Group{_groupId}.WordChecker{_groupId}_{_currentProjectId}";
@@ -418,6 +423,10 @@ namespace MOS_Word_app.Views
                     return (scoreList, passedCount, totalTasks);
                 });
 
+                CloseInstantScoringOverlay(scoringOverlay);
+                scoringOverlay = null;
+                await System.Threading.Tasks.Task.Delay(80);
+
                 // 採点結果ウィンドウを表示（Task / Result 〇✖）
                 ScoreResultWindow.ShowResults(this, result.scoreList);
 
@@ -426,16 +435,66 @@ namespace MOS_Word_app.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] Error: {ex.Message}");
+                CloseInstantScoringOverlay(scoringOverlay);
+                scoringOverlay = null;
                 MessageBox.Show($"採点中にエラーが発生しました:\n{ex.Message}", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
+                CloseInstantScoringOverlay(scoringOverlay);
                 _isScoring = false;
                 if (scoreButton != null)
                 {
                     scoreButton.IsEnabled = true;
                 }
             }
+        }
+
+        private static Window CreateInstantScoringOverlay()
+        {
+            var overlay = new Window
+            {
+                Title = "採点中",
+                Width = 320,
+                Height = 140,
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
+                BorderThickness = new Thickness(2)
+            };
+            var stack = new StackPanel
+            {
+                Margin = new Thickness(24),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "採点中です",
+                FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 12),
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
+            });
+            stack.Children.Add(new ProgressBar
+            {
+                IsIndeterminate = true,
+                Height = 20,
+                Width = 260
+            });
+            overlay.Content = stack;
+            return overlay;
+        }
+
+        private static void CloseInstantScoringOverlay(Window overlay)
+        {
+            if (overlay == null)
+                return;
+            try { overlay.Close(); } catch { }
         }
         
         private void CloseButton_Click(object sender, RoutedEventArgs e)

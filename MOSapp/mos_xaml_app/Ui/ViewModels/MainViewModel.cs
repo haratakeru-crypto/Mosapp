@@ -95,6 +95,7 @@ namespace Ui.ViewModels
         private bool _showVariantButton;
         private int _variantSetNo = 1;
         private bool _isVariantMode;
+        private bool _isInstantScoring;
         private ProjectInfo _currentProject;
         private ExcelApp _sharedExcelApp;
 
@@ -236,7 +237,7 @@ namespace Ui.ViewModels
             LoadProjects();
             CheckCommand = new RelayCommand(ExecuteCheck);
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
-            ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p));
+            ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring);
             EndExamCommand = new RelayCommand(ExecuteEndExam);
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
             ResetExamCommand = new RelayCommand(ExecuteResetExam);
@@ -1561,6 +1562,12 @@ namespace Ui.ViewModels
 
         private async void ExecuteScoreAsync(object parameter)
         {
+            if (_isInstantScoring)
+                return;
+            _isInstantScoring = true;
+            CommandManager.InvalidateRequerySuggested();
+            try
+            {
             if (CurrentProject == null)
             {
                 MessageBox.Show("プロジェクトが選択されていません。", "エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -1699,6 +1706,12 @@ namespace Ui.ViewModels
                     MessageBox.Show($"結果の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             });
+            }
+            finally
+            {
+                _isInstantScoring = false;
+                CommandManager.InvalidateRequerySuggested();
+            }
         }
 
         private JObject LoadConfig()
