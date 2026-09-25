@@ -8,7 +8,13 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         WindowStartupLocation="Manual">
-    <Grid x:Name="RootGrid" Background="#99000000">
+    <Grid x:Name="RootGrid" Background="Transparent">
+        <!-- 校正クリック受信用（通常は非表示・ヒットなし） -->
+        <Canvas x:Name="CaptureLayer"
+                Background="#01000000"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"
+                Cursor="Cross"/>
         <Canvas x:Name="HoleCanvas" IsHitTestVisible="False"/>
         <Border x:Name="Bubble"
                 Background="White"
@@ -18,7 +24,8 @@
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
                 BorderBrush="#E5E7EB"
-                BorderThickness="1">
+                BorderThickness="1"
+                IsHitTestVisible="False">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.35"/>
             </Border.Effect>
@@ -45,6 +52,7 @@
                         BorderThickness="0"
                         FontWeight="SemiBold"
                         Cursor="Hand"
+                        IsHitTestVisible="True"
                         Click="DismissButton_Click"/>
             </StackPanel>
         </Border>
@@ -55,6 +63,7 @@
               HorizontalAlignment="Left"
               VerticalAlignment="Top"
               Data="M0,8 L8,0 L16,8 Z"
-              Width="16" Height="8"/>
+              Width="16" Height="8"
+              IsHitTestVisible="False"/>
     </Grid>
 </Window>

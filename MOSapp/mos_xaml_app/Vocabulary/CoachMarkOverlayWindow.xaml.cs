@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -36,17 +37,23 @@ namespace MOSExcelMogiApp.Vocabulary
         }
 
         public event Action Dismissed;
+        /// <summary>校正用: オーバーレイ上クリックの画面物理ピクセル座標。</summary>
+        public event Action<Point> PhysicalClickCaptured;
+
         bool _clickThrough;
+        bool _captureClicks;
         double _dpiScaleX = 1.0;
         double _dpiScaleY = 1.0;
         RECT _excelPhysical;
         IntPtr _excelHwnd;
         IReadOnlyList<Rect> _lastHighlightScreens = Array.Empty<Rect>();
+        readonly List<Point> _markerLocals = new List<Point>();
 
         public CoachMarkOverlayWindow()
         {
             InitializeComponent();
             ShowActivated = false;
+            CaptureLayer.MouseLeftButtonDown += CaptureLayer_MouseLeftButtonDown;
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -87,13 +94,15 @@ namespace MOSExcelMogiApp.Vocabulary
 
         /// <param name="highlightScreens">画面物理ピクセル座標のハイライト矩形。</param>
         /// <param name="clickThrough">true のとき Excel へクリックを透過。</param>
+        /// <param name="appendSelectHint">メッセージ末尾に選択ヒントを付けるか。</param>
         public void ShowCoachMark(
             IntPtr excelHwnd,
             IReadOnlyList<Rect> highlightScreens,
             string title,
             string message,
             bool allowDismiss = true,
-            bool clickThrough = false)
+            bool clickThrough = false,
+            bool appendSelectHint = true)
         {
             _clickThrough = clickThrough;
             _excelHwnd = excelHwnd;
@@ -102,14 +111,13 @@ namespace MOSExcelMogiApp.Vocabulary
 
             TitleText.Text = title ?? "";
             MessageText.Text = message ?? "";
-            if (!allowDismiss && !string.IsNullOrWhiteSpace(MessageText.Text)
-                && MessageText.Text.IndexOf("選択", StringComparison.Ordinal) < 0)
+            if (appendSelectHint && !allowDismiss && !string.IsNullOrWhiteSpace(MessageText.Text)
+                && MessageText.Text.IndexOf("選択", StringComparison.Ordinal) < 0
+                && MessageText.Text.IndexOf("クリック", StringComparison.Ordinal) < 0)
             {
                 MessageText.Text = MessageText.Text.TrimEnd() + "\n（ハイライト箇所を選択すると次へ進みます）";
             }
 
-            // MoveWindow(物理px)は DPI と食い違いハイライトが縮小・ずれる原因になるため使わない。
-            // WPF の Left/Top/Width/Height（DIP）だけで Excel に重ねる。
             PositionOverExcel(excelHwnd);
             PaintHighlightHoles(_lastHighlightScreens);
 
@@ -125,10 +133,10 @@ namespace MOSExcelMogiApp.Vocabulary
                 RefreshDpiScale();
                 PositionOverExcel(_excelHwnd);
                 PaintHighlightHoles(_lastHighlightScreens);
-                ApplyClickThrough(clickThrough);
+                ApplyClickThrough(_clickThrough && !_captureClicks);
             }), System.Windows.Threading.DispatcherPriority.Loaded);
 
-            if (!clickThrough)
+            if (!clickThrough || _captureClicks)
                 Activate();
         }
 
@@ -153,7 +161,6 @@ namespace MOSExcelMogiApp.Vocabulary
             }
         }
 
-        /// <summary>ハイライト矩形だけ差し替え（遅延再取得用）。</summary>
         public void UpdateHighlights(IReadOnlyList<Rect> highlightScreens)
         {
             if (!IsVisible) return;
@@ -161,6 +168,57 @@ namespace MOSExcelMogiApp.Vocabulary
             RefreshDpiScale();
             PositionOverExcel(_excelHwnd);
             PaintHighlightHoles(_lastHighlightScreens);
+        }
+
+        public void UpdateMessage(string title, string message)
+        {
+            if (!string.IsNullOrEmpty(title)) TitleText.Text = title;
+            if (message != null) MessageText.Text = message;
+        }
+
+        /// <summary>左上・右下クリック校正を開始。完了まで Excel へクリックを通さない。</summary>
+        public void BeginClickCapture()
+        {
+            _captureClicks = true;
+            _markerLocals.Clear();
+            CaptureLayer.Visibility = Visibility.Visible;
+            CaptureLayer.IsHitTestVisible = true;
+            Bubble.IsHitTestVisible = false;
+            ApplyClickThrough(false);
+            Activate();
+        }
+
+        public void EndClickCapture()
+        {
+            _captureClicks = false;
+            CaptureLayer.Visibility = Visibility.Collapsed;
+            CaptureLayer.IsHitTestVisible = false;
+            ApplyClickThrough(_clickThrough);
+        }
+
+        /// <summary>校正中のクリック位置マーカー（ローカル DIP）。</summary>
+        public void AddCalibrationMarkerLocal(Point localDip)
+        {
+            _markerLocals.Add(localDip);
+            PaintHighlightHoles(_lastHighlightScreens);
+        }
+
+        void CaptureLayer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_captureClicks) return;
+            RefreshDpiScale();
+            PositionOverExcel(_excelHwnd);
+
+            Point local = e.GetPosition(this);
+            double scaleX = _dpiScaleX <= 0 ? 1 : _dpiScaleX;
+            double scaleY = _dpiScaleY <= 0 ? 1 : _dpiScaleY;
+            var physical = new Point(
+                _excelPhysical.Left + local.X * scaleX,
+                _excelPhysical.Top + local.Y * scaleY);
+
+            AddCalibrationMarkerLocal(local);
+            PhysicalClickCaptured?.Invoke(physical);
+            e.Handled = true;
         }
 
         void PaintHighlightHoles(IReadOnlyList<Rect> highlightScreens)
@@ -195,22 +253,44 @@ namespace MOSExcelMogiApp.Vocabulary
                 HoleCanvas.Children.Add(border);
             }
 
+            foreach (var m in _markerLocals)
+            {
+                var mark = new Ellipse
+                {
+                    Width = 14,
+                    Height = 14,
+                    Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x20)),
+                    Stroke = Brushes.White,
+                    StrokeThickness = 2,
+                    IsHitTestVisible = false
+                };
+                Canvas.SetLeft(mark, m.X - 7);
+                Canvas.SetTop(mark, m.Y - 7);
+                HoleCanvas.Children.Add(mark);
+            }
+
             Rect primary = holes.Count > 0
                 ? holes.OrderBy(h => h.Y).First()
                 : new Rect(Width * 0.5 - 80, 40, 160, 1);
             double bubbleLeft = Math.Max(12, Math.Min(Width - 380, primary.X + primary.Width / 2 - 160));
             double bubbleTop = primary.Bottom + 16;
-            if (bubbleTop + 160 > Height)
+            if (holes.Count == 0)
+            {
+                bubbleLeft = Math.Max(12, Width * 0.5 - 180);
+                bubbleTop = Math.Max(48, Height * 0.12);
+            }
+            else if (bubbleTop + 160 > Height)
+            {
                 bubbleTop = Math.Max(12, primary.Y - 160);
+            }
 
             Bubble.Margin = new Thickness(bubbleLeft, bubbleTop, 0, 0);
             Caret.Margin = new Thickness(
-                primary.X + primary.Width / 2 - 8,
-                bubbleTop < primary.Y ? bubbleTop + 130 : primary.Bottom + 8,
+                holes.Count > 0 ? primary.X + primary.Width / 2 - 8 : bubbleLeft + 160,
+                bubbleTop < primary.Y && holes.Count > 0 ? bubbleTop + 130 : (holes.Count > 0 ? primary.Bottom + 8 : bubbleTop - 8),
                 0, 0);
         }
 
-        /// <summary>画面物理ピクセル矩形 → このウィンドウ内 DIP。</summary>
         Rect PhysicalScreenToLocalDip(Rect screenPhysical)
         {
             double scaleX = _dpiScaleX <= 0 ? 1 : _dpiScaleX;
