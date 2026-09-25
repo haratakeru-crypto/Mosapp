@@ -9,6 +9,7 @@ namespace ExcelAddIn1
     public partial class ThisAddIn
     {
         private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_excel_current_task.txt");
+        private static readonly string BoundaryFlushRequestPath = Path.Combine(Path.GetTempPath(), "mos_excel_flush_boundary.txt");
         private static readonly string DiagnosticLogFilePath = Path.Combine(Path.GetTempPath(), "mos_excel_addin_diag.txt");
         private bool _eventHooksRegistered;
         private Timer _taskFilePollTimer;
@@ -449,6 +450,8 @@ namespace ExcelAddIn1
                     if (attemptNo < 1) attemptNo = 1;
                 }
 
+                TryConsumeBoundaryFlushRequest();
+
                 if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId && attemptNo == _currentTaskAttemptNo)
                     return;
 
@@ -480,6 +483,49 @@ namespace ExcelAddIn1
                 System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] TaskFilePollTimer_Tick: " + ex.Message);
                 WriteDiagnostic("TaskFilePollTimer_Tick error: " + ex.Message);
             }
+        }
+
+        /// <summary>採点開始の依頼があり、いまのタスクと一致するときだけ未記録差分をログへ書く。</summary>
+        private void TryConsumeBoundaryFlushRequest()
+        {
+            if (!File.Exists(BoundaryFlushRequestPath))
+                return;
+
+            string line;
+            try
+            {
+                line = File.ReadAllText(BoundaryFlushRequestPath).Trim();
+            }
+            catch
+            {
+                return;
+            }
+
+            var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 3
+                || !int.TryParse(parts[0].Trim(), out int projectId)
+                || !int.TryParse(parts[1].Trim(), out int taskId)
+                || !int.TryParse(parts[2].Trim(), out int attemptNo))
+            {
+                TryDeleteBoundaryFlushRequest();
+                return;
+            }
+
+            if (projectId != _currentTaskProjectId || taskId != _currentTaskTaskId || attemptNo != _currentTaskAttemptNo)
+                return;
+
+            FlushPendingBoundaryDiffsForTask(projectId, taskId, attemptNo);
+            TryDeleteBoundaryFlushRequest();
+        }
+
+        private static void TryDeleteBoundaryFlushRequest()
+        {
+            try
+            {
+                if (File.Exists(BoundaryFlushRequestPath))
+                    File.Delete(BoundaryFlushRequestPath);
+            }
+            catch { }
         }
 
         private static void WriteDiagnostic(string message)

@@ -1649,7 +1649,11 @@ namespace Ui.ViewModels
             List<bool> results = null;
             try
             {
-                results = await Task.Run(() => ExecuteScoringDirect(libraryName, taskCount));
+                results = await Task.Run(() =>
+                {
+                    ExcelLogReader.RequestOpenTaskBoundaryFlush(projectId);
+                    return ExecuteScoringDirect(libraryName, taskCount);
+                });
                 if (results != null && results.Count == taskCount)
                 {
                     for (int taskIndex = 1; taskIndex <= taskCount; taskIndex++)

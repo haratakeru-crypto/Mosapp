@@ -903,6 +903,18 @@ namespace Libraries
             return errors;
         }
 
+        /// <summary>
+        /// その場採点の開始時、スナップショットが一致するタスクだけ開始時との差分を一度記録する。
+        /// 一致しないときは文書を読み直さない。
+        /// </summary>
+        public static void LogMatchingBaselineDiffOnce(int groupId, int projectId, int taskId, int attemptNo)
+        {
+            var exempt = WordTaskValidationConfig.GetExemptFlags(projectId, taskId);
+            var errors = CompareAndGetErrors(groupId, projectId, taskId, attemptNo, exempt);
+            if (errors != null && errors.Count > 0)
+                LogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, errors);
+        }
+
         private static SnapshotData CaptureProjectDocument(int projectId, int groupId)
         {
             WordApp app = null;

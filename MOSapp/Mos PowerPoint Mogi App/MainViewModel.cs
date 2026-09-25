@@ -357,15 +357,16 @@ namespace MOS_PowerPoint_app
                     return;
                 }
 
+                grader.LogOpenTaskBaselineDiffOnce(CurrentProject.ProjectId);
+                Libraries.PPLogReader.ClearSnapshot();
+
                 int passedCount = 0;
                 foreach (var task in project.Tasks.OrderBy(t => t.TaskId))
                 {
                     bool passed = false;
                     try
                     {
-                        // 1タスクごとに current_task を更新し、VSTO 側の snapshot が追いつくのを短時間待つ。
                         int attemptNo = Libraries.PPTaskAttemptRegistry.GetAttempt(CurrentProject.ProjectId, task.TaskId);
-                        grader.StartTaskAndWaitForSnapshot(CurrentProject.ProjectId, task.TaskId, attemptNo, 2000, 50);
                         passed = grader.GradeTask(CurrentProject.ProjectId, task.TaskId, attemptNo);
                     }
                     catch

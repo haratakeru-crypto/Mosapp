@@ -360,6 +360,10 @@ namespace MOS_Word_app.Views
                     // WordCheckerインスタンスを作成
                     object checkerInstance = Activator.CreateInstance(checkerType);
 
+                    int openAttempt = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                    WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, openAttempt);
+                    LogReader.ClearSnapshot();
+
                     // 各タスクをチェック
                     int passedCount = 0;
                     int totalTasks = 0;

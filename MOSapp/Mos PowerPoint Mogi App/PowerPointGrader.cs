@@ -124,6 +124,40 @@ namespace MOS_PowerPoint_app
             PPGradingPerf.Log("StartTaskAndWaitForSnapshot.wait", swWait.ElapsedMilliseconds, $"P{projectId}-T{taskId} gen={expectedGen} timeout {timeoutMs}ms");
             PPGradingPerf.Log("StartTaskAndWaitForSnapshot.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
         }
+
+        /// <summary>
+        /// その場採点の開始時に、いま開いているタスクだけ離脱時と同じ破壊的比較を1回行う。
+        /// 採点用の世代番号（0以外）や別タスクの基準は比べない。
+        /// </summary>
+        public void LogOpenTaskBaselineDiffOnce(int projectId)
+        {
+            try
+            {
+                if (!Libraries.PPLogReader.TryReadCurrentTaskFile(out int curProjectId, out int curTaskId, out _, out int attemptNo, out int snapshotGen))
+                    return;
+                if (curProjectId != projectId || curTaskId <= 0 || snapshotGen != 0)
+                    return;
+
+                string snapshotPath = Libraries.PPLogReader.GetSnapshotPath();
+                if (!Libraries.PPLogReader.TryReadSnapshotMeta(snapshotPath, out int snapProjectId, out int snapTaskId, out int snapAttemptNo, out int snapGen))
+                    return;
+                if (snapProjectId != curProjectId || snapTaskId != curTaskId || snapAttemptNo != attemptNo || snapGen != 0)
+                    return;
+
+                var exempt = Libraries.PPTaskValidationConfig.GetExemptFlags(curProjectId, curTaskId);
+                List<string> errors;
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
+                {
+                    errors = Libraries.PPSnapshotChecker.CompareAndGetErrors(curProjectId, curTaskId, attemptNo, exempt);
+                }
+                if (errors != null && errors.Count > 0)
+                    Libraries.PPLogReader.AppendDestructiveErrors(curProjectId, curTaskId, attemptNo, errors);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[LogOpenTaskBaselineDiffOnce] " + ex.Message);
+            }
+        }
         /// <summary>
         /// 指定したプロジェクト・タスクの採点を行う。
         /// ログに余計な操作や許可されない座標変化があれば不合格。続けて COM による結果判定を行う。
