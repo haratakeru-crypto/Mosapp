@@ -85,10 +85,28 @@ namespace New_MOSWordVSTOAddIn
                 {
                     Globals.ThisAddIn?.RegisterRibbonLoggedReviewDeleteComment();
                 }
+                else if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase))
+                {
+                    Globals.ThisAddIn?.RegisterRibbonLoggedTableConvertTextToTable();
+                }
+                else if (IsTableColumnsDistributeCommand(commandId))
+                {
+                    // 6-5: 「幅を揃える」ボタン。列幅が同じになっただけでは記録しない。
+                    loggedCommandId = "TableColumnsDistribute";
+                    Globals.ThisAddIn?.RegisterRibbonLoggedTableColumnsDistribute();
+                }
 
                 bool cutSkipped = false;
                 if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))
+                {
                     cutSkipped = WordEvidenceHelper.TryLogInvalidParagraphCut();
+                    if (!cutSkipped)
+                        Globals.ThisAddIn?.RegisterRibbonLoggedCut();
+                }
+                else if (string.Equals(commandId, "Paste", StringComparison.OrdinalIgnoreCase))
+                {
+                    Globals.ThisAddIn?.RegisterRibbonLoggedPaste();
+                }
 
                 if (!cutSkipped)
                     WordEvidenceHelper.LogCommandWithEvidence(loggedCommandId);
@@ -103,6 +121,12 @@ namespace New_MOSWordVSTOAddIn
                 // エラー時も既定動作はブロックしない
                 cancelDefault = false;
             }
+        }
+
+        /// <summary>「列の幅を揃える」ボタンの idMso。列幅ダイアログは含めない。</summary>
+        private static bool IsTableColumnsDistributeCommand(string commandId)
+        {
+            return string.Equals(commandId, "TableColumnsDistribute", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void LogRibbonOperation(string commandId, string loggedCommandId)

@@ -152,10 +152,17 @@ namespace ExcelAddIn1
         {
             try
             {
-                _lastRangeSelectionAddress = target?.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing) ?? "";
-                if (_lastRangeSelectionAddress.Contains("]"))
+                string incoming = NormalizeExternalAddress(
+                    target?.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing) ?? "");
+
+                // グラフ挿入で選択が範囲の先頭1セルへ縮むと、作成ログが指定範囲でなくなる。
+                // 直前の複数セル範囲の内側の1セルでは、覚えていた範囲を残す。
+                if (string.IsNullOrEmpty(incoming)
+                    || IsMultiCellAddress(incoming)
+                    || string.IsNullOrEmpty(_lastRangeSelectionAddress)
+                    || !IsCellInsideAddress(incoming, _lastRangeSelectionAddress))
                 {
-                    _lastRangeSelectionAddress = _lastRangeSelectionAddress.Substring(_lastRangeSelectionAddress.IndexOf("]") + 1);
+                    _lastRangeSelectionAddress = incoming;
                 }
 
                 // 選択変更のたびにハイパーリンク集合を照合（ダイアログ挿入後に別セルを選ぶまで SheetChange が無いケースの補足）
@@ -276,27 +283,25 @@ namespace ExcelAddIn1
         {
             try
             {
-                string selectionAddress = "";
+                // 挿入直後の Selection はグラフ本体か1セルになりやすい。
+                // 複数セルのままならそれを使い、そうでなければ挿入前に選んでいた範囲を書く。
+                string live = "";
                 Excel.Range selection = Application.Selection as Excel.Range;
                 if (selection != null)
                 {
-                    selectionAddress = selection.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing);
+                    live = NormalizeExternalAddress(
+                        selection.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing));
                 }
-                else
-                {
+
+                string selectionAddress;
+                if (IsMultiCellAddress(live))
+                    selectionAddress = live;
+                else if (!string.IsNullOrEmpty(_lastRangeSelectionAddress))
                     selectionAddress = _lastRangeSelectionAddress;
-                }
-
-                if (string.IsNullOrEmpty(selectionAddress))
-                {
+                else if (!string.IsNullOrEmpty(live))
+                    selectionAddress = live;
+                else
                     selectionAddress = "NoSelection";
-                }
-
-                // Remove workbook name from address if present (e.g. [book.xlsx]Sheet1!$A$1 -> Sheet1!$A$1)
-                if (selectionAddress.Contains("]"))
-                {
-                    selectionAddress = selectionAddress.Substring(selectionAddress.IndexOf("]") + 1);
-                }
 
                 Logger.LogOperation("AddChart", $"Name={Ch.Name} Selection={selectionAddress}");
                 WriteDiagnostic($"AddChart: Name={Ch.Name} Selection={selectionAddress}");
@@ -306,6 +311,95 @@ namespace ExcelAddIn1
                 System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Application_WorkbookNewChart: " + ex.Message);
                 WriteDiagnostic("Application_WorkbookNewChart error: " + ex.Message);
             }
+        }
+
+        private static string NormalizeExternalAddress(string address)
+        {
+            if (string.IsNullOrEmpty(address)) return "";
+            int bracket = address.LastIndexOf(']');
+            if (bracket >= 0 && bracket < address.Length - 1)
+                return address.Substring(bracket + 1);
+            return address;
+        }
+
+        private static bool IsMultiCellAddress(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address)) return false;
+            string[] areas = address.Split(',');
+            if (areas.Length > 1) return true;
+            return AreaSpanCellCount(areas[0]) > 1;
+        }
+
+        private static bool IsCellInsideAddress(string singleCellAddress, string rangeAddress)
+        {
+            if (!TryParseA1Area(singleCellAddress, out string sheet, out int c1, out int r1, out int c2, out int r2))
+                return false;
+            if (c1 != c2 || r1 != r2) return false;
+
+            foreach (string area in (rangeAddress ?? "").Split(','))
+            {
+                if (!TryParseA1Area(area, out string areaSheet, out int ac1, out int ar1, out int ac2, out int ar2))
+                    continue;
+                if (!string.Equals(sheet, areaSheet, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (c1 >= ac1 && c1 <= ac2 && r1 >= ar1 && r1 <= ar2)
+                    return true;
+            }
+            return false;
+        }
+
+        private static int AreaSpanCellCount(string area)
+        {
+            if (!TryParseA1Area(area, out _, out int c1, out int r1, out int c2, out int r2))
+                return 0;
+            return (c2 - c1 + 1) * (r2 - r1 + 1);
+        }
+
+        private static bool TryParseA1Area(string area, out string sheet, out int col1, out int row1, out int col2, out int row2)
+        {
+            sheet = "";
+            col1 = row1 = col2 = row2 = 0;
+            if (string.IsNullOrWhiteSpace(area)) return false;
+
+            string local = area.Trim();
+            int bang = local.LastIndexOf('!');
+            if (bang >= 0)
+            {
+                sheet = local.Substring(0, bang).Trim().Trim('\'');
+                local = local.Substring(bang + 1);
+            }
+            local = local.Replace("$", "");
+            string start = local;
+            string end = local;
+            int colon = local.IndexOf(':');
+            if (colon >= 0)
+            {
+                start = local.Substring(0, colon);
+                end = local.Substring(colon + 1);
+            }
+            if (!TryParseA1Cell(start, out col1, out row1)) return false;
+            if (!TryParseA1Cell(end, out col2, out row2)) return false;
+            if (col1 > col2) { int t = col1; col1 = col2; col2 = t; }
+            if (row1 > row2) { int t = row1; row1 = row2; row2 = t; }
+            return true;
+        }
+
+        private static bool TryParseA1Cell(string cell, out int col, out int row)
+        {
+            col = 0;
+            row = 0;
+            if (string.IsNullOrEmpty(cell)) return false;
+            int i = 0;
+            while (i < cell.Length && char.IsLetter(cell[i])) i++;
+            if (i == 0 || i >= cell.Length) return false;
+            string letters = cell.Substring(0, i).ToUpperInvariant();
+            if (!int.TryParse(cell.Substring(i), out row) || row <= 0) return false;
+            foreach (char ch in letters)
+            {
+                if (ch < 'A' || ch > 'Z') return false;
+                col = col * 26 + (ch - 'A' + 1);
+            }
+            return col > 0;
         }
 
         private void StartTaskFilePolling()

@@ -80,12 +80,15 @@ namespace Libraries.Group1
                 document = GetDocument(wordApp, filePath);
                 if (document == null) return false;
 
-                // 1-1: 証跡で ShowAll 2回以上、かつ編集記号表示で正解（個別リセット後の旧全体ログ誤判定を防ぐ）
+                // 1-1: トグル証跡2回以上 かつ（最終ON証跡 or いま表示ON）。
+                // View.ShowAll は再オープンで消えるため、一括は離脱時の ShowAllFinalOn に頼る。
+                // FinalOn は「滞在中にトグルしたあと最終ON」でのみ付く（初期ON放置の偽○防止）。
                 bool showAllExecutedTwice = LogReader.HasTaskEvidenceAtLeast(1, 1, "ShowAll", 2);
-                bool showAll = wordApp.ActiveWindow.View.ShowAll;
                 if (!showAllExecutedTwice) return false;
 
-                return showAll;
+                bool finalOnEvidence = LogReader.HasTaskEvidence(1, 1, "ShowAllFinalOn");
+                bool liveShowAll = wordApp.ActiveWindow.View.ShowAll;
+                return finalOnEvidence || liveShowAll;
             }
             catch { return false; }
             finally { if (document != null) Marshal.ReleaseComObject(document); }

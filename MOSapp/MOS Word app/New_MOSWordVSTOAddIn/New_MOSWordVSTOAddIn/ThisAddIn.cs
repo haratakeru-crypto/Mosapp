@@ -22,6 +22,8 @@ namespace New_MOSWordVSTOAddIn
         private Timer _showAllPollTimer;
         private Timer _heartbeatOnlyTimer;
         private bool? _lastShowAllState;
+        /// <summary>1-1 滞在中に View.ShowAll のトグルを1回以上検知したか（離脱時 FinalOn 補記のガード）。</summary>
+        private bool _showAllToggledThisVisit;
         private const int ShowAllFastPollIntervalMs = 300;
         /// <summary>空アドイン診断時の心拍間隔（起動ゲート用。COM は触らない）。</summary>
         private const int HeartbeatOnlyIntervalMs = 2500;
@@ -37,6 +39,9 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>全セクションの向きを連結したフィンガープリント（先頭セクションのみでは 3-3 とチェッカーが不一致になるため）。</summary>
         private string _lastOrientationFingerprint;
         private string _lastPageBorderFingerprint;
+        private bool _task46BorderSeen;
+        private bool _task46BorderWasMatch;
+        private Timer _task46BorderFastPollTimer;
         private bool? _lastHeading1LineSimple;
         private bool? _lastLineStylish;
         private string _lastStyleSetLineFingerprint;
@@ -47,6 +52,15 @@ namespace New_MOSWordVSTOAddIn
         private string _lastWatermarkFingerprint;
         private int _suppressWatermarkPollLogs;
         private int _lastLaptopWrapType = -1;
+
+        /// <summary>5-2 滞在中に折り返し「狭く」への遷移を検知したか（離脱補記のガード）。</summary>
+        private bool _wrapTightSeenThisVisit;
+
+        /// <summary>6-1 滞在中に「文字列を表にする」を実行したか（離脱補記のガード）。</summary>
+        private bool _tableConvertSeenThisVisit;
+
+        /// <summary>3-3 滞在中に向き変更を検知したか（離脱補記のガード）。</summary>
+        private bool _orientationChangedThisVisit;
 
         /// <summary>リボンが既にログした直後のポーリング二重記録を抑止する（約2ティック）。</summary>
         private int _suppressOrientationPollLogs;
@@ -101,9 +115,17 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>7-5: 前ティックで ActiveDocument が朗読会.docm だったか</summary>
         private bool _p7FileSaveAsLastDocm;
 
+        /// <summary>7-4 滞在中に朗読会.txt への保存／遷移を検知したか（離脱補記のガード）。</summary>
+        private bool _fileSaveAsTxtSeenThisVisit;
+
+        /// <summary>7-5 滞在中に朗読会.docm への保存／遷移を検知したか（離脱補記のガード）。</summary>
+        private bool _fileSaveAsDocmSeenThisVisit;
+
         internal void RegisterRibbonLoggedPageOrientation()
         {
             _suppressOrientationPollLogs = 2;
+            if (TryGetActiveExamTask(out int projectId, out int taskId) && projectId == 3 && taskId == 3)
+                _orientationChangedThisVisit = true;
         }
 
         internal void RegisterRibbonLoggedPageBorders()
@@ -120,6 +142,52 @@ namespace New_MOSWordVSTOAddIn
         {
             _suppressResolvePollLogs = 3;
             _suppressDeletePollLogs = 2;
+        }
+
+        /// <summary>6-1: リボンで文字列を表にしたとき滞在フラグを立てる。</summary>
+        internal void RegisterRibbonLoggedTableConvertTextToTable()
+        {
+            if (TryGetActiveExamTask(out int projectId, out int taskId) && projectId == 6 && taskId == 1)
+                _tableConvertSeenThisVisit = true;
+        }
+
+        /// <summary>
+        /// 6-5: 「幅を揃える」ボタン。文書名からプロジェクトが取れなくても、作業中のタスクが 6-5 なら証跡を書く。
+        /// チェッカーは taskId 4 の証跡を見る。列幅の見た目だけでは書かない。
+        /// </summary>
+        internal void RegisterRibbonLoggedTableColumnsDistribute()
+        {
+            if (!TryGetActiveExamTask(out int projectId, out int taskId))
+                return;
+            if (projectId != 6 || taskId != 5)
+                return;
+            Logger.LogTaskEvidence(6, 4, "TableColumnsDistribute");
+        }
+
+        internal static bool IsCurrentExamTask(int projectId, int taskId)
+        {
+            return TryGetActiveExamTask(out int currentProjectId, out int currentTaskId)
+                && currentProjectId == projectId
+                && currentTaskId == taskId;
+        }
+
+        /// <summary>
+        /// 2-1: 段落切り取りでない Cut。文書名が取れなくても作業中が 2-1 なら証跡を書く。
+        /// 段落切り取りのときは呼ばない（CutParagraphSelection のみ）。
+        /// </summary>
+        internal void RegisterRibbonLoggedCut()
+        {
+            if (!IsCurrentExamTask(2, 1))
+                return;
+            Logger.LogTaskEvidence(2, 1, "Cut");
+        }
+
+        /// <summary>2-1: Paste。文書名が取れなくても作業中が 2-1 なら証跡を書く。配置だけでは書かない。</summary>
+        internal void RegisterRibbonLoggedPaste()
+        {
+            if (!IsCurrentExamTask(2, 1))
+                return;
+            Logger.LogTaskEvidence(2, 1, "Paste");
         }
 
         internal void RegisterRibbonLoggedWatermark()
@@ -224,8 +292,301 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>5-2 再入場時に WrapTight 滞在フラグをリセットする。</summary>
+        internal void SyncTask52WrapVisitOnTaskSwitch(int projectId, int taskId)
+        {
+            if (projectId == 5 && taskId == 2)
+                _wrapTightSeenThisVisit = false;
+        }
+
+        /// <summary>6-1 再入場時に TableConvert 滞在フラグをリセットする。</summary>
+        internal void SyncTask61TableConvertVisitOnTaskSwitch(int projectId, int taskId)
+        {
+            if (projectId == 6 && taskId == 1)
+                _tableConvertSeenThisVisit = false;
+        }
+
+        /// <summary>3-3 再入場時に向き変更フラグをリセットする。</summary>
+        internal void SyncTask33OrientationVisitOnTaskSwitch(int projectId, int taskId)
+        {
+            if (projectId == 3 && taskId == 3)
+                _orientationChangedThisVisit = false;
+        }
+
+        /// <summary>
+        /// 5-2 離脱時: 滞在中に「狭く」へ遷移し、かついま狭くなら WrapTight を補記する。
+        /// （5-1 直後は上下のため、無操作通過ではフラグも狭くも付かない）
+        /// </summary>
+        internal void EnsureTask52WrapEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 5 || previousTaskId != 2)
+                return;
+            if (nextProjectId == 5 && nextTaskId == 2)
+                return;
+
+            try
+            {
+                if (!_wrapTightSeenThisVisit)
+                    return;
+
+                Word.Document doc = TryGetProjectDocument(5);
+                if (doc == null)
+                    return;
+                if (IsLaptopParagraphWrapTight(doc))
+                    WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask52WrapEvidenceBeforeLeave: " + ex.Message);
+            }
+            finally
+            {
+                _wrapTightSeenThisVisit = false;
+            }
+        }
+
+        /// <summary>
+        /// 6-1 離脱時: 滞在中に「文字列を表にする」を実行していれば証跡を再記する。
+        /// 表構造があるだけでは補記しない（手作成・前回残りの偽○防止）。
+        /// </summary>
+        internal void EnsureTask61TableConvertEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 6 || previousTaskId != 1)
+                return;
+            if (nextProjectId == 6 && nextTaskId == 1)
+                return;
+
+            try
+            {
+                if (_tableConvertSeenThisVisit)
+                    WordEvidenceHelper.LogCommandWithEvidence("TableConvertTextToTable");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask61TableConvertEvidenceBeforeLeave: " + ex.Message);
+            }
+            finally
+            {
+                _tableConvertSeenThisVisit = false;
+            }
+        }
+
+        /// <summary>
+        /// 3-3 離脱時: 滞在中に向き変更を検知していれば証跡を再記する。
+        /// 横向きの文書状態だけでは補記しない。
+        /// </summary>
+        internal void EnsureTask33OrientationEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 3 || previousTaskId != 3)
+                return;
+            if (nextProjectId == 3 && nextTaskId == 3)
+                return;
+
+            try
+            {
+                if (_orientationChangedThisVisit)
+                    WordEvidenceHelper.LogCommandWithEvidence("PageOrientationPortraitLandscape");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask33OrientationEvidenceBeforeLeave: " + ex.Message);
+            }
+            finally
+            {
+                _orientationChangedThisVisit = false;
+            }
+        }
+
+        /// <summary>
+        /// 1-1 離脱時: 滞在中にトグル実績があり、かついま編集記号表示ONなら ShowAllFinalOn を補記する。
+        /// 初期ONのまま無操作で離脱しても補記しない（偽○防止）。常時ポーリングは増やさない。
+        /// </summary>
+        internal void EnsureTask11ShowAllFinalOnBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 1 || previousTaskId != 1)
+                return;
+            if (nextProjectId == 1 && nextTaskId == 1)
+                return;
+
+            try
+            {
+                if (!_showAllToggledThisVisit)
+                    return;
+
+                var app = this.Application;
+                if (app?.ActiveWindow?.View == null)
+                    return;
+
+                if (app.ActiveWindow.View.ShowAll)
+                    WordEvidenceHelper.LogCommandWithEvidence("ShowAllFinalOn");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask11ShowAllFinalOnBeforeLeave: " + ex.Message);
+            }
+            finally
+            {
+                _showAllToggledThisVisit = false;
+            }
+        }
+
+        /// <summary>1-1 再入場時にトグル実績フラグをリセットする。</summary>
+        internal void ResetTask11ShowAllVisit()
+        {
+            _showAllToggledThisVisit = false;
+        }
+
+        /// <summary>
+        /// 9-5 離脱時: 未処理履歴が0かつ追跡OFFなら AcceptAllChangesInDocAndStopTracking を補記する。
+        /// （「すべて承諾して追跡終了」直後の形。9-6 で追跡が戻る前にログを残し、一括の証跡欠落を防ぐ）
+        /// </summary>
+        internal void EnsureTask95AcceptAllEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 9 || previousTaskId != 5)
+                return;
+            if (nextProjectId == 9 && nextTaskId == 5)
+                return;
+
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(9);
+                if (doc == null)
+                    return;
+
+                int revCount = -1;
+                try { revCount = doc.Revisions.Count; } catch { revCount = -1; }
+                if (revCount != 0)
+                    return;
+
+                bool trackingOff = false;
+                try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
+                if (!trackingOff)
+                    return;
+
+                WordEvidenceHelper.LogCommandWithEvidence("AcceptAllChangesInDocAndStopTracking");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask95AcceptAllEvidenceBeforeLeave: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 4-3 離脱時: Resolve／Delete 証跡の取りこぼしをガード付きで補記する。
+        /// - 吹き出し残存＋解決済みエコ＋未解決0 → Resolve 補記
+        /// - 吹き出しなし＋滞在中 Resolve 実績あり → Delete 補記
+        /// - Resolve 実績なしで吹き出しなし → 何も捏造しない（削除のみの偽○防止）
+        /// </summary>
+        internal void EnsureTask43CommentEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 4 || previousTaskId != 3)
+                return;
+            if (nextProjectId == 4 && nextTaskId == 3)
+                return;
+
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(4);
+                if (doc == null)
+                    return;
+
+                // 離脱直前に1回走査（常時ポーリングは増やさない）
+                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+
+                bool anyEco = DocumentHasAnyEcoCommentBalloonPoll(doc);
+                int unresolved = CountUnresolvedEcoComments(doc);
+
+                if (anyEco)
+                {
+                    if (DocumentHasResolvedEcoComment(doc) && unresolved == 0)
+                        TryLogReviewResolveComment();
+                    return;
+                }
+
+                // 最終形（エコ吹き出しなし）: Resolve 実績があるときだけ Delete を補記
+                if (_ecoResolveLoggedForAttempt)
+                    WordEvidenceHelper.LogCommandWithEvidence("ReviewDeleteComment");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask43CommentEvidenceBeforeLeave: " + ex.Message);
+            }
+        }
+
+        /// <summary>7-4 / 7-5 再入場時に SaveAs 滞在フラグをリセットする。</summary>
+        internal void SyncP7FileSaveAsVisitOnTaskSwitch(int projectId, int taskId)
+        {
+            if (projectId == 7 && taskId == 4)
+                _fileSaveAsTxtSeenThisVisit = false;
+            if (projectId == 7 && taskId == 5)
+                _fileSaveAsDocmSeenThisVisit = false;
+        }
+
+        /// <summary>
+        /// 7-4 離脱時: 滞在中に朗読会.txt への保存／遷移を検知していれば FileSaveAsTxt を再記する。
+        /// ファイル存在だけでは補記しない（前回残り・他タスク保存の偽○防止）。
+        /// </summary>
+        internal void EnsureTask74FileSaveAsEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 7 || previousTaskId != 4)
+                return;
+            if (nextProjectId == 7 && nextTaskId == 4)
+                return;
+
+            try
+            {
+                if (_fileSaveAsTxtSeenThisVisit)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask74FileSaveAsEvidenceBeforeLeave: " + ex.Message);
+            }
+            finally
+            {
+                _fileSaveAsTxtSeenThisVisit = false;
+            }
+        }
+
+        /// <summary>
+        /// 7-5 離脱時: 滞在中に朗読会.docm への保存／遷移を検知していれば FileSaveAsDocm を再記する。
+        /// ファイル存在だけでは補記しない。
+        /// </summary>
+        internal void EnsureTask75FileSaveAsEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        {
+            if (previousProjectId != 7 || previousTaskId != 5)
+                return;
+            if (nextProjectId == 7 && nextTaskId == 5)
+                return;
+
+            try
+            {
+                if (_fileSaveAsDocmSeenThisVisit)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask75FileSaveAsEvidenceBeforeLeave: " + ex.Message);
+            }
+            finally
+            {
+                _fileSaveAsDocmSeenThisVisit = false;
+            }
+        }
+
         /// <summary>「5月21日より5日間の」段落付近の浮動画像が折り返し「上下」か。</summary>
         private static bool IsLaptopParagraphWrapTopBottom(Word.Document doc)
+        {
+            return IsLaptopParagraphWrapType(doc, Word.WdWrapType.wdWrapTopBottom);
+        }
+
+        /// <summary>「5月21日より5日間の」段落付近の浮動画像が折り返し「狭く」か。</summary>
+        private static bool IsLaptopParagraphWrapTight(Word.Document doc)
+        {
+            return IsLaptopParagraphWrapType(doc, Word.WdWrapType.wdWrapTight);
+        }
+
+        private static bool IsLaptopParagraphWrapType(Word.Document doc, Word.WdWrapType wrapType)
         {
             if (doc == null)
                 return false;
@@ -259,7 +620,7 @@ namespace New_MOSWordVSTOAddIn
                         int anchor = sh.Anchor != null ? sh.Anchor.Start : -1;
                         if (anchor < paraStart || anchor > paraEnd)
                             continue;
-                        return sh.WrapFormat.Type == Word.WdWrapType.wdWrapTopBottom;
+                        return sh.WrapFormat.Type == wrapType;
                     }
                     finally { Marshal.ReleaseComObject(sh); }
                 }
@@ -339,6 +700,115 @@ namespace New_MOSWordVSTOAddIn
         {
             WordEvidenceHelper.LogCommandWithEvidence("PageBorders");
             Logger.LogOperation("PageBorders", "");
+        }
+
+        /// <summary>4-6 に入った時点のページ罫線を基準にする。入場時に正答でも証跡にしない。</summary>
+        internal void CaptureTask46PageBorderBaseline()
+        {
+            _task46BorderSeen = false;
+            _task46BorderWasMatch = false;
+            if (!TryReadTask46PageBorderMatch(out bool match)) return;
+            _task46BorderSeen = true;
+            _task46BorderWasMatch = match;
+        }
+
+        /// <summary>4-6 を離れる直前に、この作業中に正答へ変わっていれば証跡を書く。</summary>
+        internal void ObserveTask46PageBorderBeforeLeave(int previousProjectId, int previousTaskId)
+        {
+            if (previousProjectId != 4 || previousTaskId != 6)
+                return;
+            TryObserveTask46PageBorder();
+            _task46BorderSeen = false;
+            _task46BorderWasMatch = false;
+        }
+
+        private void Task46BorderFastPollTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (!TryGetActiveExamTask(out int projectId, out int taskId))
+                    return;
+                if (projectId != 4 || taskId != 6)
+                    return;
+                TryObserveTask46PageBorder();
+            }
+            catch { }
+        }
+
+        /// <summary>この作業中に四辺・線種・太さ・色・影なしがそろったときだけ PageBorders を書く。</summary>
+        private void TryObserveTask46PageBorder()
+        {
+            if (!TryReadTask46PageBorderMatch(out bool match)) return;
+            if (!_task46BorderSeen)
+            {
+                _task46BorderSeen = true;
+                _task46BorderWasMatch = match;
+                return;
+            }
+            if (!_task46BorderWasMatch && match)
+                LogPageBordersForDestructiveGate();
+            _task46BorderWasMatch = match;
+        }
+
+        private bool TryReadTask46PageBorderMatch(out bool match)
+        {
+            match = false;
+            try
+            {
+                var app = this.Application;
+                if (app == null || app.Documents.Count == 0)
+                    return false;
+                if (ShouldDeferIntrusiveDocumentCom(app))
+                    return false;
+                Word.Document doc = app.ActiveDocument;
+                if (doc == null || doc.Sections.Count < 1)
+                    return false;
+
+                Word.Section section = null;
+                Word.Borders borders = null;
+                Word.Border top = null, bottom = null, left = null, right = null;
+                try
+                {
+                    section = doc.Sections[1];
+                    borders = section.Borders;
+                    int shadow = -999;
+                    try { shadow = Convert.ToInt32(((dynamic)borders).Shadow); } catch { }
+                    top = borders[Word.WdBorderType.wdBorderTop];
+                    bottom = borders[Word.WdBorderType.wdBorderBottom];
+                    left = borders[Word.WdBorderType.wdBorderLeft];
+                    right = borders[Word.WdBorderType.wdBorderRight];
+                    bool sides =
+                        IsTask46BorderEdge(top) && IsTask46BorderEdge(bottom)
+                        && IsTask46BorderEdge(left) && IsTask46BorderEdge(right);
+                    if (!sides || shadow != 0)
+                    {
+                        match = false;
+                        return true;
+                    }
+                    match = WordWatermarkInspection.ArePageBordersPureAccent3(doc);
+                    return true;
+                }
+                finally
+                {
+                    if (right != null) Marshal.ReleaseComObject(right);
+                    if (left != null) Marshal.ReleaseComObject(left);
+                    if (bottom != null) Marshal.ReleaseComObject(bottom);
+                    if (top != null) Marshal.ReleaseComObject(top);
+                    if (borders != null) Marshal.ReleaseComObject(borders);
+                    if (section != null) Marshal.ReleaseComObject(section);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsTask46BorderEdge(Word.Border border)
+        {
+            if (border == null) return false;
+            return (Word.WdLineStyle)border.LineStyle == Word.WdLineStyle.wdLineStyleSingle
+                && (Word.WdLineWidth)border.LineWidth == Word.WdLineWidth.wdLineWidth150pt;
         }
 
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
@@ -841,6 +1311,10 @@ namespace New_MOSWordVSTOAddIn
                 _showAllPollTimer.Tick += ShowAllPoll_Tick;
                 _showAllPollTimer.Start();
             }
+
+            _task46BorderFastPollTimer = new Timer { Interval = 200 };
+            _task46BorderFastPollTimer.Tick += Task46BorderFastPollTimer_Tick;
+            _task46BorderFastPollTimer.Start();
         }
 
         private void ShowAllFastPoll_Tick(object sender, EventArgs e)
@@ -882,6 +1356,12 @@ namespace New_MOSWordVSTOAddIn
             {
                 var app = this.Application;
                 UpdateShowAllPolling(app);
+                TryLogTask11ShowAllFinalOnForScore(app);
+                FlushEcoCommentEvidenceForScore();
+                FlushP7FileSaveAsEvidenceForScore(app);
+                FlushTask52WrapEvidenceForScore();
+                FlushTask61TableConvertEvidenceForScore();
+                FlushTask33OrientationEvidenceForScore();
                 FlushP7CompanyEvidenceForScore(app);
                 SynthesizeRibbonFreeEvidenceForScore(app);
             }
@@ -890,6 +1370,146 @@ namespace New_MOSWordVSTOAddIn
             {
                 try { File.Delete(EvidenceFlushFilePath); } catch { /* ignore */ }
             }
+        }
+
+        /// <summary>
+        /// 3-3 採点直前: 滞在中に向き変更を検知していれば証跡を再記する。
+        /// </summary>
+        private void FlushTask33OrientationEvidenceForScore()
+        {
+            if (!TryGetActiveExamTask(out int projectId, out int taskId))
+                return;
+            if (projectId != 3 || taskId != 3)
+                return;
+            if (!_orientationChangedThisVisit)
+                return;
+
+            try
+            {
+                WordEvidenceHelper.LogCommandWithEvidence("PageOrientationPortraitLandscape");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] FlushTask33OrientationEvidenceForScore: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 6-1 採点直前: 滞在中に変換を実行していれば証跡を再記する（表があるだけでは書かない）。
+        /// </summary>
+        private void FlushTask61TableConvertEvidenceForScore()
+        {
+            if (!TryGetActiveExamTask(out int projectId, out int taskId))
+                return;
+            if (projectId != 6 || taskId != 1)
+                return;
+            if (!_tableConvertSeenThisVisit)
+                return;
+
+            try
+            {
+                WordEvidenceHelper.LogCommandWithEvidence("TableConvertTextToTable");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] FlushTask61TableConvertEvidenceForScore: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 5-2 採点直前: 滞在中に「狭く」遷移を検知し、いま狭くなら WrapTight を再記する。
+        /// </summary>
+        private void FlushTask52WrapEvidenceForScore()
+        {
+            if (!TryGetActiveExamTask(out int projectId, out int taskId))
+                return;
+            if (projectId != 5 || taskId != 2)
+                return;
+            if (!_wrapTightSeenThisVisit)
+                return;
+
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(5);
+                if (doc == null)
+                    return;
+                if (IsLaptopParagraphWrapTight(doc))
+                    WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] FlushTask52WrapEvidenceForScore: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 7-4 / 7-5 採点直前: FullName を1回同期し、滞在中に検知済みなら証跡を再記する（ファイル存在だけでは書かない）。
+        /// </summary>
+        private void FlushP7FileSaveAsEvidenceForScore(Word.Application app)
+        {
+            if (!TryGetActiveExamTask(out int projectId, out int taskId))
+                return;
+            if (projectId != 7 || (taskId != 4 && taskId != 5))
+                return;
+
+            try
+            {
+                Word.Document doc = null;
+                try { doc = app?.ActiveDocument; } catch { doc = null; }
+                if (doc != null)
+                    UpdateFileSaveAsPolling(doc);
+
+                if (taskId == 4 && _fileSaveAsTxtSeenThisVisit)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+                if (taskId == 5 && _fileSaveAsDocmSeenThisVisit)
+                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] FlushP7FileSaveAsEvidenceForScore: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 4-3 その場／一括採点直前: Eco コメント状態を1回だけ走査し、Resolve／Delete 証跡の取りこぼしを拾う。
+        /// </summary>
+        private void FlushEcoCommentEvidenceForScore()
+        {
+            if (!TryGetActiveExamTask(out int projectId, out int taskId))
+                return;
+            if (projectId != 4 || taskId != 3)
+                return;
+
+            try
+            {
+                Word.Document doc = TryGetProjectDocument(4);
+                if (doc == null)
+                    return;
+                UpdateEcoCommentBaselineAndMaybeLog(doc, CountUnresolvedEcoComments(doc));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] FlushEcoCommentEvidenceForScore: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 1-1 その場採点: 離脱前でも、滞在中トグル実績ありかつ表示ONなら FinalOn を残す（一括で View が消えても救済）。
+        /// </summary>
+        private void TryLogTask11ShowAllFinalOnForScore(Word.Application app)
+        {
+            if (!IsShowAllEvidenceTaskActive())
+                return;
+            if (!_showAllToggledThisVisit)
+                return;
+            if (app?.ActiveWindow?.View == null)
+                return;
+            try
+            {
+                if (app.ActiveWindow.View.ShowAll)
+                    WordEvidenceHelper.LogCommandWithEvidence("ShowAllFinalOn");
+            }
+            catch { /* ignore */ }
         }
 
         /// <summary>
@@ -998,7 +1618,12 @@ namespace New_MOSWordVSTOAddIn
 
             bool viewShowAll = app.ActiveWindow.View.ShowAll;
             if (_lastShowAllState.HasValue && _lastShowAllState.Value != viewShowAll)
+            {
                 WordEvidenceHelper.LogCommandWithEvidence("ShowAll");
+                // 1-1 滞在中のトグルのみ離脱補記のガードに使う（フラッシュ時の他タスクでは立てない）
+                if (IsShowAllEvidenceTaskActive())
+                    _showAllToggledThisVisit = true;
+            }
             _lastShowAllState = viewShowAll;
         }
 
@@ -1116,7 +1741,11 @@ namespace New_MOSWordVSTOAddIn
                         if (_suppressOrientationPollLogs > 0)
                             _suppressOrientationPollLogs--;
                         else
+                        {
                             WordEvidenceHelper.LogCommandWithEvidence("PageOrientationPortraitLandscape");
+                            if (taskId == 3)
+                                _orientationChangedThisVisit = true;
+                        }
                     }
                     _lastOrientationFingerprint = orientFp;
                 }
@@ -1155,7 +1784,9 @@ namespace New_MOSWordVSTOAddIn
                     if (projectId == 4)
                     {
                     string borderFp = WordWatermarkInspection.GetPageBorderFingerprint(doc);
-                    if (_lastPageBorderFingerprint != null && borderFp != _lastPageBorderFingerprint)
+                    if (taskId == 6)
+                        TryObserveTask46PageBorder();
+                    else if (_lastPageBorderFingerprint != null && borderFp != _lastPageBorderFingerprint)
                     {
                         if (_suppressPageBorderPollLogs > 0)
                             _suppressPageBorderPollLogs--;
@@ -1303,7 +1934,12 @@ namespace New_MOSWordVSTOAddIn
                                 if (_lastLaptopWrapType != currentWrapType)
                                 {
                                     if (currentWrapType == 3) WordEvidenceHelper.LogCommandWithEvidence("WrapTopBottom");
-                                    else if (currentWrapType == 2) WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
+                                    else if (currentWrapType == 2)
+                                    {
+                                        WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
+                                        if (projectId == 5 && taskId == 2)
+                                            _wrapTightSeenThisVisit = true;
+                                    }
                                     else if (currentWrapType == 1) WordEvidenceHelper.LogCommandWithEvidence("WrapSquare");
                                 }
                                 _lastLaptopWrapType = currentWrapType;
@@ -1466,12 +2102,26 @@ namespace New_MOSWordVSTOAddIn
             return string.Equals(Path.GetFileName(fullName), P7RdDocmFileName, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void LogFileSaveAsCommandForPath(string fullName)
+        private void LogFileSaveAsCommandForPath(string fullName)
         {
             if (IsRdTxtSavePath(fullName))
-                WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+                LogFileSaveAsTxtEvidence();
             else if (IsRdDocmSavePath(fullName))
-                WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+                LogFileSaveAsDocmEvidence();
+        }
+
+        private void LogFileSaveAsTxtEvidence()
+        {
+            WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+            if (TryGetActiveExamTask(out int projectId, out int taskId) && projectId == 7 && taskId == 4)
+                _fileSaveAsTxtSeenThisVisit = true;
+        }
+
+        private void LogFileSaveAsDocmEvidence()
+        {
+            WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+            if (TryGetActiveExamTask(out int projectId, out int taskId) && projectId == 7 && taskId == 5)
+                _fileSaveAsDocmSeenThisVisit = true;
         }
 
         /// <summary>
@@ -1499,9 +2149,9 @@ namespace New_MOSWordVSTOAddIn
                 }
 
                 if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasTxt && nowTxt)
-                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+                    LogFileSaveAsTxtEvidence();
                 if (!string.IsNullOrEmpty(_p7FileSaveAsTrackedFullName) && !wasDocm && nowDocm)
-                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+                    LogFileSaveAsDocmEvidence();
 
                 _p7FileSaveAsTrackedFullName = fullName;
                 _p7FileSaveAsLastTxt = nowTxt;
@@ -1510,9 +2160,9 @@ namespace New_MOSWordVSTOAddIn
             else
             {
                 if (!_p7FileSaveAsLastTxt && nowTxt)
-                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsTxt");
+                    LogFileSaveAsTxtEvidence();
                 if (!_p7FileSaveAsLastDocm && nowDocm)
-                    WordEvidenceHelper.LogCommandWithEvidence("FileSaveAsDocm");
+                    LogFileSaveAsDocmEvidence();
                 _p7FileSaveAsLastTxt = nowTxt;
                 _p7FileSaveAsLastDocm = nowDocm;
             }
@@ -2381,6 +3031,15 @@ namespace New_MOSWordVSTOAddIn
                     {
                         _addIn.EnsureTask45WatermarkEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId, ensureXml);
                         _addIn.EnsureTask51WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask52WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask61TableConvertEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask33OrientationEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask11ShowAllFinalOnBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask95AcceptAllEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask43CommentEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask74FileSaveAsEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.EnsureTask75FileSaveAsEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                        _addIn.ObserveTask46PageBorderBeforeLeave(_projectId, _taskId);
                     }
 
                     bool doLeaveCompare = sameProject && _taskId >= 0 && !forceSnapshot;
@@ -2408,9 +3067,18 @@ namespace New_MOSWordVSTOAddIn
                     _attemptNo = attemptNo;
                     _exemptFlags = exemptFlags;
 
+                    if (taskChanged && projectId == 1 && taskId == 1)
+                        _addIn.ResetTask11ShowAllVisit();
+                    if (taskChanged && projectId == 4 && taskId == 6)
+                        _addIn.CaptureTask46PageBorderBaseline();
+
                     Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
                     _addIn.SyncWatermarkPollingBaselineOnTaskSwitch(projectId, normalizedXml);
                     _addIn.SyncEcoCommentBaselineOnTaskSwitch(projectId, taskId);
+                    _addIn.SyncP7FileSaveAsVisitOnTaskSwitch(projectId, taskId);
+                    _addIn.SyncTask52WrapVisitOnTaskSwitch(projectId, taskId);
+                    _addIn.SyncTask61TableConvertVisitOnTaskSwitch(projectId, taskId);
+                    _addIn.SyncTask33OrientationVisitOnTaskSwitch(projectId, taskId);
 
                     if (captured != null)
                     {

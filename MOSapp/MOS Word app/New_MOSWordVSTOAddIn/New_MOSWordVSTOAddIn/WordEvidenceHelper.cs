@@ -16,6 +16,8 @@ namespace New_MOSWordVSTOAddIn
         private static readonly (int ProjectId, int TaskId, string CommandId)[] EvidenceTargets =
         {
             (1, 1, "ShowAll"),
+            // 1-1: 離脱時・トグル実績ありかつ最終表示ONのときだけ付く（初期ON放置の偽○防止）
+            (1, 1, "ShowAllFinalOn"),
             // 1-1-5: 環境により FontClearFormatting 等の idMso が無効のため、Ribbon では ClearFormatting のみフック
             (1, 5, "ClearFormatting"),
             (2, 1, "Cut"),
@@ -72,7 +74,8 @@ namespace New_MOSWordVSTOAddIn
             try
             {
                 int activeProjectId = TryGetActiveProjectId();
-                if (activeProjectId > 0 && activeProjectId != 2)
+                bool task21 = Globals.ThisAddIn != null && ThisAddIn.IsCurrentExamTask(2, 1);
+                if (!task21 && activeProjectId > 0 && activeProjectId != 2)
                     return false;
 
                 var app = Globals.ThisAddIn?.Application;
@@ -231,6 +234,7 @@ namespace New_MOSWordVSTOAddIn
         private static bool UsesFixedProjectWhenActiveUnknown(string commandId)
         {
             return string.Equals(commandId, "ShowAll", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandId, "ShowAllFinalOn", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "FileSaveAsTxt", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "FileSaveAsDocm", StringComparison.OrdinalIgnoreCase);
         }
