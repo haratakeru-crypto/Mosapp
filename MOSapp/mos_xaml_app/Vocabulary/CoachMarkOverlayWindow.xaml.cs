@@ -196,6 +196,26 @@ namespace MOSExcelMogiApp.Vocabulary
             ApplyClickThrough(_clickThrough);
         }
 
+        /// <summary>クリック校正と同じ基準の Excel ウィンドウ物理矩形。</summary>
+        public Rect? TryGetOverlayWindowPhysical()
+        {
+            RefreshDpiScale();
+            PositionOverExcel(_excelHwnd);
+            if (_excelPhysical.Right <= _excelPhysical.Left || _excelPhysical.Bottom <= _excelPhysical.Top)
+                return null;
+            return new Rect(
+                _excelPhysical.Left,
+                _excelPhysical.Top,
+                _excelPhysical.Right - _excelPhysical.Left,
+                _excelPhysical.Bottom - _excelPhysical.Top);
+        }
+
+        public void ClearCalibrationMarkers()
+        {
+            _markerLocals.Clear();
+            PaintHighlightHoles(_lastHighlightScreens);
+        }
+
         /// <summary>校正中のクリック位置マーカー（ローカル DIP）。</summary>
         public void AddCalibrationMarkerLocal(Point localDip)
         {

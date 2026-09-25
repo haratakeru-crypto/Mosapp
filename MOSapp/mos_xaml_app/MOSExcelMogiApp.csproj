@@ -224,6 +224,7 @@
     <Compile Include="Vocabulary\VocabularySessionController.cs" />
     <Compile Include="Vocabulary\VocabularyHwndHelper.cs" />
     <Compile Include="Vocabulary\VocabularyHighlightHelper.cs" />
+    <Compile Include="Vocabulary\VocabularyHighlightCalibration.cs" />
     <Compile Include="Vocabulary\VocabularyRibbonTabProbe.cs" />
     <Compile Include="Vocabulary\CoachMarkOverlayWindow.xaml.cs">
       <DependentUpon>CoachMarkOverlayWindow.xaml</DependentUpon>
@@ -300,6 +301,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\JSON\ExcelVocabularyKeywords.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\JSON\VocabHighlightCalibration.json" Condition="Exists('References\JSON\VocabHighlightCalibration.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\CSV\解答手順あり模擬試験①問題文.csv">

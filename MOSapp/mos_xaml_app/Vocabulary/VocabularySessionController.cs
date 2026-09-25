@@ -49,13 +49,15 @@ namespace MOSExcelMogiApp.Vocabulary
         bool _prevPollTargetSelected;
         /// <summary>1/2 で選択解除に失敗したとき、ポーリングでは進めずイベント待ちにする。</summary>
         bool _step0IgnorePoll;
-        /// <summary>クリック校正中（左上→右下）。</summary>
+        /// <summary>クリック校正中。</summary>
         bool _calibratingHole;
         int _calibrateCornerIndex;
         Point? _calibrateTopLeftPhysical;
-        /// <summary>セッション内で再利用する校正済み穴（画面物理ピクセル）。</summary>
-        Rect? _calibratedTableHolePhysical;
-        Rect? _calibratedChartHolePhysical;
+        /// <summary>校正比率（物理座標は表示のたびに再計算）。</summary>
+        VocabularyHighlightCalibration.HoleRatio _calibratedTableRatio;
+        VocabularyHighlightCalibration.HoleRatio _calibratedChartRatio;
+        /// <summary>locked 校正があるとき COM 穴に落とさない。</summary>
+        bool _calibrationLocked;
 
         public VocabularySessionController(
             Dispatcher dispatcher,
@@ -117,8 +119,65 @@ namespace MOSExcelMogiApp.Vocabulary
             _tutorialMode = tutorial.Count > 0;
             _phase = _tutorialMode ? Phase.Tutorial : Phase.Quiz;
             WriteVocabModeFlag(true);
+            _calibrationLocked = false;
+            _calibratedTableRatio = null;
+            _calibratedChartRatio = null;
+            TryLoadPersistedCalibration();
             StartWatcher();
             ShowCurrent(showTutorialCoach: _tutorialMode);
+        }
+
+        void TryLoadPersistedCalibration()
+        {
+            try
+            {
+                var store = VocabularyHighlightCalibration.Load();
+                if (store == null || !store.Locked) return;
+
+                _calibrationLocked = true;
+                if (store.Table != null && store.Table.IsValid)
+                    _calibratedTableRatio = store.Table;
+                if (store.Chart != null && store.Chart.IsValid)
+                    _calibratedChartRatio = store.Chart;
+            }
+            catch { }
+        }
+
+        void PersistCalibration()
+        {
+            try
+            {
+                if (_calibratedTableRatio == null && _calibratedChartRatio == null)
+                    return;
+
+                var store = VocabularyHighlightCalibration.Load()
+                            ?? new VocabularyHighlightCalibration.Store();
+                store.Locked = true;
+                if (_calibratedTableRatio != null)
+                    store.Table = _calibratedTableRatio;
+                if (_calibratedChartRatio != null)
+                    store.Chart = _calibratedChartRatio;
+
+                VocabularyHighlightCalibration.Save(store);
+                _calibrationLocked = true;
+            }
+            catch { }
+        }
+
+        /// <summary>現在の Excel HWND から校正穴を解決。</summary>
+        Rect? ResolveCalibratedHoleNow(bool table)
+        {
+            var ratio = table ? _calibratedTableRatio : _calibratedChartRatio;
+            if (ratio == null || !ratio.IsValid) return null;
+            IntPtr hwnd = IntPtr.Zero;
+            try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+            return VocabularyHighlightCalibration.ResolveHole(ratio, hwnd);
+        }
+
+        bool HasValidCalibratedRatio(bool table)
+        {
+            var ratio = table ? _calibratedTableRatio : _calibratedChartRatio;
+            return ratio != null && ratio.IsValid;
         }
 
         public void GoNext()
@@ -171,7 +230,6 @@ namespace MOSExcelMogiApp.Vocabulary
                 {
                     delay.Stop();
                     if (_currentSolved || _tutorialSubStep != 0) return;
-                    // テーブル／グラフ: 校正済み穴が無ければクリック校正から
                     if (NeedsHoleCalibration(_current))
                         StartHoleCalibration();
                     else
@@ -187,17 +245,54 @@ namespace MOSExcelMogiApp.Vocabulary
 
         bool NeedsHoleCalibration(VocabularyKeywordItem item)
         {
-            if (IsTableKeyword(item)) return !_calibratedTableHolePhysical.HasValue;
-            if (IsChartKeyword(item)) return !_calibratedChartHolePhysical.HasValue;
+            if (item == null) return false;
+            if (IsTableKeyword(item)) return !HasValidCalibratedRatio(table: true);
+            if (IsChartKeyword(item)) return !HasValidCalibratedRatio(table: false);
             return false;
         }
 
         void StartHoleCalibration()
         {
+            IntPtr hwnd = IntPtr.Zero;
+            try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+            if (VocabularyHighlightCalibration.TryGetExcelWindowPhysical(hwnd) == null)
+            {
+                // HWND 未準備なら少し待って再試行
+                var retry = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+                int tries = 0;
+                retry.Tick += (s, e) =>
+                {
+                    tries++;
+                    try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+                    if (VocabularyHighlightCalibration.TryGetExcelWindowPhysical(hwnd) != null || tries >= 8)
+                    {
+                        retry.Stop();
+                        if (VocabularyHighlightCalibration.TryGetExcelWindowPhysical(hwnd) == null)
+                        {
+                            MessageBox.Show(
+                                "Excel ウィンドウを取得できないため、ハイライト位置を設定できません。",
+                                "単語帳",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+                            ShowTutorialCoachStep();
+                            return;
+                        }
+                        BeginHoleCalibrationUi();
+                    }
+                };
+                retry.Start();
+                return;
+            }
+
+            BeginHoleCalibrationUi();
+        }
+
+        void BeginHoleCalibrationUi()
+        {
             _calibratingHole = true;
             _calibrateCornerIndex = 0;
             _calibrateTopLeftPhysical = null;
-            _suppressSelectionPollUntil = DateTime.UtcNow.AddHours(1); // 校正中は進行しない
+            _suppressSelectionPollUntil = DateTime.UtcNow.AddHours(1);
 
             bool isTable = IsTableKeyword(_current);
             ShowCoach(
@@ -232,17 +327,56 @@ namespace MOSExcelMogiApp.Vocabulary
 
             if (!_calibrateTopLeftPhysical.HasValue) return;
 
+            // クリック座標と同じ基準のウィンドウ矩形で比率化（オーバーレイの矩形を優先）
+            Rect? win = _coach.TryGetOverlayWindowPhysical();
+            if (!win.HasValue)
+            {
+                IntPtr hwnd = IntPtr.Zero;
+                try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+                win = VocabularyHighlightCalibration.TryGetExcelWindowPhysical(hwnd);
+            }
+
+            if (!win.HasValue)
+            {
+                MessageBox.Show(
+                    "ウィンドウサイズを取得できないため保存できません。もう一度設定してください。",
+                    "単語帳",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
             var tl = _calibrateTopLeftPhysical.Value;
             double x = Math.Min(tl.X, physical.X);
             double y = Math.Min(tl.Y, physical.Y);
             double w = Math.Max(24, Math.Abs(physical.X - tl.X));
             double h = Math.Max(24, Math.Abs(physical.Y - tl.Y));
             var hole = new Rect(x, y, w, h);
+            var ratio = VocabularyHighlightCalibration.ToRatio(hole, win.Value);
+            if (!ratio.IsValid)
+            {
+                MessageBox.Show(
+                    "選択範囲が小さすぎます。左上と右下をもう一度クリックしてください。",
+                    "単語帳",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                _calibrateCornerIndex = 0;
+                _calibrateTopLeftPhysical = null;
+                _coach.ClearCalibrationMarkers();
+                _coach.UpdateMessage(
+                    "ハイライト位置の設定",
+                    IsTableKeyword(_current)
+                        ? "テーブルの『左上』の角をクリックしてください。"
+                        : "グラフの『左上』の角をクリックしてください。");
+                return;
+            }
 
             if (IsTableKeyword(_current))
-                _calibratedTableHolePhysical = hole;
+                _calibratedTableRatio = ratio;
             else if (IsChartKeyword(_current))
-                _calibratedChartHolePhysical = hole;
+                _calibratedChartRatio = ratio;
+
+            PersistCalibration();
 
             _calibratingHole = false;
             _calibrateCornerIndex = 0;
@@ -252,6 +386,11 @@ namespace MOSExcelMogiApp.Vocabulary
 
             _suppressSelectionPollUntil = DateTime.UtcNow.AddMilliseconds(500);
             CapturePollBaseline();
+            MessageBox.Show(
+                "ハイライト位置を決定しました。\n以降は画面比率で同じ位置に表示します。",
+                "単語帳",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             ShowTutorialCoachStep();
         }
 
@@ -758,58 +897,7 @@ namespace MOSExcelMogiApp.Vocabulary
                 ExcelApp excel = null;
                 try { excel = _getExcelApp?.Invoke(); } catch { }
 
-                // 校正済み穴があるときは COM 枠よりオーバーレイ穴を優先（太線は付けない）
-                var holes = new List<Rect>();
-                if (holesOverride != null)
-                {
-                    holes.AddRange(holesOverride);
-                    try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
-                }
-                else if (hint != null
-                         && hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
-                         && _calibratedTableHolePhysical.HasValue)
-                {
-                    holes.Add(_calibratedTableHolePhysical.Value);
-                    try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
-                }
-                else if (hint != null
-                         && hint.Equals("Chart", StringComparison.OrdinalIgnoreCase)
-                         && _calibratedChartHolePhysical.HasValue)
-                {
-                    holes.Add(_calibratedChartHolePhysical.Value);
-                    try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
-                }
-                else if (hint != null
-                         && hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase)
-                         && _calibratedTableHolePhysical.HasValue)
-                {
-                    holes.Add(_calibratedTableHolePhysical.Value);
-                    holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, "TableDesignTab"));
-                    try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
-                }
-                else if (hint != null
-                         && hint.Equals("ChartThenDesignTab", StringComparison.OrdinalIgnoreCase)
-                         && _calibratedChartHolePhysical.HasValue)
-                {
-                    holes.Add(_calibratedChartHolePhysical.Value);
-                    holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, "ChartDesignTab"));
-                    try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
-                }
-                else
-                {
-                    if (hint != null &&
-                        (hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
-                         || hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        try { VocabularyHighlightHelper.ApplyNativeTableHighlight(excel); } catch { }
-                    }
-                    else
-                    {
-                        try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
-                    }
-
-                    holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, hint));
-                }
+                var holes = BuildCoachHoles(hwnd, excel, hint, holesOverride);
 
                 _coach = new CoachMarkOverlayWindow();
                 Action dismissAction = () =>
@@ -833,6 +921,10 @@ namespace MOSExcelMogiApp.Vocabulary
                     _coach.PhysicalClickCaptured += OnCalibrationPhysicalClick;
                     _coach.BeginClickCapture();
                 }
+                else if (ShouldRetryCalibratedHole(hint, holes))
+                {
+                    ScheduleCalibratedHoleRetry(hint);
+                }
             }
             catch (Exception ex)
             {
@@ -842,6 +934,125 @@ namespace MOSExcelMogiApp.Vocabulary
                 MessageBox.Show((title ?? "") + "\n\n" + (message ?? ""), "単語帳", MessageBoxButton.OK, MessageBoxImage.Information);
                 onDismiss?.Invoke();
             }
+        }
+
+        List<Rect> BuildCoachHoles(IntPtr hwnd, ExcelApp excel, string hint, IReadOnlyList<Rect> holesOverride)
+        {
+            var holes = new List<Rect>();
+            if (holesOverride != null)
+            {
+                holes.AddRange(holesOverride);
+                try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
+                return holes;
+            }
+
+            bool wantTable = hint != null && (
+                hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
+                || hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase));
+            bool wantChart = hint != null && (
+                hint.Equals("Chart", StringComparison.OrdinalIgnoreCase)
+                || hint.Equals("ChartThenDesignTab", StringComparison.OrdinalIgnoreCase));
+
+            if (wantTable)
+            {
+                var cal = ResolveCalibratedHoleNow(table: true);
+                if (cal.HasValue)
+                {
+                    holes.Add(cal.Value);
+                    try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
+                }
+                else if (!_calibrationLocked || !HasValidCalibratedRatio(table: true))
+                {
+                    try { VocabularyHighlightHelper.ApplyNativeTableHighlight(excel); } catch { }
+                    if (hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase))
+                        holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, "Table"));
+                    else
+                        holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, hint));
+                }
+
+                if (hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase))
+                    holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, "TableDesignTab"));
+                return holes;
+            }
+
+            if (wantChart)
+            {
+                var cal = ResolveCalibratedHoleNow(table: false);
+                if (cal.HasValue)
+                    holes.Add(cal.Value);
+                else if (!_calibrationLocked || !HasValidCalibratedRatio(table: false))
+                {
+                    if (hint.Equals("ChartThenDesignTab", StringComparison.OrdinalIgnoreCase))
+                        holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, "Chart"));
+                    else
+                        holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, hint));
+                }
+
+                if (hint.Equals("ChartThenDesignTab", StringComparison.OrdinalIgnoreCase))
+                    holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, "ChartDesignTab"));
+                try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
+                return holes;
+            }
+
+            try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
+            holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, hint));
+            return holes;
+        }
+
+        bool ShouldRetryCalibratedHole(string hint, List<Rect> holes)
+        {
+            if (!_calibrationLocked || string.IsNullOrEmpty(hint)) return false;
+            bool table = hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
+                         || hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase);
+            bool chart = hint.Equals("Chart", StringComparison.OrdinalIgnoreCase)
+                         || hint.Equals("ChartThenDesignTab", StringComparison.OrdinalIgnoreCase);
+            if (table && HasValidCalibratedRatio(true) && !ResolveCalibratedHoleNow(true).HasValue)
+                return true;
+            if (chart && HasValidCalibratedRatio(false) && !ResolveCalibratedHoleNow(false).HasValue)
+                return true;
+            if (table && HasValidCalibratedRatio(true)
+                && hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
+                && holes.Count == 0)
+                return true;
+            return false;
+        }
+
+        void ScheduleCalibratedHoleRetry(string hint)
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            int tries = 0;
+            timer.Tick += (s, e) =>
+            {
+                tries++;
+                if (_coach == null || _currentSolved)
+                {
+                    timer.Stop();
+                    return;
+                }
+
+                bool table = hint != null && (
+                    hint.Equals("Table", StringComparison.OrdinalIgnoreCase)
+                    || hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase));
+                var cal = ResolveCalibratedHoleNow(table: table);
+                if (cal.HasValue)
+                {
+                    var list = new List<Rect> { cal.Value };
+                    if (hint != null && hint.IndexOf("ThenDesignTab", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        IntPtr hwnd = IntPtr.Zero;
+                        try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
+                        string tabHint = table ? "TableDesignTab" : "ChartDesignTab";
+                        list.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, tabHint));
+                    }
+                    try { _coach.UpdateHighlights(list); } catch { }
+                    timer.Stop();
+                    return;
+                }
+
+                if (tries >= 10)
+                    timer.Stop();
+            };
+            timer.Start();
         }
 
         void CloseCoach()
