@@ -73,31 +73,6 @@ c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\MosP
 c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\QRCoder.dll
 c:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\MosPracticeClient.pdb
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Assets\universities.json
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.AssemblyReference.cache
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\UiTestAppBarWindow.baml
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ResultWindow.baml
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PasswordWindow.baml
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ReviewPageWindow.baml
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\SubjectSelectionWindow.baml
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ScoreResultWindow.baml
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\UiTestAppBarWindow.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ResultWindow.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PasswordWindow.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ReviewPageWindow.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\SubjectSelectionWindow.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ScoreResultWindow.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\App.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_Content.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_MarkupCompile.cache
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MainWindow.g.cs
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_MarkupCompile.lref
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MainWindow.baml
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.g.resources
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS_PowerPoint_app.Properties.Resources.resources
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.GenerateResource.cache
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.CoreCompileInputs.cache
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe
-C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.pdb
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Ribbon.xml
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Assets\universities.json
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Assets\config.json
@@ -145,8 +120,33 @@ C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bi
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_10.pdb
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_11.pdb
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Newtonsoft.Json.xml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.AssemblyReference.cache
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\UiTestAppBarWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ResultWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PasswordWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ReviewPageWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\SubjectSelectionWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ScoreResultWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MainWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\UiTestAppBarWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ResultWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PasswordWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ReviewPageWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\SubjectSelectionWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\ScoreResultWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\App.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_Content.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_MarkupCompile.cache
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App_MarkupCompile.lref
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MainWindow.baml
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.g.resources
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS_PowerPoint_app.Properties.Resources.resources
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.GenerateResource.cache
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS PowerPoint app.csproj.CoreCompileInputs.cache
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe.manifest
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.application
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\MOS Powe.03856F61.Up2Date
-c:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.baml
-c:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.g.cs
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.exe
+C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.pdb

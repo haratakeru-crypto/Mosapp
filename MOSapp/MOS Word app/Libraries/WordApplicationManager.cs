@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using MOS_Word_app;
 using WordApp = Microsoft.Office.Interop.Word.Application;
 using WordDoc = Microsoft.Office.Interop.Word.Document;
@@ -136,6 +137,182 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine(
                     $"[WordApplicationManager] TryOpenExamDocument error {sw.ElapsedMilliseconds}ms: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 起動済み Word のまま次の試験文書を開く。Word の終了・再起動・起動待ちはしない。
+        /// 既存 Word が無い、または VSTO 心拍が古いときは false。
+        /// </summary>
+        public static Task<bool> TrySwitchToDocumentInRunningWordAsync(string filePath)
+        {
+            return RunOnStaAsync(() => TrySwitchToDocumentInRunningWord(filePath));
+        }
+
+        /// <summary>
+        /// 初回起動相当のオープンを STA スレッドで行う。次プロジェクトの失敗時だけ使う。
+        /// </summary>
+        public static Task<bool> TryOpenExamDocumentOnStaAsync(string filePath, bool makeVisible = true)
+        {
+            return RunOnStaAsync(() =>
+            {
+                bool opened = TryOpenExamDocument(filePath, out WordApp app, makeVisible);
+                if (app != null)
+                {
+                    try { Marshal.ReleaseComObject(app); } catch { /* ignore */ }
+                }
+                return opened;
+            });
+        }
+
+        private static Task<bool> RunOnStaAsync(Func<bool> action)
+        {
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    tcs.TrySetResult(action());
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[WordApplicationManager] STA worker: " + ex.Message);
+                    tcs.TrySetResult(false);
+                }
+            });
+            thread.IsBackground = true;
+            thread.Name = "WordExamSta";
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return tcs.Task;
+        }
+
+        private static bool TrySwitchToDocumentInRunningWord(string filePath)
+        {
+            var sw = Stopwatch.StartNew();
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                System.Diagnostics.Debug.WriteLine("[WordApplicationManager] Next-project fast-path skipped: file missing");
+                return false;
+            }
+
+            if (!LogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds))
+            {
+                System.Diagnostics.Debug.WriteLine("[WordApplicationManager] Next-project fast-path skipped: heartbeat stale");
+                return false;
+            }
+
+            WordApp wordApp = TryGetActiveWordApplication();
+            if (wordApp == null)
+            {
+                System.Diagnostics.Debug.WriteLine("[WordApplicationManager] Next-project fast-path skipped: no Word");
+                return false;
+            }
+
+            try
+            {
+                WordDataPathHelper.RemoveZoneIdentifier(filePath);
+                try
+                {
+                    wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone;
+                }
+                catch { /* ignore */ }
+
+                TrySetVisible(wordApp, true);
+                LogReader.RequestCloseNavigationPaneIfOpen();
+                if (!TrySaveAndCloseOpenDocuments(wordApp))
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WordApplicationManager] Next-project fast-path close failed {sw.ElapsedMilliseconds}ms");
+                    return false;
+                }
+
+                bool opened = TryOpenDocumentWithRetry(wordApp, filePath);
+                System.Diagnostics.Debug.WriteLine(
+                    $"[WordApplicationManager] Next-project fast-path open={(opened ? "ok" : "fail")} {sw.ElapsedMilliseconds}ms file={Path.GetFileName(filePath)}");
+                return opened;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[WordApplicationManager] Next-project fast-path error {sw.ElapsedMilliseconds}ms: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                try { Marshal.ReleaseComObject(wordApp); } catch { /* ignore */ }
+            }
+        }
+
+        private static bool TrySaveAndCloseOpenDocuments(WordApp wordApp)
+        {
+            if (wordApp == null)
+                return false;
+
+            try
+            {
+                int guard = 0;
+                try { guard = wordApp.Documents.Count + 2; } catch { return false; }
+
+                while (guard-- > 0)
+                {
+                    int count;
+                    try { count = wordApp.Documents.Count; }
+                    catch { return false; }
+                    if (count <= 0)
+                        return true;
+
+                    WordDoc doc = null;
+                    try
+                    {
+                        doc = wordApp.Documents[1];
+                        try
+                        {
+                            if (doc.Saved == false)
+                                doc.Save();
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                "[WordApplicationManager] Next-project save: " + ex.Message);
+                        }
+
+                        doc.Close(SaveChanges: false);
+                    }
+                    catch (COMException ex) when (ex.HResult == unchecked((int)0x80010108))
+                    {
+                        System.Diagnostics.Debug.WriteLine("[WordApplicationManager] Next-project close disconnected");
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[WordApplicationManager] Next-project close: " + ex.Message);
+                        return false;
+                    }
+                    finally
+                    {
+                        if (doc != null)
+                        {
+                            try { Marshal.ReleaseComObject(doc); } catch { /* ignore */ }
+                        }
+                    }
+                }
+
+                try
+                {
+                    return wordApp.Documents.Count == 0;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[WordApplicationManager] Next-project close: " + ex.Message);
                 return false;
             }
         }

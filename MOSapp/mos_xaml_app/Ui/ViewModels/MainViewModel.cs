@@ -2727,12 +2727,12 @@ namespace Ui.ViewModels
             }
         }
 
-        private void ExecuteNextProject(object parameter)
+        private bool _isSwitchingProject;
+
+        private async void ExecuteNextProject(object parameter)
         {
-            if (CurrentProject == null)
-            {
+            if (_isSwitchingProject || CurrentProject == null)
                 return;
-            }
 
             // オブジェクト選択時は警告を表示して移動しない
             if (TryShowObjectSelectedWarningIfExcelObjectSelected())
@@ -2745,7 +2745,7 @@ namespace Ui.ViewModels
             if (currentProjectNumber == 10)
             {
                 System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Opening review page for Project 10");
-                
+
                 // UIの応答性を高めるため、Excelの保存・終了処理をバックグラウンドで行う
                 //（特に CloseExcelApplication はプロセス終了を待機するため時間がかかる場合がある）
                 ReviewPageWindow.PendingExcelCloseTask = Task.Run(() =>
@@ -2768,9 +2768,7 @@ namespace Ui.ViewModels
 
             // プロジェクト10以降は何もしない
             if (currentProjectNumber >= 10)
-            {
                 return;
-            }
 
             int nextProjectNumber = CurrentProject.ProjectNumber + 1;
             string nextFilePath = GetProjectFilePath(groupId, nextProjectNumber);
@@ -2781,26 +2779,36 @@ namespace Ui.ViewModels
                 return;
             }
 
+            _isSwitchingProject = true;
             try
             {
                 IsVariantMode = false;
-
-                TryReplaceExcelWorkbook(nextFilePath, "[ExecuteNextProject]");
-                ScoringResultDialog.TryBringOpenToFront();
-
-                CurrentProject = new ProjectInfo
+                await ExcelDelayedProjectOpenNotice.RunAsync(async () =>
                 {
-                    Name = $"プロジェクト{groupId}-{nextProjectNumber}",
-                    FilePath = nextFilePath,
-                    Group = $"Group {groupId}",
-                    ProjectNumber = nextProjectNumber
-                };
-                OnPropertyChanged(nameof(IsNextProjectVisible));
-                ResultMessage = $"次のプロジェクトに移動しました: {Path.GetFileName(nextFilePath)}";
+                    await Task.Run(() =>
+                    {
+                        TryReplaceExcelWorkbook(nextFilePath, "[ExecuteNextProject]");
+                    });
+
+                    ScoringResultDialog.TryBringOpenToFront();
+                    CurrentProject = new ProjectInfo
+                    {
+                        Name = $"プロジェクト{groupId}-{nextProjectNumber}",
+                        FilePath = nextFilePath,
+                        Group = $"Group {groupId}",
+                        ProjectNumber = nextProjectNumber
+                    };
+                    OnPropertyChanged(nameof(IsNextProjectVisible));
+                    ResultMessage = $"次のプロジェクトに移動しました: {Path.GetFileName(nextFilePath)}";
+                });
             }
             catch (Exception ex)
             {
                 ResultMessage = $"エラー: 次のプロジェクトファイルを開けませんでした: {ex.Message}";
+            }
+            finally
+            {
+                _isSwitchingProject = false;
             }
         }
 
