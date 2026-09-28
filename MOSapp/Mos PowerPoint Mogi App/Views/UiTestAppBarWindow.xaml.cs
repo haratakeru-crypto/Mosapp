@@ -95,6 +95,7 @@ namespace MOS_PowerPoint_app.Views
         private TimeSpan _remainingTime;
         private int _currentProjectId = 1;
         private int _currentTaskId = 1;
+        private bool _isMovingToNextProject;
         private int _groupId = 1; // グループIDを保存
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
@@ -2234,12 +2235,23 @@ namespace MOS_PowerPoint_app.Views
         
         private async Task MoveToNextProjectAsync()
         {
-            int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
-            // 最終プロジェクトで「次」は「すべて完了」になるため、プレゼン準備オーバーレイは出さない
-            if (_currentProjectId >= maxProjectId)
-                await MoveToNextProjectCoreAsync();
-            else
-                await RunWithDelayedPrepareOverlayAsync(MoveToNextProjectCoreAsync);
+            if (_isMovingToNextProject)
+                return;
+
+            _isMovingToNextProject = true;
+            try
+            {
+                int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
+                // 最終プロジェクトで「次」は「すべて完了」になるため、プレゼン準備オーバーレイは出さない
+                if (_currentProjectId >= maxProjectId)
+                    await MoveToNextProjectCoreAsync();
+                else
+                    await RunWithDelayedPrepareOverlayAsync(MoveToNextProjectCoreAsync);
+            }
+            finally
+            {
+                _isMovingToNextProject = false;
+            }
         }
 
         private async Task MoveToNextProjectCoreAsync()
