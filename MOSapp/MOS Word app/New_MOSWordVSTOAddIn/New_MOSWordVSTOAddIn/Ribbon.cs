@@ -69,14 +69,6 @@ namespace New_MOSWordVSTOAddIn
                 {
                     loggedCommandId = "ColumnsLeft";
                 }
-                else if (string.Equals(commandId, "PageBorders", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(commandId, "PageBorderOptionsDialog", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(commandId, "PageBorderAndShadingDialog", StringComparison.OrdinalIgnoreCase))
-                {
-                    // 4-6: ページ罫線系。Word の Ribbon.xml では PageBorderAndShadingDialog のみ有効（PageBorders は不明 ID）
-                    loggedCommandId = "PageBorders";
-                    Globals.ThisAddIn?.RegisterRibbonLoggedPageBorders();
-                }
                 else if (string.Equals(commandId, "PageOrientationPortraitLandscape", StringComparison.OrdinalIgnoreCase))
                 {
                     Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
@@ -145,9 +137,6 @@ namespace New_MOSWordVSTOAddIn
             else if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(loggedCommandId, "TableConvertTextToTable", StringComparison.OrdinalIgnoreCase))
                 Logger.LogOperation("InsertTable", loggedCommandId ?? "");
-            else if (string.Equals(loggedCommandId, "PageBorders", StringComparison.OrdinalIgnoreCase))
-                // 4-6: ページ罫線 — 採点ゲート②で PageBorders 種別として判定（RibbonCommand 汎用にしない）
-                Logger.LogOperation("PageBorders", commandId ?? "");
             else
                 Logger.LogOperation("RibbonCommand", loggedCommandId ?? commandId ?? "");
         }

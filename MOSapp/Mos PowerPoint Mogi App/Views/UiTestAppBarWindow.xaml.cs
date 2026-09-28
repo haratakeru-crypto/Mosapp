@@ -1009,7 +1009,7 @@ namespace MOS_PowerPoint_app.Views
             }
         }
         
-        private void ScoreButton_Click(object sender, RoutedEventArgs e)
+        private async void ScoreButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isScoring)
                 return;
@@ -1026,10 +1026,12 @@ namespace MOS_PowerPoint_app.Views
                 BeginScoringSession();
                 _instantScoringOverlay = CreateInstantScoringOverlay();
                 _instantScoringOverlay.Show();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+                await Task.Delay(80);
 
-                // プロジェクト一覧画面の採点と同じ処理を実行（MainViewModel.ExecuteScore → 採点結果ダイアログ表示）
+                // 採点本体は画面スレッドの外で行い、バーの更新を止めない。結果表示は ExecuteScore 内で画面側に戻す。
                 if (_onScoreClick != null)
-                    _onScoreClick();
+                    await Task.Run(() => _onScoreClick());
                 else
                     MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -1105,6 +1107,7 @@ namespace MOS_PowerPoint_app.Views
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
+            PowerPointStartupInputGate.End();
             _timer?.Stop();
             _projectTimer?.Stop();
             SaveAllPowerPointPresentations();

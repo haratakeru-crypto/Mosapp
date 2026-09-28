@@ -314,6 +314,7 @@ namespace MOS_Word_app.Views
                 : MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
+            WordStartupInputGate.End();
             _timer?.Stop();
             SaveAndCloseAllWordDocuments();
             TryQuitWord();

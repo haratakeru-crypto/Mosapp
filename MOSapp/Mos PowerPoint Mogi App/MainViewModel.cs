@@ -220,78 +220,101 @@ namespace MOS_PowerPoint_app
                     return;
                 }
 
-                var preparingOwner = System.Windows.Application.Current?.MainWindow;
-                Views.PreparingWindow.Run(preparingOwner, () =>
+                Views.PowerPointStartupInputGate.Begin();
+
+                string filePath = project.FilePath;
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+
+                // 開く処理とアドイン待ちは画面スレッドの外で行い、準備中ダイアログを残す。
+                System.Threading.Tasks.Task.Run(() =>
                 {
+                    string errorMessage = null;
+                    bool vstoFailed = false;
+                    bool opened = false;
                     try
                     {
-                        // 開発用 / MSI 用レジストリの二重読み込みを防ぐ
                         string vstoIssue;
                         if (!Libraries.VSTOInstallerHelper.EnsureAddInReadyForExam(out vstoIssue))
                         {
-                            ResultMessage = "エラー: PowerPoint 用 VSTO アドインを準備できません。"
+                            errorMessage = "エラー: PowerPoint 用 VSTO アドインを準備できません。"
                                 + (string.IsNullOrEmpty(vstoIssue) ? "" : ("\n" + vstoIssue));
-                            MessageBox.Show(
-                                ResultMessage,
-                                "VSTO 未準備",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Warning);
-                            return;
+                            vstoFailed = true;
                         }
+                        else
+                        {
+                            Libraries.PPLogReader.ClearCurrentTaskFile();
 
-                        // プロジェクト起動前にタスク情報をクリアし、アドイン側の古いスナップショットとの比較を防止
-                        Libraries.PPLogReader.ClearCurrentTaskFile();
+                            PowerPointApp pptApp = null;
+                            bool launchedNew = false;
+                            try
+                            {
+                                pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                            }
+                            catch
+                            {
+                                Libraries.PPLogReader.ClearVstoHeartbeat();
+                                pptApp = new PowerPointApp();
+                                pptApp.Visible = MsoTriState.msoTrue;
+                                launchedNew = true;
+                            }
 
-                        // PowerPointアプリケーションを取得または作成（起動経路は従来どおり Presentations.Open）
-                        PowerPointApp pptApp = null;
-                        bool launchedNew = false;
-                        try
-                        {
-                            pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
-                        }
-                        catch
-                        {
-                            Libraries.PPLogReader.ClearVstoHeartbeat();
-                            pptApp = new PowerPointApp();
-                            pptApp.Visible = MsoTriState.msoTrue;
-                            launchedNew = true;
-                        }
+                            try
+                            {
+                                pptApp.Presentations.Open(filePath, WithWindow: MsoTriState.msoTrue);
+                                Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
+                                Views.PowerPointStartupInputGate.DisablePowerPointWindows();
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                            }
 
-                        try
-                        {
-                            pptApp.Presentations.Open(project.FilePath, WithWindow: MsoTriState.msoTrue);
-                            Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
+                            int waitMs = launchedNew ? VstoHeartbeatWaitAfterLaunchMs : ExistingPptHeartbeatWaitMs;
+                            if (!Libraries.PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds)
+                                && !Libraries.PPLogReader.WaitForVstoHeartbeat(waitMs, ActiveVstoHeartbeatMaxAgeSeconds)
+                                && (launchedNew
+                                    || !Libraries.PPLogReader.WaitForVstoHeartbeat(VstoHeartbeatWaitAfterLaunchMs, ActiveVstoHeartbeatMaxAgeSeconds)))
+                            {
+                                errorMessage = "エラー: PowerPoint 用 VSTO アドインが応答していません。アドインを有効にしてから再度開いてください。";
+                                vstoFailed = true;
+                            }
+                            else
+                            {
+                                opened = true;
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        errorMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
+                        System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
+                    }
 
-                        int waitMs = launchedNew ? VstoHeartbeatWaitAfterLaunchMs : ExistingPptHeartbeatWaitMs;
-                        if (!Libraries.PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds)
-                            && !Libraries.PPLogReader.WaitForVstoHeartbeat(waitMs, ActiveVstoHeartbeatMaxAgeSeconds)
-                            && (launchedNew
-                                || !Libraries.PPLogReader.WaitForVstoHeartbeat(VstoHeartbeatWaitAfterLaunchMs, ActiveVstoHeartbeatMaxAgeSeconds)))
+                    if (dispatcher == null)
+                        return;
+
+                    dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!opened)
                         {
-                            ResultMessage = "エラー: PowerPoint 用 VSTO アドインが応答していません。アドインを有効にしてから再度開いてください。";
-                            MessageBox.Show(
-                                ResultMessage,
-                                "VSTO 未準備",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Warning);
+                            Views.PowerPointStartupInputGate.End();
+                            ResultMessage = errorMessage ?? "エラー: PowerPointファイルを開けませんでした。";
+                            if (vstoFailed)
+                            {
+                                MessageBox.Show(
+                                    ResultMessage,
+                                    "VSTO 未準備",
+                                    MessageBoxButton.OK,
+                                    MessageBoxImage.Warning);
+                            }
                             return;
                         }
 
                         CurrentProject = project;
                         HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                         ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
-                        ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(project.FilePath)}";
-                    }
-                    catch (Exception ex)
-                    {
-                        ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
-                        System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
-                    }
+                        ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(filePath)}";
+                    }));
                 });
             }
         }
@@ -305,26 +328,32 @@ namespace MOS_PowerPoint_app
         {
             if (CurrentProject == null)
             {
-                ResultMessage = "プロジェクトを開いてから実行してください。";
+                RunOnUi(() => ResultMessage = "プロジェクトを開いてから実行してください。");
                 return;
             }
 
             if (!Libraries.PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds)
                 && !Libraries.PPLogReader.WaitForVstoHeartbeat(VstoHeartbeatWaitAfterLaunchMs, ActiveVstoHeartbeatMaxAgeSeconds))
             {
-                ResultMessage = "PowerPoint 用 VSTO アドインが応答していないため採点できません。アドインを有効にしてから再度実行してください。";
-                MessageBox.Show(ResultMessage, "VSTO 未準備", MessageBoxButton.OK, MessageBoxImage.Warning);
+                RunOnUi(() =>
+                {
+                    ResultMessage = "PowerPoint 用 VSTO アドインが応答していないため採点できません。アドインを有効にしてから再度実行してください。";
+                    MessageBox.Show(ResultMessage, "VSTO 未準備", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
                 return;
             }
 
-            TaskResults.Clear();
-            ResultMessage = "採点中...";
+            RunOnUi(() =>
+            {
+                TaskResults.Clear();
+                ResultMessage = "採点中...";
+            });
 
             string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
                 "MOS模擬アプリ問題文一覧_PowerPoint.json");
             if (!File.Exists(jsonPath))
             {
-                ResultMessage = "該当プロジェクトのタスクが見つかりません（問題文JSONがありません）。";
+                RunOnUi(() => ResultMessage = "該当プロジェクトのタスクが見つかりません（問題文JSONがありません）。");
                 return;
             }
 
@@ -336,14 +365,14 @@ namespace MOS_PowerPoint_app
             }
             catch (Exception ex)
             {
-                ResultMessage = $"問題文の読み込みに失敗しました: {ex.Message}";
+                RunOnUi(() => ResultMessage = $"問題文の読み込みに失敗しました: {ex.Message}");
                 return;
             }
 
             var project = projectData?.Projects?.FirstOrDefault(p => p.ProjectId == CurrentProject.ProjectId);
             if (project?.Tasks == null || project.Tasks.Count == 0)
             {
-                ResultMessage = "該当プロジェクトのタスクが見つかりません。";
+                RunOnUi(() => ResultMessage = "該当プロジェクトのタスクが見つかりません。");
                 return;
             }
 
@@ -353,7 +382,7 @@ namespace MOS_PowerPoint_app
                 grader = new PowerPointGrader();
                 if (!grader.Connect())
                 {
-                    ResultMessage = "PowerPoint を起動し、対象のファイルを開いた状態で実行してください。";
+                    RunOnUi(() => ResultMessage = "PowerPoint を起動し、対象のファイルを開いた状態で実行してください。");
                     return;
                 }
 
@@ -374,24 +403,38 @@ namespace MOS_PowerPoint_app
                         passed = false;
                     }
                     if (passed) passedCount++;
-                    TaskResults.Add(new TaskResult
+                    var taskResult = new TaskResult
                     {
                         TaskNumber = task.TaskId,
                         IsPassed = passed,
                         TaskName = string.IsNullOrEmpty(task.Description) ? $"タスク{task.TaskId}" : task.Description
-                    });
+                    };
+                    RunOnUi(() => TaskResults.Add(taskResult));
                 }
-                ResultMessage = $"採点: {passedCount}/{project.Tasks.Count} タスク合格";
-                ScoreCompleted?.Invoke(this, EventArgs.Empty);
+                int taskCount = project.Tasks.Count;
+                RunOnUi(() =>
+                {
+                    ResultMessage = $"採点: {passedCount}/{taskCount} タスク合格";
+                    ScoreCompleted?.Invoke(this, EventArgs.Empty);
+                });
             }
             catch (Exception ex)
             {
-                ResultMessage = $"採点中にエラーが発生しました: {ex.Message}";
+                RunOnUi(() => ResultMessage = $"採点中にエラーが発生しました: {ex.Message}");
             }
             finally
             {
                 grader?.Dispose();
             }
+        }
+
+        private static void RunOnUi(Action action)
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.CheckAccess())
+                action();
+            else
+                dispatcher.Invoke(action);
         }
 
         private void ExecuteResetAllProjects(object parameter)

@@ -128,6 +128,7 @@ namespace New_MOSWordVSTOAddIn
                 _orientationChangedThisVisit = true;
         }
 
+        /// <summary>ページ罫線ダイアログのクリックでは呼ばない。指紋変化のポーリング記録を潰すため。</summary>
         internal void RegisterRibbonLoggedPageBorders()
         {
             _suppressPageBorderPollLogs = 2;

@@ -207,42 +207,53 @@ namespace MOS_Word_app
                     }
                 }
 
-                var preparingOwner = System.Windows.Application.Current?.MainWindow;
-                MOS_Word_app.Views.PreparingWindow.Run(preparingOwner, () =>
+                Views.WordStartupInputGate.Begin();
+
+                string targetPath = NormalizeDocumentPath(project.FilePath);
+                bool switchingProject = CurrentProject != null
+                    && !string.Equals(NormalizeDocumentPath(CurrentProject.FilePath), targetPath, StringComparison.OrdinalIgnoreCase);
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+
+                // アドイン待ちは画面スレッドの外で行い、準備中ダイアログを描けるようにする。
+                System.Threading.Tasks.Task.Run(() =>
                 {
+                    bool opened = false;
+                    string errorMessage = null;
                     try
                     {
-                        string targetPath = NormalizeDocumentPath(project.FilePath);
-                        bool switchingProject = CurrentProject != null
-                            && !string.Equals(NormalizeDocumentPath(CurrentProject.FilePath), targetPath, StringComparison.OrdinalIgnoreCase);
-
-                        // 別プロジェクトへ切り替えるときだけ全ドキュメントを保存・閉じる
                         if (switchingProject)
                             SaveAndCloseAllWordDocuments();
 
-                        // 同じパスが既に開いていれば一度閉じてから開き直す（フォルダ上の最新を読む）
                         WordApplicationManager.TryCloseOpenDocumentByPath(project.FilePath);
+                        opened = WordApplicationManager.TryOpenExamDocument(project.FilePath, out _, makeVisible: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        errorMessage = ex.Message;
+                        System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
+                    }
 
-                        // 準備中は非表示のまま開き、完了後に表示（文書付き起動は維持）
-                        if (!WordApplicationManager.TryOpenExamDocument(project.FilePath, out _, makeVisible: false))
+                    if (dispatcher == null)
+                        return;
+
+                    dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!opened)
                         {
-                            ResultMessage = $"エラー: Wordファイルを開けませんでした: {Path.GetFileName(project.FilePath)}";
+                            Views.WordStartupInputGate.End();
+                            ResultMessage = errorMessage != null
+                                ? $"エラー: ファイルを開けませんでした: {errorMessage}"
+                                : $"エラー: Wordファイルを開けませんでした: {Path.GetFileName(project.FilePath)}";
                             return;
                         }
 
                         CurrentProject = project;
                         HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                         ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
-                        WordApplicationManager.SetWordVisible(true);
                         ApplyExamWindowLayoutFromOpenProject();
                         BringWordWindowToForeground();
                         ResultMessage = $"Wordファイルを開きました: {Path.GetFileName(project.FilePath)}";
-                    }
-                    catch (Exception ex)
-                    {
-                        ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
-                        System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
-                    }
+                    }));
                 });
             }
         }

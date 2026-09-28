@@ -218,6 +218,7 @@
       <DependentUpon>ObjectSelectedWarningWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Views\WordStartupInputGate.cs" />
     <Compile Include="Views\PreparingWindow.xaml.cs">
       <DependentUpon>PreparingWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

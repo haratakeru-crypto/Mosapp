@@ -4,7 +4,7 @@
     FontColorPicker・WatermarkGallery 等のギャラリーは Word の commands スキーマでフック不可（command のみ可）。透かしは ThisAddIn ポーリングで [Op] Watermark。
     ColumnsLeft/Right・ColumnBreak は Word で無効/未対応のため使わない。段組みは ColumnsDialog、段区切りは ThisAddIn ポーリング。
     InsertSectionBreakNextPage は環境で無効になり得るため SectionBreakInsert のみ。向きの縦横個別 id は省略（PageOrientationPortraitLandscape + ポーリング）。
-    Word では PageBorders / PageBorderOptionsDialog は無効 id のため PageBorderAndShadingDialog のみ（Ribbon.cs で PageBorders ログに正規化）。
+    Word では PageBorders / PageBorderOptionsDialog は無効 id のため PageBorderAndShadingDialog のみ。開いただけでは [Op] PageBorders にしない。罫線の変化は ThisAddIn の指紋ポーリングと採点時スナップショットで検知する。
     StyleSetGallery は Word で不明 ID のため未接続。StyleSetLineSimple は ThisAddIn の見出し1下罫線ポーリングで記録。
     ShowAll も Word の Ribbon で不明 ID のため未接続。編集記号は ThisAddIn の View.ShowAll / Options.ShowAll ポーリングで記録（1-1）。
     4-3: ReviewResolveComment は Word で無効 id となるため未接続。ReviewDeleteComment のみフック。解決操作の採点はチェッカー側で Comment.Done を参照。

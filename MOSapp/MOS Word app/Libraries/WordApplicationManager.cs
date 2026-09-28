@@ -472,10 +472,12 @@ namespace Libraries
             if (app == null)
                 throw new InvalidOperationException("起動後の Word へ接続できませんでした。");
 
-            // 文書付き起動でも、掴めた直後に非表示へ（準備中ダイアログを隠さない）
+            // 文書付き起動でも、掴めた直後に表示方針へ合わせる。非表示指定のときだけ隠す。
             TrySetVisible(app, makeVisible);
             if (!makeVisible)
                 KeepWordHidden(app);
+            else
+                MOS_Word_app.Views.WordStartupInputGate.DisableWordWindows();
 
             // 文書付き起動時は VSTO と文書読込が並行するため、心拍は短めに待ちつつ Open リトライに委ねる
             int vstoWaitMs = string.IsNullOrEmpty(preferredDocumentPath)
@@ -494,6 +496,8 @@ namespace Libraries
                 {
                     if (!makeVisible)
                         KeepWordHidden(app);
+                    else
+                        MOS_Word_app.Views.WordStartupInputGate.DisableWordWindows();
                     Thread.Sleep(100);
                 }
             }

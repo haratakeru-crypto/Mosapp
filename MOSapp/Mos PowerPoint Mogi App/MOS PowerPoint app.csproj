@@ -187,6 +187,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Compile Include="Views\PowerPointStartupInputGate.cs" />
     <Compile Include="Views\PreparingWindow.xaml.cs">
       <DependentUpon>PreparingWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

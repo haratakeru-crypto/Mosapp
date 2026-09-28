@@ -171,6 +171,7 @@
       <DependentUpon>ResultWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Ui\ExcelStartupInputGate.cs" />
     <Compile Include="Views\ObjectSelectedWarningWindow.xaml.cs">
       <DependentUpon>ObjectSelectedWarningWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

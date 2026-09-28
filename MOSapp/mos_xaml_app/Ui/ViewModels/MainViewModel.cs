@@ -918,6 +918,8 @@ namespace Ui.ViewModels
                     return;
                 }
 
+                ExcelStartupInputGate.Begin();
+
                 Interlocked.Exchange(ref _endExamShutdownStarted, 0);
 
                 if (parameter is ProjectViewModel pvm)
@@ -951,6 +953,7 @@ namespace Ui.ViewModels
             }
             catch (Exception ex)
             {
+                ExcelStartupInputGate.End();
                 System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] failed error={ex.GetType().Name}:{ex.Message}");
                 ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
             }
@@ -2860,6 +2863,7 @@ namespace Ui.ViewModels
                 return;
             }
 
+            ExcelStartupInputGate.End();
             IsExcelOverlayVisible = false;
             CurrentProject = null;
             ResultMessage = "試験を終了しました。";
