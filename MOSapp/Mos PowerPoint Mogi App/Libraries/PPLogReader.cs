@@ -16,12 +16,19 @@ namespace Libraries
         private static readonly AsyncLocal<int?> _gradingProjectId = new AsyncLocal<int?>();
         private static readonly AsyncLocal<int?> _gradingTaskId = new AsyncLocal<int?>();
         private static readonly AsyncLocal<int?> _gradingAttemptNo = new AsyncLocal<int?>();
+        private static readonly AsyncLocal<bool> _gradingBatchScoring = new AsyncLocal<bool>();
 
-        public static void SetGradingContext(int projectId, int taskId, int attemptNo)
+        public static void SetGradingContext(int projectId, int taskId, int attemptNo, bool batchScoring = false)
         {
             _gradingProjectId.Value = projectId;
             _gradingTaskId.Value = taskId;
             _gradingAttemptNo.Value = attemptNo;
+            _gradingBatchScoring.Value = batchScoring;
+        }
+
+        public static bool IsBatchScoring()
+        {
+            return _gradingBatchScoring.Value;
         }
 
         public static void ClearGradingContext()
@@ -29,6 +36,7 @@ namespace Libraries
             _gradingProjectId.Value = null;
             _gradingTaskId.Value = null;
             _gradingAttemptNo.Value = null;
+            _gradingBatchScoring.Value = false;
         }
 
         /// <summary>
@@ -43,6 +51,50 @@ namespace Libraries
         public static string GetVstoHeartbeatPath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_ppt_vsto_heartbeat.txt");
+        }
+
+        /// <summary>一括採点中だけ、VSTOのcurrent_task監視を高速化するための一時フラグ。</summary>
+        public static string GetBatchScoringFastPollFlagPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_batch_scoring_fast_poll.txt");
+        }
+
+        public static bool IsBatchScoringFastPollEnabled()
+        {
+            try
+            {
+                return File.Exists(GetBatchScoringFastPollFlagPath());
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static void BeginBatchScoringFastPoll()
+        {
+            try
+            {
+                File.WriteAllText(GetBatchScoringFastPollFlagPath(), DateTime.UtcNow.ToString("o"), new UTF8Encoding(false));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] BeginBatchScoringFastPoll: " + ex.Message);
+            }
+        }
+
+        public static void EndBatchScoringFastPoll()
+        {
+            try
+            {
+                string path = GetBatchScoringFastPollFlagPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] EndBatchScoringFastPoll: " + ex.Message);
+            }
         }
 
         /// <summary>直近で VSTO がハートビートを更新していれば true（既定 5 分以内）。</summary>

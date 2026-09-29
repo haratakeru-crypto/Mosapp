@@ -41,12 +41,8 @@ namespace Libraries.Group1
                     PptShape videoShape = null;
                     try
                     {
-                        for (int attempt = 1; attempt <= 5 && videoShape == null; attempt++)
-                        {
-                            videoShape = PowerPointCheckerCommon.FindFirstVideoShape(slide);
-                            if (videoShape == null)
-                                Thread.Sleep(400);
-                        }
+                        if (!TryFindVideoForScoring(slide, out videoShape))
+                            return false;
                         return videoShape != null;
                     }
                     finally
@@ -82,13 +78,8 @@ namespace Libraries.Group1
                     PptShape videoShape = null;
                     try
                     {
-                        for (int attempt = 1; attempt <= 5 && videoShape == null; attempt++)
-                        {
-                            videoShape = PowerPointCheckerCommon.FindFirstVideoShape(slide);
-                            if (videoShape == null)
-                                Thread.Sleep(400);
-                        }
-                        if (videoShape == null) return false;
+                        if (!TryFindVideoForScoring(slide, out videoShape) || videoShape == null)
+                            return false;
 
                         MediaFormat mf = null;
                         try
@@ -142,20 +133,32 @@ namespace Libraries.Group1
             {
                 pres = PowerPointCheckerCommon.GetActivePresentation();
                 if (pres == null) return false;
-                for (int attempt = 1; attempt <= 5; attempt++)
+                bool batch = PPLogReader.IsBatchScoring();
+                int maxAttempts = batch ? 2 : 5;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
                 {
                     Slide slide = null;
                     try
                     {
                         slide = PowerPointCheckerCommon.GetSlideByNumber(pres, P9_3TargetSlideNumber);
-                        if (slide != null && SlideHasAudioMatchingP9_3(slide, pres))
+                        if (slide == null)
+                        {
+                            if (batch) return false;
+                            continue;
+                        }
+
+                        PowerPointCheckerCommon.MediaScanStatus status = ScanSlideAudioP9_3(slide, pres);
+                        if (status == PowerPointCheckerCommon.MediaScanStatus.Found)
                             return true;
+                        if (batch && status == PowerPointCheckerCommon.MediaScanStatus.NotFound)
+                            return false;
                     }
                     finally
                     {
                         if (slide != null) { try { Marshal.ReleaseComObject(slide); } catch { } }
                     }
-                    Thread.Sleep(400);
+                    if (attempt < maxAttempts)
+                        Thread.Sleep(batch ? 100 : 400);
                 }
                 return false;
             }
@@ -166,17 +169,43 @@ namespace Libraries.Group1
             }
         }
 
-        private static bool SlideHasAudioMatchingP9_3(Slide slide, Presentation pres)
+        private static bool TryFindVideoForScoring(Slide slide, out PptShape videoShape)
         {
-            if (slide == null) return false;
+            videoShape = null;
+            bool batch = PPLogReader.IsBatchScoring();
+            int maxAttempts = batch ? 2 : 5;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                PowerPointCheckerCommon.MediaScanStatus status =
+                    PowerPointCheckerCommon.TryFindFirstVideoShape(slide, out videoShape);
+                if (status == PowerPointCheckerCommon.MediaScanStatus.Found)
+                    return videoShape != null;
+                if (videoShape != null)
+                {
+                    try { Marshal.ReleaseComObject(videoShape); } catch { }
+                    videoShape = null;
+                }
+                if (batch && status == PowerPointCheckerCommon.MediaScanStatus.NotFound)
+                    return false;
+                if (attempt < maxAttempts)
+                    Thread.Sleep(batch ? 100 : 400);
+            }
+            return videoShape != null;
+        }
+
+        private static PowerPointCheckerCommon.MediaScanStatus ScanSlideAudioP9_3(Slide slide, Presentation pres)
+        {
+            if (slide == null) return PowerPointCheckerCommon.MediaScanStatus.TransientComFailure;
             PptShapes shapes = null;
+            bool sawIndexFailure = false;
             try
             {
-                shapes = slide.Shapes;
-                if (shapes == null) return false;
+                try { shapes = slide.Shapes; }
+                catch { return PowerPointCheckerCommon.MediaScanStatus.TransientComFailure; }
+                if (shapes == null) return PowerPointCheckerCommon.MediaScanStatus.TransientComFailure;
                 int shapeCount;
                 try { shapeCount = shapes.Count; }
-                catch { return false; }
+                catch { return PowerPointCheckerCommon.MediaScanStatus.TransientComFailure; }
 
                 for (int i = 1; i <= shapeCount; i++)
                 {
@@ -184,19 +213,25 @@ namespace Libraries.Group1
                     try
                     {
                         try { sh = shapes[i]; }
-                        catch { continue; }
+                        catch
+                        {
+                            sawIndexFailure = true;
+                            continue;
+                        }
 
                         if (PptAudioMediaHelper.ShapeMatchesP9_3AudioSettings(sh, pres))
-                            return true;
+                            return PowerPointCheckerCommon.MediaScanStatus.Found;
                     }
                     finally
                     {
                         if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
                     }
                 }
-                return false;
+                return sawIndexFailure
+                    ? PowerPointCheckerCommon.MediaScanStatus.TransientComFailure
+                    : PowerPointCheckerCommon.MediaScanStatus.NotFound;
             }
-            catch { return false; }
+            catch { return PowerPointCheckerCommon.MediaScanStatus.TransientComFailure; }
             finally
             {
                 if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }

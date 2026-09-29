@@ -126,6 +126,8 @@ namespace PowerPointAddIn1
         private Timer _task2TransitionFastPollTimer;
 
         private Timer _taskFilePollTimer;
+        private int _taskFilePollIntervalMs = 500;
+        private DateTime _lastHeartbeatWriteUtc = DateTime.MinValue;
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
         private int _currentTaskAttemptNo = 1;
@@ -248,7 +250,7 @@ namespace PowerPointAddIn1
             _task2TransitionFastPollTimer.Start();
 
             _taskFilePollTimer = new Timer();
-            _taskFilePollTimer.Interval = 500;
+            _taskFilePollTimer.Interval = _taskFilePollIntervalMs;
             _taskFilePollTimer.Tick += TaskFilePollTimer_Tick;
             _taskFilePollTimer.Start();
         }
@@ -257,7 +259,8 @@ namespace PowerPointAddIn1
         {
             try
             {
-                Logger.WriteVstoHeartbeat();
+                UpdateTaskFilePollInterval();
+                WriteHeartbeatIfDue();
 
                 if (!File.Exists(CurrentTaskFilePath))
                 {
@@ -418,6 +421,37 @@ namespace PowerPointAddIn1
             {
                 System.Diagnostics.Debug.WriteLine("[TaskFilePoll] " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// 一括採点中だけcurrent_task監視を100～150msにする。
+        /// 心拍は採点中でも最低500ms間隔を維持し、通常試験では従来どおり500msのままにする。
+        /// </summary>
+        private void UpdateTaskFilePollInterval()
+        {
+            bool fastPoll = false;
+            try
+            {
+                fastPoll = File.Exists(Path.Combine(Path.GetTempPath(), "mos_ppt_batch_scoring_fast_poll.txt"));
+            }
+            catch { }
+
+            int desiredIntervalMs = fastPoll ? 150 : 500;
+            if (desiredIntervalMs == _taskFilePollIntervalMs || _taskFilePollTimer == null)
+                return;
+
+            _taskFilePollIntervalMs = desiredIntervalMs;
+            _taskFilePollTimer.Interval = desiredIntervalMs;
+        }
+
+        private void WriteHeartbeatIfDue()
+        {
+            DateTime now = DateTime.UtcNow;
+            if ((now - _lastHeartbeatWriteUtc).TotalMilliseconds < 500)
+                return;
+
+            Logger.WriteVstoHeartbeat();
+            _lastHeartbeatWriteUtc = now;
         }
 
         private static readonly string SnapshotFilePath = Path.Combine(Path.GetTempPath(), "mos_ppt_snapshot.txt");
@@ -1630,6 +1664,40 @@ namespace PowerPointAddIn1
             }
         }
 
+        /// <summary>
+        /// 1-8: スライド2のサマリーズームが「1.教育理念」「4.募集要項」の2件だけなら true。
+        /// タイトル「ご提案のポイント」は採点側の COM 確認に残し、証跡の条件にはしない。
+        /// </summary>
+        private static bool TryDetectTask1_8SummaryZoomLinks(PowerPoint.Presentation pres)
+        {
+            if (pres == null)
+                return false;
+
+            string tempPath = Path.Combine(Path.GetTempPath(), "mos_1_8_vsto_" + Guid.NewGuid().ToString("N") + ".pptx");
+            try
+            {
+                pres.SaveCopyAs(tempPath);
+                return PptxSlideZoomLinkReader.TryValidateSummaryZoomTargetTitles(
+                    tempPath,
+                    2,
+                    "1.教育理念",
+                    "4.募集要項",
+                    new[] { 1, 9 },
+                    out _);
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); } catch { }
+                }
+            }
+        }
+
         private bool TryDetectTask4_3GlowOnActivePresentationOpenXml(out bool on)
         {
             on = false;
@@ -2399,73 +2467,10 @@ namespace PowerPointAddIn1
                         finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
                     }
 
-                    if (IsCurrentTask(1, 8) && !_task1_8Logged)
+                    if (IsCurrentTask(1, 8) && !_task1_8Logged && TryDetectTask1_8SummaryZoomLinks(pres))
                     {
-                        PowerPoint.Slides slides = null;
-                        PowerPoint.Slide slide2 = null;
-                        try
-                        {
-                            slides = pres.Slides;
-                            if (slides != null && slides.Count >= 2)
-                            {
-                                slide2 = slides[2];
-                                if (slide2 != null)
-                                {
-                                    PowerPoint.Shapes shapes = slide2.Shapes;
-                                    if (shapes != null)
-                                    {
-                                        for (int i = 1; i <= shapes.Count; i++)
-                                        {
-                                            PowerPoint.Shape sh = null;
-                                            try
-                                            {
-                                                sh = shapes[i];
-                                                if (sh.HasTextFrame == Office.MsoTriState.msoTrue)
-                                                {
-                                                    var tf = (Microsoft.Office.Interop.PowerPoint.TextFrame)sh.TextFrame;
-                                                    string text = tf?.TextRange?.Text ?? "";
-                                                    if (text.IndexOf("ご提案のポイント", StringComparison.OrdinalIgnoreCase) >= 0)
-                                                    {
-                                                        // ズームオブジェクト (Shape.Type == msoZoom (21)) が存在することを確認
-                                                        bool hasZoom = false;
-                                                        for (int j = 1; j <= shapes.Count; j++)
-                                                        {
-                                                            PowerPoint.Shape shZoom = null;
-                                                            try
-                                                            {
-                                                                shZoom = shapes[j];
-                                                                if ((int)shZoom.Type == 21 || shZoom.Name.Contains("Zoom") || shZoom.Name.Contains("ズーム"))
-                                                                {
-                                                                    hasZoom = true;
-                                                                    break;
-                                                                }
-                                                            }
-                                                            catch { }
-                                                            finally { if (shZoom != null) try { Marshal.ReleaseComObject(shZoom); } catch { } }
-                                                        }
-
-                                                        if (hasZoom)
-                                                        {
-                                                            Logger.LogTask1_8SummaryZoom();
-                                                            _task1_8Logged = true;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            catch { }
-                                            finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
-                                        }
-                                        try { Marshal.ReleaseComObject(shapes); } catch { }
-                                    }
-                                }
-                            }
-                        }
-                        finally
-                        {
-                            if (slide2 != null) try { Marshal.ReleaseComObject(slide2); } catch { }
-                            if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { }
-                        }
+                        Logger.LogTask1_8SummaryZoom();
+                        _task1_8Logged = true;
                     }
                 }
                 finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
