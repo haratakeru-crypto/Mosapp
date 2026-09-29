@@ -105,6 +105,10 @@ namespace Ui.ViewModels
         /// <summary>試験終了スレッドの保存・Quit が終わるまでシグナル。初期は完了済み。</summary>
         private readonly ManualResetEventSlim _excelShutdownFinished = new ManualResetEventSlim(true);
 
+        private readonly object _excelReviewShutdownGate = new object();
+        private readonly object _excelStaShutdownGate = new object();
+        private Task _excelReviewShutdownTask;
+
         /// <summary>
         /// アプリが利用する Excel インスタンスを取得（無ければ作成）。
         /// Process.Start による別インスタンス起動や GetActiveObject の取り違えを避けるため、1インスタンスに固定して使い回す。
@@ -2222,90 +2226,130 @@ namespace Ui.ViewModels
         
         public void CloseExcelApplication()
         {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && dispatcher.CheckAccess())
+                DetachSharedExcelApplication();
+
+            ShutdownExcelOnCurrentSta(null);
+        }
+
+        /// <summary>
+        /// レビュー遷移用に、共有 RCW を渡さず専用 STA で Excel を保存して終了する。
+        /// すでに終了処理中なら、同じタスクを返す。
+        /// </summary>
+        public Task BeginExcelShutdownForReview(Action onCompleted = null)
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+                return (Task)dispatcher.Invoke(new Func<Task>(() => BeginExcelShutdownForReview(onCompleted)));
+
+            lock (_excelReviewShutdownGate)
+            {
+                if (_excelReviewShutdownTask != null && !_excelReviewShutdownTask.IsCompleted)
+                    return _excelReviewShutdownTask;
+
+                string filePath = CurrentProject?.FilePath;
+                DetachSharedExcelApplication();
+                _excelShutdownFinished.Reset();
+
+                var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var thread = new Thread(() =>
+                {
+                    try
+                    {
+                        ShutdownExcelOnCurrentSta(filePath);
+                        tcs.TrySetResult(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[BeginExcelShutdownForReview] " + ex.Message);
+                        tcs.TrySetResult(false);
+                    }
+                    finally
+                    {
+                        _excelShutdownFinished.Set();
+                        if (onCompleted != null)
+                        {
+                            if (dispatcher != null && !dispatcher.CheckAccess())
+                                dispatcher.BeginInvoke(onCompleted);
+                            else
+                                onCompleted();
+                        }
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Name = "ExcelReviewShutdown"
+                };
+                thread.SetApartmentState(ApartmentState.STA);
+                thread.Start();
+                _excelReviewShutdownTask = tcs.Task;
+                return _excelReviewShutdownTask;
+            }
+        }
+
+        /// <summary>
+        /// UI が保持する Excel RCW をバックグラウンドへ渡さない。このスレッドでは解放しない。
+        /// </summary>
+        private void DetachSharedExcelApplication()
+        {
+            StopAttachRetryTimer();
+            _sharedExcelApp = null;
+        }
+
+        /// <summary>
+        /// 呼び出し元の STA 上で Excel を取得し、保存・終了・COM 解放まで行う。
+        /// 共有 RCW は使わない。
+        /// </summary>
+        private void ShutdownExcelOnCurrentSta(string preferredFilePath)
+        {
+            lock (_excelStaShutdownGate)
+            {
+                ShutdownExcelOnCurrentStaCore(preferredFilePath);
+            }
+        }
+
+        private void ShutdownExcelOnCurrentStaCore(string preferredFilePath)
+        {
             ExcelApp excelApp = null;
             int excelPid = -1;
-
             try
             {
-                try
+                using (OleMessageFilterScope.Enter())
                 {
-                    // アプリが保持しているインスタンスを優先して閉じる
-                    excelApp = _sharedExcelApp ?? (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                    if (excelApp != null)
+                    try
                     {
-                        excelPid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
-
-                        try { excelApp.DisplayAlerts = false; } catch { /* ignore */ }
-
-                        // 全ブックを保存してから閉じる（アクティブのみだと他ブックで Quit が止まることがある）
-                        try
-                        {
-                            for (int i = excelApp.Workbooks.Count; i >= 1; i--)
-                            {
-                                ExcelWorkbook wb = null;
-                                try
-                                {
-                                    wb = excelApp.Workbooks[i];
-                                    try
-                                    {
-                                        if (wb.Saved == false)
-                                            wb.Save();
-                                    }
-                                    catch (Exception saveEx)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine(
-                                            "[CloseExcelApplication] Save workbook: " + saveEx.Message);
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    System.Diagnostics.Debug.WriteLine(
-                                        "[CloseExcelApplication] Workbook access: " + ex.Message);
-                                }
-                                finally
-                                {
-                                    if (wb != null)
-                                    {
-                                        try { Marshal.ReleaseComObject(wb); } catch { /* ignore */ }
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine(
-                                "[CloseExcelApplication] Save all: " + ex.Message);
-                        }
-
-                        CloseAllWorkbooks(excelApp, "[CloseExcelApplication]");
-
-                        try { excelApp.Quit(); } catch { /* ignore */ }
-                        try { Marshal.ReleaseComObject(excelApp); } catch { /* ignore */ }
-                        excelApp = null;
+                        excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
                     }
-                }
-                catch (COMException)
-                {
-                    // Excelが開いていない場合は無視
-                    System.Diagnostics.Debug.WriteLine("[CloseExcelApplication] No Excel application is running");
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[CloseExcelApplication] Error saving/closing Excel: {ex.Message}");
-                }
+                    catch (COMException)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ExcelShutdown] No Excel application is running");
+                        return;
+                    }
 
-                if (excelPid > 0)
-                {
-                    Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
-                        excelPid,
-                        8000,
-                        3000,
-                        "[CloseExcelApplication]");
+                    if (excelApp == null)
+                        return;
+
+                    excelPid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                    try { excelApp.DisplayAlerts = false; } catch { /* ignore */ }
+
+                    SaveOpenWorkbooks(excelApp, preferredFilePath);
+                    CloseAllWorkbooks(excelApp, "[ExcelShutdown]");
+
+                    try
+                    {
+                        excelApp.Quit();
+                        System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit requested");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit: " + ex.Message);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Excel終了エラー: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine("[ExcelShutdown] " + ex.Message);
             }
             finally
             {
@@ -2313,7 +2357,69 @@ namespace Ui.ViewModels
                 {
                     try { Marshal.ReleaseComObject(excelApp); } catch { /* ignore */ }
                 }
-                _sharedExcelApp = null;
+            }
+
+            if (excelPid > 0)
+            {
+                Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
+                    excelPid,
+                    8000,
+                    3000,
+                    "[ExcelShutdown]");
+            }
+        }
+
+        private static void SaveOpenWorkbooks(ExcelApp excelApp, string preferredFilePath)
+        {
+            if (excelApp == null)
+                return;
+
+            int count;
+            try
+            {
+                count = excelApp.Workbooks.Count;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Workbook count: " + ex.Message);
+                return;
+            }
+
+            for (int i = 1; i <= count; i++)
+            {
+                ExcelWorkbook workbook = null;
+                try
+                {
+                    workbook = excelApp.Workbooks[i];
+                    string fullName = null;
+                    try { fullName = workbook.FullName; } catch { /* ignore */ }
+
+                    bool preferred = !string.IsNullOrEmpty(preferredFilePath)
+                        && (string.Equals(fullName, preferredFilePath, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(
+                                Path.GetFileName(fullName ?? string.Empty),
+                                Path.GetFileName(preferredFilePath),
+                                StringComparison.OrdinalIgnoreCase));
+
+                    if (workbook.Saved == false)
+                        workbook.Save();
+
+                    System.Diagnostics.Debug.WriteLine(
+                        "[ExcelShutdown] Saved workbook"
+                        + (preferred ? " (current project)" : string.Empty)
+                        + ": " + (fullName ?? workbook.Name));
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Save workbook: " + ex.Message);
+                }
+                finally
+                {
+                    if (workbook != null)
+                    {
+                        try { Marshal.ReleaseComObject(workbook); } catch { /* ignore */ }
+                    }
+                }
             }
         }
 
@@ -2745,24 +2851,23 @@ namespace Ui.ViewModels
             if (currentProjectNumber == 10)
             {
                 System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Opening review page for Project 10");
-
-                // UIの応答性を高めるため、Excelの保存・終了処理をバックグラウンドで行う
-                //（特に CloseExcelApplication はプロセス終了を待機するため時間がかかる場合がある）
-                ReviewPageWindow.PendingExcelCloseTask = Task.Run(() =>
+                _isSwitchingProject = true;
+                Task shutdown = null;
+                try
                 {
-                    try
-                    {
-                        SaveCurrentExcelProject(closeWorkbook: true);
-                        CloseExcelApplication();
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Background shutdown error: {ex.Message}");
-                    }
-                });
+                    shutdown = BeginExcelShutdownForReview(() => _isSwitchingProject = false);
+                    ReviewPageWindow.SetPendingExcelCloseTask(shutdown);
+                    OpenReviewPageRequested?.Invoke(this, EventArgs.Empty);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Review transition error: {ex.Message}");
+                    _isSwitchingProject = false;
+                    return;
+                }
 
-                // UIスレッドでは即座にレビューページ遷移イベントを発火させる
-                OpenReviewPageRequested?.Invoke(this, EventArgs.Empty);
+                if (shutdown == null)
+                    _isSwitchingProject = false;
                 return;
             }
 
@@ -2873,6 +2978,7 @@ namespace Ui.ViewModels
 
             ExcelStartupInputGate.End();
             IsExcelOverlayVisible = false;
+            DetachSharedExcelApplication();
             CurrentProject = null;
             ResultMessage = "試験を終了しました。";
 
@@ -2883,8 +2989,7 @@ namespace Ui.ViewModels
             {
                 try
                 {
-                    SaveAllExcelWorkbooks();
-                    CloseExcelApplication();
+                    ShutdownExcelOnCurrentSta(null);
                 }
                 catch (Exception ex)
                 {

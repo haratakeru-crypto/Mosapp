@@ -45,6 +45,7 @@ namespace MOSExcelMogiApp
         private DispatcherTimer _excelPositionRetryTimer;
         private DateTime _excelPositionRetryDeadline;
         private bool _isNavigatingToTask = false; // 連続クリックで多重起動しないためのガード
+        private bool _isOpeningReviewPage;
         private bool _pendingResultRetry;
         private int _resultRetryProjectId;
         private int _resultRetryTaskId;
@@ -1226,27 +1227,16 @@ namespace MOSExcelMogiApp
         
         private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isOpeningReviewPage)
+                return;
+
+            _isOpeningReviewPage = true;
             try
             {
-                // レビューページを開く前に現在のExcelプロジェクトを自動保存
-                // closeWorkbook: false にして、ワークブックは開いたままにする
                 if (_viewModel != null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Saving and closing current project before opening review page");
-                    _viewModel.SaveCurrentExcelProject(closeWorkbook: true);
-                    
-                    // Excelの終了プロセス（QuitとKill待機）はUIスレッドをブロックするため、非同期で実行する
-                    ReviewPageWindow.PendingExcelCloseTask = Task.Run(() => 
-                    {
-                        try
-                        {
-                            _viewModel.CloseExcelApplication();
-                        }
-                        catch (Exception innerEx)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error closing Excel async: {innerEx.Message}");
-                        }
-                    });
+                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Requesting STA Excel shutdown before review page");
+                    ReviewPageWindow.SetPendingExcelCloseTask(_viewModel.BeginExcelShutdownForReview());
                 }
 
                 // メインのバーウィンドウを非表示にする
@@ -1267,6 +1257,7 @@ namespace MOSExcelMogiApp
                 reviewWindow.OnNavigateToTask = (g, p, t) => NavigateToTask(p, t, g);
                 reviewWindow.Closed += (s, args) => 
                 {
+                    _isOpeningReviewPage = false;
                     // レビューページが閉じられたらメインウィンドウを再表示
                     this.Show();
                 };
@@ -1276,6 +1267,7 @@ namespace MOSExcelMogiApp
             }
             catch (Exception ex)
             {
+                _isOpeningReviewPage = false;
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 // エラーが発生した場合はメインウィンドウを再表示

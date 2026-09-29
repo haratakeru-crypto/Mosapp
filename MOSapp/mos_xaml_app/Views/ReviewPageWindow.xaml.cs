@@ -40,7 +40,23 @@ namespace MOSExcelMogiApp.Views
         private ExcelApp _scoringExcelApp;
 
         /// <summary>バックグラウンドで実行中のExcel終了タスク。採点開始前に完了を待機するために使用します。</summary>
-        public static Task PendingExcelCloseTask { get; set; }
+        private static Task _pendingExcelCloseTask;
+
+        public static void SetPendingExcelCloseTask(Task task)
+        {
+            Interlocked.Exchange(ref _pendingExcelCloseTask, task);
+        }
+
+        private static async Task WaitForPendingExcelCloseAsync(string logPrefix)
+        {
+            var task = Interlocked.Exchange(ref _pendingExcelCloseTask, null);
+            if (task == null)
+                return;
+
+            System.Diagnostics.Debug.WriteLine(logPrefix + " waiting...");
+            try { await task; } catch { }
+            System.Diagnostics.Debug.WriteLine(logPrefix + " finished.");
+        }
 
         private Dictionary<int, bool[]> _projectTaskCompletedStates;
         private Dictionary<int, bool[]> _projectTaskFlaggedStates;
@@ -531,13 +547,7 @@ namespace MOSExcelMogiApp.Views
                 System.Diagnostics.Debug.WriteLine("ナビゲーション実行開始");
 
                 // Excel のバックグラウンド終了処理が走っている場合は完了を待つ（競合によるクラッシュを防止）
-                if (PendingExcelCloseTask != null)
-                {
-                    System.Diagnostics.Debug.WriteLine("[NavigateToTask] Waiting for background Excel close task...");
-                    try { await PendingExcelCloseTask; } catch { }
-                    PendingExcelCloseTask = null;
-                    System.Diagnostics.Debug.WriteLine("[NavigateToTask] Background Excel close task finished.");
-                }
+                await WaitForPendingExcelCloseAsync("[NavigateToTask]");
 
                 // タイマーを停止
                 _timer?.Stop();
@@ -721,13 +731,7 @@ namespace MOSExcelMogiApp.Views
                 await Task.Delay(50);
 
                 // バックグラウンドでExcelの終了処理が走っている場合は、完了を待つ
-                if (PendingExcelCloseTask != null)
-                {
-                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Waiting for background Excel close task to finish...");
-                    try { await PendingExcelCloseTask; } catch { }
-                    PendingExcelCloseTask = null;
-                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Background Excel close task finished.");
-                }
+                await WaitForPendingExcelCloseAsync("[ReviewPageWindow]");
                 
                 try
                 {
