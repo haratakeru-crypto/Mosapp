@@ -55,6 +55,27 @@ namespace Libraries
             if (projectId != scoringProjectId || taskId <= 0)
                 return;
 
+            TryRequestBoundaryFlush(projectId, taskId, attemptNo, timeoutMs, out _);
+        }
+
+        /// <summary>
+        /// レビュー遷移前に、現在タスクの未記録差分をVSTOへ確定させる。
+        /// 要求ファイルが削除されたときだけ成功とする。現在タスクが無い、または時間内に消えないときは false。
+        /// </summary>
+        public static bool TryRequestCurrentTaskBoundaryFlush(int timeoutMs, out string detail)
+        {
+            if (!TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo) || taskId <= 0)
+            {
+                detail = "no-current-task";
+                return false;
+            }
+
+            return TryRequestBoundaryFlush(projectId, taskId, attemptNo, timeoutMs, out detail);
+        }
+
+        private static bool TryRequestBoundaryFlush(int projectId, int taskId, int attemptNo, int timeoutMs, out string detail)
+        {
+            detail = $"P{projectId}-T{taskId}-A{attemptNo}";
             string path = GetBoundaryFlushRequestPath();
             try
             {
@@ -63,13 +84,21 @@ namespace Libraries
                 while (sw.ElapsedMilliseconds < timeoutMs)
                 {
                     if (!File.Exists(path))
-                        return;
+                    {
+                        detail += " flushed";
+                        return true;
+                    }
                     Thread.Sleep(50);
                 }
+
+                detail += " timeout";
+                return false;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[ExcelLogReader] RequestOpenTaskBoundaryFlush: " + ex.Message);
+                detail += " error";
+                Debug.WriteLine("[ExcelLogReader] TryRequestBoundaryFlush: " + ex.Message);
+                return false;
             }
         }
 

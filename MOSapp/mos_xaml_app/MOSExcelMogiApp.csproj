@@ -216,6 +216,7 @@
     <Compile Include="Libraries\Group3\ExcelChecker3_9.cs" />
     <Compile Include="Libraries\Group3\ExcelChecker3_10.cs" />
     <Compile Include="Libraries\ExcelLogReader.cs" />
+    <Compile Include="Libraries\ExcelGradingPerf.cs" />
     <Compile Include="Libraries\ExcelApplicationManager.cs" />
     <Compile Include="Libraries\ExcelTaskValidationConfig.cs" />
   </ItemGroup>

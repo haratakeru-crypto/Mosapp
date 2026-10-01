@@ -252,20 +252,7 @@ namespace Libraries.Group1
                     return false;
                 }
                 
-                // 現在の印刷範囲を取得
-                string currentPrintArea = worksheet.PageSetup.PrintArea;
-                
-                // 期待される印刷範囲をチェック（A4:F131）
-                if (string.IsNullOrEmpty(currentPrintArea))
-                {
-                    return false;
-                }
-                
-                // 印刷範囲を正規化（スペースを除去し、大文字に変換）
-                string normalizedPrintArea = currentPrintArea.Replace(" ", "").ToUpper();
-                
-                // 期待される範囲A4:F131をチェック
-                return normalizedPrintArea == "A4:F131" || normalizedPrintArea == "$A$4:$F$131";
+                return IsSalesListPrintAreaAcceptable(worksheet, worksheet.PageSetup.PrintArea);
             }
             catch (Exception)
             {
@@ -276,6 +263,93 @@ namespace Libraries.Group1
                 if (worksheet != null)
                     Marshal.ReleaseComObject(worksheet);
             }
+        }
+
+        /// <summary>
+        /// 3-2: 印刷範囲の本体は A4:F131。メモで右方向の長方形に広がった場合は、
+        /// 5行目以降に値がないときだけ許可する。4行目の見出しは見ない。
+        /// </summary>
+        private static bool IsSalesListPrintAreaAcceptable(Worksheet worksheet, string printArea)
+        {
+            if (worksheet == null || string.IsNullOrWhiteSpace(printArea))
+                return false;
+
+            string normalized = printArea.Replace(" ", "").Replace("$", "").ToUpperInvariant();
+            int bang = normalized.LastIndexOf('!');
+            if (bang >= 0)
+                normalized = normalized.Substring(bang + 1);
+            if (normalized.IndexOf(',') >= 0)
+                return false;
+            if (!TryParseA1Range(normalized, out int startCol, out int startRow, out int endCol, out int endRow))
+                return false;
+            if (startCol != 1 || startRow != 4 || endRow != 131 || endCol < 6)
+                return false;
+            if (endCol == 6)
+                return true;
+
+            Range extra = null;
+            try
+            {
+                extra = worksheet.Range[worksheet.Cells[5, 7], worksheet.Cells[131, endCol]];
+                object raw = extra.Value2;
+                if (raw == null)
+                    return true;
+                if (!(raw is object[,] values))
+                    return string.IsNullOrWhiteSpace(Convert.ToString(raw));
+
+                int rows = values.GetLength(0);
+                int cols = values.GetLength(1);
+                for (int r = 1; r <= rows; r++)
+                {
+                    for (int c = 1; c <= cols; c++)
+                    {
+                        if (!string.IsNullOrWhiteSpace(Convert.ToString(values[r, c])))
+                            return false;
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (extra != null)
+                {
+                    try { Marshal.ReleaseComObject(extra); } catch { }
+                }
+            }
+        }
+
+        private static bool TryParseA1Range(string range, out int startCol, out int startRow, out int endCol, out int endRow)
+        {
+            startCol = startRow = endCol = endRow = 0;
+            string[] parts = range.Split(':');
+            if (parts.Length != 2)
+                return false;
+            return TryParseA1Cell(parts[0], out startCol, out startRow)
+                && TryParseA1Cell(parts[1], out endCol, out endRow)
+                && startCol <= endCol
+                && startRow <= endRow;
+        }
+
+        private static bool TryParseA1Cell(string cell, out int column, out int row)
+        {
+            column = 0;
+            row = 0;
+            if (string.IsNullOrEmpty(cell))
+                return false;
+
+            int index = 0;
+            while (index < cell.Length && cell[index] >= 'A' && cell[index] <= 'Z')
+            {
+                column = (column * 26) + (cell[index] - 'A' + 1);
+                index++;
+            }
+            if (column <= 0 || index >= cell.Length)
+                return false;
+            return int.TryParse(cell.Substring(index), out row) && row > 0;
         }
 
         private bool CheckTask_1_1_03(string filePath)

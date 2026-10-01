@@ -2234,6 +2234,20 @@ namespace Ui.ViewModels
         }
 
         /// <summary>
+        /// Excelを閉じる前に、いまのタスクの未記録差分をVSTOへ確定させる。
+        /// 失敗してもレビュー遷移は止めない。
+        /// </summary>
+        public void FlushCurrentTaskBoundaryBeforeReview()
+        {
+            var sw = Stopwatch.StartNew();
+            bool flushed = ExcelLogReader.TryRequestCurrentTaskBoundaryFlush(2000, out string detail);
+            ExcelGradingPerf.LogImmediate(
+                "Review.BoundaryFlush",
+                sw.ElapsedMilliseconds,
+                $"ok={flushed} {detail}");
+        }
+
+        /// <summary>
         /// レビュー遷移用に、共有 RCW を渡さず専用 STA で Excel を保存して終了する。
         /// すでに終了処理中なら、同じタスクを返す。
         /// </summary>
@@ -2313,6 +2327,7 @@ namespace Ui.ViewModels
         {
             ExcelApp excelApp = null;
             int excelPid = -1;
+            bool ownsExamWorkbook = false;
             try
             {
                 using (OleMessageFilterScope.Enter())
@@ -2331,6 +2346,7 @@ namespace Ui.ViewModels
                         return;
 
                     excelPid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                    ownsExamWorkbook = ExcelInstanceOwnsExamWorkbook(excelApp, preferredFilePath);
                     try { excelApp.DisplayAlerts = false; } catch { /* ignore */ }
 
                     SaveOpenWorkbooks(excelApp, preferredFilePath);
@@ -2359,14 +2375,57 @@ namespace Ui.ViewModels
                 }
             }
 
-            if (excelPid > 0)
+            if (excelPid <= 0)
+                return;
+
+            const int normalExitWaitMs = 1500;
+            const int forceKillWaitMs = 800;
+            bool exited = Libraries.ExcelApplicationManager.WaitForExcelProcessExit(excelPid, normalExitWaitMs);
+            if (!exited && ownsExamWorkbook)
             {
                 Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
                     excelPid,
-                    8000,
-                    3000,
+                    0,
+                    forceKillWaitMs,
                     "[ExcelShutdown]");
             }
+        }
+
+        private static bool ExcelInstanceOwnsExamWorkbook(ExcelApp excelApp, string preferredFilePath)
+        {
+            if (excelApp == null || string.IsNullOrWhiteSpace(preferredFilePath))
+                return false;
+
+            string expectedPath;
+            try
+            {
+                expectedPath = Path.GetFullPath(preferredFilePath);
+            }
+            catch
+            {
+                return false;
+            }
+
+            try
+            {
+                if (excelApp.Workbooks == null)
+                    return false;
+
+                foreach (ExcelWorkbook workbook in excelApp.Workbooks)
+                {
+                    try
+                    {
+                        string fullName = workbook.FullName;
+                        if (!string.IsNullOrEmpty(fullName)
+                            && string.Equals(Path.GetFullPath(fullName), expectedPath, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            return false;
         }
 
         private static void SaveOpenWorkbooks(ExcelApp excelApp, string preferredFilePath)
@@ -2851,10 +2910,11 @@ namespace Ui.ViewModels
             if (currentProjectNumber == 10)
             {
                 System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Opening review page for Project 10");
-                _isSwitchingProject = true;
+                    _isSwitchingProject = true;
                 Task shutdown = null;
                 try
                 {
+                    FlushCurrentTaskBoundaryBeforeReview();
                     shutdown = BeginExcelShutdownForReview(() => _isSwitchingProject = false);
                     ReviewPageWindow.SetPendingExcelCloseTask(shutdown);
                     OpenReviewPageRequested?.Invoke(this, EventArgs.Empty);

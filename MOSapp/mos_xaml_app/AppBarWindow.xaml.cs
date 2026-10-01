@@ -1236,6 +1236,7 @@ namespace MOSExcelMogiApp
                 if (_viewModel != null)
                 {
                     System.Diagnostics.Debug.WriteLine("[AppBarWindow] Requesting STA Excel shutdown before review page");
+                    _viewModel.FlushCurrentTaskBoundaryBeforeReview();
                     ReviewPageWindow.SetPendingExcelCloseTask(_viewModel.BeginExcelShutdownForReview());
                 }
 

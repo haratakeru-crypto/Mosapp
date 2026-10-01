@@ -186,6 +186,11 @@ namespace Libraries
         /// <summary>
         /// Quit 後も同一 PID が残る場合に VSTO が再ロードされないため、待機してから必要なら Kill する。
         /// </summary>
+        public static bool WaitForExcelProcessExit(int pid, int timeoutMs)
+        {
+            return WaitForProcessExitById(pid, timeoutMs);
+        }
+
         public static void EnsureExcelProcessExited(int pid, int waitAfterQuitMs = 10000, int waitAfterKillMs = 5000, string logContext = null)
         {
             if (pid <= 0) return;
