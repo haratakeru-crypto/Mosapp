@@ -289,10 +289,52 @@ namespace Libraries.Group1
             }
         }
 
+        public readonly struct StyleSetLineResult
+        {
+            public bool IsSimple { get; }
+            public bool IsStylish { get; }
+
+            public StyleSetLineResult(bool isSimple, bool isStylish)
+            {
+                IsSimple = isSimple;
+                IsStylish = isStylish;
+            }
+        }
+
+        [ThreadStatic]
+        private static StyleSetLineInspectionContext _styleSetInspection;
+
+        /// <summary>
+        /// 4-4 の線スタイルセットを1回の文書読み取りで判定する。Stylish なら Simple は false。
+        /// </summary>
+        public static StyleSetLineResult EvaluateStyleSetLine(Document doc)
+        {
+            if (doc == null)
+                return new StyleSetLineResult(false, false);
+
+            StyleSetLineInspectionContext previous = _styleSetInspection;
+            _styleSetInspection = new StyleSetLineInspectionContext(doc);
+            try
+            {
+                bool stylish = EvaluateStyleSetLineStylish(doc);
+                bool simple = stylish ? false : EvaluateStyleSetLineSimple(doc);
+                return new StyleSetLineResult(simple, stylish);
+            }
+            finally
+            {
+                _styleSetInspection = previous;
+            }
+        }
+
         /// <summary>4-4: スタイルセット「線（シンプル）」— 見出し1に0.5pt単線、見出し2・表題に下罫線なし、見出し1/2フォントプロファイル一致。</summary>
         public static bool IsDocumentStyleSetLineSimple(Document doc)
         {
-            if (doc == null || IsDocumentStyleSetLineStylish(doc))
+            return EvaluateStyleSetLine(doc).IsSimple;
+        }
+
+        private static bool EvaluateStyleSetLineSimple(Document doc)
+        {
+            if (doc == null)
                 return false;
 
             if (!TryGetStyleBottomBorder(doc, WdBuiltinStyle.wdStyleHeading1, out int h1Style, out int h1Width))
@@ -324,6 +366,11 @@ namespace Libraries.Group1
         /// <summary>4-4 否定用: スタイルセット「線（スタイリッシュ）」等、シンプル以外の線スタイルセット。</summary>
         public static bool IsDocumentStyleSetLineStylish(Document doc)
         {
+            return EvaluateStyleSetLine(doc).IsStylish;
+        }
+
+        private static bool EvaluateStyleSetLineStylish(Document doc)
+        {
             if (doc == null)
                 return false;
 
@@ -352,9 +399,18 @@ namespace Libraries.Group1
         /// <summary>本文中の見出し2段落に実効下罫線があるか（COM + document.xml）。</summary>
         private static bool HasAnyHeading2ParagraphBottomBorder(Document doc)
         {
-            if (HasAnyHeading2ParagraphBottomBorderCom(doc))
-                return true;
-            return HasHeading2ParagraphBottomBorderInOpenXml(doc);
+            StyleSetLineInspectionContext ctx = ActiveStyleSetInspection(doc);
+            if (ctx != null && ctx.Heading2BorderLoaded)
+                return ctx.Heading2Border;
+
+            bool result = HasAnyHeading2ParagraphBottomBorderCom(doc)
+                || HasHeading2ParagraphBottomBorderInOpenXml(doc);
+            if (ctx != null)
+            {
+                ctx.Heading2BorderLoaded = true;
+                ctx.Heading2Border = result;
+            }
+            return result;
         }
 
         private static bool HasAnyHeading2ParagraphBottomBorderCom(Document doc)
@@ -533,14 +589,26 @@ namespace Libraries.Group1
         {
             if (doc == null)
                 return string.Empty;
+
+            StyleSetLineInspectionContext ctx = ActiveStyleSetInspection(doc);
+            if (ctx != null && ctx.FullXmlLoaded)
+                return ctx.FullXml ?? string.Empty;
+
+            string xml;
             try
             {
-                return doc.WordOpenXML ?? string.Empty;
+                xml = doc.WordOpenXML ?? string.Empty;
             }
             catch
             {
-                return string.Empty;
+                xml = string.Empty;
             }
+            if (ctx != null)
+            {
+                ctx.FullXmlLoaded = true;
+                ctx.FullXml = xml;
+            }
+            return xml;
         }
 
         private static string ExtractOpenXmlDocumentBodyBlob(string wordOpenXml)
@@ -666,6 +734,40 @@ namespace Libraries.Group1
             out int theme,
             out float tint)
         {
+            StyleSetLineInspectionContext ctx = ActiveStyleSetInspection(doc);
+            int key = (int)styleId;
+            if (ctx != null && ctx.Fonts.TryGetValue(key, out StyleFontSnapshot cached))
+            {
+                bold = cached.Bold;
+                size = cached.Size;
+                theme = cached.Theme;
+                tint = cached.Tint;
+                return cached.Success;
+            }
+
+            bool success = TryGetStyleFontMetricsUncached(doc, styleId, out bold, out size, out theme, out tint);
+            if (ctx != null)
+            {
+                ctx.Fonts[key] = new StyleFontSnapshot
+                {
+                    Success = success,
+                    Bold = bold,
+                    Size = size,
+                    Theme = theme,
+                    Tint = tint
+                };
+            }
+            return success;
+        }
+
+        private static bool TryGetStyleFontMetricsUncached(
+            Document doc,
+            WdBuiltinStyle styleId,
+            out int bold,
+            out float size,
+            out int theme,
+            out float tint)
+        {
             bold = 0;
             size = 0f;
             theme = (int)WdThemeColorIndex.wdNotThemeColor;
@@ -733,17 +835,18 @@ namespace Libraries.Group1
         {
             if (doc == null)
                 return string.Empty;
-            try
+
+            StyleSetLineInspectionContext ctx = ActiveStyleSetInspection(doc);
+            if (ctx != null && ctx.StylesLoaded)
+                return ctx.StylesXml ?? string.Empty;
+
+            string styles = ExtractOpenXmlStylesBlob(TryGetFullWordOpenXml(doc));
+            if (ctx != null)
             {
-                string xml = doc.WordOpenXML;
-                if (string.IsNullOrEmpty(xml))
-                    return string.Empty;
-                return ExtractOpenXmlStylesBlob(xml);
+                ctx.StylesLoaded = true;
+                ctx.StylesXml = styles;
             }
-            catch
-            {
-                return string.Empty;
-            }
+            return styles;
         }
 
         private static string ExtractOpenXmlStylesBlob(string wordOpenXml)
@@ -1089,6 +1192,30 @@ namespace Libraries.Group1
 
         private static bool TryGetStyleBottomBorder(Document doc, WdBuiltinStyle styleId, out int lineStyle, out int lineWidth)
         {
+            StyleSetLineInspectionContext ctx = ActiveStyleSetInspection(doc);
+            int key = (int)styleId;
+            if (ctx != null && ctx.Borders.TryGetValue(key, out StyleBorderSnapshot cached))
+            {
+                lineStyle = cached.LineStyle;
+                lineWidth = cached.LineWidth;
+                return cached.Success;
+            }
+
+            bool success = TryGetStyleBottomBorderUncached(doc, styleId, out lineStyle, out lineWidth);
+            if (ctx != null)
+            {
+                ctx.Borders[key] = new StyleBorderSnapshot
+                {
+                    Success = success,
+                    LineStyle = lineStyle,
+                    LineWidth = lineWidth
+                };
+            }
+            return success;
+        }
+
+        private static bool TryGetStyleBottomBorderUncached(Document doc, WdBuiltinStyle styleId, out int lineStyle, out int lineWidth)
+        {
             lineStyle = 0;
             lineWidth = 0;
             Style style = null;
@@ -1261,6 +1388,48 @@ namespace Libraries.Group1
                 yield return index;
                 index += value.Length;
             }
+        }
+
+        private static StyleSetLineInspectionContext ActiveStyleSetInspection(Document doc)
+        {
+            StyleSetLineInspectionContext ctx = _styleSetInspection;
+            if (ctx == null || doc == null || !ReferenceEquals(ctx.Document, doc))
+                return null;
+            return ctx;
+        }
+
+        private sealed class StyleSetLineInspectionContext
+        {
+            public StyleSetLineInspectionContext(Document document)
+            {
+                Document = document;
+            }
+
+            public Document Document { get; }
+            public bool FullXmlLoaded;
+            public string FullXml = string.Empty;
+            public bool StylesLoaded;
+            public string StylesXml = string.Empty;
+            public bool Heading2BorderLoaded;
+            public bool Heading2Border;
+            public readonly Dictionary<int, StyleBorderSnapshot> Borders = new Dictionary<int, StyleBorderSnapshot>();
+            public readonly Dictionary<int, StyleFontSnapshot> Fonts = new Dictionary<int, StyleFontSnapshot>();
+        }
+
+        private struct StyleBorderSnapshot
+        {
+            public bool Success;
+            public int LineStyle;
+            public int LineWidth;
+        }
+
+        private struct StyleFontSnapshot
+        {
+            public bool Success;
+            public int Bold;
+            public float Size;
+            public int Theme;
+            public float Tint;
         }
     }
 }

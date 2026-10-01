@@ -164,6 +164,39 @@ namespace Libraries
             return count;
         }
 
+        /// <summary>
+        /// document.xml の現在表示される本文文字数。削除改訂（w:del）は除き、挿入改訂の w:t は含める。
+        /// </summary>
+        public static int CountVisibleBodyTextLength(string wordOpenXml)
+        {
+            if (string.IsNullOrEmpty(wordOpenXml))
+                return 0;
+
+            var docPartMatch = Regex.Match(
+                wordOpenXml,
+                @"<pkg:part pkg:name=""/word/document\.xml""[^>]*>.*?</pkg:part>",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            string bodyXml = docPartMatch.Success ? docPartMatch.Value : wordOpenXml;
+            bodyXml = Regex.Replace(bodyXml, @"<w:del\b[^>]*>.*?</w:del>", string.Empty, RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
+            int length = 0;
+            foreach (Match match in Regex.Matches(bodyXml, @"<w:t(?:\s[^>]*)?>(.*?)</w:t>", RegexOptions.Singleline | RegexOptions.IgnoreCase))
+                length += DecodeXmlText(match.Groups[1].Value).Length;
+            return length;
+        }
+
+        private static string DecodeXmlText(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+            return value
+                .Replace("&lt;", "<")
+                .Replace("&gt;", ">")
+                .Replace("&quot;", "\"")
+                .Replace("&apos;", "'")
+                .Replace("&amp;", "&");
+        }
+
         /// <summary>document.xml 内の w:footnoteReference 数（8-3 ゲート・チェッカー用）。</summary>
         public static int CountFootnoteReferencesInXml(string wordOpenXml)
         {

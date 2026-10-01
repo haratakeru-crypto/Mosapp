@@ -340,6 +340,10 @@ namespace MOS_Word_app.Views
 
                 // 通常モード: レビューページを開く（編集内容をディスクに保存してから Word を閉じる）
                 LogReader.RequestCloseNavigationPaneIfOpen();
+                WriteCurrentTaskFile();
+                int reviewAttemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, reviewAttemptNo);
+                WordBatchScoring.PrepareBeforeClosingDocumentsForBatchScoring(_currentProjectId, _currentTaskId, reviewAttemptNo);
                 SaveAndCloseAllWordDocuments();
                 this.Hide();
 

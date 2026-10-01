@@ -12,11 +12,28 @@ namespace Libraries
     /// <summary>
     /// VSTO が追記する <c>mos_word_log.txt</c> を読み、採点用 Project/Task 付き行のみを解釈する。
     /// </summary>
+    public sealed class VstoEvidenceFlushAck
+    {
+        public bool Completed { get; set; }
+        public long RequestId { get; set; }
+        public int ProjectId { get; set; }
+        public int TaskId { get; set; }
+        public int AttemptNo { get; set; }
+        public bool EvidenceWritten { get; set; }
+    }
+
     public static class LogReader
     {
         private const string LegacyTaskEvidenceFileName = "mos_word_task_evidence.txt";
         private const string EvidenceFlushFileName = "mos_word_flush_evidence.txt";
+        private const string EvidenceFlushAckFileName = "mos_word_flush_evidence.ack.txt";
         private const string CloseNavigationFileName = "mos_word_close_navigation.txt";
+        private const string BatchCacheEnabledKey = "MOS.Word.LogReader.BatchCacheEnabled";
+        private const string BatchCacheGenerationKey = "MOS.Word.LogReader.BatchCacheGeneration";
+
+        private static readonly object CacheSync = new object();
+        private static CachedLines LogFileCache;
+        private static CachedLines DestructiveFileCache;
 
         /// <summary>
         /// 採点用1行: [timestamp] [ProjectN] [TaskN-M] [CommandId] Executed。Task の N は Project と一致すること。
@@ -86,6 +103,30 @@ namespace Libraries
             return $"[Task{projectId}-{taskId}]";
         }
 
+        public static void BeginBatchScoringLogCache()
+        {
+            AppDomain.CurrentDomain.SetData(BatchCacheEnabledKey, true);
+            InvalidateBatchScoringLogCache();
+        }
+
+        public static void EndBatchScoringLogCache()
+        {
+            AppDomain.CurrentDomain.SetData(BatchCacheEnabledKey, false);
+            InvalidateBatchScoringLogCache();
+            lock (CacheSync)
+            {
+                LogFileCache = default;
+                DestructiveFileCache = default;
+            }
+        }
+
+        public static void InvalidateBatchScoringLogCache()
+        {
+            object current = AppDomain.CurrentDomain.GetData(BatchCacheGenerationKey);
+            int generation = current is int value ? value : 0;
+            AppDomain.CurrentDomain.SetData(BatchCacheGenerationKey, unchecked(generation + 1));
+        }
+
         public static void ClearLog()
         {
             try
@@ -97,6 +138,10 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] Error clearing log: {ex.Message}");
+            }
+            finally
+            {
+                InvalidateBatchScoringLogCache();
             }
         }
 
@@ -144,6 +189,10 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] ClearTaskEvidenceForProject: {ex.Message}");
             }
+            finally
+            {
+                InvalidateBatchScoringLogCache();
+            }
         }
 
         /// <summary>個別リセット: 対象プロジェクトの破壊検知エラー行のみ削除する。</summary>
@@ -175,6 +224,10 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] ClearDestructiveLogForProject: {ex.Message}");
+            }
+            finally
+            {
+                InvalidateBatchScoringLogCache();
             }
         }
 
@@ -216,6 +269,10 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] AppendTaskEvidence: {ex.Message}");
             }
+            finally
+            {
+                InvalidateBatchScoringLogCache();
+            }
         }
 
         public static bool HasTaskEvidence(int projectId, int taskId, string commandId)
@@ -240,7 +297,7 @@ namespace Libraries
             int count = 0;
             try
             {
-                foreach (string line in File.ReadAllLines(path, Encoding.UTF8))
+                foreach (string line in ReadCachedLines(path))
                 {
                     if (string.IsNullOrWhiteSpace(line))
                         continue;
@@ -277,7 +334,7 @@ namespace Libraries
             int count = 0;
             try
             {
-                foreach (string line in File.ReadAllLines(path, Encoding.UTF8))
+                foreach (string line in ReadCachedLines(path))
                 {
                     if (string.IsNullOrWhiteSpace(line))
                         continue;
@@ -306,7 +363,7 @@ namespace Libraries
 
             try
             {
-                foreach (string line in File.ReadAllLines(logFilePath, Encoding.UTF8))
+                foreach (string line in ReadCachedLines(logFilePath))
                 {
                     if (string.IsNullOrWhiteSpace(line))
                         continue;
@@ -428,6 +485,11 @@ namespace Libraries
             return Path.Combine(Path.GetTempPath(), EvidenceFlushFileName);
         }
 
+        public static string GetEvidenceFlushAckFilePath()
+        {
+            return Path.Combine(Path.GetTempPath(), EvidenceFlushAckFileName);
+        }
+
         public static string GetCloseNavigationFilePath()
         {
             return Path.Combine(Path.GetTempPath(), CloseNavigationFileName);
@@ -457,25 +519,110 @@ namespace Libraries
         }
 
         /// <summary>
-        /// 採点直前に VSTO へ ShowAll 等のポーリング同期を依頼し、処理完了（ファイル削除）まで待機する。
+        /// 採点直前に VSTO へ ShowAll 等のポーリング同期を依頼し、処理完了まで待機する。
         /// </summary>
         public static void RequestVstoEvidenceFlush(int timeoutMs = 1200)
         {
+            TryRequestVstoEvidenceFlush(0, 0, 0, timeoutMs);
+        }
+
+        /// <summary>
+        /// VSTO 証跡確定を依頼する。一致する応答があれば true。
+        /// </summary>
+        public static bool TryRequestVstoEvidenceFlush(int timeoutMs = 1200)
+        {
+            return TryRequestVstoEvidenceFlush(0, 0, 0, timeoutMs).Completed;
+        }
+
+        /// <summary>
+        /// 指定タスクの VSTO 証跡確定を依頼する。ack の requestId とタスクが一致したときだけ完了とする。
+        /// </summary>
+        public static VstoEvidenceFlushAck TryRequestVstoEvidenceFlush(int projectId, int taskId, int attemptNo, int timeoutMs = 1200)
+        {
+            long requestId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             string path = GetEvidenceFlushFilePath();
+            string ackPath = GetEvidenceFlushAckFilePath();
+            var result = new VstoEvidenceFlushAck
+            {
+                RequestId = requestId,
+                ProjectId = projectId,
+                TaskId = taskId,
+                AttemptNo = attemptNo
+            };
             try
             {
-                File.WriteAllText(path, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Encoding.UTF8);
+                try
+                {
+                    if (File.Exists(ackPath))
+                        File.Delete(ackPath);
+                }
+                catch { }
+
+                string payload = $"{requestId},{projectId},{taskId},{attemptNo},{requestId}";
+                File.WriteAllText(path, payload, new UTF8Encoding(false));
                 var sw = Stopwatch.StartNew();
                 while (sw.ElapsedMilliseconds < timeoutMs)
                 {
-                    if (!File.Exists(path))
-                        return;
+                    if (TryReadEvidenceFlushAck(ackPath, requestId, projectId, taskId, attemptNo, out bool evidenceWritten))
+                    {
+                        result.Completed = true;
+                        result.EvidenceWritten = evidenceWritten;
+                        break;
+                    }
                     Thread.Sleep(30);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] RequestVstoEvidenceFlush: {ex.Message}");
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(ackPath))
+                        File.Delete(ackPath);
+                }
+                catch { }
+                InvalidateBatchScoringLogCache();
+            }
+            return result;
+        }
+
+        private static bool TryReadEvidenceFlushAck(
+            string ackPath,
+            long requestId,
+            int projectId,
+            int taskId,
+            int attemptNo,
+            out bool evidenceWritten)
+        {
+            evidenceWritten = false;
+            try
+            {
+                if (string.IsNullOrEmpty(ackPath) || !File.Exists(ackPath))
+                    return false;
+                string[] parts = File.ReadAllText(ackPath, Encoding.UTF8).Trim()
+                    .Split(new[] { ',' }, StringSplitOptions.None);
+                if (parts.Length < 6)
+                    return false;
+                if (!long.TryParse(parts[0].Trim(), out long ackRequestId) || ackRequestId != requestId)
+                    return false;
+                if (!int.TryParse(parts[1].Trim(), out int ackProjectId) || ackProjectId != projectId)
+                    return false;
+                if (!int.TryParse(parts[2].Trim(), out int ackTaskId) || ackTaskId != taskId)
+                    return false;
+                if (!int.TryParse(parts[3].Trim(), out int ackAttemptNo) || ackAttemptNo != attemptNo)
+                    return false;
+                if (!int.TryParse(parts[4].Trim(), out int processed) || processed != 1)
+                    return false;
+                evidenceWritten = int.TryParse(parts[5].Trim(), out int written) && written == 1;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] TryReadEvidenceFlushAck: {ex.Message}");
+                return false;
             }
         }
 
@@ -504,6 +651,10 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] ClearDestructiveLog: {ex.Message}");
+            }
+            finally
+            {
+                InvalidateBatchScoringLogCache();
             }
         }
 
@@ -534,6 +685,10 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] LogTaskStart: {ex.Message}");
             }
+            finally
+            {
+                InvalidateBatchScoringLogCache();
+            }
         }
 
         public static List<string> GetOperationsForTask(int projectId, int taskId, int attemptNo)
@@ -545,7 +700,7 @@ namespace Libraries
 
             try
             {
-                string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+                string[] lines = ReadCachedLines(path);
                 int curP = -1, curT = -1, curA = 0;
                 foreach (string line in lines)
                 {
@@ -610,7 +765,7 @@ namespace Libraries
                 if (!File.Exists(path))
                     return false;
                 string prefix = $"{projectId},{taskId},{attemptNo}:";
-                foreach (string line in File.ReadAllLines(path, Encoding.UTF8))
+                foreach (string line in ReadCachedLines(path))
                 {
                     if (line != null && line.StartsWith(prefix, StringComparison.Ordinal))
                         return true;
@@ -636,6 +791,10 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] AppendDestructiveErrors: {ex.Message}");
+            }
+            finally
+            {
+                InvalidateBatchScoringLogCache();
             }
         }
 
@@ -687,6 +846,123 @@ namespace Libraries
                 return "";
             int space = opLine.IndexOf(' ');
             return space > 0 ? opLine.Substring(0, space).Trim() : opLine.Trim();
+        }
+
+        private static string[] ReadCachedLines(string path)
+        {
+            if (!IsBatchCacheEnabled())
+                return ReadLinesUncached(path);
+
+            int generation = CurrentBatchCacheGeneration();
+            bool destructive = IsDestructiveLogPath(path);
+            if (TryReadFreshCache(path, destructive, generation, out string[] cached))
+                return cached;
+
+            if (!TryGetFileStamp(path, out bool existsBefore, out long lengthBefore, out long ticksBefore))
+                return ReadLinesUncached(path);
+
+            string[] lines = ReadLinesUncached(path);
+            if (!TryGetFileStamp(path, out bool existsAfter, out long lengthAfter, out long ticksAfter))
+                return lines;
+            if (existsBefore != existsAfter || lengthBefore != lengthAfter || ticksBefore != ticksAfter)
+                return lines;
+
+            lock (CacheSync)
+            {
+                var stored = new CachedLines
+                {
+                    Generation = generation,
+                    Exists = existsAfter,
+                    Length = lengthAfter,
+                    WriteTicks = ticksAfter,
+                    Lines = lines
+                };
+                if (destructive)
+                    DestructiveFileCache = stored;
+                else
+                    LogFileCache = stored;
+            }
+            return lines;
+        }
+
+        private static bool TryReadFreshCache(string path, bool destructive, int generation, out string[] lines)
+        {
+            lines = null;
+            if (!TryGetFileStamp(path, out bool exists, out long length, out long ticks))
+                return false;
+
+            lock (CacheSync)
+            {
+                CachedLines cached = destructive ? DestructiveFileCache : LogFileCache;
+                if (cached.Lines == null || cached.Generation != generation)
+                    return false;
+                if (cached.Exists != exists || cached.Length != length || cached.WriteTicks != ticks)
+                    return false;
+                lines = cached.Lines;
+                return true;
+            }
+        }
+
+        private static string[] ReadLinesUncached(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                    return new string[0];
+                return File.ReadAllLines(path, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ReadLinesUncached: {ex.Message}");
+                return new string[0];
+            }
+        }
+
+        private static bool TryGetFileStamp(string path, out bool exists, out long length, out long writeTicks)
+        {
+            exists = false;
+            length = 0;
+            writeTicks = 0;
+            try
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                    return true;
+                var info = new FileInfo(path);
+                exists = true;
+                length = info.Length;
+                writeTicks = info.LastWriteTimeUtc.Ticks;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] TryGetFileStamp: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool IsBatchCacheEnabled()
+        {
+            return AppDomain.CurrentDomain.GetData(BatchCacheEnabledKey) as bool? == true;
+        }
+
+        private static int CurrentBatchCacheGeneration()
+        {
+            object current = AppDomain.CurrentDomain.GetData(BatchCacheGenerationKey);
+            return current is int value ? value : 0;
+        }
+
+        private static bool IsDestructiveLogPath(string path)
+        {
+            return string.Equals(path, GetDestructiveErrorLogPath(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private struct CachedLines
+        {
+            public int Generation;
+            public bool Exists;
+            public long Length;
+            public long WriteTicks;
+            public string[] Lines;
         }
     }
 

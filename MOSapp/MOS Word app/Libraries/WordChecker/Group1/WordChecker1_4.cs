@@ -333,8 +333,9 @@ namespace Libraries.Group1
                 }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_04] ロジック実行開始");
-                bool lineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(document);
-                bool lineStylish = WordWatermarkInspection.IsDocumentStyleSetLineStylish(document);
+                WordWatermarkInspection.StyleSetLineResult styleSet = WordWatermarkInspection.EvaluateStyleSetLine(document);
+                bool lineSimple = styleSet.IsSimple;
+                bool lineStylish = styleSet.IsStylish;
                 bool logSimple = LogReader.HasTaskEvidence(4, 4, "StyleSetLineSimple");
                 bool logStylish = LogReader.HasTaskEvidence(4, 4, "StyleSetLineStylish");
                 bool logOk = logSimple && !logStylish;
