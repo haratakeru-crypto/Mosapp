@@ -27,8 +27,8 @@ namespace Libraries
             ExcelApp app = null;
             try
             {
-                // 既に起動中ならそれを使う（アドインロード済み前提で、PIDが取れれば待機も行う）
-                app = TryGetActiveExcelApplication();
+                // 既に起動中なら生存確認済みのものを使う（終了直後の古い ROT は捨てる）
+                app = TryGetHealthyExcelApplication();
                 if (app != null)
                 {
                     TrySetVisible(app, makeVisible);
@@ -94,15 +94,42 @@ namespace Libraries
             return app;
         }
 
-        private static ExcelApp TryGetActiveExcelApplication()
+        /// <summary>
+        /// ROT 上の Excel.Application を取得し、Hwnd まで応答する生存インスタンスだけ返す。
+        /// 終了直後の古い登録（InvalidCastException / RPC 0x800706BA 等）は解放して null を返す。新規起動はしない。
+        /// </summary>
+        public static ExcelApp TryGetHealthyExcelApplication()
         {
+            object raw = null;
+            bool keep = false;
             try
             {
-                return (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                raw = Marshal.GetActiveObject("Excel.Application");
+                var app = raw as ExcelApp;
+                if (app == null)
+                    return null;
+
+                // 古いプロキシはここで RPC 切断になる。直接キャストの例外を呼び出し元へ出さない。
+                _ = app.Hwnd;
+                keep = true;
+                return app;
+            }
+            catch (COMException)
+            {
+                return null;
+            }
+            catch (InvalidCastException)
+            {
+                return null;
             }
             catch
             {
                 return null;
+            }
+            finally
+            {
+                if (!keep)
+                    ReleaseComObjectSafe(raw);
             }
         }
 
@@ -111,9 +138,9 @@ namespace Libraries
             var sw = Stopwatch.StartNew();
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
-                var app = TryGetActiveExcelApplication();
+                var app = TryGetHealthyExcelApplication();
                 if (app != null) return app;
-                Thread.Sleep(250);
+                Thread.Sleep(200);
             }
             return null;
         }
@@ -130,17 +157,28 @@ namespace Libraries
             var sw = Stopwatch.StartNew();
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
-                var app = TryGetActiveExcelApplication();
+                var app = TryGetHealthyExcelApplication();
                 if (app != null)
                 {
                     int pid = TryGetExcelProcessId(app);
                     if (pid == expectedPid)
                         return app;
+
+                    // 別インスタンスや HWND 未確定の参照は保持せず、次の ROT 登録を待つ。
+                    ReleaseComObjectSafe(app);
                 }
-                Thread.Sleep(250);
+                Thread.Sleep(200);
             }
 
             return null;
+        }
+
+        private static void ReleaseComObjectSafe(object comObject)
+        {
+            if (comObject == null || !Marshal.IsComObject(comObject))
+                return;
+
+            try { Marshal.ReleaseComObject(comObject); } catch { }
         }
 
         private static void TrySetVisible(ExcelApp app, bool makeVisible)

@@ -1359,23 +1359,12 @@ namespace MOSExcelMogiApp
                 {
                     System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Opening Excel file: {filePath}");
 
-                    // Excel を COM で取得（起動中ならそれを使う／無ければ新規起動→最後にシェル起動＋ROT 接続）
-                    try
-                    {
-                        excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                        // ROT に残った古いプロキシが無効でないか生存確認（0x800706BE 等が出れば死んでいる）
-                        try { var _ = excelApp.Hwnd; }
-                        catch
-                        {
-                            Marshal.ReleaseComObject(excelApp);
-                            excelApp = null;
-                            throw new COMException("Stale Excel proxy detected");
-                        }
-                    }
-                    catch (COMException)
+                    // 起動中の正常な Excel だけ使う。終了直後の古い ROT は例外にせず、既存の復旧経路へ進む。
+                    excelApp = ExcelApplicationManager.TryGetHealthyExcelApplication();
+                    if (excelApp == null)
                     {
                         if (_viewModel == null)
-                            throw;
+                            throw new InvalidOperationException("Excel に接続できませんでした。");
 
                         // 先に対象ブックをシェルで開き短時間で ROT 接続（スタート画面の空 Excel 起動より優先）
                         excelApp = _viewModel.TryOpenWorkbookByShellAndAttachRunningExcel(
