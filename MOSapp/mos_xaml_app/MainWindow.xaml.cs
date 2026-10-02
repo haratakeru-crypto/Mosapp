@@ -362,6 +362,7 @@ namespace MOSExcelMogiApp
             {
                 ExcelLogReader.ClearOperationLogForProject(projectId);
                 ExcelLogReader.ClearDestructiveLogForProject(projectId);
+                ExcelLogReader.ClearDiagnosticLog();
                 ExcelTaskAttemptRegistry.ClearProject(projectId);
 
                 // 正規作業ファイルを最優先し、旧 config/Initial 配置は移行元に限定する。
@@ -734,6 +735,7 @@ namespace MOSExcelMogiApp
             {
                 ExcelLogReader.ClearOperationLogForProject(projectId);
                 ExcelLogReader.ClearDestructiveLogForProject(projectId);
+                ExcelLogReader.ClearDiagnosticLog();
                 ExcelTaskAttemptRegistry.ClearProject(projectId);
 
                 string projectFilePath = _viewModel?.GetVariantWorkingFilePath(groupId, projectId, variantSetNo);

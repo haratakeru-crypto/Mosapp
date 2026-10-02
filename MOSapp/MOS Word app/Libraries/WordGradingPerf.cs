@@ -9,7 +9,7 @@ namespace Libraries
 {
     /// <summary>
     /// 採点処理のパフォーマンス計測。処理中はメモリへ蓄積し、
-    /// 一括採点終了時だけ %TEMP%\mos_word_grading_perf.log へまとめて出力する。
+    /// 一括採点終了時に %TEMP%\mos_word_grading_perf.log を直近1回の内容で置き換える。
     /// </summary>
     public static class WordGradingPerf
     {
@@ -84,7 +84,7 @@ namespace Libraries
 
             try
             {
-                File.AppendAllText(LogPath, report, new UTF8Encoding(false));
+                File.WriteAllText(LogPath, report, new UTF8Encoding(false));
             }
             catch (Exception ex)
             {

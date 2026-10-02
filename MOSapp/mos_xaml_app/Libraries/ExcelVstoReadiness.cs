@@ -88,6 +88,19 @@ namespace Libraries
             return IsStartupCompleted(processId);
         }
 
+        /// <summary>
+        /// 診断ログを消したあと、続き読みの位置だけ戻す。
+        /// 起動済み Excel の起動完了は残し、ファイルが短く作り直されても先頭を読み飛ばさない。
+        /// </summary>
+        public static void ResetAfterDiagnosticLogCleared()
+        {
+            lock (Sync)
+            {
+                _readOffset = 0;
+                _pendingLine = "";
+            }
+        }
+
         public static void RecordHostEvent(string message)
         {
             if (string.IsNullOrEmpty(message))
@@ -114,7 +127,11 @@ namespace Libraries
                 try
                 {
                     if (!File.Exists(DiagnosticPath))
+                    {
+                        _readOffset = 0;
+                        _pendingLine = "";
                         return;
+                    }
 
                     using (var stream = new FileStream(
                         DiagnosticPath,

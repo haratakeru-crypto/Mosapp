@@ -259,6 +259,7 @@ namespace Libraries
                 if (File.Exists(path)) File.Delete(path);
             }
             catch { }
+            ExcelVstoReadiness.ResetAfterDiagnosticLogCleared();
         }
 
 

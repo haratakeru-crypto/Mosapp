@@ -62,6 +62,8 @@ namespace MOS_Word_app
                 return;
             }
 
+            WordBatchScoring.ClearScoringErrorLog();
+
             _startupSplash = CreateStartupSplash();
             _startupSplash.Show();
             // 連打時に「起動中」が見えるよう、一度描画を進める

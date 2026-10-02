@@ -9,14 +9,16 @@ namespace Libraries
 {
     /// <summary>
     /// Excel一括採点のパフォーマンス計測。処理中はメモリへ蓄積し、
-    /// 一括採点終了時だけ %TEMP%\mos_excel_grading_perf.log へまとめて出力する。
+    /// 一括採点の記録は %TEMP%\mos_excel_grading_perf.log に直近1回だけ残す。
     /// </summary>
     public static class ExcelGradingPerf
     {
         private static readonly object Sync = new object();
         private static readonly Dictionary<string, Sample> Samples = new Dictionary<string, Sample>(StringComparer.Ordinal);
         private static readonly List<string> Details = new List<string>();
+        private static readonly List<string> Preamble = new List<string>();
         private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "mos_excel_grading_perf.log");
+        private static bool _sessionOpen;
 
         public static bool Enabled { get; set; } = true;
 
@@ -25,11 +27,26 @@ namespace Libraries
             if (!Enabled)
                 return;
 
+            string text;
             lock (Sync)
             {
                 Samples.Clear();
+                var carried = new List<string>(Preamble);
+                Preamble.Clear();
                 Details.Clear();
                 Details.Add($"===== {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {name} =====");
+                Details.AddRange(carried);
+                _sessionOpen = true;
+                text = string.Join(Environment.NewLine, Details) + Environment.NewLine;
+            }
+
+            try
+            {
+                ReplaceFile(text);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ExcelGradingPerf] " + ex.Message);
             }
         }
 
@@ -62,9 +79,30 @@ namespace Libraries
             try
             {
                 string line = string.IsNullOrWhiteSpace(detail)
-                    ? $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {category}: {elapsedMs} ms{Environment.NewLine}"
-                    : $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {category}: {elapsedMs} ms {detail}{Environment.NewLine}";
-                File.AppendAllText(LogPath, line, new UTF8Encoding(false));
+                    ? $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {category}: {elapsedMs} ms"
+                    : $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {category}: {elapsedMs} ms {detail}";
+                string text;
+                bool replace;
+                lock (Sync)
+                {
+                    if (_sessionOpen)
+                    {
+                        Details.Add(line);
+                        replace = false;
+                        text = line + Environment.NewLine;
+                    }
+                    else
+                    {
+                        Preamble.Add(line);
+                        replace = true;
+                        text = string.Join(Environment.NewLine, Preamble) + Environment.NewLine;
+                    }
+                }
+
+                if (replace)
+                    ReplaceFile(text);
+                else
+                    File.AppendAllText(LogPath, text, new UTF8Encoding(false));
             }
             catch (Exception ex)
             {
@@ -98,16 +136,22 @@ namespace Libraries
                 report = builder.ToString();
                 Samples.Clear();
                 Details.Clear();
+                _sessionOpen = false;
             }
 
             try
             {
-                File.AppendAllText(LogPath, report, new UTF8Encoding(false));
+                File.WriteAllText(LogPath, report, new UTF8Encoding(false));
             }
             catch (Exception ex)
             {
                 Debug.WriteLine("[ExcelGradingPerf] " + ex.Message);
             }
+        }
+
+        private static void ReplaceFile(string text)
+        {
+            File.WriteAllText(LogPath, text, new UTF8Encoding(false));
         }
 
         private sealed class Sample

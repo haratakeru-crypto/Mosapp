@@ -6,7 +6,7 @@ using System.Text;
 namespace Libraries
 {
     /// <summary>
-    /// アプリバーのリセット所要時間。採点ログとは別に、区間が終わった時点で %TEMP%\mos_reset_perf.log へ書く。
+    /// アプリバーのリセット所要時間。%TEMP%\mos_reset_perf.log は直近1回だけ残す。
     /// </summary>
     public static class ResetPerfLog
     {
@@ -15,7 +15,7 @@ namespace Libraries
 
         public static void Begin(string app, int projectId)
         {
-            WriteLine($"===== {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {app} project={projectId} reset =====");
+            WriteLine($"===== {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {app} project={projectId} reset =====", replace: true);
         }
 
         public static void Write(string app, int projectId, string stage, long elapsedMs, string path, string detail = null)
@@ -23,16 +23,20 @@ namespace Libraries
             string line = string.IsNullOrWhiteSpace(detail)
                 ? $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {app} project={projectId} {stage} {elapsedMs} ms path={path}"
                 : $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {app} project={projectId} {stage} {elapsedMs} ms path={path} {detail}";
-            WriteLine(line);
+            WriteLine(line, replace: false);
         }
 
-        static void WriteLine(string line)
+        static void WriteLine(string line, bool replace)
         {
             try
             {
                 lock (Sync)
                 {
-                    File.AppendAllText(LogPath, line + Environment.NewLine, new UTF8Encoding(false));
+                    string text = line + Environment.NewLine;
+                    if (replace)
+                        File.WriteAllText(LogPath, text, new UTF8Encoding(false));
+                    else
+                        File.AppendAllText(LogPath, text, new UTF8Encoding(false));
                 }
             }
             catch (Exception ex)

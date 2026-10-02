@@ -581,6 +581,21 @@ namespace Libraries
             return wordApp.Documents.Count < countBefore;
         }
 
+        /// <summary>起動時に前回までの採点例外ログを消す。試験のリセットでは消さない。</summary>
+        public static void ClearScoringErrorLog()
+        {
+            try
+            {
+                string logPath = Path.Combine(Path.GetTempPath(), "mos_word_scoring_errors.log");
+                if (File.Exists(logPath))
+                    File.Delete(logPath);
+            }
+            catch
+            {
+                // ignore log failure
+            }
+        }
+
         private static void AppendScoringErrorLog(string context, Exception ex)
         {
             try
