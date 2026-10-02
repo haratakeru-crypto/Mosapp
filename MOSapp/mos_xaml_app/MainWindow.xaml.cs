@@ -129,6 +129,7 @@ namespace MOSExcelMogiApp
             _appBarWindow = null;
             if (bar == null)
                 return;
+            try { bar.Closed -= OnAppBarWindowClosed; } catch { /* ignore */ }
             try { bar.Close(); } catch { /* ignore */ }
         }
         
@@ -140,6 +141,7 @@ namespace MOSExcelMogiApp
             if (_appBarWindow == null || !_appBarWindow.IsLoaded)
             {
                 _appBarWindow = new AppBarWindow(_viewModel);
+                _appBarWindow.Closed += OnAppBarWindowClosed;
                 // Excel の前面化を優先するため、表示時にフォーカスを奪わない。
                 _appBarWindow.ShowActivated = false;
             }
@@ -150,6 +152,18 @@ namespace MOSExcelMogiApp
             }
         }
         
+        private void OnAppBarWindowClosed(object sender, EventArgs e)
+        {
+            if (!ReferenceEquals(sender, _appBarWindow))
+                return;
+            _appBarWindow = null;
+            if (_isExiting)
+                return;
+            _viewModel?.EnableProjectSelection();
+            this.Show();
+            this.Activate();
+        }
+
         private void OnHideMainWindowRequested(object sender, EventArgs e)
         {
             this.Hide();
@@ -157,6 +171,7 @@ namespace MOSExcelMogiApp
         
         private void OnShowMainWindowRequested(object sender, EventArgs e)
         {
+            _viewModel?.EnableProjectSelection();
             this.Show();
             this.Activate();
         }

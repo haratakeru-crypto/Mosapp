@@ -561,6 +561,7 @@ namespace MOSExcelMogiApp.Views
                                 viewModel.IsExcelOverlayVisible = false;
                                 viewModel.CurrentProject = null;
                                 viewModel.ResultMessage = "";
+                                viewModel.EnableProjectSelection();
                             }
                         }
                         
@@ -733,6 +734,7 @@ namespace MOSExcelMogiApp.Views
                                 viewModel.IsExcelOverlayVisible = false;
                                 viewModel.CurrentProject = null;
                                 viewModel.ResultMessage = "";
+                                viewModel.EnableProjectSelection();
                             }
                         }
                         

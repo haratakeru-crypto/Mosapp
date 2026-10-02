@@ -441,6 +441,7 @@ namespace MOS_Word_app.Views
             var mainWindow = System.Windows.Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
             if (mainWindow != null)
             {
+                (mainWindow.DataContext as MOS_Word_app.MainViewModel)?.EnableProjectSelection();
                 mainWindow.Show();
                 mainWindow.Activate();
             }

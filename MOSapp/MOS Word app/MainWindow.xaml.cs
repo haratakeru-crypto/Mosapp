@@ -149,6 +149,7 @@ namespace MOS_Word_app
             _appBarWindow = null;
             if (_isExiting)
                 return;
+            _viewModel?.EnableProjectSelection();
             this.Show();
             this.Activate();
         }

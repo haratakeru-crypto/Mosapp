@@ -235,6 +235,7 @@ namespace Ui.ViewModels
         private DispatcherTimer _examExcelWindowWatchTimer;
         private int _examExcelPid;
         private bool _examExcelWindowSeen;
+        private bool _isOpeningProject;
         private int _attachRetryAttempts;
         private const int MaxAttachRetryAttempts = 30;
 
@@ -243,7 +244,7 @@ namespace Ui.ViewModels
             _excelCheckerService = excelCheckerService;
             LoadProjects();
             CheckCommand = new RelayCommand(ExecuteCheck);
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
+            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
             ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring);
             EndExamCommand = new RelayCommand(ExecuteEndExam);
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
@@ -798,6 +799,27 @@ namespace Ui.ViewModels
             }
         }
 
+        public void EnableProjectSelection()
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(EnableProjectSelection));
+                return;
+            }
+
+            if (!_isOpeningProject)
+                return;
+            _isOpeningProject = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void DisableProjectSelection()
+        {
+            _isOpeningProject = true;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
         private void ExecuteOpenProject(object parameter)
         {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
@@ -829,8 +851,13 @@ namespace Ui.ViewModels
                 return;
             }
 
+            DisableProjectSelection();
+
             if (!WaitForExcelShutdownToCompleteBeforeOpeningProject())
+            {
+                EnableProjectSelection();
                 return;
+            }
 
             IsVariantMode = false;
 
@@ -838,6 +865,7 @@ namespace Ui.ViewModels
             ClearStaleSharedExcelBeforeOpen(filePath);
             if (string.IsNullOrEmpty(filePath))
             {
+                EnableProjectSelection();
                 ResultMessage = $"エラー: プロジェクトID '{projectId}' からファイルパスを取得できませんでした。";
                 System.Diagnostics.Debug.WriteLine($"Failed to get file path for projectId: {projectId}");
                 return;
@@ -845,6 +873,7 @@ namespace Ui.ViewModels
             
             if (!File.Exists(filePath))
             {
+                EnableProjectSelection();
                 ResultMessage = $"エラー: ファイルが見つかりません: {filePath}\n\nファイルが存在するか確認してください。";
                 System.Diagnostics.Debug.WriteLine($"File not found: {filePath}");
                 return;
@@ -922,6 +951,7 @@ namespace Ui.ViewModels
 
                 if (!opened)
                 {
+                    EnableProjectSelection();
                     ResultMessage = "エラー: Excel を起動できませんでした。";
                     return;
                 }
@@ -961,6 +991,7 @@ namespace Ui.ViewModels
             }
             catch (Exception ex)
             {
+                EnableProjectSelection();
                 ExcelStartupInputGate.End();
                 System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] failed error={ex.GetType().Name}:{ex.Message}");
                 ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";

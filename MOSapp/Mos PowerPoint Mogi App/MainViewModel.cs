@@ -36,7 +36,7 @@ namespace MOS_PowerPoint_app
         public MainViewModel()
         {
             LoadProjects();
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
+            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllProjectsCommand = new RelayCommand(ExecuteResetAllProjects);
             TaskResults = new ObservableCollection<TaskResult>();
@@ -207,6 +207,29 @@ namespace MOS_PowerPoint_app
         private const int VstoHeartbeatWaitAfterLaunchMs = 8000;
         private const int ActiveVstoHeartbeatMaxAgeSeconds = 15;
 
+        private bool _isOpeningProject;
+
+        public void EnableProjectSelection()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(EnableProjectSelection));
+                return;
+            }
+
+            if (!_isOpeningProject)
+                return;
+            _isOpeningProject = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void DisableProjectSelection()
+        {
+            _isOpeningProject = true;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
         private void ExecuteOpenProject(object parameter)
         {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
@@ -220,6 +243,7 @@ namespace MOS_PowerPoint_app
                     return;
                 }
 
+                DisableProjectSelection();
                 Views.PowerPointStartupInputGate.Begin();
 
                 string filePath = project.FilePath;
@@ -291,13 +315,17 @@ namespace MOS_PowerPoint_app
                     }
 
                     if (dispatcher == null)
+                    {
+                        EnableProjectSelection();
                         return;
+                    }
 
                     dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (!opened)
                         {
                             Views.PowerPointStartupInputGate.End();
+                            EnableProjectSelection();
                             ResultMessage = errorMessage ?? "エラー: PowerPointファイルを開けませんでした。";
                             if (vstoFailed)
                             {

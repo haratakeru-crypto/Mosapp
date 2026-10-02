@@ -49,7 +49,7 @@ namespace MOS_Word_app
         public MainViewModel()
         {
             LoadProjects();
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
+            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
             TabSearchCommand = new RelayCommand(ExecuteTabSearch);
             ResetAllInGroupCommand = new RelayCommand(ExecuteResetAllInGroup);
             TabTasks = new ObservableCollection<TabTaskInfo>();
@@ -158,6 +158,29 @@ namespace MOS_Word_app
             }
         }
 
+        private bool _isOpeningProject;
+
+        public void EnableProjectSelection()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(EnableProjectSelection));
+                return;
+            }
+
+            if (!_isOpeningProject)
+                return;
+            _isOpeningProject = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void DisableProjectSelection()
+        {
+            _isOpeningProject = true;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
         private void ExecuteOpenProject(object parameter)
         {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
@@ -168,9 +191,11 @@ namespace MOS_Word_app
                 return;
             }
             var project = (ProjectViewModel)parameter;
+            DisableProjectSelection();
             {
                 if (string.IsNullOrEmpty(project.FilePath))
                 {
+                    EnableProjectSelection();
                     ResultMessage = $"エラー: ファイルが見つかりません: {project.FilePath ?? "パスが設定されていません"}";
                     return;
                 }
@@ -184,6 +209,7 @@ namespace MOS_Word_app
                     }
                     catch (Exception exCopy)
                     {
+                        EnableProjectSelection();
                         ResultMessage = $"エラー: ファイルをコピーできませんでした: {exCopy.Message}";
                         return;
                     }
@@ -202,6 +228,7 @@ namespace MOS_Word_app
 
                     if (result == MessageBoxResult.No)
                     {
+                        EnableProjectSelection();
                         ResultMessage = "Wordの起動をキャンセルしました。";
                         return;
                     }
@@ -234,13 +261,17 @@ namespace MOS_Word_app
                     }
 
                     if (dispatcher == null)
+                    {
+                        EnableProjectSelection();
                         return;
+                    }
 
                     dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (!opened)
                         {
                             Views.WordStartupInputGate.End();
+                            EnableProjectSelection();
                             ResultMessage = errorMessage != null
                                 ? $"エラー: ファイルを開けませんでした: {errorMessage}"
                                 : $"エラー: Wordファイルを開けませんでした: {Path.GetFileName(project.FilePath)}";
