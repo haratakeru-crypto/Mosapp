@@ -322,6 +322,9 @@ namespace MOS_Word_app.Views
             }
 
             Window scoringOverlay = null;
+            Timer scoringNoticeTimer = null;
+            bool scoringCompleted = false;
+            bool scoringNoticeShown = false;
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId}");
@@ -345,9 +348,15 @@ namespace MOS_Word_app.Views
                     return;
                 }
 
-                scoringOverlay = CreateInstantScoringOverlay();
-                scoringOverlay.Show();
-                await System.Threading.Tasks.Task.Delay(80);
+                const int scoringNoticeDelayMs = 300;
+                scoringNoticeTimer = new Timer(_ => Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (scoringCompleted || scoringOverlay != null)
+                        return;
+                    scoringOverlay = CreateInstantScoringOverlay();
+                    scoringOverlay.Show();
+                    scoringNoticeShown = true;
+                })), null, scoringNoticeDelayMs, Timeout.Infinite);
 
                 var result = await System.Threading.Tasks.Task.Run(() =>
                 {
@@ -430,9 +439,13 @@ namespace MOS_Word_app.Views
                     }
                 });
 
+                scoringCompleted = true;
+                scoringNoticeTimer.Dispose();
+                scoringNoticeTimer = null;
                 CloseInstantScoringOverlay(scoringOverlay);
                 scoringOverlay = null;
-                await System.Threading.Tasks.Task.Delay(80);
+                if (scoringNoticeShown)
+                    await System.Threading.Tasks.Task.Delay(80);
 
                 // 採点結果ウィンドウを表示（Task / Result 〇✖）
                 ScoreResultWindow.ShowResults(this, result.scoreList);
@@ -442,12 +455,24 @@ namespace MOS_Word_app.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] Error: {ex.Message}");
+                scoringCompleted = true;
+                if (scoringNoticeTimer != null)
+                {
+                    scoringNoticeTimer.Dispose();
+                    scoringNoticeTimer = null;
+                }
                 CloseInstantScoringOverlay(scoringOverlay);
                 scoringOverlay = null;
                 MessageBox.Show($"採点中にエラーが発生しました:\n{ex.Message}", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
+                scoringCompleted = true;
+                if (scoringNoticeTimer != null)
+                {
+                    scoringNoticeTimer.Dispose();
+                    scoringNoticeTimer = null;
+                }
                 CloseInstantScoringOverlay(scoringOverlay);
                 _isScoring = false;
                 if (scoreButton != null)

@@ -218,6 +218,7 @@
     <Compile Include="Libraries\ExcelLogReader.cs" />
     <Compile Include="Libraries\ExcelGradingPerf.cs" />
     <Compile Include="Libraries\ExcelApplicationManager.cs" />
+    <Compile Include="Libraries\ExcelVstoReadiness.cs" />
     <Compile Include="Libraries\ExcelTaskValidationConfig.cs" />
   </ItemGroup>
   <ItemGroup>

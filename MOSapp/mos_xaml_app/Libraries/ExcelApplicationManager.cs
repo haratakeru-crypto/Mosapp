@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using ExcelApp = Microsoft.Office.Interop.Excel.Application;
@@ -18,9 +17,6 @@ namespace Libraries
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool AllowSetForegroundWindow(uint dwProcessId);
-
-        private static readonly string AddinDiagPath = ExcelLogReader.GetDiagnosticLogPath();
-        private const string AddinStartupCompletedMarker = "Startup completed";
 
         public static ExcelApp GetOrCreateExcelApplication(bool makeVisible, int timeoutMs = 30000)
         {
@@ -82,13 +78,16 @@ namespace Libraries
         /// <summary>
         /// 起動済みの Excel のみ ROT から取得する。新規プロセスは起動しない（シェル起動後の COM 接続用）。
         /// </summary>
-        public static ExcelApp TryAttachRunningExcelApplication(bool makeVisible, int timeoutMs = 15000)
+        public static ExcelApp TryAttachRunningExcelApplication(bool makeVisible, int timeoutMs = 15000, bool waitForVstoStartup = true)
         {
             var app = WaitForActiveExcelApplication(timeoutMs);
             if (app == null)
                 return null;
 
             TrySetVisible(app, makeVisible);
+            if (!waitForVstoStartup)
+                return app;
+
             int vstoWaitMs = Math.Min(timeoutMs, 8000);
             WaitForVstoStartupIfPossible(app, vstoWaitMs);
             return app;
@@ -332,43 +331,12 @@ namespace Libraries
 
         private static void WaitForVstoStartupByPid(int excelPid, int timeoutMs)
         {
-            if (excelPid <= 0) return;
-            var sw = Stopwatch.StartNew();
-
-            while (sw.ElapsedMilliseconds < timeoutMs)
-            {
-                if (IsAddinStartupCompleted(excelPid))
-                    return;
-
-                Thread.Sleep(200);
-            }
+            ExcelVstoReadiness.WaitForStartup(excelPid, timeoutMs);
         }
 
         private static bool IsAddinStartupCompleted(int excelPid)
         {
-            if (excelPid <= 0) return false;
-            if (!File.Exists(AddinDiagPath)) return false;
-
-            // 例: "[yyyy-MM-dd HH:mm:ss.xxx] [PID:12345] Startup completed"
-            string pidToken = "[PID:" + excelPid.ToString() + "]";
-            try
-            {
-                foreach (var line in File.ReadLines(AddinDiagPath))
-                {
-                    if (line == null) continue;
-                    if (line.IndexOf(pidToken, StringComparison.OrdinalIgnoreCase) >= 0 &&
-                        line.IndexOf(AddinStartupCompletedMarker, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-                // ignore
-            }
-
-            return false;
+            return ExcelVstoReadiness.IsStartupCompleted(excelPid);
         }
 
         private static int StartExcelProcess()

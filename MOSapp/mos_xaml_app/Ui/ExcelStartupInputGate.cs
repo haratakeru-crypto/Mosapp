@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -13,21 +11,21 @@ using Libraries;
 namespace Ui.ViewModels
 {
     /// <summary>
-    /// Excel はすぐ見せる。アドインが記録を始めるまで、Excel のウィンドウを無効にし前面に案内を出す。
+    /// Excel はすぐ見せる。対象ブックのアドインが初期基準を終えるまで、その Excel だけを無効にし前面に案内を出す。
     /// </summary>
     internal static class ExcelStartupInputGate
     {
         const int TimeoutMs = 15000;
         const int PollMs = 200;
 
-        static readonly Regex PidRegex = new Regex(@"\[PID:(\d+)\].*Startup completed", RegexOptions.Compiled);
-
-        static readonly HashSet<int> ReadyPids = new HashSet<int>();
         static readonly List<IntPtr> DisabledWindows = new List<IntPtr>();
         static DispatcherTimer _timer;
         static Window _dialog;
         static Stopwatch _waiting;
         static bool _active;
+        static int _targetPid;
+        static string _expectedFile;
+        static string _openToken;
 
         delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
@@ -43,24 +41,24 @@ namespace Ui.ViewModels
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
-        public static void Begin()
+        public static void Begin(string expectedFilePath, string openToken)
         {
             var dispatcher = Application.Current?.Dispatcher;
             if (dispatcher == null)
                 return;
             if (!dispatcher.CheckAccess())
             {
-                dispatcher.BeginInvoke(new Action(Begin));
+                dispatcher.BeginInvoke(new Action(() => Begin(expectedFilePath, openToken)));
                 return;
             }
 
-            End();
-            RefreshReadyPids();
-            if (AllRunningExcelAddinsReady())
-                return;
-
+            Finish(_active ? "restart" : null);
+            _expectedFile = expectedFilePath ?? "";
+            _openToken = openToken ?? "";
+            _targetPid = 0;
             _active = true;
             _waiting = Stopwatch.StartNew();
+            ExcelVstoReadiness.RecordHostEvent("gate start file=" + _expectedFile);
             _dialog = CreateDialog();
             _dialog.Show();
             DisableExcelWindows();
@@ -68,6 +66,35 @@ namespace Ui.ViewModels
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMs) };
             _timer.Tick += OnTick;
             _timer.Start();
+        }
+
+        public static void NotifyTargetProcess(int processId)
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return;
+            if (!dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(() => NotifyTargetProcess(processId)));
+                return;
+            }
+
+            if (!_active || processId <= 0 || _targetPid == processId)
+            {
+                if (_active && processId > 0 && _targetPid == processId && IsTargetReady(processId))
+                    Finish("ready");
+                return;
+            }
+
+            _targetPid = processId;
+            ExcelVstoReadiness.RecordHostEvent(
+                "gate target-pid pid=" + processId
+                + " elapsed=" + ElapsedMs()
+                + "ms file=" + _expectedFile);
+            ReleaseDisabledWindows();
+            DisableExcelWindows();
+            if (IsTargetReady(processId))
+                Finish("ready");
         }
 
         public static void End()
@@ -79,7 +106,32 @@ namespace Ui.ViewModels
                 return;
             }
 
+            Finish(_active ? "closed" : null);
+        }
+
+        static void OnTick(object sender, EventArgs e)
+        {
+            if (!_active)
+                return;
+
+            DisableExcelWindows();
+            bool ready = _targetPid > 0 && IsTargetReady(_targetPid);
+            bool timedOut = _waiting != null && _waiting.ElapsedMilliseconds >= TimeoutMs;
+            if (ready)
+                Finish("ready");
+            else if (timedOut)
+                Finish("timeout");
+        }
+
+        static void Finish(string reason)
+        {
+            bool wasActive = _active;
+            long elapsed = ElapsedMs();
+            int pid = _targetPid;
+            string file = _expectedFile;
+
             _active = false;
+            _targetPid = 0;
             if (_timer != null)
             {
                 _timer.Stop();
@@ -93,6 +145,33 @@ namespace Ui.ViewModels
                 _dialog = null;
             }
 
+            ReleaseDisabledWindows();
+            _waiting = null;
+            _expectedFile = null;
+            _openToken = null;
+
+            if (wasActive && !string.IsNullOrEmpty(reason))
+            {
+                ExcelVstoReadiness.RecordHostEvent(
+                    "gate end reason=" + reason
+                    + " elapsed=" + elapsed
+                    + "ms pid=" + pid
+                    + " file=" + file);
+            }
+        }
+
+        static bool IsTargetReady(int processId)
+        {
+            return ExcelVstoReadiness.IsOpenReady(processId, _openToken);
+        }
+
+        static long ElapsedMs()
+        {
+            return _waiting == null ? 0 : _waiting.ElapsedMilliseconds;
+        }
+
+        static void ReleaseDisabledWindows()
+        {
             foreach (IntPtr hwnd in DisabledWindows)
             {
                 try { EnableWindow(hwnd, true); } catch { }
@@ -100,67 +179,17 @@ namespace Ui.ViewModels
             DisabledWindows.Clear();
         }
 
-        static void OnTick(object sender, EventArgs e)
-        {
-            if (!_active)
-                return;
-
-            DisableExcelWindows();
-            RefreshReadyPids();
-            bool timedOut = _waiting != null && _waiting.ElapsedMilliseconds >= TimeoutMs;
-            if (timedOut || AllRunningExcelAddinsReady())
-                End();
-        }
-
-        static bool AllRunningExcelAddinsReady()
-        {
-            bool any = false;
-            foreach (Process process in Process.GetProcessesByName("EXCEL"))
-            {
-                try
-                {
-                    if (process.HasExited)
-                        continue;
-                    any = true;
-                    if (!ReadyPids.Contains(process.Id))
-                        return false;
-                }
-                finally
-                {
-                    process.Dispose();
-                }
-            }
-            return any;
-        }
-
-        static void RefreshReadyPids()
-        {
-            try
-            {
-                string path = ExcelLogReader.GetDiagnosticLogPath();
-                if (!File.Exists(path))
-                    return;
-                foreach (string line in File.ReadLines(path))
-                {
-                    Match match = PidRegex.Match(line ?? "");
-                    if (match.Success && int.TryParse(match.Groups[1].Value, out int pid))
-                        ReadyPids.Add(pid);
-                }
-            }
-            catch
-            {
-                /* 読めない間は待ちを続ける */
-            }
-        }
-
         static void DisableExcelWindows()
         {
+            int onlyPid = _targetPid;
             EnumWindows((hWnd, lParam) =>
             {
                 if (!IsWindowVisible(hWnd))
                     return true;
                 GetWindowThreadProcessId(hWnd, out uint pid);
                 if (pid == 0)
+                    return true;
+                if (onlyPid > 0 && (int)pid != onlyPid)
                     return true;
                 try
                 {
@@ -175,6 +204,8 @@ namespace Ui.ViewModels
                     return true;
                 }
 
+                if (DisabledWindows.Contains(hWnd))
+                    return true;
                 if (EnableWindow(hWnd, false))
                     DisabledWindows.Add(hWnd);
                 return true;

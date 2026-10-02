@@ -33,11 +33,17 @@ namespace ExcelAddIn1
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Add-in started. Log file: " + Logger.GetLogFilePath());
+            var startup = System.Diagnostics.Stopwatch.StartNew();
             WriteDiagnostic("Startup begin");
             RegisterApplicationEventHooks();
-            InitializeLayoutSnapshotsForAllOpenWorkbooks();
+            WriteDiagnostic("Hooks ready elapsed=" + startup.ElapsedMilliseconds + "ms");
+            // タスク文脈は 500ms タイマーを待たず、初期基準より前に確定する。
+            ApplyCurrentTaskFile();
+            // 起動完了はイベント登録と表示中シートの基準作成まで。未表示シートは初回表示時に遅延する。
+            // PageSetup と改ページは非印刷タスクの無断変更も検知するため、操作許可前に取る。
+            InitializeLayoutSnapshotsForAllOpenWorkbooks("Startup");
             StartTaskFilePolling();
-            WriteDiagnostic("Startup completed");
+            WriteDiagnostic(WithOpenToken("Startup completed elapsed=" + startup.ElapsedMilliseconds + "ms"));
         }
 
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
@@ -100,7 +106,7 @@ namespace ExcelAddIn1
         {
             string name = SafeWorkbookName(workbook);
             WriteDiagnostic("WorkbookOpen: " + name);
-            InitializeLayoutSnapshotsForWorkbook(workbook, readFreeze: false);
+            InitializeLayoutSnapshotsForWorkbook(workbook, readFreeze: false, "WorkbookOpen");
         }
 
         private void Application_WorkbookBeforeClose(Excel.Workbook workbook, ref bool cancel)
@@ -134,8 +140,9 @@ namespace ExcelAddIn1
                 }
                 else
                 {
-                    Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
-                    WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
+                Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
+                WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
+                InvalidateFreshBaseline();
                 }
 
                 ClearPendingDoubleClickCapture();
@@ -423,6 +430,14 @@ namespace ExcelAddIn1
 
         private void TaskFilePollTimer_Tick(object sender, EventArgs e)
         {
+            ApplyCurrentTaskFile();
+        }
+
+        /// <summary>
+        /// タスクファイルをその場で読み、前回タスクの境界を確定してから新しい基準を作る。
+        /// </summary>
+        private void ApplyCurrentTaskFile()
+        {
             try
             {
                 if (!File.Exists(CurrentTaskFilePath)) return;
@@ -473,9 +488,11 @@ namespace ExcelAddIn1
                 Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
                 Logger.LogTaskStart(projectId, taskId, attemptNo);
                 // TaskStart 直後の自動イベント（SheetActivate/WindowActivate）で出る
-                // 最初のレイアウト差分だけ無視する。
+                // 最初のレイアウト差分だけ無視する。旧タスクの境界フラッシュ後に、
+                // 新タスクの基準は表示中シートだけ更新する。
                 _ignoreNextAutoLayoutChangeAfterTaskStart = true;
-                InitializeLayoutSnapshotsForAllOpenWorkbooks();
+                if (Application != null)
+                    InitializeLayoutSnapshotsForWorkbook(Application.ActiveWorkbook, readFreeze: false, "TaskStart");
                 WriteDiagnostic($"Task context updated: {projectId}-{taskId}-{attemptNo} (ignore next auto layout change)");
             }
             catch (Exception ex)
@@ -540,6 +557,38 @@ namespace ExcelAddIn1
             catch
             {
                 // Ignore diagnostic logging errors.
+            }
+        }
+
+        private static string WithOpenToken(string message)
+        {
+            string token = ReadOpenToken();
+            if (string.IsNullOrEmpty(token))
+                return message;
+            return message + " token=" + token;
+        }
+
+        private static string ReadOpenToken()
+        {
+            try
+            {
+                string path = Path.Combine(Path.GetTempPath(), "mos_excel_open_token.txt");
+                if (!File.Exists(path))
+                    return "";
+                string token = File.ReadAllText(path).Trim();
+                if (token.Length == 0 || token.Length > 64)
+                    return "";
+                foreach (char c in token)
+                {
+                    bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+                    if (!hex)
+                        return "";
+                }
+                return token;
+            }
+            catch
+            {
+                return "";
             }
         }
 

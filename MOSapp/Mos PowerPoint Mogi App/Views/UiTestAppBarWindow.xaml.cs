@@ -118,6 +118,8 @@ namespace MOS_PowerPoint_app.Views
         private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private bool _isScoring;
         private Window _instantScoringOverlay;
+        private Timer _instantScoringNoticeTimer;
+        private bool _instantScoringFinished;
 
         public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null)
         {
@@ -1114,14 +1116,21 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint)");
 
                 BeginScoringSession();
-                _instantScoringOverlay = CreateInstantScoringOverlay();
-                _instantScoringOverlay.Show();
-                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-                await Task.Delay(80);
-
-                // 採点本体は画面スレッドの外で行い、バーの更新を止めない。結果表示は ExecuteScore 内で画面側に戻す。
+                _instantScoringFinished = false;
                 if (_onScoreClick != null)
+                {
+                    const int scoringNoticeDelayMs = 300;
+                    _instantScoringNoticeTimer = new Timer(_ => Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (_instantScoringFinished || _instantScoringOverlay != null)
+                            return;
+                        _instantScoringOverlay = CreateInstantScoringOverlay();
+                        _instantScoringOverlay.Show();
+                    })), null, scoringNoticeDelayMs, Timeout.Infinite);
+
+                    // 採点本体は画面スレッドの外で行い、バーの更新を止めない。結果表示は ExecuteScore 内で画面側に戻す。
                     await Task.Run(() => _onScoreClick());
+                }
                 else
                     MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -1142,6 +1151,13 @@ namespace MOS_PowerPoint_app.Views
         /// <summary>結果ダイアログの直前に呼ぶ。採点中表示が結果を覆わないようにする。</summary>
         public void CloseInstantScoringOverlay()
         {
+            _instantScoringFinished = true;
+            if (_instantScoringNoticeTimer != null)
+            {
+                _instantScoringNoticeTimer.Dispose();
+                _instantScoringNoticeTimer = null;
+            }
+
             var overlay = _instantScoringOverlay;
             _instantScoringOverlay = null;
             if (overlay == null)
