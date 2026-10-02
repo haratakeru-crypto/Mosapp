@@ -1181,9 +1181,9 @@ namespace MOSExcelMogiApp
                             try
                             {
                                 if (isVariantMode)
-                                    mainWindow.ResetVariantProject(groupId, projectId, variantSetNo, showMessage: false);
+                                    mainWindow.ResetVariantProject(groupId, projectId, variantSetNo, showMessage: false, logResetPerf: true);
                                 else
-                                    mainWindow.ResetProject(groupId, projectId, showMessage: false);
+                                    mainWindow.ResetProject(groupId, projectId, showMessage: false, logResetPerf: true);
                             }
                             catch (Exception ex) { resetError = ex; }
                         }, System.Windows.Threading.DispatcherPriority.Background);

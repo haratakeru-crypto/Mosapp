@@ -116,6 +116,8 @@ namespace MOS_PowerPoint_app.Views
         private int _currentProjectId = 1;
         /// <summary>最終プロジェクト完了時に、タスク情報を消す前へ確定した破壊判定。</summary>
         private bool _lastTaskDestructiveBaselineConfirmed;
+        bool _resetCloseUsedProcessKill;
+        bool _resetReopenAfterQuit;
         private int _currentTaskId = 1;
         private bool _isMovingToNextProject;
         private int _groupId = 1; // グループIDを保存
@@ -2740,8 +2742,11 @@ namespace MOS_PowerPoint_app.Views
             return OpenProjectDocument(projectId, groupId, forBatchScoring: false);
         }
 
-        private bool OpenProjectDocument(int projectId, int groupId, bool forBatchScoring)
+        private bool OpenProjectDocument(int projectId, int groupId, bool forBatchScoring, bool logResetPerf = false, bool deferFailureUi = false)
         {
+            var reopenSw = Stopwatch.StartNew();
+            bool reopenLogged = false;
+            string reopenPath = _resetReopenAfterQuit ? "fallback" : "main";
             try
             {
                 string tabFolder = PowerPointDataPathHelper.GetTabFolder(groupId);
@@ -2755,6 +2760,12 @@ namespace MOS_PowerPoint_app.Views
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 {
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のファイルが見つかりません: {tabFolder}");
+                    if (logResetPerf && !deferFailureUi)
+                    {
+                        ResetPerfLog.Write("powerpoint", projectId, "reopen", 0, "main", "result=missing");
+                        ResetPerfLog.Write("powerpoint", projectId, "ready", 0, "main", "result=missing");
+                        reopenLogged = true;
+                    }
                     return false;
                 }
 
@@ -2776,6 +2787,7 @@ namespace MOS_PowerPoint_app.Views
                     catch
                     {
                         PPLogReader.ClearVstoHeartbeat();
+                        reopenPath = "fallback";
                         pptApp = new PowerPointApp();
                         pptApp.Visible = Microsoft.Office.Core.MsoTriState.msoTrue;
                     }
@@ -2798,7 +2810,16 @@ namespace MOS_PowerPoint_app.Views
                             System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー (試行 {retryCount}/3): {ex.Message}");
                             if (retryCount >= 3)
                             {
-                                MessageBox.Show($"プロジェクト{projectId}のファイルを開けませんでした。\nPowerPointを一度終了してから再度お試しください。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                                if (!deferFailureUi)
+                                {
+                                    if (logResetPerf && !reopenLogged)
+                                    {
+                                        ResetPerfLog.Write("powerpoint", projectId, "reopen", reopenSw.ElapsedMilliseconds, reopenPath, "result=fail");
+                                        ResetPerfLog.Write("powerpoint", projectId, "ready", 0, reopenPath, "result=fail");
+                                        reopenLogged = true;
+                                    }
+                                    MessageBox.Show($"プロジェクト{projectId}のファイルを開けませんでした。\nPowerPointを一度終了してから再度お試しください。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                                }
                                 return false;
                             }
 
@@ -2812,7 +2833,12 @@ namespace MOS_PowerPoint_app.Views
                             }
                             catch
                             {
-                                try { pptApp = new PowerPointApp(); } catch { }
+                                try
+                                {
+                                    reopenPath = "fallback";
+                                    pptApp = new PowerPointApp();
+                                }
+                                catch { }
                             }
 
                             if (pptApp != null)
@@ -2820,12 +2846,46 @@ namespace MOS_PowerPoint_app.Views
                         }
                     }
 
-                    if (presentation == null) return false;
+                    if (presentation == null)
+                    {
+                        if (logResetPerf && !reopenLogged && !deferFailureUi)
+                        {
+                            ResetPerfLog.Write("powerpoint", projectId, "reopen", reopenSw.ElapsedMilliseconds, reopenPath, "result=fail");
+                            ResetPerfLog.Write("powerpoint", projectId, "ready", 0, reopenPath, "result=fail");
+                            reopenLogged = true;
+                        }
+                        return false;
+                    }
 
                     // 起動経路は Presentations.Open のまま。VSTO 心拍が来るまで待ってから続行する。
+                    long reopenMs = reopenSw.ElapsedMilliseconds;
                     var readyTimer = Stopwatch.StartNew();
                     bool presentationReady = WaitUntilPresentationReady(pptApp, filePath, ensureVsto: !forBatchScoring);
                     PPGradingPerf.Log("OpenProjectDocument.PresentationReady", readyTimer.ElapsedMilliseconds, $"P{projectId} ready={presentationReady}");
+                    if (!presentationReady && deferFailureUi)
+                        return false;
+
+                    if (logResetPerf && !reopenLogged)
+                    {
+                        ResetPerfLog.Write(
+                            "powerpoint",
+                            projectId,
+                            "reopen",
+                            reopenMs,
+                            reopenPath,
+                            _resetReopenAfterQuit ? "quit-process" : (reopenPath == "fallback" ? "cold-start" : null));
+                        reopenLogged = true;
+                    }
+                    if (logResetPerf)
+                    {
+                        ResetPerfLog.Write(
+                            "powerpoint",
+                            projectId,
+                            "ready",
+                            readyTimer.ElapsedMilliseconds,
+                            reopenPath,
+                            presentationReady ? "signal=vsto-heartbeat result=ok" : "signal=vsto-heartbeat result=fail");
+                    }
                     if (!presentationReady)
                     {
                         System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] Presentation not ready: Project {projectId}");
@@ -2854,6 +2914,11 @@ namespace MOS_PowerPoint_app.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"プロジェクトプレゼンテーションを開く際のエラー: {ex.Message}");
+                if (logResetPerf && !reopenLogged && !deferFailureUi)
+                {
+                    ResetPerfLog.Write("powerpoint", projectId, "reopen", reopenSw.ElapsedMilliseconds, reopenPath, "result=fail");
+                    ResetPerfLog.Write("powerpoint", projectId, "ready", 0, reopenPath, "result=fail");
+                }
                 return false;
             }
         }
@@ -3050,8 +3115,20 @@ namespace MOS_PowerPoint_app.Views
                     PowerPointChecker1_1.ResetTask4SlideDeletionState();
                     MessageBox.Show("プロジェクトをリセットしました。", "リセット完了", MessageBoxButton.OK, MessageBoxImage.Information);
                     
-                    // リセット後、PowerPointプレゼンテーションを再読み込み
-                    OpenProjectDocument(_currentProjectId, _groupId);
+                    // リセット後、PowerPointプレゼンテーションを再読み込み。失敗時は一度だけ終了して開き直す。
+                    if (!OpenProjectDocument(_currentProjectId, _groupId, forBatchScoring: false, logResetPerf: true, deferFailureUi: true))
+                    {
+                        QuitPowerPointForResetRetry();
+                        _resetReopenAfterQuit = true;
+                        try
+                        {
+                            OpenProjectDocument(_currentProjectId, _groupId, forBatchScoring: false, logResetPerf: true);
+                        }
+                        finally
+                        {
+                            _resetReopenAfterQuit = false;
+                        }
+                    }
                     WriteCurrentTaskFile();
                 }
             }
@@ -3064,8 +3141,29 @@ namespace MOS_PowerPoint_app.Views
         
         private void ResetProject(int groupId, int projectId)
         {
+            ResetPerfLog.Begin("powerpoint", projectId);
+            _resetCloseUsedProcessKill = false;
+            var closeSw = Stopwatch.StartNew();
             CloseAllPowerPointPresentations();
-            MOS_PowerPoint_app.PowerPointProjectResetHelper.ResetProject(groupId, projectId);
+            ResetPerfLog.Write(
+                "powerpoint",
+                projectId,
+                "close",
+                closeSw.ElapsedMilliseconds,
+                _resetCloseUsedProcessKill ? "fallback" : "main",
+                _resetCloseUsedProcessKill ? "process-kill" : null);
+
+            var copySw = Stopwatch.StartNew();
+            try
+            {
+                MOS_PowerPoint_app.PowerPointProjectResetHelper.ResetProject(groupId, projectId);
+                ResetPerfLog.Write("powerpoint", projectId, "copy", copySw.ElapsedMilliseconds, "main");
+            }
+            catch
+            {
+                ResetPerfLog.Write("powerpoint", projectId, "copy", copySw.ElapsedMilliseconds, "main", "result=fail");
+                throw;
+            }
         }
         
         /// <summary>
@@ -3124,6 +3222,63 @@ namespace MOS_PowerPoint_app.Views
             {
                 return 0;
             }
+        }
+
+        /// <summary>リセットの開き直し失敗時だけ、保存せず PowerPoint を終了する。</summary>
+        void QuitPowerPointForResetRetry()
+        {
+            PowerPointApp pptApp = null;
+            try
+            {
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
+                {
+                    try
+                    {
+                        pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                    }
+                    catch (COMException)
+                    {
+                        pptApp = null;
+                    }
+
+                    if (pptApp != null)
+                    {
+                        try { pptApp.DisplayAlerts = PpAlertLevel.ppAlertsNone; } catch { }
+                        CloseAllPowerPointPresentations();
+                        try { pptApp.Quit(); } catch { }
+                        try { Marshal.ReleaseComObject(pptApp); } catch { }
+                        pptApp = null;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[QuitPowerPointForResetRetry] " + ex.Message);
+            }
+
+            var wait = Stopwatch.StartNew();
+            while (wait.ElapsedMilliseconds < 5000)
+            {
+                if (Process.GetProcessesByName("POWERPNT").Length == 0)
+                    return;
+                Thread.Sleep(200);
+            }
+
+            foreach (Process process in Process.GetProcessesByName("POWERPNT"))
+            {
+                try
+                {
+                    if (!process.HasExited)
+                        process.Kill();
+                }
+                catch { }
+                finally
+                {
+                    try { process.Dispose(); } catch { }
+                }
+            }
+
+            PPLogReader.ClearVstoHeartbeat();
         }
 
         /// <summary>
@@ -3257,6 +3412,7 @@ namespace MOS_PowerPoint_app.Views
                         if (newCount >= prevCount)
                         {
                             System.Diagnostics.Debug.WriteLine($"[CloseAllPowerPointPresentations] Countが減らないため、強制的にプロセスを終了します。 (prev={prevCount}, new={newCount})");
+                            _resetCloseUsedProcessKill = true;
                             try
                             {
                                 var pptProcesses = System.Diagnostics.Process.GetProcessesByName("POWERPNT");

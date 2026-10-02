@@ -349,8 +349,15 @@ namespace MOSExcelMogiApp
             }
         }
         
-        public void ResetProject(int groupId, int projectId, bool showMessage = true)
+        public void ResetProject(int groupId, int projectId, bool showMessage = true, bool logResetPerf = false)
         {
+            if (logResetPerf)
+                ResetPerfLog.Begin("excel", projectId);
+            bool closeLogged = false;
+            bool copyLogged = false;
+            bool reopenLogged = false;
+            var closeSw = new System.Diagnostics.Stopwatch();
+            var copySw = new System.Diagnostics.Stopwatch();
             try
             {
                 ExcelLogReader.ClearOperationLogForProject(projectId);
@@ -405,11 +412,16 @@ namespace MOSExcelMogiApp
                 // テンプレートファイル自体の Zone.Identifier を削除（存在する場合）
                 RemoveZoneIdentifier(templatePath);
                 
-                // Excel を全ブック閉じたうえで終了し、ロック・二重オープンを防ぐ（共有 COM 参照もクリア）
-                System.Diagnostics.Debug.WriteLine($"[ResetProject] Quitting Excel before reset");
-                _viewModel.QuitExcelForProjectReset();
+                System.Diagnostics.Debug.WriteLine($"[ResetProject] Closing workbooks without quitting Excel");
+                bool keepExcel = CloseExcelForReset(projectFilePath, closeSw, out string closePath, out string closeDetail);
+                if (logResetPerf)
+                {
+                    ResetPerfLog.Write("excel", projectId, "close", closeSw.ElapsedMilliseconds, closePath, closeDetail);
+                    closeLogged = true;
+                }
                 
                 // ファイルがロックされているか確認してからコピー
+                copySw.Start();
                 int retryCount = 0;
                 while (retryCount < 10 && IsFileLocked(projectFilePath))
                 {
@@ -513,6 +525,13 @@ namespace MOSExcelMogiApp
                         throw new IOException(
                             $"採点用Initialファイルの更新に失敗しました: {initialFilePath}", ex);
                     }
+
+                    copySw.Stop();
+                    if (logResetPerf)
+                    {
+                        ResetPerfLog.Write("excel", projectId, "copy", copySw.ElapsedMilliseconds, "main", "lockRetries=" + retryCount);
+                        copyLogged = true;
+                    }
                     
                     // リセット後、現在のプロジェクトなら Excel でブックを開き直す（シェル起動）
                     if (_viewModel?.CurrentProject != null)
@@ -544,9 +563,15 @@ namespace MOSExcelMogiApp
                                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from project file before opening Excel");
                             }
 
-                            _viewModel.OpenExcelWorkbookAfterResetByShell(projectFilePath);
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Reopened workbook via shell: {projectFilePath}");
+                            ReopenExcelAfterReset(projectFilePath, projectId, keepExcel, logResetPerf, null, ref reopenLogged);
+                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Reopened workbook: {projectFilePath}");
                         }
+                    }
+                    if (logResetPerf && !reopenLogged)
+                    {
+                        ResetPerfLog.Write("excel", projectId, "reopen", 0, "main", "skipped");
+                        ResetPerfLog.Write("excel", projectId, "ready", 0, "main", "skipped");
+                        reopenLogged = true;
                     }
                     
                     if (showMessage)
@@ -584,15 +609,127 @@ namespace MOSExcelMogiApp
                     MessageBox.Show($"{errorMsg}\n\n{ex.StackTrace}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 System.Diagnostics.Debug.WriteLine($"Error in ResetProject: {ex.Message}\n{ex.StackTrace}");
+                if (logResetPerf)
+                    LogExcelResetFailure(projectId, closeLogged, copyLogged, reopenLogged, closeSw, copySw);
                 throw;
             }
+        }
+
+        bool CloseExcelForReset(
+            string projectFilePath,
+            System.Diagnostics.Stopwatch closeSw,
+            out string closePath,
+            out string closeDetail)
+        {
+            closeSw.Start();
+            bool keepExcel = _viewModel != null && _viewModel.TryCloseWorkbooksKeepingExcel();
+            if (keepExcel)
+            {
+                for (int attempt = 0; attempt < 3 && IsFileLocked(projectFilePath); attempt++)
+                    System.Threading.Thread.Sleep(200);
+
+                if (IsFileLocked(projectFilePath))
+                {
+                    _viewModel.QuitExcelForProjectReset();
+                    keepExcel = false;
+                    closePath = "fallback";
+                    closeDetail = "quit-process";
+                }
+                else
+                {
+                    closePath = "main";
+                    closeDetail = "keep-process";
+                }
+            }
+            else
+            {
+                closePath = "main";
+                closeDetail = "no-process";
+            }
+
+            closeSw.Stop();
+            return keepExcel;
+        }
+
+        void ReopenExcelAfterReset(
+            string projectFilePath,
+            int projectId,
+            bool keepExcel,
+            bool logResetPerf,
+            string detailSuffix,
+            ref bool reopenLogged)
+        {
+            var reopenSw = System.Diagnostics.Stopwatch.StartNew();
+            bool opened = keepExcel && _viewModel.TryOpenWorkbookInRunningExcel(projectFilePath);
+            long reopenMs = reopenSw.ElapsedMilliseconds;
+            long readyMs = 0;
+            bool ready = false;
+            if (opened)
+            {
+                var readySw = System.Diagnostics.Stopwatch.StartNew();
+                ready = _viewModel.WaitUntilResetWorkbookReady(projectFilePath, 2000);
+                readyMs = readySw.ElapsedMilliseconds;
+            }
+
+            if (opened && ready)
+            {
+                if (logResetPerf)
+                {
+                    ResetPerfLog.Write("excel", projectId, "reopen", reopenMs, "main", "com" + detailSuffix);
+                    ResetPerfLog.Write(
+                        "excel",
+                        projectId,
+                        "ready",
+                        readyMs,
+                        "main",
+                        "signal=vsto-startup result=ok" + detailSuffix);
+                    reopenLogged = true;
+                }
+                return;
+            }
+
+            if (keepExcel)
+                _viewModel.QuitExcelForProjectReset();
+
+            _viewModel.OpenExcelWorkbookAfterResetByShell(projectFilePath);
+            if (logResetPerf)
+            {
+                string path = keepExcel ? "fallback" : "main";
+                string detail = (keepExcel ? "quit-process shell" : "shell") + detailSuffix;
+                ResetPerfLog.Write("excel", projectId, "reopen", reopenSw.ElapsedMilliseconds, path, detail);
+                reopenLogged = true;
+                ExcelResetReadyWatch.Start(projectId, projectFilePath, path);
+            }
+        }
+
+        static void LogExcelResetFailure(
+            int projectId,
+            bool closeLogged,
+            bool copyLogged,
+            bool reopenLogged,
+            System.Diagnostics.Stopwatch closeSw,
+            System.Diagnostics.Stopwatch copySw)
+        {
+            if (!closeLogged)
+                ResetPerfLog.Write("excel", projectId, "close", closeSw.ElapsedMilliseconds, "main", "result=fail");
+            else if (!copyLogged)
+                ResetPerfLog.Write("excel", projectId, "copy", copySw.ElapsedMilliseconds, "main", "result=fail");
+            else if (!reopenLogged)
+                ResetPerfLog.Write("excel", projectId, "reopen", 0, "main", "result=fail");
         }
 
         /// <summary>
         /// 類題モード用リセット: PracticeVariant Templates → 作業用 xlsx に復元し Excel を開き直す（教材 Initial は更新しない）。
         /// </summary>
-        public void ResetVariantProject(int groupId, int projectId, int variantSetNo, bool showMessage = true)
+        public void ResetVariantProject(int groupId, int projectId, int variantSetNo, bool showMessage = true, bool logResetPerf = false)
         {
+            if (logResetPerf)
+                ResetPerfLog.Begin("excel", projectId);
+            bool closeLogged = false;
+            bool copyLogged = false;
+            bool reopenLogged = false;
+            var closeSw = new System.Diagnostics.Stopwatch();
+            var copySw = new System.Diagnostics.Stopwatch();
             try
             {
                 ExcelLogReader.ClearOperationLogForProject(projectId);
@@ -626,9 +763,21 @@ namespace MOSExcelMogiApp
                 DataPathHelper.ClearReadOnly(templatePath);
                 RemoveZoneIdentifier(templatePath);
 
-                System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Quitting Excel before reset");
-                _viewModel.QuitExcelForProjectReset();
+                System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Closing workbooks without quitting Excel");
+                bool keepExcel = CloseExcelForReset(projectFilePath, closeSw, out string closePath, out string closeDetail);
+                if (logResetPerf)
+                {
+                    ResetPerfLog.Write(
+                        "excel",
+                        projectId,
+                        "close",
+                        closeSw.ElapsedMilliseconds,
+                        closePath,
+                        closeDetail + " variant=" + variantSetNo);
+                    closeLogged = true;
+                }
 
+                copySw.Start();
                 int retryCount = 0;
                 while (retryCount < 10 && IsFileLocked(projectFilePath))
                 {
@@ -661,6 +810,12 @@ namespace MOSExcelMogiApp
                         newProjectFile.IsReadOnly = false;
 
                     System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Variant file reset successfully: {projectFilePath}");
+                    copySw.Stop();
+                    if (logResetPerf)
+                    {
+                        ResetPerfLog.Write("excel", projectId, "copy", copySw.ElapsedMilliseconds, "main", "variant=" + variantSetNo + " lockRetries=" + retryCount);
+                        copyLogged = true;
+                    }
 
                     if (_viewModel?.CurrentProject != null)
                     {
@@ -670,9 +825,21 @@ namespace MOSExcelMogiApp
 
                         if (currentGroupId == groupId && currentProjectId == projectId)
                         {
-                            _viewModel.OpenExcelWorkbookAfterResetByShell(projectFilePath);
-                            System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Reopened workbook via shell: {projectFilePath}");
+                            ReopenExcelAfterReset(
+                                projectFilePath,
+                                projectId,
+                                keepExcel,
+                                logResetPerf,
+                                " variant=" + variantSetNo,
+                                ref reopenLogged);
+                            System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Reopened workbook: {projectFilePath}");
                         }
+                    }
+                    if (logResetPerf && !reopenLogged)
+                    {
+                        ResetPerfLog.Write("excel", projectId, "reopen", 0, "main", "skipped");
+                        ResetPerfLog.Write("excel", projectId, "ready", 0, "main", "skipped");
+                        reopenLogged = true;
                     }
 
                     if (showMessage)
@@ -704,6 +871,8 @@ namespace MOSExcelMogiApp
                 if (showMessage)
                     MessageBox.Show($"{errorMsg}\n\n{ex.StackTrace}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 System.Diagnostics.Debug.WriteLine($"Error in ResetVariantProject: {ex.Message}\n{ex.StackTrace}");
+                if (logResetPerf)
+                    LogExcelResetFailure(projectId, closeLogged, copyLogged, reopenLogged, closeSw, copySw);
                 throw;
             }
         }

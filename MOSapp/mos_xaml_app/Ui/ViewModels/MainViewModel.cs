@@ -2751,6 +2751,185 @@ namespace Ui.ViewModels
         }
 
         /// <summary>
+        /// 保存せずブックだけ閉じる。Excel が動いていればプロセスは残し true。動いていなければ false。
+        /// 空の Excel は新たに作らない。
+        /// </summary>
+        public bool TryCloseWorkbooksKeepingExcel()
+        {
+            ExcelApp excelApp = null;
+            bool createdReference = false;
+            try
+            {
+                using (OleMessageFilterScope.Enter())
+                {
+                    excelApp = TryGetSharedExcelApplication();
+                    if (excelApp == null)
+                    {
+                        try
+                        {
+                            excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                            createdReference = true;
+                        }
+                        catch (COMException)
+                        {
+                            return false;
+                        }
+                    }
+
+                    try
+                    {
+                        _ = excelApp.Visible;
+                    }
+                    catch
+                    {
+                        if (createdReference)
+                        {
+                            try { Marshal.ReleaseComObject(excelApp); } catch { }
+                        }
+                        _sharedExcelApp = null;
+                        return false;
+                    }
+
+                    CloseAllWorkbooks(excelApp, "[ResetKeepExcel]");
+                    if (createdReference)
+                        _sharedExcelApp = excelApp;
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[TryCloseWorkbooksKeepingExcel] " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 起動中の Excel にブックを開く。起動していなければ false。新しい Excel は作らない。
+        /// </summary>
+        public bool TryOpenWorkbookInRunningExcel(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return false;
+
+            ExcelApp excelApp = null;
+            ExcelWorkbook workbook = null;
+            try
+            {
+                using (OleMessageFilterScope.Enter())
+                {
+                    excelApp = TryGetSharedExcelApplication();
+                    if (excelApp == null)
+                    {
+                        try
+                        {
+                            excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                            _sharedExcelApp = excelApp;
+                        }
+                        catch (COMException)
+                        {
+                            return false;
+                        }
+                    }
+
+                    workbook = excelApp.Workbooks.Open(filePath, ReadOnly: false);
+                    try { workbook.Activate(); } catch { }
+                    try { excelApp.Visible = true; } catch { }
+                }
+
+                if (CurrentProject != null)
+                {
+                    CurrentProject = new ProjectInfo
+                    {
+                        Name = CurrentProject.Name,
+                        FilePath = filePath,
+                        Group = CurrentProject.Group,
+                        ProjectNumber = CurrentProject.ProjectNumber
+                    };
+                }
+
+                Application.Current?.Dispatcher?.BeginInvoke(
+                    new Action(() => SharedExcelApplicationAttached?.Invoke(this, EventArgs.Empty)),
+                    DispatcherPriority.Background);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[TryOpenWorkbookInRunningExcel] " + ex.Message);
+                return false;
+            }
+            finally
+            {
+                if (workbook != null)
+                {
+                    try { Marshal.ReleaseComObject(workbook); } catch { }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 対象ブックが前面で、そのプロセスのアドイン起動完了が見えるまで短い間隔で確認する。
+        /// </summary>
+        public bool WaitUntilResetWorkbookReady(string filePath, int timeoutMs)
+        {
+            var wait = Stopwatch.StartNew();
+            while (true)
+            {
+                if (IsResetWorkbookReady(filePath))
+                    return true;
+                if (wait.ElapsedMilliseconds >= timeoutMs)
+                    return IsResetWorkbookReady(filePath);
+                Thread.Sleep(200);
+            }
+        }
+
+        bool IsResetWorkbookReady(string filePath)
+        {
+            ExcelApp excelApp = TryGetSharedExcelApplication();
+            bool releaseApp = false;
+            if (excelApp == null)
+            {
+                try
+                {
+                    excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                    releaseApp = true;
+                }
+                catch (COMException)
+                {
+                    return false;
+                }
+            }
+
+            ExcelWorkbook workbook = null;
+            try
+            {
+                workbook = excelApp.ActiveWorkbook;
+                string fullName = workbook == null ? null : workbook.FullName;
+                if (string.IsNullOrWhiteSpace(fullName))
+                    return false;
+                if (!string.Equals(Path.GetFullPath(fullName), Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                int processId = ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                return processId > 0 && ExcelVstoReadiness.IsStartupCompleted(processId);
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (workbook != null)
+                {
+                    try { Marshal.ReleaseComObject(workbook); } catch { }
+                }
+                if (releaseApp && excelApp != null)
+                {
+                    try { Marshal.ReleaseComObject(excelApp); } catch { }
+                }
+            }
+        }
+
+        /// <summary>
         /// プロジェクトリセット前に全ワークブックを保存せずに閉じ、Excel を終了し、共有 COM 参照をクリアする。
         /// 読み取り専用二重オープンやファイルロック残りを防ぐため終了ボタン経路に近いクリーンアップを行う。
         /// </summary>

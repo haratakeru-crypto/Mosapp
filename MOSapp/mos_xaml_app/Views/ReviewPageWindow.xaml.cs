@@ -662,7 +662,7 @@ namespace MOSExcelMogiApp.Views
                 // UI更新の機会を与える
                 await Task.Delay(100);
 
-                // 「採点中です」オーバーレイを表示（即座にフィードバックを出す）
+                // 「採点の準備をしています...」オーバーレイを表示（採点開始前の接続待ち）
                 await Dispatcher.InvokeAsync(() =>
                 {
                     scoringOverlay = new Window
@@ -688,7 +688,7 @@ namespace MOSExcelMogiApp.Views
                     };
                     var text = new TextBlock
                     {
-                        Text = "採点中です",
+                        Text = "採点の準備をしています...",
                         FontSize = 18,
                         HorizontalAlignment = HorizontalAlignment.Center,
                         Margin = new Thickness(0, 0, 0, 12),

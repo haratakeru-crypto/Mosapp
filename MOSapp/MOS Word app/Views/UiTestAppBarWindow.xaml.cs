@@ -2112,7 +2112,7 @@ namespace MOS_Word_app.Views
                 ApplyExamWindowLayout();
         }
 
-        private void OpenProjectDocument(int projectId, int groupId)
+        private void OpenProjectDocument(int projectId, int groupId, bool showPreparingDialog = true)
         {
             string filePath = null;
             try
@@ -2123,8 +2123,8 @@ namespace MOS_Word_app.Views
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}の作業ファイルが見つかりません。");
                     return;
                 }
-                
-                PreparingWindow.Run(this, () =>
+
+                Action open = () =>
                 {
                     WordApplicationManager.TryCloseOpenDocumentByPath(filePath);
                     if (!WordApplicationManager.TryOpenExamDocument(filePath, out _, makeVisible: false))
@@ -2136,7 +2136,12 @@ namespace MOS_Word_app.Views
                     WordApplicationManager.SetWordVisible(true);
                     ApplyExamWindowLayout();
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
-                });
+                };
+
+                if (showPreparingDialog)
+                    PreparingWindow.Run(this, open);
+                else
+                    open();
             }
             catch (Exception ex)
             {
@@ -2237,7 +2242,7 @@ namespace MOS_Word_app.Views
         }
         
         
-        private async void ResetButton_Click(object sender, RoutedEventArgs e)
+        private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -2250,71 +2255,30 @@ namespace MOS_Word_app.Views
                 if (result != MessageBoxResult.Yes)
                     return;
 
-                var waitWindow = new Window
+                if (!ResetProject(_groupId, _currentProjectId))
                 {
-                    Title = "リセット中",
-                    Width = 300,
-                    Height = 120,
-                    WindowStyle = WindowStyle.None,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    ShowInTaskbar = false,
-                    ResizeMode = ResizeMode.NoResize,
-                    Topmost = true,
-                    Background = System.Windows.Media.Brushes.White,
-                    BorderBrush = System.Windows.Media.Brushes.SteelBlue,
-                    BorderThickness = new Thickness(2)
-                };
-                var stack = new StackPanel
-                {
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Thickness(16)
-                };
-                stack.Children.Add(new TextBlock
-                {
-                    Text = $"リセット中です...\nプロジェクト {_currentProjectId}",
-                    FontSize = 14,
-                    TextAlignment = TextAlignment.Center,
-                    Foreground = System.Windows.Media.Brushes.SteelBlue
-                });
-                waitWindow.Content = stack;
-                waitWindow.Show();
-
-                Exception resetError = null;
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        if (!ResetProject(_groupId, _currentProjectId))
-                            resetError = new InvalidOperationException("リセットを完了できませんでした。");
-                    }
-                    catch (Exception ex) { resetError = ex; }
-                }, DispatcherPriority.Background);
-
-                waitWindow.Close();
-
-                if (resetError != null)
-                {
-                    MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
+                    MessageBox.Show("リセットを完了できませんでした。",
                         "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                OpenProjectDocument(_currentProjectId, _groupId);
+                MessageBox.Show("プロジェクトをリセットしました。", "リセット完了",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
 
-                bool originalTopmost = this.Topmost;
+                string resetFilePath = null;
                 try
                 {
-                    this.Topmost = true;
-                    this.Activate();
-                    MessageBox.Show(this, "プロジェクトをリセットしました。", "リセット完了",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    resetFilePath = WordDataPathHelper.FindExistingWorkingFile(_groupId, _currentProjectId);
                 }
-                finally
+                catch (Exception pathEx)
                 {
-                    this.Topmost = originalTopmost;
+                    System.Diagnostics.Debug.WriteLine("[ResetButton_Click] path: " + pathEx.Message);
                 }
 
+                var reopenSw = Stopwatch.StartNew();
+                OpenProjectDocument(_currentProjectId, _groupId, showPreparingDialog: false);
+                ResetPerfLog.Write("word", _currentProjectId, "reopen", reopenSw.ElapsedMilliseconds, "main");
+                LogWordResetReady(_currentProjectId, resetFilePath);
                 ApplyExamWindowLayout();
 
                 int taskCount = _tasks != null ? _tasks.Count : 0;
@@ -2333,12 +2297,128 @@ namespace MOS_Word_app.Views
         /// <returns>リセットを実行した場合は true。</returns>
         private bool ResetProject(int groupId, int projectId)
         {
-            if (!CloseAllWordDocuments())
-                TryQuitWord();
+            ResetPerfLog.Begin("word", projectId);
+            var closeSw = Stopwatch.StartNew();
+            bool closed = CloseAllWordDocuments();
+            string closePath = "main";
+            string closeDetail = null;
+            if (!closed)
+            {
+                string workingPath = null;
+                try
+                {
+                    workingPath = WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
+                }
+                catch (Exception pathEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ResetProject] working path: " + pathEx.Message);
+                }
+
+                if (IsWorkingFileLocked(workingPath))
+                {
+                    TryQuitWord();
+                    closePath = "fallback";
+                    closeDetail = "quit";
+                }
+                else
+                {
+                    closeDetail = "file-free";
+                }
+            }
             Thread.Sleep(500); // Word がファイルハンドルを解放するまで待つ
-            MOS_Word_app.WordProjectResetHelper.ResetProject(groupId, projectId);
+            ResetPerfLog.Write(
+                "word",
+                projectId,
+                "close",
+                closeSw.ElapsedMilliseconds,
+                closePath,
+                closeDetail);
+
+            var copySw = Stopwatch.StartNew();
+            try
+            {
+                MOS_Word_app.WordProjectResetHelper.ResetProject(groupId, projectId);
+                ResetPerfLog.Write("word", projectId, "copy", copySw.ElapsedMilliseconds, "main");
+            }
+            catch
+            {
+                ResetPerfLog.Write("word", projectId, "copy", copySw.ElapsedMilliseconds, "main", "result=fail");
+                throw;
+            }
             _lastTaskStartKey = null;
             return true;
+        }
+
+        void LogWordResetReady(int projectId, string filePath)
+        {
+            var readySw = Stopwatch.StartNew();
+            if (IsWordResetReady(filePath))
+            {
+                ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "signal=vsto-heartbeat result=ok");
+                return;
+            }
+
+            var thread = new Thread(() => WatchWordResetReady(projectId, filePath, readySw));
+            thread.IsBackground = true;
+            thread.Name = "WordResetReady";
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+        }
+
+        static void WatchWordResetReady(int projectId, string filePath, Stopwatch readySw)
+        {
+            const int timeoutMs = 15000;
+            try
+            {
+                while (readySw.ElapsedMilliseconds < timeoutMs)
+                {
+                    if (IsWordResetReady(filePath))
+                    {
+                        ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "signal=vsto-heartbeat result=ok");
+                        return;
+                    }
+                    Thread.Sleep(200);
+                }
+
+                ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "signal=vsto-heartbeat result=timeout");
+            }
+            catch (Exception ex)
+            {
+                ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "result=fail " + ex.Message);
+            }
+        }
+
+        static bool IsWordResetReady(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !LogReader.IsVstoHeartbeatFresh(15))
+                return false;
+
+            WordApp wordApp = null;
+            WordDoc document = null;
+            try
+            {
+                wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                document = wordApp.ActiveDocument;
+                string fullName = document == null ? null : document.FullName;
+                if (string.IsNullOrWhiteSpace(fullName))
+                    return false;
+                return string.Equals(Path.GetFullPath(fullName), Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (document != null)
+                {
+                    try { Marshal.ReleaseComObject(document); } catch { }
+                }
+                if (wordApp != null)
+                {
+                    try { Marshal.ReleaseComObject(wordApp); } catch { }
+                }
+            }
         }
         
         /// <summary>
@@ -2552,7 +2632,7 @@ namespace MOS_Word_app.Views
                     catch (COMException comEx) when (comEx.HResult == unchecked((int)0x80010108)) // RPC_E_DISCONNECTED
                     {
                         System.Diagnostics.Debug.WriteLine($"[CloseAllWordDocuments] ドキュメントは既に切断されています: {comEx.Message}");
-                        return false;
+                        return !WordStillHasDocuments();
                     }
                     catch (Exception closeEx)
                     {
@@ -2586,7 +2666,51 @@ namespace MOS_Word_app.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[CloseAllWordDocuments] Error: {ex.Message}");
+                return !WordStillHasDocuments();
+            }
+        }
+
+        /// <summary>COM が切れても、文書が残っていなければ閉じ切れたとみなす。</summary>
+        private static bool WordStillHasDocuments()
+        {
+            WordApp wordApp = null;
+            try
+            {
+                wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                return wordApp.Documents.Count > 0;
+            }
+            catch
+            {
                 return false;
+            }
+            finally
+            {
+                if (wordApp != null)
+                {
+                    try { Marshal.ReleaseComObject(wordApp); } catch { }
+                }
+            }
+        }
+
+        static bool IsWorkingFileLocked(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                return false;
+
+            try
+            {
+                using (new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                }
+                return false;
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return true;
             }
         }
 

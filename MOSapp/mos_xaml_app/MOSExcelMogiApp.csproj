@@ -217,6 +217,8 @@
     <Compile Include="Libraries\Group3\ExcelChecker3_10.cs" />
     <Compile Include="Libraries\ExcelLogReader.cs" />
     <Compile Include="Libraries\ExcelGradingPerf.cs" />
+    <Compile Include="Libraries\ResetPerfLog.cs" />
+    <Compile Include="Libraries\ExcelResetReadyWatch.cs" />
     <Compile Include="Libraries\ExcelApplicationManager.cs" />
     <Compile Include="Libraries\ExcelVstoReadiness.cs" />
     <Compile Include="Libraries\ExcelTaskValidationConfig.cs" />

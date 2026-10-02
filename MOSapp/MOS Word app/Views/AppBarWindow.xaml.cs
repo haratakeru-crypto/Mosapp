@@ -1657,7 +1657,7 @@ namespace MOS_Word_app.Views
                 ApplyExamWindowLayout();
         }
         
-        private void OpenProjectDocument(int projectId, int groupId)
+        private void OpenProjectDocument(int projectId, int groupId, bool showPreparingDialog = true)
         {
             string filePath = null;
             try
@@ -1669,9 +1669,9 @@ namespace MOS_Word_app.Views
                     PositionWordWindow();
                     return;
                 }
-                
+
                 // 同じパスが開いていれば一度閉じ、ハイブリッド Open（心拍即利用 / 拒否リトライ）
-                PreparingWindow.Run(this, () =>
+                Action open = () =>
                 {
                     WordApplicationManager.TryCloseOpenDocumentByPath(filePath);
                     if (!WordApplicationManager.TryOpenExamDocument(filePath, out _, makeVisible: false))
@@ -1684,7 +1684,12 @@ namespace MOS_Word_app.Views
                     WordApplicationManager.SetWordVisible(true);
                     ApplyExamWindowLayout();
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
-                });
+                };
+
+                if (showPreparingDialog)
+                    PreparingWindow.Run(this, open);
+                else
+                    open();
             }
             catch (Exception ex)
             {
@@ -1844,7 +1849,7 @@ namespace MOS_Word_app.Views
             return flaggedCount;
         }
         
-        private async void ResetButton_Click(object sender, RoutedEventArgs e)
+        private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -1857,73 +1862,24 @@ namespace MOS_Word_app.Views
                 if (result != MessageBoxResult.Yes)
                     return;
 
-                var waitWindow = new Window
+                try
                 {
-                    Title = "リセット中",
-                    Width = 300,
-                    Height = 120,
-                    WindowStyle = WindowStyle.None,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    ShowInTaskbar = false,
-                    ResizeMode = ResizeMode.NoResize,
-                    Topmost = true,
-                    Background = System.Windows.Media.Brushes.White,
-                    BorderBrush = System.Windows.Media.Brushes.SteelBlue,
-                    BorderThickness = new Thickness(2)
-                };
-                var stack = new StackPanel
-                {
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Thickness(16)
-                };
-                stack.Children.Add(new TextBlock
-                {
-                    Text = $"リセット中です...\nプロジェクト {_currentProjectId}",
-                    FontSize = 14,
-                    TextAlignment = TextAlignment.Center,
-                    Foreground = System.Windows.Media.Brushes.SteelBlue
-                });
-                waitWindow.Content = stack;
-                waitWindow.Show();
-
-                Exception resetError = null;
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        if (!CloseAllWordDocuments())
-                            TryQuitWord();
-                        Thread.Sleep(500);
-                        ResetProject(_groupId, _currentProjectId);
-                    }
-                    catch (Exception ex) { resetError = ex; }
-                }, DispatcherPriority.Background);
-
-                waitWindow.Close();
-
-                if (resetError != null)
+                    if (!CloseAllWordDocuments())
+                        TryQuitWord();
+                    Thread.Sleep(500);
+                    ResetProject(_groupId, _currentProjectId);
+                }
+                catch (Exception resetError)
                 {
                     MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
                         "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                OpenProjectDocument(_currentProjectId, _groupId);
+                MessageBox.Show("プロジェクトをリセットしました。", "リセット完了",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
 
-                bool originalTopmost = this.Topmost;
-                try
-                {
-                    this.Topmost = true;
-                    this.Activate();
-                    MessageBox.Show(this, "プロジェクトをリセットしました。", "リセット完了",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                finally
-                {
-                    this.Topmost = originalTopmost;
-                }
-
+                OpenProjectDocument(_currentProjectId, _groupId, showPreparingDialog: false);
                 ApplyExamWindowLayout();
 
                 int taskCount = _tasks != null ? _tasks.Count : 0;

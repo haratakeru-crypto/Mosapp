@@ -157,6 +157,7 @@
     <Compile Include="Libraries\ScoreResultStore.cs" />
     <Compile Include="Libraries\WordBatchScoring.cs" />
     <Compile Include="Libraries\WordGradingPerf.cs" />
+    <Compile Include="Libraries\ResetPerfLog.cs" />
     <Compile Include="Libraries\WordChecker\Group1\WordWatermarkInspection.cs" />
     <Compile Include="Libraries\WordChecker\WordFindHelper.cs" />
     <Compile Include="Libraries\WordWindowLayoutHelper.cs" />

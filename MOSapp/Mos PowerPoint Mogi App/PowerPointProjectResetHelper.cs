@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Libraries;
 
@@ -35,6 +36,7 @@ namespace MOS_PowerPoint_app
 
             // テンプレートは編集可能な状態を正とし、既存の読み取り専用属性も明示解除する。
             PowerPointDataPathHelper.ClearReadOnly(templatePath, "テンプレート");
+            RemoveZoneIdentifier(templatePath);
 
             if (File.Exists(projectFilePath))
             {
@@ -44,6 +46,8 @@ namespace MOS_PowerPoint_app
             }
 
             File.Copy(templatePath, projectFilePath, overwrite: true);
+            // File.Copy は Zone.Identifier も引き継ぐため、コピー先だけ外して保護ビューを防ぐ
+            RemoveZoneIdentifier(projectFilePath);
             // コピー直後に読み取り専用を解除（テンプレート属性の引き継ぎを防ぐ）
             try
             {
@@ -83,6 +87,7 @@ namespace MOS_PowerPoint_app
                 try
                 {
                     File.Copy(projectFilePath, initialFilePath, overwrite: true);
+                    RemoveZoneIdentifier(initialFilePath);
                     copied = true;
                 }
                 catch (IOException) when (retryCount < maxRetries - 1)
@@ -109,6 +114,31 @@ namespace MOS_PowerPoint_app
                 {
                     System.Diagnostics.Debug.WriteLine($"[PowerPointProjectResetHelper] 読み取り専用解除（Initial）: {ex.Message}");
                 }
+            }
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool DeleteFileW(string lpFileName);
+
+        /// <summary>このファイルだけから Zone.Identifier を外す。フォルダ全体はたどらない。</summary>
+        static void RemoveZoneIdentifier(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                return;
+
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.IsReadOnly)
+                {
+                    try { fileInfo.IsReadOnly = false; } catch { }
+                }
+
+                DeleteFileW(filePath + ":Zone.Identifier");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PowerPointProjectResetHelper] Zone.Identifier 削除スキップ: {ex.Message}");
             }
         }
     }
