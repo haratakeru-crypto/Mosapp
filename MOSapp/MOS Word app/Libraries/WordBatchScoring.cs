@@ -1313,6 +1313,29 @@ namespace Libraries
         /// その場採点の開始時、スナップショットが一致するタスクだけ開始時との差分を一度記録する。
         /// 一致しないときは文書を読み直さない。
         /// </summary>
+        [ThreadStatic] static bool _reuseActive;
+        [ThreadStatic] static bool _reuseCaptured;
+        [ThreadStatic] static int _reuseGroupId;
+        [ThreadStatic] static int _reuseProjectId;
+        [ThreadStatic] static SnapshotData _reuseCurrent;
+
+        /// <summary>その場採点中は、今の文書の現在状態を1回だけ読む。</summary>
+        public static void BeginReuseCurrentDocument(int groupId, int projectId)
+        {
+            _reuseActive = true;
+            _reuseCaptured = false;
+            _reuseGroupId = groupId;
+            _reuseProjectId = projectId;
+            _reuseCurrent = null;
+        }
+
+        public static void EndReuseCurrentDocument()
+        {
+            _reuseActive = false;
+            _reuseCaptured = false;
+            _reuseCurrent = null;
+        }
+
         public static void LogMatchingBaselineDiffOnce(int groupId, int projectId, int taskId, int attemptNo)
         {
             var exempt = WordTaskValidationConfig.GetExemptFlags(projectId, taskId);
@@ -1331,13 +1354,16 @@ namespace Libraries
                 if (app == null) return null;
                 string path = ResolveSnapshotProjectPath(projectId, groupId);
                 if (string.IsNullOrEmpty(path)) return null;
+                if (_reuseActive && _reuseCaptured && groupId == _reuseGroupId && projectId == _reuseProjectId)
+                    return _reuseCurrent;
+
                 WordDoc doc = FindOpenDocumentForSnapshot(app, path);
                 if (doc == null)
                 {
                     try { doc = app.Documents.Open(path, ReadOnly: true, Visible: false); }
-                    catch { return null; }
+                    catch { return RememberReuse(groupId, projectId, null); }
                 }
-                try { return BuildSnapshotFromDocument(doc); }
+                try { return RememberReuse(groupId, projectId, BuildSnapshotFromDocument(doc)); }
                 finally
                 {
                     if (doc != null)
@@ -1353,6 +1379,16 @@ namespace Libraries
             }
         }
 
+        static SnapshotData RememberReuse(int groupId, int projectId, SnapshotData data)
+        {
+            if (_reuseActive && groupId == _reuseGroupId && projectId == _reuseProjectId)
+            {
+                _reuseCaptured = true;
+                _reuseCurrent = data;
+            }
+            return data;
+        }
+
         private static SnapshotData BuildSnapshotFromDocument(WordDoc doc)
         {
             var data = new SnapshotData { FullName = doc.FullName ?? "" };
@@ -1364,11 +1400,12 @@ namespace Libraries
             try { data.Tables = doc.Tables.Count; } catch { }
             try { data.CompatibilityMode = (int)doc.CompatibilityMode; } catch { data.CompatibilityMode = -1; }
             data.HeaderPrimaryFp = GetHeaderFingerprint(doc);
-            data.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprintFromDocument(doc);
             data.PageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
             try
             {
                 string openXml = doc.WordOpenXML;
+                data.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprint(
+                    WordWatermarkInspection.NormalizeXml(openXml));
                 data.FootnoteReferenceCount = WordFindHelper.CountFootnoteReferencesInXml(openXml);
                 data.VisibleBodyTextLength = WordFindHelper.CountVisibleBodyTextLength(openXml);
             }

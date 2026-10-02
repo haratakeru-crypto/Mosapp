@@ -133,7 +133,7 @@ namespace Libraries.Group1
                 return "None";
             try
             {
-                return GetWatermarkFingerprint(NormalizeXml(doc.WordOpenXML));
+                return GetWatermarkFingerprint(NormalizeXml(WordOpenXmlSession.Get(doc)));
             }
             catch
             {
@@ -594,15 +594,7 @@ namespace Libraries.Group1
             if (ctx != null && ctx.FullXmlLoaded)
                 return ctx.FullXml ?? string.Empty;
 
-            string xml;
-            try
-            {
-                xml = doc.WordOpenXML ?? string.Empty;
-            }
-            catch
-            {
-                xml = string.Empty;
-            }
+            string xml = WordOpenXmlSession.Get(doc);
             if (ctx != null)
             {
                 ctx.FullXmlLoaded = true;
@@ -980,8 +972,7 @@ namespace Libraries.Group1
                 return false;
             try
             {
-                string docXml = null;
-                try { docXml = document.WordOpenXML; } catch { }
+                string docXml = WordOpenXmlSession.Get(document);
 
                 bool xmlHasPgBorders = TryExtractPgBordersXml(docXml, out string pgBordersXml);
                 bool xmlPure = xmlHasPgBorders && IsPgBordersXmlPureAccent3(pgBordersXml);
@@ -1430,6 +1421,56 @@ namespace Libraries.Group1
             public float Size;
             public int Theme;
             public float Tint;
+        }
+    }
+
+    /// <summary>
+    /// その場採点のあいだ、同じ文書の WordOpenXML を1回だけ取る。
+    /// チェッカー DLL 側のこの型に対して Begin / End する。
+    /// </summary>
+    public static class WordOpenXmlSession
+    {
+        [ThreadStatic] static int _depth;
+        [ThreadStatic] static string _path;
+        [ThreadStatic] static string _xml;
+
+        public static void Begin()
+        {
+            _depth++;
+        }
+
+        public static void End()
+        {
+            if (_depth > 0)
+                _depth--;
+            if (_depth == 0)
+            {
+                _path = null;
+                _xml = null;
+            }
+        }
+
+        public static string Get(Document doc)
+        {
+            if (doc == null)
+                return string.Empty;
+
+            string path = null;
+            try { path = doc.FullName; } catch { }
+
+            if (_depth > 0 && _xml != null && string.Equals(_path, path, StringComparison.OrdinalIgnoreCase))
+                return _xml;
+
+            string xml;
+            try { xml = doc.WordOpenXML ?? string.Empty; }
+            catch { xml = string.Empty; }
+
+            if (_depth > 0)
+            {
+                _path = path;
+                _xml = xml;
+            }
+            return xml;
         }
     }
 }

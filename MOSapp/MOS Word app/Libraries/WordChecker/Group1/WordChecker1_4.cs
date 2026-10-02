@@ -180,7 +180,7 @@ namespace Libraries.Group1
                 try
                 {
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
-                    string xml = document.WordOpenXML;
+                    string xml = WordOpenXmlSession.Get(document);
                     if (!string.IsNullOrEmpty(xml))
                     {
                         xmlContainsPhrase = xml.Contains("前田先生に最終確認");
@@ -403,7 +403,7 @@ namespace Libraries.Group1
                 string normalizedXml = "";
                 try
                 {
-                    string xml = document.WordOpenXML;
+                    string xml = WordOpenXmlSession.Get(document);
                     normalizedXml = WordWatermarkInspection.NormalizeXml(xml);
                 }
                 catch { }

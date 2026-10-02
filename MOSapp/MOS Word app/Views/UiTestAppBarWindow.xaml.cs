@@ -403,8 +403,14 @@ namespace MOS_Word_app.Views
 
                     // WordCheckerインスタンスを作成
                     object checkerInstance = Activator.CreateInstance(checkerType);
+                    MethodInfo beginOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("Begin");
+                    MethodInfo endOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("End");
 
                     int openAttempt = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                    WordSnapshotChecker.BeginReuseCurrentDocument(_groupId, _currentProjectId);
+                    beginOpenXml?.Invoke(null, null);
+                    try
+                    {
                     WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, openAttempt);
 
                     try
@@ -465,6 +471,12 @@ namespace MOS_Word_app.Views
                     finally
                     {
                         LogReader.ClearSnapshot();
+                    }
+                    }
+                    finally
+                    {
+                        try { endOpenXml?.Invoke(null, null); } catch { }
+                        WordSnapshotChecker.EndReuseCurrentDocument();
                     }
                 });
 
