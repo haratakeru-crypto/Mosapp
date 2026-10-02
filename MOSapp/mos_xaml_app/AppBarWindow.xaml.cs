@@ -155,6 +155,8 @@ namespace MOSExcelMogiApp
 
             // シェル起動後の共有 Excel 接続完了時に Excel ウィンドウを再配置（起動直後のずれを解消）
             _viewModel.SharedExcelApplicationAttached += OnSharedExcelApplicationAttached;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            ApplyScoreResultActionState();
 
             this.Activated += (s, e) =>
             {
@@ -476,6 +478,11 @@ namespace MOSExcelMogiApp
             {
                 _timer.Stop();
                 UpdateTimerDisplay();
+                if (_viewModel != null && _viewModel.IsScoreResultOpen)
+                {
+                    _viewModel.RequestEndExamAfterScoreResult();
+                    return;
+                }
                 // 試験終了処理
                 _viewModel.EndExamCommand.Execute(null);
             }
@@ -1227,6 +1234,8 @@ namespace MOSExcelMogiApp
         
         private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel != null && _viewModel.IsScoreResultOpen)
+                return;
             if (_isOpeningReviewPage)
                 return;
 
@@ -1662,6 +1671,8 @@ namespace MOSExcelMogiApp
 
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel != null && _viewModel.IsScoreResultOpen)
+                return;
             // モーダル確認中も DispatcherTimer は進むため、先に止めないと Timer_Tick から試験終了が走り Excel が先に閉じることがある
             bool timerWasEnabled = _timer != null && _timer.IsEnabled;
             if (timerWasEnabled)
@@ -1777,8 +1788,24 @@ namespace MOSExcelMogiApp
                 _viewModel.VariantModeChanged -= OnVariantModeChanged;
                 _viewModel.OpenReviewPageRequested -= OnOpenReviewPageRequested;
                 _viewModel.SharedExcelApplicationAttached -= OnSharedExcelApplicationAttached;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             }
             base.OnClosed(e);
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsScoreResultOpen))
+                ApplyScoreResultActionState();
+        }
+
+        private void ApplyScoreResultActionState()
+        {
+            bool enabled = _viewModel == null || !_viewModel.IsScoreResultOpen;
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = enabled;
+            if (EndExamButton != null)
+                EndExamButton.IsEnabled = enabled;
         }
 
         private void WriteCurrentTaskFile()

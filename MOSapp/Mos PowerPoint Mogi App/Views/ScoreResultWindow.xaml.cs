@@ -15,6 +15,9 @@ namespace MOS_PowerPoint_app.Views
     {
         private DispatcherTimer _keepOnTopTimer;
         private static int _openCount;
+        private bool _closing;
+        private bool _foregroundHooksAttached;
+        private bool _foregroundArmed;
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -26,8 +29,10 @@ namespace MOS_PowerPoint_app.Views
             DataContext = list;
 
             Loaded += ScoreResultWindow_Loaded;
+            Closing += ScoreResultWindow_Closing;
             Closed += ScoreResultWindow_Closed;
             Deactivated += ScoreResultWindow_Deactivated;
+            _foregroundHooksAttached = true;
         }
 
         /// <summary>
@@ -42,16 +47,22 @@ namespace MOS_PowerPoint_app.Views
                 ShowInTaskbar = true
             };
 
+            bool ownerWasTopmost = false;
             if (owner != null)
             {
+                ownerWasTopmost = owner.Topmost;
                 owner.Topmost = true;
-                owner.Activate();
             }
 
-            w.ShowDialog();
-
-            if (owner != null)
-                owner.Topmost = true;
+            try
+            {
+                w.ShowDialog();
+            }
+            finally
+            {
+                if (owner != null)
+                    owner.Topmost = ownerWasTopmost;
+            }
         }
 
         /// <summary>
@@ -69,7 +80,7 @@ namespace MOS_PowerPoint_app.Views
                 {
                     foreach (Window window in app.Windows)
                     {
-                        if (window is ScoreResultWindow score && score.IsVisible)
+                        if (window is ScoreResultWindow score && score.CanBringToForeground)
                             score.BringToForeground();
                     }
                 }
@@ -82,18 +93,36 @@ namespace MOS_PowerPoint_app.Views
             catch { }
         }
 
+        private bool CanBringToForeground => !_closing && IsLoaded && IsVisible;
+
         private void ScoreResultWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            if (!_foregroundArmed)
+            {
+                _foregroundArmed = true;
+                if (_openCount++ == 0 && Application.Current != null)
+                    Application.Current.Activated += Application_Activated;
+            }
+
             BringToForeground();
             _keepOnTopTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             _keepOnTopTimer.Tick += KeepOnTopTimer_Tick;
             _keepOnTopTimer.Start();
+        }
 
-            if (_openCount++ == 0 && Application.Current != null)
-                Application.Current.Activated += Application_Activated;
+        private void ScoreResultWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _closing = true;
+            ReleaseForegroundHooks();
         }
 
         private void ScoreResultWindow_Closed(object sender, EventArgs e)
+        {
+            _closing = true;
+            ReleaseForegroundHooks();
+        }
+
+        private void ReleaseForegroundHooks()
         {
             if (_keepOnTopTimer != null)
             {
@@ -102,6 +131,16 @@ namespace MOS_PowerPoint_app.Views
                 _keepOnTopTimer = null;
             }
 
+            if (!_foregroundHooksAttached)
+                return;
+
+            _foregroundHooksAttached = false;
+            Deactivated -= ScoreResultWindow_Deactivated;
+
+            if (!_foregroundArmed)
+                return;
+
+            _foregroundArmed = false;
             if (--_openCount <= 0)
             {
                 _openCount = 0;
@@ -112,6 +151,9 @@ namespace MOS_PowerPoint_app.Views
 
         private void ScoreResultWindow_Deactivated(object sender, EventArgs e)
         {
+            if (!CanBringToForeground)
+                return;
+
             Dispatcher.BeginInvoke(new Action(BringToForeground), DispatcherPriority.ApplicationIdle);
         }
 
@@ -122,19 +164,18 @@ namespace MOS_PowerPoint_app.Views
 
         private void KeepOnTopTimer_Tick(object sender, EventArgs e)
         {
-            if (!IsVisible)
+            if (_closing || !IsVisible || IsActive)
                 return;
 
-            if (!IsActive)
-            {
-                Topmost = false;
-                Topmost = true;
-                BringToForeground();
-            }
+            Topmost = false;
+            Topmost = true;
         }
 
         private void BringToForeground()
         {
+            if (!CanBringToForeground)
+                return;
+
             Topmost = true;
             Activate();
             try

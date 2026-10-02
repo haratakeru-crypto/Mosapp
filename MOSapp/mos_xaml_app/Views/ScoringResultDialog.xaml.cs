@@ -29,6 +29,9 @@ namespace MOSExcelMogiApp.Views
         private Dictionary<int, string> _answerStepsByTaskId = new Dictionary<int, string>();
         private DispatcherTimer _keepOnTopTimer;
         private static int _openCount;
+        private bool _closing;
+        private bool _foregroundHooksAttached;
+        private bool _foregroundArmed;
 
         /// <summary>▲ クリックで解答手順表示後、採点結果を再表示するか。</summary>
         public bool ReopenAfterAnswerSteps { get; private set; }
@@ -54,7 +57,7 @@ namespace MOSExcelMogiApp.Views
                 {
                     foreach (Window window in app.Windows)
                     {
-                        if (window is ScoringResultDialog score && score.IsVisible)
+                        if (window is ScoringResultDialog score && score.CanBringToForeground)
                             score.BringToForeground();
                     }
                 }
@@ -116,16 +119,22 @@ namespace MOSExcelMogiApp.Views
                 ShowInTaskbar = true
             };
 
+            bool ownerWasTopmost = false;
             if (owner != null)
             {
+                ownerWasTopmost = owner.Topmost;
                 owner.Topmost = true;
-                owner.Activate();
             }
 
-            w.ShowDialog();
-
-            if (owner != null)
-                owner.Topmost = true;
+            try
+            {
+                w.ShowDialog();
+            }
+            finally
+            {
+                if (owner != null)
+                    owner.Topmost = ownerWasTopmost;
+            }
         }
 
         /// <summary>
@@ -133,39 +142,45 @@ namespace MOSExcelMogiApp.Views
         /// </summary>
         public static void ShowVariantResults(Window owner, int taskCount, int groupId, int projectId, int variantSetNo)
         {
+            bool ownerWasTopmost = false;
             if (owner != null)
             {
+                ownerWasTopmost = owner.Topmost;
                 owner.Topmost = true;
-                owner.Activate();
             }
 
-            while (true)
+            try
             {
-                var w = new ScoringResultDialog(taskCount, groupId, projectId, variantSetNo)
+                while (true)
                 {
-                    Owner = owner,
-                    Topmost = true,
-                    ShowInTaskbar = true
-                };
+                    var w = new ScoringResultDialog(taskCount, groupId, projectId, variantSetNo)
+                    {
+                        Owner = owner,
+                        Topmost = true,
+                        ShowInTaskbar = true
+                    };
 
-                w.ShowDialog();
+                    w.ShowDialog();
 
-                if (!w.ReopenAfterAnswerSteps)
-                    break;
+                    if (!w.ReopenAfterAnswerSteps)
+                        break;
 
-                string steps = w.GetAnswerStepsForTask(w.AnswerStepsTaskId);
-                string title = $"類題{variantSetNo} プロジェクト {groupId}-{projectId} タスク {w.AnswerStepsTaskId} 解答手順";
-                var answerWindow = new AnswerStepsWindow(title, steps)
-                {
-                    Owner = owner,
-                    Topmost = true,
-                    ShowInTaskbar = true
-                };
-                answerWindow.ShowDialog();
+                    string steps = w.GetAnswerStepsForTask(w.AnswerStepsTaskId);
+                    string title = $"類題{variantSetNo} プロジェクト {groupId}-{projectId} タスク {w.AnswerStepsTaskId} 解答手順";
+                    var answerWindow = new AnswerStepsWindow(title, steps)
+                    {
+                        Owner = owner,
+                        Topmost = true,
+                        ShowInTaskbar = true
+                    };
+                    answerWindow.ShowDialog();
+                }
             }
-
-            if (owner != null)
-                owner.Topmost = true;
+            finally
+            {
+                if (owner != null)
+                    owner.Topmost = ownerWasTopmost;
+            }
         }
 
         private string GetAnswerStepsForTask(int taskId)
@@ -175,25 +190,45 @@ namespace MOSExcelMogiApp.Views
             return string.Empty;
         }
 
+        private bool CanBringToForeground => !_closing && IsLoaded && IsVisible;
+
         private void HookForegroundBehavior()
         {
             Loaded += ScoringResultDialog_Loaded;
+            Closing += ScoringResultDialog_Closing;
             Closed += ScoringResultDialog_Closed;
             Deactivated += ScoringResultDialog_Deactivated;
+            _foregroundHooksAttached = true;
         }
 
         private void ScoringResultDialog_Loaded(object sender, RoutedEventArgs e)
         {
+            if (!_foregroundArmed)
+            {
+                _foregroundArmed = true;
+                if (_openCount++ == 0 && Application.Current != null)
+                    Application.Current.Activated += Application_Activated;
+            }
+
             BringToForeground();
             _keepOnTopTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             _keepOnTopTimer.Tick += KeepOnTopTimer_Tick;
             _keepOnTopTimer.Start();
+        }
 
-            if (_openCount++ == 0 && Application.Current != null)
-                Application.Current.Activated += Application_Activated;
+        private void ScoringResultDialog_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _closing = true;
+            ReleaseForegroundHooks();
         }
 
         private void ScoringResultDialog_Closed(object sender, EventArgs e)
+        {
+            _closing = true;
+            ReleaseForegroundHooks();
+        }
+
+        private void ReleaseForegroundHooks()
         {
             if (_keepOnTopTimer != null)
             {
@@ -202,6 +237,16 @@ namespace MOSExcelMogiApp.Views
                 _keepOnTopTimer = null;
             }
 
+            if (!_foregroundHooksAttached)
+                return;
+
+            _foregroundHooksAttached = false;
+            Deactivated -= ScoringResultDialog_Deactivated;
+
+            if (!_foregroundArmed)
+                return;
+
+            _foregroundArmed = false;
             if (--_openCount <= 0)
             {
                 _openCount = 0;
@@ -212,6 +257,9 @@ namespace MOSExcelMogiApp.Views
 
         private void ScoringResultDialog_Deactivated(object sender, EventArgs e)
         {
+            if (!CanBringToForeground)
+                return;
+
             Dispatcher.BeginInvoke(new Action(BringToForeground), DispatcherPriority.ApplicationIdle);
         }
 
@@ -222,19 +270,18 @@ namespace MOSExcelMogiApp.Views
 
         private void KeepOnTopTimer_Tick(object sender, EventArgs e)
         {
-            if (!IsVisible)
+            if (_closing || !IsVisible || IsActive)
                 return;
 
-            if (!IsActive)
-            {
-                Topmost = false;
-                Topmost = true;
-                BringToForeground();
-            }
+            Topmost = false;
+            Topmost = true;
         }
 
         private void BringToForeground()
         {
+            if (!CanBringToForeground)
+                return;
+
             Topmost = true;
             Activate();
             try

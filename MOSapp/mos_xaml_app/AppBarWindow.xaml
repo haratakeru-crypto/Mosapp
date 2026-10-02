@@ -229,7 +229,7 @@
                             </Button.Style>
                         </Button>
                         
-                        <Button Content="次のプロジェクト" 
+                        <Button Name="NextProjectButton" Content="次のプロジェクト" 
                                 Command="{Binding NextProjectCommand}"
                                 Visibility="{Binding IsNextProjectVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Background="White" 
@@ -538,7 +538,7 @@
                                 </Button>
 
                                 <!-- 右側: 終了ボタン（ここに配置） -->
-                                <Button Content="終了" 
+                                <Button Name="EndExamButton" Content="終了" 
                                         Click="EndButton_Click"
                                         Background="#EF4444" 
                                         Foreground="White" 

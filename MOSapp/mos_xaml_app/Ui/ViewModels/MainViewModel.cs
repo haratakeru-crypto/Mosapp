@@ -236,6 +236,8 @@ namespace Ui.ViewModels
         private int _examExcelPid;
         private bool _examExcelWindowSeen;
         private bool _isOpeningProject;
+        private bool _isScoreResultOpen;
+        private bool _endExamPendingAfterScoreResult;
         private int _attachRetryAttempts;
         private const int MaxAttachRetryAttempts = 30;
 
@@ -245,11 +247,11 @@ namespace Ui.ViewModels
             LoadProjects();
             CheckCommand = new RelayCommand(ExecuteCheck);
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
-            ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring);
-            EndExamCommand = new RelayCommand(ExecuteEndExam);
+            ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring && !_isScoreResultOpen);
+            EndExamCommand = new RelayCommand(ExecuteEndExam, _ => !_isScoreResultOpen);
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
             ResetExamCommand = new RelayCommand(ExecuteResetExam);
-            NextProjectCommand = new RelayCommand(ExecuteNextProject);
+            NextProjectCommand = new RelayCommand(ExecuteNextProject, _ => !_isScoreResultOpen);
             GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode);
             GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant);
     }
@@ -343,6 +345,14 @@ namespace Ui.ViewModels
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
 
         [DllImport("user32.dll")]
         private static extern bool BringWindowToTop(IntPtr hWnd);
@@ -796,6 +806,68 @@ namespace Ui.ViewModels
             {
                 bool result = _excelCheckerService.CheckExcel(project.GroupId, project.ProjectId, SelectedFilePath);
                 ResultMessage = $"Project{project.GroupId}-{project.ProjectId}: {(result ? "Success" : "Failed")}";
+            }
+        }
+
+        public bool IsScoreResultOpen => _isScoreResultOpen;
+
+        public void SetScoreResultOpen(bool open)
+        {
+            if (_isScoreResultOpen == open)
+                return;
+            _isScoreResultOpen = open;
+            OnPropertyChanged(nameof(IsScoreResultOpen));
+            CommandManager.InvalidateRequerySuggested();
+            if (!open && _endExamPendingAfterScoreResult)
+            {
+                _endExamPendingAfterScoreResult = false;
+                ExecuteEndExam(null);
+            }
+        }
+
+        public void RequestEndExamAfterScoreResult()
+        {
+            _endExamPendingAfterScoreResult = true;
+        }
+
+        private void ShowScoreResultDialog(Action showDialog)
+        {
+            SetScoreResultOpen(true);
+            try
+            {
+                showDialog();
+            }
+            finally
+            {
+                if (!_endExamPendingAfterScoreResult)
+                    RestoreExcelInputAfterScoreResult();
+                SetScoreResultOpen(false);
+            }
+        }
+
+        /// <summary>
+        /// 結果ダイアログが前面を取ったあと、対象 Excel が無効なら戻して一度だけ前面へ出す。
+        /// </summary>
+        private void RestoreExcelInputAfterScoreResult()
+        {
+            try
+            {
+                ExcelApp excelApp = TryGetSharedExcelApplication();
+                if (excelApp == null)
+                    return;
+
+                IntPtr hwnd = new IntPtr(excelApp.Hwnd);
+                if (hwnd == IntPtr.Zero)
+                    return;
+
+                if (!IsWindowEnabled(hwnd))
+                    EnableWindow(hwnd, true);
+
+                TryForceForeground(hwnd);
+            }
+            catch
+            {
+                /* ignore */
             }
         }
 
@@ -1775,7 +1847,8 @@ namespace Ui.ViewModels
                     {
                         var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
                             ?? Application.Current.MainWindow;
-                        ScoringResultDialog.ShowVariantResults(owner, taskCount, groupId, projectId, VariantSetNo);
+                        ShowScoreResultDialog(() =>
+                            ScoringResultDialog.ShowVariantResults(owner, taskCount, groupId, projectId, VariantSetNo));
                         ResultMessage = $"類題{VariantSetNo}: {taskCount}問の解答手順を表示できます";
                     }
                     catch (Exception ex)
@@ -1886,7 +1959,8 @@ namespace Ui.ViewModels
                     MOSExcelMogiApp.Models.ExamResultStorage.SaveProjectResult(projectId, results);
                     var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
                         ?? Application.Current.MainWindow;
-                    ScoringResultDialog.ShowResults(owner, taskCount, results, groupId, projectId);
+                    ShowScoreResultDialog(() =>
+                        ScoringResultDialog.ShowResults(owner, taskCount, results, groupId, projectId));
                     ResultMessage = $"採点完了: {taskCount}問のタスクを採点しました";
                 }
                 catch (Exception ex)

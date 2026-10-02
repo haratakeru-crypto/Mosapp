@@ -38,6 +38,26 @@ namespace MOS_PowerPoint_app.Views
         [DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+        [DllImport("user32.dll")]
+        static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
+
+        [DllImport("kernel32.dll")]
+        static extern uint GetCurrentThreadId();
+
         private const int SW_RESTORE = 9;
         
         [DllImport("user32.dll")]
@@ -117,6 +137,9 @@ namespace MOS_PowerPoint_app.Views
         private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private bool _isScoring;
+        private bool _isScoreResultOpen;
+        private bool _nextProjectPendingAfterScoreResult;
+        private bool _examResultPendingAfterScoreResult;
         private Window _instantScoringOverlay;
         private Timer _instantScoringNoticeTimer;
         private bool _instantScoringFinished;
@@ -405,6 +428,11 @@ namespace MOS_PowerPoint_app.Views
             {
                 _timer.Stop();
                 UpdateTimerDisplay();
+                if (_isScoreResultOpen)
+                {
+                    _examResultPendingAfterScoreResult = true;
+                    return;
+                }
                 // 試験終了処理：結果画面を表示
                 ShowResultWindowAsync();
             }
@@ -1028,6 +1056,11 @@ namespace MOS_PowerPoint_app.Views
             if (elapsed.TotalMinutes >= 5.0)
             {
                 _projectTimer.Stop();
+                if (_isScoreResultOpen)
+                {
+                    _nextProjectPendingAfterScoreResult = true;
+                    return;
+                }
                 MoveToNextProjectWithMessage();
             }
         }
@@ -1204,12 +1237,151 @@ namespace MOS_PowerPoint_app.Views
             overlay.Content = stack;
             return overlay;
         }
+
+        public void ShowScoreResult(IEnumerable<MOS_PowerPoint_app.TaskResult> scoreList)
+        {
+            bool reviewEnabled = ReviewPageButton == null || ReviewPageButton.IsEnabled;
+            bool scoreEnabled = ScoreButton == null || ScoreButton.IsEnabled;
+            bool nextEnabled = NextProjectButton == null || NextProjectButton.IsEnabled;
+            bool closeEnabled = CloseExamButton == null || CloseExamButton.IsEnabled;
+            SetScoreResultActionsEnabled(false);
+            _isScoreResultOpen = true;
+            try
+            {
+                ScoreResultWindow.ShowResults(this, scoreList);
+            }
+            finally
+            {
+                _isScoreResultOpen = false;
+                bool continueAfterResult = _examResultPendingAfterScoreResult || _nextProjectPendingAfterScoreResult;
+                if (!continueAfterResult)
+                    RestorePowerPointInputAfterScoreResult();
+                if (ReviewPageButton != null)
+                    ReviewPageButton.IsEnabled = reviewEnabled;
+                if (ScoreButton != null)
+                    ScoreButton.IsEnabled = scoreEnabled;
+                if (NextProjectButton != null)
+                    NextProjectButton.IsEnabled = nextEnabled;
+                if (CloseExamButton != null)
+                    CloseExamButton.IsEnabled = closeEnabled;
+                if (_examResultPendingAfterScoreResult)
+                {
+                    _examResultPendingAfterScoreResult = false;
+                    _nextProjectPendingAfterScoreResult = false;
+                    ShowResultWindowAsync();
+                }
+                else if (_nextProjectPendingAfterScoreResult)
+                {
+                    _nextProjectPendingAfterScoreResult = false;
+                    MoveToNextProjectWithMessage();
+                }
+            }
+        }
+
+        private void SetScoreResultActionsEnabled(bool enabled)
+        {
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = enabled;
+            if (ScoreButton != null)
+                ScoreButton.IsEnabled = enabled;
+            if (NextProjectButton != null)
+                NextProjectButton.IsEnabled = enabled;
+            if (CloseExamButton != null)
+                CloseExamButton.IsEnabled = enabled;
+        }
+
+        /// <summary>
+        /// 結果ダイアログが前面を取ったあと、PowerPoint が無効なら戻して一度だけ前面へ出す。
+        /// </summary>
+        private void RestorePowerPointInputAfterScoreResult()
+        {
+            try
+            {
+                IntPtr hwnd = TryGetPowerPointMainWindowHandle();
+                if (hwnd == IntPtr.Zero)
+                    return;
+                if (!IsWindowEnabled(hwnd))
+                    EnableWindow(hwnd, true);
+                TryForceForeground(hwnd);
+            }
+            catch
+            {
+                /* ignore */
+            }
+        }
+
+        private static IntPtr TryGetPowerPointMainWindowHandle()
+        {
+            Process[] pptProcesses = Process.GetProcessesByName("POWERPNT");
+            try
+            {
+                if (pptProcesses.Length == 0)
+                    return IntPtr.Zero;
+
+                uint processId = (uint)pptProcesses[0].Id;
+                IntPtr found = IntPtr.Zero;
+                EnumWindows((windowHandle, lParam) =>
+                {
+                    GetWindowThreadProcessId(windowHandle, out uint windowProcessId);
+                    if (windowProcessId != processId)
+                        return true;
+
+                    var className = new StringBuilder(256);
+                    GetClassName(windowHandle, className, className.Capacity);
+                    if (!className.ToString().Contains("PPTFrameClass"))
+                        return true;
+
+                    found = windowHandle;
+                    return false;
+                }, IntPtr.Zero);
+                return found;
+            }
+            finally
+            {
+                foreach (Process process in pptProcesses)
+                    process.Dispose();
+            }
+        }
+
+        private static void TryForceForeground(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero)
+                return;
+
+            uint currentTid = 0;
+            uint targetTid = 0;
+            bool attached = false;
+            try
+            {
+                currentTid = GetCurrentThreadId();
+                targetTid = GetWindowThreadProcessId(hWnd, out _);
+                if (currentTid != 0 && targetTid != 0 && currentTid != targetTid)
+                    attached = AttachThreadInput(currentTid, targetTid, true);
+
+                ShowWindow(hWnd, SW_RESTORE);
+                BringWindowToTop(hWnd);
+                SetForegroundWindow(hWnd);
+            }
+            catch
+            {
+                /* ignore */
+            }
+            finally
+            {
+                if (attached && currentTid != 0 && targetTid != 0)
+                {
+                    try { AttachThreadInput(currentTid, targetTid, false); } catch { }
+                }
+            }
+        }
         
         /// <summary>
         /// 閉じるボタン（Excelに合わせて結果画面は表示せず、試験終了してメインに戻る）
         /// </summary>
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
@@ -1241,6 +1413,8 @@ namespace MOS_PowerPoint_app.Views
         
         private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             ShowReviewPageWindow();
         }
 
@@ -2335,6 +2509,8 @@ namespace MOS_PowerPoint_app.Views
         
         private async void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             ScoreResultWindow.TryBringOpenToFront();
             await MoveToNextProjectAsync();
         }

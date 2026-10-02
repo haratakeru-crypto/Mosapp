@@ -35,6 +35,28 @@ namespace MOS_Word_app.Views
 
         [DllImport("user32.dll")]
         static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
+
+        [DllImport("kernel32.dll")]
+        static extern uint GetCurrentThreadId();
+
+        const int SW_RESTORE = 9;
         
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -75,6 +97,8 @@ namespace MOS_Word_app.Views
         private DateTime _projectStartTime; // プロジェクト開始時刻
         private DispatcherTimer _projectTimer; // プロジェクト用タイマー（5分制限）
         private Dictionary<int, Dictionary<int, string>> _clipboardTargets = new Dictionary<int, Dictionary<int, string>>(); // クリップボード対象（プロジェクトID → タスクID → 問題文）
+        private bool _isScoreResultOpen;
+        private bool _nextProjectPendingAfterScoreResult;
         private bool _isPaused = false; // 一時停止状態
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
@@ -239,6 +263,11 @@ namespace MOS_Word_app.Views
             if (elapsed.TotalMinutes >= 5.0)
             {
                 _projectTimer.Stop();
+                if (_isScoreResultOpen)
+                {
+                    _nextProjectPendingAfterScoreResult = true;
+                    return;
+                }
                 MoveToNextProjectWithMessage();
             }
         }
@@ -448,7 +477,7 @@ namespace MOS_Word_app.Views
                     await System.Threading.Tasks.Task.Delay(80);
 
                 // 採点結果ウィンドウを表示（Task / Result 〇✖）
-                ScoreResultWindow.ShowResults(this, result.scoreList);
+                ShowScoreResult(result.scoreList);
 
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点完了: {result.passedCount}/{result.totalTasks}");
             }
@@ -528,9 +557,141 @@ namespace MOS_Word_app.Views
                 return;
             try { overlay.Close(); } catch { }
         }
+
+        private void ShowScoreResult(IEnumerable<MOS_Word_app.TaskResult> scoreList)
+        {
+            bool reviewEnabled = ReviewPageButton == null || ReviewPageButton.IsEnabled;
+            bool scoreEnabled = ScoreButton == null || ScoreButton.IsEnabled;
+            bool nextEnabled = NextProjectButton == null || NextProjectButton.IsEnabled;
+            bool closeEnabled = CloseExamButton == null || CloseExamButton.IsEnabled;
+            SetScoreResultActionsEnabled(false);
+            _isScoreResultOpen = true;
+            try
+            {
+                ScoreResultWindow.ShowResults(this, scoreList);
+            }
+            finally
+            {
+                _isScoreResultOpen = false;
+                if (!_nextProjectPendingAfterScoreResult)
+                    RestoreWordInputAfterScoreResult();
+                if (ReviewPageButton != null)
+                    ReviewPageButton.IsEnabled = reviewEnabled;
+                if (ScoreButton != null)
+                    ScoreButton.IsEnabled = scoreEnabled;
+                if (NextProjectButton != null)
+                    NextProjectButton.IsEnabled = nextEnabled;
+                if (CloseExamButton != null)
+                    CloseExamButton.IsEnabled = closeEnabled;
+                if (_nextProjectPendingAfterScoreResult)
+                {
+                    _nextProjectPendingAfterScoreResult = false;
+                    MoveToNextProjectWithMessage();
+                }
+            }
+        }
+
+        private void SetScoreResultActionsEnabled(bool enabled)
+        {
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = enabled;
+            if (ScoreButton != null)
+                ScoreButton.IsEnabled = enabled;
+            if (NextProjectButton != null)
+                NextProjectButton.IsEnabled = enabled;
+            if (CloseExamButton != null)
+                CloseExamButton.IsEnabled = enabled;
+        }
+
+        /// <summary>
+        /// 結果ダイアログが前面を取ったあと、Word が無効なら戻して一度だけ前面へ出す。
+        /// </summary>
+        private void RestoreWordInputAfterScoreResult()
+        {
+            try
+            {
+                IntPtr hwnd = TryGetWordMainWindowHandle();
+                if (hwnd == IntPtr.Zero)
+                    return;
+                if (!IsWindowEnabled(hwnd))
+                    EnableWindow(hwnd, true);
+                TryForceForeground(hwnd);
+            }
+            catch
+            {
+                /* ignore */
+            }
+        }
+
+        private static IntPtr TryGetWordMainWindowHandle()
+        {
+            Process[] wordProcesses = Process.GetProcessesByName("WINWORD");
+            try
+            {
+                if (wordProcesses.Length == 0)
+                    return IntPtr.Zero;
+
+                uint processId = (uint)wordProcesses[0].Id;
+                IntPtr found = IntPtr.Zero;
+                EnumWindows((windowHandle, lParam) =>
+                {
+                    GetWindowThreadProcessId(windowHandle, out uint windowProcessId);
+                    if (windowProcessId != processId)
+                        return true;
+
+                    var className = new StringBuilder(256);
+                    GetClassName(windowHandle, className, className.Capacity);
+                    if (!className.ToString().Contains("OpusApp"))
+                        return true;
+
+                    found = windowHandle;
+                    return false;
+                }, IntPtr.Zero);
+                return found;
+            }
+            finally
+            {
+                foreach (Process process in wordProcesses)
+                    process.Dispose();
+            }
+        }
+
+        private static void TryForceForeground(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero)
+                return;
+
+            uint currentTid = 0;
+            uint targetTid = 0;
+            bool attached = false;
+            try
+            {
+                currentTid = GetCurrentThreadId();
+                targetTid = GetWindowThreadProcessId(hWnd, out _);
+                if (currentTid != 0 && targetTid != 0 && currentTid != targetTid)
+                    attached = AttachThreadInput(currentTid, targetTid, true);
+
+                ShowWindow(hWnd, SW_RESTORE);
+                BringWindowToTop(hWnd);
+                SetForegroundWindow(hWnd);
+            }
+            catch
+            {
+                /* ignore */
+            }
+            finally
+            {
+                if (attached && currentTid != 0 && targetTid != 0)
+                {
+                    try { AttachThreadInput(currentTid, targetTid, false); } catch { }
+                }
+            }
+        }
         
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             var owner = Application.Current.MainWindow;
             var result = owner != null
                 ? MessageBox.Show(owner, "アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question)
@@ -545,6 +706,8 @@ namespace MOS_Word_app.Views
         
         private async void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             try
             {
                 // 「結果に戻る」モードの場合は、隠れている ResultWindow を再表示する
@@ -1791,6 +1954,8 @@ namespace MOS_Word_app.Views
         
         private async void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             ScoreResultWindow.TryBringOpenToFront();
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
