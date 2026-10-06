@@ -808,6 +808,52 @@ namespace ExcelAddIn1
             return string.Join("|", parts);
         }
 
+        /// <summary>
+        /// 名前定義シグネチャから定義名の集合だけを取り出し、追加・削除があるか判定する。
+        /// RefersTo だけの変化（SORT/スピル等の自動更新）は破壊的操作にしない。
+        /// 署名要素形式: "WB:名前:参照先" / "WS:名前:参照先"
+        /// </summary>
+        private static bool HasNamedRangeNameSetChanged(string oldSignature, string newSignature)
+        {
+            var oldNames = ExtractNamedRangeNameKeys(oldSignature);
+            var newNames = ExtractNamedRangeNameKeys(newSignature);
+            if (oldNames.Count != newNames.Count)
+                return true;
+            foreach (string name in oldNames)
+            {
+                if (!newNames.Contains(name))
+                    return true;
+            }
+            return false;
+        }
+
+        private static HashSet<string> ExtractNamedRangeNameKeys(string signature)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(signature))
+                return keys;
+
+            foreach (string part in signature.Split('|'))
+            {
+                if (string.IsNullOrEmpty(part))
+                    continue;
+
+                // "WB:氏名:=Sheet!$A$1" → scope=WB, name=氏名
+                int first = part.IndexOf(':');
+                if (first < 0 || first >= part.Length - 1)
+                    continue;
+                int second = part.IndexOf(':', first + 1);
+                string scope = part.Substring(0, first);
+                string name = second > first
+                    ? part.Substring(first + 1, second - first - 1)
+                    : part.Substring(first + 1);
+                if (string.IsNullOrEmpty(name))
+                    continue;
+                keys.Add(scope + ":" + name);
+            }
+            return keys;
+        }
+
         private static string BuildExternalDataSignature(Excel.Worksheet ws)
         {
             var parts = new List<string>();
@@ -1290,7 +1336,9 @@ namespace ExcelAddIn1
                 Logger.LogOperation("MoveOrResizeShape", $"{sheetName}!Count={newS.ShapeCount}");
             }
 
-            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.NamedRanges) && oldS.NamedRangeSignature != newS.NamedRangeSignature)
+            // 参照先(RefersTo)だけの自動更新は無視し、定義名の追加・削除があるときだけ記録する
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.NamedRanges)
+                && HasNamedRangeNameSetChanged(oldS.NamedRangeSignature, newS.NamedRangeSignature))
                 Logger.LogOperation("ManageNamedRange", $"{sheetName}!NamedRangeChanged");
 
             if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.ExternalData) && oldS.ExternalDataSignature != newS.ExternalDataSignature)

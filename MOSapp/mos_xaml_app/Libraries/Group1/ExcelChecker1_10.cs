@@ -1,409 +1,156 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.Excel;
+using Libraries;
 
 namespace Libraries.Group1
 {
     public class ExcelChecker1_10
     {
-        public bool CheckExcel(string filePath)
+        public bool CheckTask_1_10_01() => RunCheck(CheckTask_1_10_01_Impl);
+        public bool CheckTask_1_10_02() => RunCheck(CheckTask_1_10_02_Impl);
+        public bool CheckTask_1_10_03() => RunCheck(CheckTask_1_10_03_Impl);
+        public bool CheckTask_1_10_04() => RunCheck(CheckTask_1_10_04_Impl);
+        public bool CheckTask_1_10_05() => RunCheck(CheckTask_1_10_05_Impl);
+        public bool CheckTask_1_10_06() => RunCheck(CheckTask_1_10_06_Impl);
+        public bool CheckTask_1_10_07() => RunCheck(CheckTask_1_10_07_Impl);
+        public bool CheckTask_1_10_08() => RunCheck(CheckTask_1_10_08_Impl);
+
+        private bool RunCheck(Func<string, bool> task)
         {
-            return true;
+            try
+            {
+                string filePath = GetCurrentExcelFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(ExcelScoreExplanation.UnavailableText);
+                return task(filePath);
+            }
+            catch
+            {
+                return Miss(ExcelScoreExplanation.UnavailableText);
+            }
         }
 
-        public bool CheckTask_1_10_01()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_01_Impl(filePath);
-        }
-
-        public bool CheckTask_1_10_02()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_02_Impl(filePath);
-        }
-
-        public bool CheckTask_1_10_03()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_03_Impl(filePath);
-        }
-
-        public bool CheckTask_1_10_04()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_04_Impl(filePath);
-        }
-
-        public bool CheckTask_1_10_05()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_05_Impl(filePath);
-        }
-
-        public bool CheckTask_1_10_06()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_06_Impl(filePath);
-        }
-
-        public bool CheckTask_1_10_07()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_07_Impl(filePath);
-        }
-
-        public bool CheckTask_1_10_08()
-        {
-            string filePath = GetCurrentExcelFilePath();
-            if (string.IsNullOrEmpty(filePath))
-                return false;
-            return CheckTask_1_10_08_Impl(filePath);
-        }
-
+        // ---------------------------------------------------------
+        // 10-1: 担当者リスト!G5:G26 = IF(Fn>5,"あり","なし")
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_01_Impl(string filePath)
         {
-            Application excelApp = null;
-            Workbook workbook = null;
-            Worksheet worksheet = null;
-            try
-            {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
-
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
-                    return false;
-                }
-
-                // タスク10-1: シート［担当者リスト］の「昇給」の列に、関数で勤続年数が5より大きければ「あり」、そうでなければ「なし」
-                worksheet = FindWorksheet(workbook, "担当者リスト");
-                if (worksheet == null) return false;
-
-                // G5セルのIF関数をチェック
-                Range targetCell = worksheet.Range["G5"];
-                string formula = targetCell.Formula as string;
-
-                if (formula != null)
-                {
-                    string normalizedFormula = formula.Replace(" ", "").ToUpper();
-                    // IF関数とF5>5の条件、「あり」「なし」の値をチェック
-                    return normalizedFormula.Contains("IF(") &&
-                           normalizedFormula.Contains("F5>5") &&
-                           normalizedFormula.Contains("あり") &&
-                           normalizedFormula.Contains("なし") &&
-                           !normalizedFormula.Contains("$");
-                }
-                return false;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-            finally
-            {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
-            }
+            return CheckFilledFormula(
+                filePath,
+                "担当者リスト",
+                "G5",
+                "G6:G26",
+                (formula, row) => IsIfAriNashi(formula, row),
+                (sheet, cell, formula) => ExplainIfAriNashi(sheet, cell, formula));
         }
 
+        // ---------------------------------------------------------
+        // 10-2: 出張精算!G5:G9 = IF(En>=300,10000,5000)
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_02_Impl(string filePath)
         {
-            Application excelApp = null;
-            Workbook workbook = null;
-            Worksheet worksheet = null;
-            try
-            {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
-
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
-                    return false;
-                }
-
-                // タスク10-2: シート［出張精算］の「手当金額」の列に、関数で「距離」が300㎞以上であれば「10000」、そうでなければ「5000」
-                worksheet = FindWorksheet(workbook, "出張精算");
-                if (worksheet == null) return false;
-
-                // G5セルのIF関数をチェック
-                Range targetCell = worksheet.Range["G5"];
-                string formula = targetCell.Formula as string;
-
-                if (formula != null)
-                {
-                    string normalizedFormula = formula.Replace(" ", "").ToUpper();
-                    // IF関数とE5>=300の条件、10000、5000の値をチェック
-                    return normalizedFormula.Contains("IF(") &&
-                           normalizedFormula.Contains("E5>=300") &&
-                           normalizedFormula.Contains("10000") &&
-                           normalizedFormula.Contains("5000") &&
-                           !normalizedFormula.Contains("$");
-                }
-                return false;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-            finally
-            {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
-            }
+            return CheckFilledFormula(
+                filePath,
+                "出張精算",
+                "G5",
+                "G6:G9",
+                (formula, row) => IsIfKyori(formula, row),
+                (sheet, cell, formula) => ExplainIfKyori(sheet, cell, formula));
         }
 
+        // ---------------------------------------------------------
+        // 10-3: 売上一覧!G4:G99 = IF(在庫<=13%,"在庫を補充","")
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_03_Impl(string filePath)
         {
-            Application excelApp = null;
-            Workbook workbook = null;
-            Worksheet worksheet = null;
-            try
-            {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
-
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
-                    return false;
-                }
-
-                // タスク10-3: シート［売上一覧］の「補充の有無」の列に、関数で「在庫」が13%以下であれば「在庫を補充」、そうでなければ何も表示しない
-                worksheet = FindWorksheet(workbook, "売上一覧");
-                if (worksheet == null) return false;
-
-                // G4セルのIF関数をチェック（G5ではなくG4から開始）
-                Range targetCell = worksheet.Range["G4"];
-                string formula = targetCell.Formula as string;
-
-                if (formula != null)
-                {
-                    string normalizedFormula = formula.Replace(" ", "").ToUpper();
-                    // IF関数とF5<=13%または<=0.13の条件、「在庫を補充」の値、空文字列をチェック
-                    bool hasIF = normalizedFormula.Contains("IF(");
-                    bool hasCondition = normalizedFormula.Contains("F5<=13%") || normalizedFormula.Contains("F5<=0.13") ||
-                                       normalizedFormula.Contains("F4<=13%") || normalizedFormula.Contains("F4<=0.13");
-                    bool hasMessage = normalizedFormula.Contains("在庫を補充");
-                    bool hasEmptyString = normalizedFormula.Contains("\"\"");
-                    bool noAbsoluteRef = !normalizedFormula.Contains("$");
-                    
-                    return hasIF && hasCondition && hasMessage && hasEmptyString && noAbsoluteRef;
-                }
-                return false;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-            finally
-            {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
-            }
+            return CheckFilledFormula(
+                filePath,
+                "売上一覧",
+                "G4",
+                "G5:G99",
+                (formula, row) => IsIfStock(formula, row),
+                (sheet, cell, formula) => ExplainIfStock(sheet, cell, formula));
         }
 
+        // ---------------------------------------------------------
+        // 10-4: 担当者リスト!A5 = SEQUENCE(22,1,1,1)
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_04_Impl(string filePath)
         {
-            Application excelApp = null;
-            Workbook workbook = null;
-            Worksheet worksheet = null;
+            Workbook workbook;
+            Worksheet worksheet;
+            if (!TryOpenSheet(filePath, "担当者リスト", out workbook, out worksheet))
+                return Miss(ExcelScoreExplanation.UnavailableText);
+
             try
             {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
+                const string sheet = "担当者リスト";
+                const string cell = "A5";
+                string formula = worksheet.Range[cell].Formula as string;
+                if (string.IsNullOrWhiteSpace(formula))
+                    return Miss($"{SheetCell(sheet, cell)}に数式がありません。");
 
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
+                string n = NormalizeFormula(formula);
+                bool hasSeq = n.Contains("SEQUENCE(");
+                bool hasArgs = n.Contains("22,1,1,1") || (n.Contains("22") && n.Contains("1,1,1"));
+                if (hasSeq && hasArgs)
+                    return true;
 
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
-                    return false;
-                }
-
-                // タスク10-4: シート「担当者リスト」の「No」の列に、関数で1から順に22行分入力
-                worksheet = FindWorksheet(workbook, "担当者リスト");
-                if (worksheet == null) return false;
-
-                // A5セルのSEQUENCE関数をチェック
-                Range targetCell = worksheet.Range["A5"];
-                string formula = targetCell.Formula as string;
-
-                if (formula != null)
-                {
-                    string normalizedFormula = formula.Replace(" ", "").ToUpper();
-                    // SEQUENCE関数と22行、1列、開始値1、目盛り1をチェック
-                    return normalizedFormula.Contains("SEQUENCE(") &&
-                           normalizedFormula.Contains("22") &&
-                           normalizedFormula.Contains("1,1,1");
-                }
-                return false;
-            }
-            catch (Exception)
-            {
+                if (!hasSeq)
+                    ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}にSEQUENCE関数がありません。");
+                if (hasSeq && !hasArgs)
+                    ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の引数が「{Quote(DescribeFormulaArgs(formula, "SEQUENCE"))}」になっています。");
                 return false;
             }
             finally
             {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
+                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
             }
         }
 
+        // ---------------------------------------------------------
+        // 10-5: 業務予定!C4 = SEQUENCE(...,0.5)
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_05_Impl(string filePath)
         {
-            Application excelApp = null;
-            Workbook workbook = null;
-            Worksheet worksheet = null;
+            Workbook workbook;
+            Worksheet worksheet;
+            if (!TryOpenSheet(filePath, "業務予定", out workbook, out worksheet))
+                return Miss(ExcelScoreExplanation.UnavailableText);
+
             try
             {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
+                const string sheet = "業務予定";
+                const string cell = "C4";
+                string formula = worksheet.Range[cell].Formula as string;
+                if (string.IsNullOrWhiteSpace(formula))
+                    return Miss($"{SheetCell(sheet, cell)}に数式がありません。");
 
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
+                string n = NormalizeFormula(formula);
+                bool hasSeq = n.Contains("SEQUENCE(");
+                bool hasStep = n.Contains("0.5");
+                if (hasSeq && hasStep)
+                    return true;
 
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
-                    return false;
-                }
-
-                // タスク10-5: シート「業務予定」の「開始時間」の列の数式を変更して、10時から30分おきになるようにする
-                worksheet = FindWorksheet(workbook, "業務予定");
-                if (worksheet == null) return false;
-
-                // C4セルのSEQUENCE関数をチェック（目盛りが0.5になっているか）
-                Range targetCell = worksheet.Range["C4"];
-                string formula = targetCell.Formula as string;
-
-                if (formula != null)
-                {
-                    string normalizedFormula = formula.Replace(" ", "").ToUpper();
-                    // SEQUENCE関数と目盛り0.5をチェック
-                    return normalizedFormula.Contains("SEQUENCE(") &&
-                           normalizedFormula.Contains("0.5");
-                }
-                return false;
-            }
-            catch (Exception)
-            {
+                if (!hasSeq)
+                    ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}にSEQUENCE関数がありません。");
+                if (hasSeq && !hasStep)
+                    ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の目盛りが「{Quote(DescribeFormulaArgs(formula, "SEQUENCE"))}」になっています。");
                 return false;
             }
             finally
             {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
+                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
             }
         }
 
+        // ---------------------------------------------------------
+        // 10-6: 売上集計/営業予定!D6 = SORT(A6:B14,2,-1)
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_06_Impl(string filePath)
         {
             Application excelApp = null;
@@ -411,217 +158,332 @@ namespace Libraries.Group1
             Worksheet worksheet = null;
             try
             {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
+                if (!TryGetWorkbook(filePath, out excelApp, out workbook))
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
-                    return false;
-                }
-
-                // タスク10-6: シート「売上集計」のセル【D6】を開始位置として、関数で表を「売上合計」の高い順に並べ替えて表示
-                // シート名が「営業予定」または「売上集計」の可能性があるので両方チェック
-                worksheet = FindWorksheet(workbook, "売上集計");
+                worksheet = FindWorksheet(workbook, "売上集計") ?? FindWorksheet(workbook, "営業予定");
                 if (worksheet == null)
-                {
-                    worksheet = FindWorksheet(workbook, "営業予定");
-                }
-                if (worksheet == null) return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
-                // D6セルのSORT関数をチェック
-                Range targetCell = worksheet.Range["D6"];
-                string formula = targetCell.Formula as string;
+                string sheet = worksheet.Name;
+                const string cell = "D6";
+                string formula = worksheet.Range[cell].Formula as string;
+                if (string.IsNullOrWhiteSpace(formula))
+                    return Miss($"{SheetCell(sheet, cell)}に数式がありません。");
 
-                if (formula != null)
-                {
-                    string normalizedFormula = formula.Replace(" ", "").ToUpper();
-                    // SORT関数と並べ替えインデックス2、並べ替え順序-1（降順）をチェック
-                    return normalizedFormula.Contains("SORT(") &&
-                           normalizedFormula.Contains("A6:B14") &&
-                           normalizedFormula.Contains("2") &&
-                           normalizedFormula.Contains("-1");
-                }
+                string n = NormalizeFormula(formula);
+                bool hasSort = n.Contains("SORT(");
+                bool hasRange = n.Contains("A6:B14");
+                bool hasIndex = n.Contains(",2,") || n.Contains(",2)");
+                bool hasDesc = n.Contains("-1");
+                if (hasSort && hasRange && hasIndex && hasDesc)
+                    return true;
+
+                if (!hasSort)
+                    ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}にSORT関数がありません。");
+                if (hasSort && !hasRange)
+                    ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の参照範囲が「{Quote(DescribeFormulaArgs(formula, "SORT"))}」になっています。");
+                if (hasSort && hasRange && (!hasIndex || !hasDesc))
+                    ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の並べ替え条件が「{Quote(DescribeFormulaArgs(formula, "SORT"))}」になっています。");
                 return false;
             }
-            catch (Exception)
+            catch
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
+                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
             }
         }
 
+        // ---------------------------------------------------------
+        // 10-7: 売上一覧!I4:I99 = En*$K$4（K4は絶対参照）
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_07_Impl(string filePath)
         {
-            Application excelApp = null;
-            Workbook workbook = null;
-            Worksheet worksheet = null;
+            Workbook workbook;
+            Worksheet worksheet;
+            if (!TryOpenSheet(filePath, "売上一覧", out workbook, out worksheet))
+                return Miss(ExcelScoreExplanation.UnavailableText);
+
             try
             {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
+                const string sheet = "売上一覧";
+                string formulaI4 = worksheet.Range["I4"].Formula as string;
+                if (string.IsNullOrWhiteSpace(formulaI4))
+                    return Miss($"{SheetCell(sheet, "I4")}に数式がありません。");
 
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                foreach (Workbook wb in excelApp.Workbooks)
+                if (!IsTaxPrice(formulaI4, 4))
                 {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
+                    ExplainTaxPrice(sheet, "I4", formulaI4, 4);
                     return false;
                 }
 
-                // タスク10-7: シート「売上一覧」の「税込価格」の列に、「税込価格」を算出（単価と税率の乗算、税率はセル【K4】を参照）
-                worksheet = FindWorksheet(workbook, "売上一覧");
-                if (worksheet == null) return false;
-
-                // I4セルの数式をチェック（E4*$K$4の絶対参照）
-                Range targetCell = worksheet.Range["I4"];
-                string formula = targetCell.Formula as string;
-
-                if (formula != null)
+                var missingOrWrong = new List<string>();
+                foreach (Range cell in worksheet.Range["I5:I99"].Cells)
                 {
-                    string normalizedFormula = formula.Replace(" ", "").ToUpper();
-                    // E4*$K$4の絶対参照をチェック
-                    return normalizedFormula.Contains("E4") &&
-                           normalizedFormula.Contains("$K$4") &&
-                           normalizedFormula.Contains("*");
+                    int row = cell.Row;
+                    string formula = cell.Formula as string;
+                    if (!IsTaxPrice(formula, row))
+                        missingOrWrong.Add(cell.Address[false, false]);
                 }
-                return false;
-            }
-            catch (Exception)
-            {
-                return false;
+
+                if (missingOrWrong.Count == 0)
+                    return true;
+
+                return Miss($"シート「{sheet}」の{JoinNames(missingOrWrong)}に税込価格の数式がありません。");
             }
             finally
             {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
+                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
             }
         }
 
+        // ---------------------------------------------------------
+        // 10-8: 在庫管理!B4 にテキスト取込
+        // ---------------------------------------------------------
         private bool CheckTask_1_10_08_Impl(string filePath)
         {
-            Application excelApp = null;
-            Workbook workbook = null;
-            Worksheet worksheet = null;
+            Workbook workbook;
+            Worksheet worksheet;
+            if (!TryOpenSheet(filePath, "在庫管理", out workbook, out worksheet))
+                return Miss(ExcelScoreExplanation.UnavailableText);
+
             try
             {
-                try
-                {
-                    excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch
-                {
-                    excelApp = new Application();
-                    excelApp.Visible = false;
-                }
+                const string sheet = "在庫管理";
+                bool foundImport = false;
+                bool foundAtB4 = false;
+                string sampleDest = null;
 
-                workbook = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                foreach (Workbook wb in excelApp.Workbooks)
-                {
-                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        workbook = wb;
-                        break;
-                    }
-                }
-
-                if (workbook == null)
-                {
-                    return false;
-                }
-
-                // タスク10-8: シート「在庫管理」のセル「B4」を基準に、テキストファイル「在庫管理表.txt」をインポート
-                worksheet = FindWorksheet(workbook, "在庫管理");
-                if (worksheet == null) return false;
-
-                // B4付近にQueryTableがあるかチェック
                 if (worksheet.QueryTables.Count > 0)
                 {
                     foreach (QueryTable qt in worksheet.QueryTables)
                     {
-                        // クエリテーブルの接続文字列にテキストファイルが含まれているかチェック
-                        string connection = qt.Connection as string;
-                        if (connection != null && connection.Contains(".txt"))
+                        Range destination = null;
+                        try { destination = qt.Destination; } catch { }
+                        if (destination == null)
+                            continue;
+
+                        foundImport = true;
+                        sampleDest = destination.Address.Replace("$", "");
+                        if (destination.Row == 4 && destination.Column == 2)
                         {
-                            // テーブルの開始位置がB4付近かチェック
-                            Range destination = qt.Destination;
-                            if (destination != null)
-                            {
-                                if (destination.Address.Contains("$B$4") || destination.Row == 4)
-                                {
-                                    return true;
-                                }
-                            }
+                            foundAtB4 = true;
+                            break;
                         }
                     }
                 }
 
-                // ListObjectsもチェック（Power Queryでインポートした場合）
-                if (worksheet.ListObjects.Count > 0)
+                if (!foundAtB4 && worksheet.ListObjects.Count > 0)
                 {
                     foreach (ListObject lo in worksheet.ListObjects)
                     {
-                        Range headerRange = lo.HeaderRowRange;
-                        if (headerRange != null && headerRange.Row >= 4 && headerRange.Column == 2)
+                        Range headerRange = null;
+                        try { headerRange = lo.HeaderRowRange; } catch { }
+                        if (headerRange == null)
+                            continue;
+
+                        // 行位置に関わらず取込ありとみなし、B4 かどうかで正誤を分ける
+                        foundImport = true;
+                        sampleDest = headerRange.Address.Replace("$", "");
+                        if (headerRange.Row == 4 && headerRange.Column == 2)
                         {
-                            return true;
+                            foundAtB4 = true;
+                            break;
                         }
                     }
                 }
 
-                return false;
-            }
-            catch (Exception)
-            {
-                return false;
+                if (foundAtB4)
+                    return true;
+
+                if (!foundImport)
+                    return Miss($"シート「{sheet}」にテキストファイルの取り込みがありません。");
+
+                return Miss($"シート「{sheet}」の取り込み位置が「{Quote(sampleDest ?? "（不明）")}」になっています。");
             }
             finally
             {
-                if (worksheet != null)
-                    Marshal.ReleaseComObject(worksheet);
+                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
+            }
+        }
+
+        // ===== fill-range helper =====
+        private bool CheckFilledFormula(
+            string filePath,
+            string sheetName,
+            string startCell,
+            string fillRangeAddress,
+            Func<string, int, bool> isOk,
+            Action<string, string, string> explainStart)
+        {
+            Workbook workbook;
+            Worksheet worksheet;
+            if (!TryOpenSheet(filePath, sheetName, out workbook, out worksheet))
+                return Miss(ExcelScoreExplanation.UnavailableText);
+
+            try
+            {
+                Range start = worksheet.Range[startCell];
+                string startFormula = start.Formula as string;
+                if (string.IsNullOrWhiteSpace(startFormula))
+                    return Miss($"{SheetCell(sheetName, startCell)}に数式がありません。");
+
+                int startRow = start.Row;
+                if (!isOk(startFormula, startRow))
+                {
+                    explainStart(sheetName, startCell, startFormula);
+                    return false;
+                }
+
+                var missingOrWrong = new List<string>();
+                foreach (Range cell in worksheet.Range[fillRangeAddress].Cells)
+                {
+                    string formula = cell.Formula as string;
+                    if (!isOk(formula, cell.Row))
+                        missingOrWrong.Add(cell.Address[false, false]);
+                }
+
+                if (missingOrWrong.Count == 0)
+                    return true;
+
+                return Miss($"シート「{sheetName}」の{JoinNames(missingOrWrong)}に正しい数式がありません。");
+            }
+            finally
+            {
+                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
+            }
+        }
+
+        // ===== formula matchers =====
+        private static bool IsIfAriNashi(string formula, int row)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            if (n.Contains("$")) return false;
+            return n.Contains("IF(")
+                && n.Contains($"F{row}>5")
+                && n.Contains("あり")
+                && n.Contains("なし");
+        }
+
+        private static void ExplainIfAriNashi(string sheet, string cell, string formula)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            if (!n.Contains("IF("))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}にIF関数がありません。");
+            else
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の引数が「{Quote(DescribeFormulaArgs(formula, "IF"))}」になっています。");
+            if (n.Contains("$"))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に「$」が含まれています。");
+        }
+
+        private static bool IsIfKyori(string formula, int row)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            if (n.Contains("$")) return false;
+            return n.Contains("IF(")
+                && n.Contains($"E{row}>=300")
+                && n.Contains("10000")
+                && n.Contains("5000");
+        }
+
+        private static void ExplainIfKyori(string sheet, string cell, string formula)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            if (!n.Contains("IF("))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}にIF関数がありません。");
+            else
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の引数が「{Quote(DescribeFormulaArgs(formula, "IF"))}」になっています。");
+            if (n.Contains("$"))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に「$」が含まれています。");
+        }
+
+        private static bool IsIfStock(string formula, int row)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            if (n.Contains("$")) return false;
+            // 解答手順は G4 で F5 を参照するため、Fn と F(n+1) の両方を許容
+            bool cond = n.Contains($"F{row}<=13%") || n.Contains($"F{row}<=0.13")
+                || n.Contains($"F{row + 1}<=13%") || n.Contains($"F{row + 1}<=0.13");
+            return n.Contains("IF(")
+                && cond
+                && n.Contains("在庫を補充")
+                && n.Contains("\"\"");
+        }
+
+        private static void ExplainIfStock(string sheet, string cell, string formula)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            if (!n.Contains("IF("))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}にIF関数がありません。");
+            else
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の引数が「{Quote(DescribeFormulaArgs(formula, "IF"))}」になっています。");
+            if (n.Contains("$"))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に「$」が含まれています。");
+        }
+
+        private static bool IsTaxPrice(string formula, int row)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            return n.Contains($"E{row}")
+                && n.Contains("$K$4")
+                && n.Contains("*");
+        }
+
+        private static void ExplainTaxPrice(string sheet, string cell, string formula, int row)
+        {
+            string n = NormalizeFormula(formula ?? "");
+            if (!n.Contains("*") && !n.Contains($"E{row}") && !n.Contains("$K$4"))
+            {
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式が「{Quote(formula)}」になっています。");
+                return;
+            }
+            if (!n.Contains($"E{row}"))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}が単価（E{row}）を参照していません。");
+            if (!n.Contains("$K$4"))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}が税率（$K$4）を参照していません。");
+            if (!n.Contains("*"))
+                ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}が掛け算の数式になっていません。");
+        }
+
+        // ===== COM helpers =====
+        private bool TryOpenSheet(string filePath, string sheetName, out Workbook workbook, out Worksheet worksheet)
+        {
+            workbook = null;
+            worksheet = null;
+            Application excelApp;
+            if (!TryGetWorkbook(filePath, out excelApp, out workbook))
+                return false;
+            worksheet = FindWorksheet(workbook, sheetName);
+            return worksheet != null;
+        }
+
+        private bool TryGetWorkbook(string filePath, out Application excelApp, out Workbook workbook)
+        {
+            excelApp = null;
+            workbook = null;
+            try
+            {
+                try { excelApp = (Application)Marshal.GetActiveObject("Excel.Application"); }
+                catch { excelApp = new Application { Visible = false }; }
+
+                string fileName = Path.GetFileName(filePath);
+                foreach (Workbook wb in excelApp.Workbooks)
+                {
+                    if (wb.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
+                        wb.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        workbook = wb;
+                        return true;
+                    }
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -630,16 +492,12 @@ namespace Libraries.Group1
             try
             {
                 Application excelApp = (Application)Marshal.GetActiveObject("Excel.Application");
-                if (excelApp.ActiveWorkbook != null)
-                {
-                    return excelApp.ActiveWorkbook.FullName;
-                }
+                return excelApp.ActiveWorkbook?.FullName;
             }
             catch
             {
-                // Excel not running or no active workbook
+                return null;
             }
-            return null;
         }
 
         private Worksheet FindWorksheet(Workbook workbook, string worksheetName)
@@ -647,11 +505,76 @@ namespace Libraries.Group1
             foreach (Worksheet ws in workbook.Worksheets)
             {
                 if (ws.Name.Equals(worksheetName, StringComparison.OrdinalIgnoreCase))
-                {
                     return ws;
-                }
             }
             return null;
+        }
+
+        private static bool Miss(string reason)
+        {
+            ExcelScoreExplanation.Note(reason);
+            return false;
+        }
+
+        private static string SheetCell(string sheetName, string cellAddress)
+        {
+            return $"シート「{sheetName}」の{cellAddress}";
+        }
+
+        private static string Quote(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        private static string JoinNames(IList<string> names)
+        {
+            if (names == null || names.Count == 0)
+                return "";
+            const int maxItems = 5;
+            if (names.Count <= maxItems)
+                return string.Join("、", names);
+            return string.Join("、", names.Take(maxItems)) + "ほか";
+        }
+
+        private static string NormalizeFormula(string formula)
+        {
+            if (string.IsNullOrEmpty(formula))
+                return "";
+            return formula.Replace(" ", "").ToUpperInvariant();
+        }
+
+        private static string DescribeFormulaArgs(string formula, string functionName)
+        {
+            if (string.IsNullOrEmpty(formula) || string.IsNullOrEmpty(functionName))
+                return "（不明）";
+            string upper = formula.ToUpperInvariant();
+            string key = functionName.ToUpperInvariant() + "(";
+            int start = upper.IndexOf(key, StringComparison.Ordinal);
+            if (start < 0)
+                return formula.Trim();
+            start += key.Length;
+            int depth = 1;
+            int i = start;
+            for (; i < formula.Length; i++)
+            {
+                char c = formula[i];
+                if (c == '(') depth++;
+                else if (c == ')')
+                {
+                    depth--;
+                    if (depth == 0)
+                        break;
+                }
+            }
+            if (depth != 0 || i <= start)
+                return formula.Trim();
+            return formula.Substring(start, i - start).Trim();
         }
     }
 }

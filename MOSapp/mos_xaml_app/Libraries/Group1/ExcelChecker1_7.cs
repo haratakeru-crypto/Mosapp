@@ -154,7 +154,7 @@ namespace Libraries.Group1
                     if (hasMax && !hasRange)
                         ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の参照範囲が「{Quote(DescribeFormulaArgs(formula, "MAX"))}」になっています。");
                     if (hasAbs)
-                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に絶対参照が含まれています。");
+                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に「$」が含まれています。");
                     if (hasMax && hasRange && !hasAbs)
                         return Miss($"{SheetCell(sheet, cell)}の数式が「{Quote(formula)}」になっています。");
                     return false;
@@ -198,7 +198,7 @@ namespace Libraries.Group1
                     if (hasCount && !hasRange)
                         ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の参照範囲が「{Quote(DescribeFormulaArgs(formula, "COUNT"))}」になっています。");
                     if (hasAbs)
-                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に絶対参照が含まれています。");
+                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に「$」が含まれています。");
                     if (hasCount && hasRange && !hasAbs)
                         return Miss($"{SheetCell(sheet, cell)}の数式が「{Quote(formula)}」になっています。");
                     return false;
@@ -242,7 +242,7 @@ namespace Libraries.Group1
                     if (hasFunc && !hasRange)
                         ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の参照範囲が「{Quote(DescribeFormulaArgs(formula, "COUNTBLANK"))}」になっています。");
                     if (hasAbs)
-                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に絶対参照が含まれています。");
+                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に「$」が含まれています。");
                     if (hasFunc && hasRange && !hasAbs)
                         return Miss($"{SheetCell(sheet, cell)}の数式が「{Quote(formula)}」になっています。");
                     return false;
@@ -352,7 +352,7 @@ namespace Libraries.Group1
                     if (g7HasFunc && !g7HasArgs)
                         ExcelScoreExplanation.Note($"{SheetCell(sheet, "G7")}の引数が「{Quote(DescribeFormulaArgs(g7Formula, "LEFT"))}」になっています。");
                     if (g7HasAbs)
-                        ExcelScoreExplanation.Note($"{SheetCell(sheet, "G7")}の数式に絶対参照が含まれています。");
+                        ExcelScoreExplanation.Note($"{SheetCell(sheet, "G7")}の数式に「$」が含まれています。");
                     return false;
                 }
 
@@ -371,7 +371,7 @@ namespace Libraries.Group1
                 if (missingOrWrong.Count == 0)
                     return true;
 
-                return Miss($"シート「{sheet}」の{JoinNames(missingOrWrong)}にLEFT関数（相対参照）がありません。");
+                return Miss($"シート「{sheet}」の{JoinNames(missingOrWrong)}にLEFT関数がありません。");
             }
             catch (Exception)
             {
@@ -421,7 +421,7 @@ namespace Libraries.Group1
                     if (hasFunc && !hasRange)
                         ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の参照範囲が「{Quote(DescribeFormulaArgs(formula, "UNIQUE"))}」になっています。");
                     if (hasAbs)
-                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に絶対参照が含まれています。");
+                        ExcelScoreExplanation.Note($"{SheetCell(sheet, cell)}の数式に「$」が含まれています。");
                     if (hasFunc && hasRange && !hasAbs)
                         return Miss($"{SheetCell(sheet, cell)}の数式が「{Quote(formula)}」になっています。");
                     return false;
