@@ -852,6 +852,9 @@ namespace Ui.ViewModels
         {
             try
             {
+                // ゲート解除漏れでトップレベルが無効のまま残っていても戻す。
+                ExcelStartupInputGate.EnsureExcelInputEnabled(_examExcelPid);
+
                 ExcelApp excelApp = TryGetSharedExcelApplication();
                 if (excelApp == null)
                     return;

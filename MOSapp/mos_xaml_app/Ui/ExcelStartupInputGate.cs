@@ -36,7 +36,13 @@ namespace Ui.ViewModels
         static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
 
         [DllImport("user32.dll")]
+        static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
         static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool IsWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -91,7 +97,8 @@ namespace Ui.ViewModels
                 "gate target-pid pid=" + processId
                 + " elapsed=" + ElapsedMs()
                 + "ms file=" + _expectedFile);
-            ReleaseDisabledWindows();
+            // PID 確定前に無効化した他 Excel も含め、いったん全部戻してから対象だけ落とす。
+            RestoreExcelInput(releaseTrackedOnly: false, onlyPid: 0);
             DisableExcelWindows();
             if (IsTargetReady(processId))
                 Finish("ready");
@@ -107,6 +114,21 @@ namespace Ui.ViewModels
             }
 
             Finish(_active ? "closed" : null);
+        }
+
+        /// <summary>
+        /// ゲート外からも呼べる保険。無効のまま残った Excel トップレベルを有効に戻す。
+        /// </summary>
+        public static void EnsureExcelInputEnabled(int processId = 0)
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(() => EnsureExcelInputEnabled(processId)));
+                return;
+            }
+
+            RestoreExcelInput(releaseTrackedOnly: false, onlyPid: processId);
         }
 
         static void OnTick(object sender, EventArgs e)
@@ -145,7 +167,8 @@ namespace Ui.ViewModels
                 _dialog = null;
             }
 
-            ReleaseDisabledWindows();
+            // 追跡漏れがあっても Excel を操作不能のまま残さない。
+            RestoreExcelInput(releaseTrackedOnly: false, onlyPid: 0);
             _waiting = null;
             _expectedFile = null;
             _openToken = null;
@@ -170,13 +193,39 @@ namespace Ui.ViewModels
             return _waiting == null ? 0 : _waiting.ElapsedMilliseconds;
         }
 
-        static void ReleaseDisabledWindows()
+        static void RestoreExcelInput(bool releaseTrackedOnly, int onlyPid)
         {
             foreach (IntPtr hwnd in DisabledWindows)
             {
-                try { EnableWindow(hwnd, true); } catch { }
+                try
+                {
+                    if (IsWindow(hwnd))
+                        EnableWindow(hwnd, true);
+                }
+                catch { }
             }
             DisabledWindows.Clear();
+
+            if (releaseTrackedOnly)
+                return;
+
+            ForceEnableExcelWindows(onlyPid);
+        }
+
+        static void ForceEnableExcelWindows(int onlyPid)
+        {
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (!IsExcelTopLevelWindow(hWnd, onlyPid))
+                    return true;
+                try
+                {
+                    if (!IsWindowEnabled(hWnd))
+                        EnableWindow(hWnd, true);
+                }
+                catch { }
+                return true;
+            }, IntPtr.Zero);
         }
 
         static void DisableExcelWindows()
@@ -184,32 +233,39 @@ namespace Ui.ViewModels
             int onlyPid = _targetPid;
             EnumWindows((hWnd, lParam) =>
             {
-                if (!IsWindowVisible(hWnd))
+                if (!IsExcelTopLevelWindow(hWnd, onlyPid))
                     return true;
-                GetWindowThreadProcessId(hWnd, out uint pid);
-                if (pid == 0)
-                    return true;
-                if (onlyPid > 0 && (int)pid != onlyPid)
-                    return true;
-                try
-                {
-                    using (Process process = Process.GetProcessById((int)pid))
-                    {
-                        if (!string.Equals(process.ProcessName, "EXCEL", StringComparison.OrdinalIgnoreCase))
-                            return true;
-                    }
-                }
-                catch
-                {
-                    return true;
-                }
 
                 if (DisabledWindows.Contains(hWnd))
                     return true;
-                if (EnableWindow(hWnd, false))
-                    DisabledWindows.Add(hWnd);
+
+                // EnableWindow の戻り値は「直前が有効だったか」。既に無効でも追跡する。
+                try { EnableWindow(hWnd, false); } catch { }
+                DisabledWindows.Add(hWnd);
                 return true;
             }, IntPtr.Zero);
+        }
+
+        static bool IsExcelTopLevelWindow(IntPtr hWnd, int onlyPid)
+        {
+            if (!IsWindowVisible(hWnd))
+                return false;
+            GetWindowThreadProcessId(hWnd, out uint pid);
+            if (pid == 0)
+                return false;
+            if (onlyPid > 0 && (int)pid != onlyPid)
+                return false;
+            try
+            {
+                using (Process process = Process.GetProcessById((int)pid))
+                {
+                    return string.Equals(process.ProcessName, "EXCEL", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         static Window CreateDialog()
