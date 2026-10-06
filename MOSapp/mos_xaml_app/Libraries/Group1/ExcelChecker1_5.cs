@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Excel = Microsoft.Office.Interop.Excel;
+using Libraries;
 
 namespace Libraries.Group1
 {
@@ -10,7 +11,7 @@ namespace Libraries.Group1
     {
         // タスク5-2の正解スタイルID（正解は347）
         // バージョン差異を考慮して複数を許可していますが、実質的には347が対象です
-        private readonly int[] VALID_STYLE_IDS = { 208, 8, 209, 9, 287, 288, 347 }; 
+        private readonly int[] VALID_STYLE_IDS = { 208, 8, 209, 9, 287, 288, 347 };
 
 
         // ラッパーメソッド
@@ -29,54 +30,57 @@ namespace Libraries.Group1
             {
                 Console.WriteLine($"[DEBUG] {taskName} called");
                 string filePath = GetCurrentExcelFilePath();
-                if (string.IsNullOrEmpty(filePath)) return false;
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return checkImpl(filePath);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] Exception in {taskName}: {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
 
         // ==========================================
         // タスク5-1: クイックレイアウト・グラフタイトル
+        // ChartLayout は COM/VSTO から読めないため、円グラフのレイアウト1相当を
+        // 「タイトル + 凡例なし + パーセント付きデータラベル」で代理判定する。
+        // （レイアウト2/6は凡例あり、レイアウト5は％なしで区別）
         // ==========================================
         private bool CheckTask_1_5_01_Impl(string filePath)
         {
             return ProcessChartTask(filePath, "売上実績", (chart) =>
             {
+                bool titleOk = false;
                 if (!chart.HasTitle)
                 {
-                    Console.WriteLine("[DEBUG] Failed: Chart has no title.");
-                    return false;
+                    ExcelScoreExplanation.Note("グラフタイトルがありません。");
                 }
-
-                string title = chart.ChartTitle.Text.Trim();
-                Console.WriteLine($"[DEBUG] Current Title: '{title}'");
-                
-                if (!title.StartsWith("売上構成比"))
+                else
                 {
-                    Console.WriteLine($"[DEBUG] Failed: Title mismatch. Expected to start with: '売上構成比'");
-                    return false;
+                    string title = chart.ChartTitle.Text.Trim();
+                    Console.WriteLine($"[DEBUG] Current Title: '{title}'");
+                    if (title.StartsWith("売上構成比"))
+                        titleOk = true;
+                    else
+                        ExcelScoreExplanation.Note($"グラフタイトルが「{Quote(title)}」になっています。");
                 }
 
-                bool hasLegend = chart.HasLegend;
-                Console.WriteLine($"[DEBUG] HasLegend: {hasLegend}");
-                
-                if (hasLegend)
+                bool noLegend = !chart.HasLegend;
+                bool hasPercentLabels = ChartHasPercentageDataLabels(chart);
+                bool layoutOk = noLegend && hasPercentLabels;
+                Console.WriteLine($"[DEBUG] Layout1 proxy (NoLegend={noLegend}, ShowPercentage={hasPercentLabels})");
+                if (!layoutOk)
+                    ExcelScoreExplanation.Note("グラフのレイアウトがレイアウト1になっていません。");
+
+                if (titleOk && layoutOk)
                 {
-                    Console.WriteLine($"[DEBUG] Legend Position: {chart.Legend.Position}");
-                    if (chart.Legend.Position == Excel.XlLegendPosition.xlLegendPositionRight)
-                    {
-                        Console.WriteLine("[DEBUG] Task 5-1 Passed: Title and Legend position correct.");
-                        return true;
-                    }
+                    Console.WriteLine("[DEBUG] Task 5-1 Passed: Title and Layout1 proxy.");
+                    return true;
                 }
 
-                Console.WriteLine("[DEBUG] Task 5-1 Passed: Title is correct.");
-                return true;
+                return false;
             });
         }
 
@@ -88,7 +92,6 @@ namespace Libraries.Group1
         {
             return ProcessChartTask(filePath, "商品別売上", (chart) =>
             {
-                // 1. スタイルのチェック
                 object styleObj = chart.ChartStyle;
                 int styleId = -1;
 
@@ -103,16 +106,13 @@ namespace Libraries.Group1
                     if (styleId == validId) isStyleCorrect = true;
                 }
 
-                // 2. 配色 (ChartColor) のチェックを追加
-                // 「カラフルなパレット3」は通常 ID 12
                 object colorObj = chart.ChartColor;
                 int colorId = -1;
                 if (colorObj != null && int.TryParse(colorObj.ToString(), out colorId))
                 {
                     Console.WriteLine($"[DEBUG] Current Chart Color: {colorId}");
                 }
-                
-                // 厳密に 12 であることを要求
+
                 bool isColorCorrect = (colorId == 12);
 
                 if (isStyleCorrect && isColorCorrect)
@@ -121,9 +121,11 @@ namespace Libraries.Group1
                     return true;
                 }
 
-                if (!isStyleCorrect) Console.WriteLine("[DEBUG] Failed: Style ID mismatch.");
-                if (!isColorCorrect) Console.WriteLine($"[DEBUG] Failed: Color mismatch. Expected 12, got {colorId}.");
-                
+                // ChartStyle / ChartColor の数値は画面の「スタイルN」「パレットN」と一致しないため、内部IDは出さない。
+                if (!isStyleCorrect)
+                    ExcelScoreExplanation.Note("グラフスタイルがスタイル12になっていません。");
+                if (!isColorCorrect)
+                    ExcelScoreExplanation.Note("グラフの配色がカラフルなパレット3になっていません。");
                 return false;
             });
         }
@@ -136,52 +138,50 @@ namespace Libraries.Group1
         {
             return ProcessChartTask(filePath, "商品別売上", (chart) =>
             {
-                // レイアウト変更の検知
-                // 1. タイトルが初期状態から変わっている場合
+                bool titleOk = true;
                 if (chart.HasTitle)
                 {
                     string title = chart.ChartTitle.Text.Trim();
                     if (title != "総計" && !string.IsNullOrEmpty(title))
                     {
-                        Console.WriteLine($"[DEBUG] Failed: Chart title changed ('{title}'), likely due to layout change.");
-                        return false;
+                        titleOk = false;
+                        ExcelScoreExplanation.Note($"グラフタイトルが「{Quote(title)}」に変わっています。");
                     }
                 }
 
-                // 2. 凡例が右側にある場合（レイアウト1）
-                if (chart.HasLegend && chart.Legend.Position == Excel.XlLegendPosition.xlLegendPositionRight)
-                {
-                    Console.WriteLine("[DEBUG] Failed: Layout appears to be changed (Legend on right = Layout 1).");
-                    return false;
-                }
+                bool layoutOk = !(chart.HasLegend && chart.Legend.Position == Excel.XlLegendPosition.xlLegendPositionRight);
+                if (!layoutOk)
+                    ExcelScoreExplanation.Note("グラフのレイアウトが変わっています（凡例が右にあります）。");
 
-                // 1. データラベル非表示のチェック
                 Excel.SeriesCollection seriesColl = (Excel.SeriesCollection)chart.SeriesCollection();
-                if (seriesColl.Count == 0) return false;
+                if (seriesColl.Count == 0)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
+                bool labelsHidden = true;
                 foreach (Excel.Series s in seriesColl)
                 {
                     if (s.HasDataLabels)
                     {
-                        Console.WriteLine("[DEBUG] Failed: Data Labels are visible.");
-                        return false; 
+                        labelsHidden = false;
+                        break;
                     }
                 }
+                if (!labelsHidden)
+                    ExcelScoreExplanation.Note("データラベルが表示されたままです。");
 
-                // 2. データの範囲変更（追加）のチェック
-                Excel.Series series1 = seriesColl.Item(1);
-                string formula = series1.Formula;
-                Console.WriteLine($"[DEBUG] Series Formula: {formula}");
+                // 初期グラフにも行10は含まれることが多いため、$10 判定は使わない。
+                // 解答手順どおり B 列まで広げて 1〜5 月が入っているかを見る。
+                bool rangeExpanded = ChartSeriesIncludesColumnB(seriesColl);
+                Console.WriteLine($"[DEBUG] Task 5-3 range includes column B: {rangeExpanded}");
+                if (!rangeExpanded)
+                    ExcelScoreExplanation.Note("グラフに1月から5月のデータが追加されていません。");
 
-                bool rangeExpanded = formula.Contains("$10") || formula.Contains(":10");
-
-                if (rangeExpanded)
+                if (titleOk && layoutOk && labelsHidden && rangeExpanded)
                 {
-                    Console.WriteLine("[DEBUG] Task 5-3 Passed: Range expanded ($10) and labels hidden.");
+                    Console.WriteLine("[DEBUG] Task 5-3 Passed: Range includes column B and labels hidden.");
                     return true;
                 }
 
-                Console.WriteLine("[DEBUG] Failed: Range does not match expected expansion (Expected $10).");
                 return false;
             });
         }
@@ -194,31 +194,37 @@ namespace Libraries.Group1
         {
             return ProcessChartTask(filePath, "商品別売上", (chart) =>
             {
-                // レイアウト変更の検知（タイトルが初期状態から変わっている場合）
+                bool titleOk = true;
                 if (chart.HasTitle)
                 {
                     string title = chart.ChartTitle.Text.Trim();
-                    // 初期タイトルは「総計」なので、それ以外に変わっている場合はレイアウト適用と判断
                     if (title != "総計" && !string.IsNullOrEmpty(title))
                     {
-                        Console.WriteLine($"[DEBUG] Failed: Chart title changed ('{title}'), likely due to layout change.");
-                        return false;
+                        titleOk = false;
+                        ExcelScoreExplanation.Note($"グラフタイトルが「{Quote(title)}」に変わっています。");
                     }
                 }
 
+                bool legendOk = false;
                 if (!chart.HasLegend)
                 {
-                    Console.WriteLine("[DEBUG] Failed: No legend found.");
-                    return false;
+                    ExcelScoreExplanation.Note("凡例が表示されていません。");
+                }
+                else if (chart.Legend.Position == Excel.XlLegendPosition.xlLegendPositionTop)
+                {
+                    legendOk = true;
+                }
+                else
+                {
+                    ExcelScoreExplanation.Note($"凡例の位置が「{DescribeLegendPosition(chart.Legend.Position)}」になっています。");
                 }
 
-                if (chart.Legend.Position == Excel.XlLegendPosition.xlLegendPositionTop)
+                if (titleOk && legendOk)
                 {
                     Console.WriteLine("[DEBUG] Task 5-4 Passed: Legend is at Top.");
                     return true;
                 }
 
-                Console.WriteLine($"[DEBUG] Failed: Legend position is {chart.Legend.Position}.");
                 return false;
             });
         }
@@ -232,73 +238,58 @@ namespace Libraries.Group1
             return ProcessChartTask(filePath, "月別売上", (chart) =>
             {
                 Excel.SeriesCollection seriesColl = (Excel.SeriesCollection)chart.SeriesCollection();
-                if (seriesColl.Count == 0) return false;
+                if (seriesColl.Count == 0)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 Excel.Series series = seriesColl.Item(1);
 
                 if (!series.HasDataLabels)
-                {
-                    Console.WriteLine("[DEBUG] Failed: Data Labels not enabled.");
-                    return false;
-                }
+                    return Miss("データラベルが表示されていません。");
 
                 Excel.DataLabels dataLabels = (Excel.DataLabels)series.DataLabels();
-                
+
                 if (dataLabels.Position == Excel.XlDataLabelPosition.xlLabelPositionInsideEnd)
                 {
                     Console.WriteLine("[DEBUG] Task 5-5 Passed: Label position is InsideEnd.");
                     return true;
                 }
 
-                Console.WriteLine($"[DEBUG] Failed: Label position is {dataLabels.Position}.");
-                return false;
+                return Miss($"データラベルの位置が「{DescribeDataLabelPosition(dataLabels.Position)}」になっています。");
             });
         }
 
 
         // ==========================================
         // タスク5-6: 第1横軸ラベル（軸タイトル）
+        // 月別売上は横棒グラフのため、画面の第1横軸は数値軸(xlValue)。
+        // （項目軸 xlCategory は縦方向になる）
         // ==========================================
         private bool CheckTask_1_5_06_Impl(string filePath)
         {
             return ProcessChartTask(filePath, "月別売上", (chart) =>
             {
-                // 軸のタイプを柔軟にチェック (xlCategory or xlValue)
-                bool titleFound = false;
-                string foundTitle = "";
-                var axisTypes = new[] { Excel.XlAxisType.xlCategory, Excel.XlAxisType.xlValue };
+                string horizontalTitle = TryGetAxisTitle(chart, Excel.XlAxisType.xlValue);
+                string verticalTitle = TryGetAxisTitle(chart, Excel.XlAxisType.xlCategory);
 
-                foreach (var type in axisTypes)
+                if (!string.IsNullOrEmpty(horizontalTitle))
                 {
-                    try
+                    if (horizontalTitle == "単位：円" || horizontalTitle.Contains("単位：円"))
                     {
-                        Excel.Axis axis = (Excel.Axis)chart.Axes(type);
-                        if (axis.HasTitle)
-                        {
-                            string t = axis.AxisTitle.Text.Trim();
-                            // "単位：円" を含むか、完全一致か
-                            if (t == "単位：円" || t.Contains("単位：円"))
-                            {
-                                titleFound = true;
-                                foundTitle = t;
-                                break;
-                            }
-                        }
+                        Console.WriteLine($"[DEBUG] Task 5-6 Passed: Horizontal axis title '{horizontalTitle}'.");
+                        return true;
                     }
-                    catch
-                    {
-                        // 軸が存在しない場合等は無視
-                    }
+                    return Miss($"第1横軸ラベルが「{Quote(horizontalTitle)}」になっています。");
                 }
 
-                if (titleFound)
+                // 横軸未設定。縦軸に何かある場合はそちらを理由に出す。
+                if (!string.IsNullOrEmpty(verticalTitle))
                 {
-                    Console.WriteLine($"[DEBUG] Task 5-6 Passed: Axis title '{foundTitle}' found.");
-                    return true;
+                    if (verticalTitle == "単位：円" || verticalTitle.Contains("単位：円"))
+                        return Miss("第1横軸ではなく第1縦軸に設定されています。");
+                    return Miss($"第1縦軸ラベルが設定されていて、「{Quote(verticalTitle)}」となっています。");
                 }
 
-                Console.WriteLine("[DEBUG] Failed: X-Axis (or any axis) has no matching title.");
-                return false;
+                return Miss("第1横軸ラベル（単位：円）が表示されていません。");
             });
         }
 
@@ -327,7 +318,8 @@ namespace Libraries.Group1
                         break;
                     }
                 }
-                if (workbook == null) return false;
+                if (workbook == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 foreach (Excel.Worksheet ws in workbook.Worksheets)
                 {
@@ -337,10 +329,12 @@ namespace Libraries.Group1
                         break;
                     }
                 }
-                if (worksheet == null) return false;
+                if (worksheet == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 Excel.ChartObjects chartObjects = (Excel.ChartObjects)worksheet.ChartObjects();
-                if (chartObjects.Count == 0) return false;
+                if (chartObjects.Count == 0)
+                    return Miss($"シート「{sheetName}」にグラフがありません。");
 
                 Excel.ChartObject chartObj = chartObjects.Item(1);
                 return checkLogic(chartObj.Chart);
@@ -348,7 +342,7 @@ namespace Libraries.Group1
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] Error in ProcessChartTask: {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -364,6 +358,149 @@ namespace Libraries.Group1
                 return excelApp.ActiveWorkbook?.FullName;
             }
             catch { return null; }
+        }
+
+        private static bool Miss(string reason)
+        {
+            ExcelScoreExplanation.Note(reason);
+            return false;
+        }
+
+        private static string TryGetAxisTitle(Excel.Chart chart, Excel.XlAxisType axisType)
+        {
+            try
+            {
+                Excel.Axis axis = (Excel.Axis)chart.Axes(axisType);
+                if (axis != null && axis.HasTitle)
+                {
+                    string t = axis.AxisTitle.Text?.Trim();
+                    if (!string.IsNullOrEmpty(t))
+                        return t;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] TryGetAxisTitle({axisType}): {ex.Message}");
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 系列のデータ範囲に B 列（1〜5月側）が含まれるか。
+        /// </summary>
+        private static bool ChartSeriesIncludesColumnB(Excel.SeriesCollection seriesColl)
+        {
+            if (seriesColl == null || seriesColl.Count == 0)
+                return false;
+
+            foreach (Excel.Series series in seriesColl)
+            {
+                try
+                {
+                    if (series.Values is Excel.Range valuesRange)
+                    {
+                        int startCol = valuesRange.Column;
+                        int endCol = startCol + valuesRange.Columns.Count - 1;
+                        if (startCol <= 2 && endCol >= 2)
+                            return true;
+                    }
+                }
+                catch
+                {
+                    // Values が Range でない場合は Formula へ
+                }
+
+                try
+                {
+                    string formula = series.Formula ?? "";
+                    Console.WriteLine($"[DEBUG] Series Formula: {formula}");
+                    if (formula.IndexOf("$B$", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true;
+                }
+                catch
+                {
+                    // 次の系列へ
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 系列にパーセント付きデータラベルがあるか（クイックレイアウト1の代理指標）。
+        /// </summary>
+        private static bool ChartHasPercentageDataLabels(Excel.Chart chart)
+        {
+            try
+            {
+                Excel.SeriesCollection seriesColl = (Excel.SeriesCollection)chart.SeriesCollection();
+                if (seriesColl == null || seriesColl.Count == 0)
+                    return false;
+
+                foreach (Excel.Series series in seriesColl)
+                {
+                    try
+                    {
+                        if (!series.HasDataLabels)
+                            continue;
+
+                        Excel.DataLabels dataLabels = (Excel.DataLabels)series.DataLabels();
+                        if (dataLabels != null && dataLabels.ShowPercentage)
+                            return true;
+                    }
+                    catch
+                    {
+                        // 系列ごとに読めない場合は次へ
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] ChartHasPercentageDataLabels: {ex.Message}");
+            }
+
+            return false;
+        }
+
+        private static string Quote(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        private static string DescribeLegendPosition(Excel.XlLegendPosition position)
+        {
+            switch (position)
+            {
+                case Excel.XlLegendPosition.xlLegendPositionTop: return "上";
+                case Excel.XlLegendPosition.xlLegendPositionBottom: return "下";
+                case Excel.XlLegendPosition.xlLegendPositionLeft: return "左";
+                case Excel.XlLegendPosition.xlLegendPositionRight: return "右";
+                case Excel.XlLegendPosition.xlLegendPositionCorner: return "隅";
+                default: return position.ToString();
+            }
+        }
+
+        private static string DescribeDataLabelPosition(Excel.XlDataLabelPosition position)
+        {
+            switch (position)
+            {
+                case Excel.XlDataLabelPosition.xlLabelPositionInsideEnd: return "内側上端（内部外側）";
+                case Excel.XlDataLabelPosition.xlLabelPositionInsideBase: return "内側下端";
+                case Excel.XlDataLabelPosition.xlLabelPositionOutsideEnd: return "外側上端";
+                case Excel.XlDataLabelPosition.xlLabelPositionCenter: return "中央";
+                case Excel.XlDataLabelPosition.xlLabelPositionBestFit: return "自動";
+                case Excel.XlDataLabelPosition.xlLabelPositionLeft: return "左";
+                case Excel.XlDataLabelPosition.xlLabelPositionRight: return "右";
+                case Excel.XlDataLabelPosition.xlLabelPositionAbove: return "上";
+                case Excel.XlDataLabelPosition.xlLabelPositionBelow: return "下";
+                default: return position.ToString();
+            }
         }
     }
 }

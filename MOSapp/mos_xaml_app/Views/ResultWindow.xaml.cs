@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using Newtonsoft.Json;
 using System.IO;
@@ -374,6 +375,7 @@ namespace MOSExcelMogiApp.Views
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
                                     ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
+                                    FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
                                     ResultColor = null // 後でUIスレッドで設定
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
@@ -428,6 +430,7 @@ namespace MOSExcelMogiApp.Views
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
                                     ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
+                                    FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
                                     ResultColor = isCorrect.HasValue 
                                         ? (isCorrect.Value ? Brushes.Green : Brushes.Red)
                                         : Brushes.Gray
@@ -878,8 +881,35 @@ namespace MOSExcelMogiApp.Views
             return filteredProjects;
         }
 
+        private static string FailReasonFor(int projectId, int taskId)
+        {
+            return MOSExcelMogiApp.Models.ExamResultStorage.GetFailReason(projectId, taskId);
+        }
+
+        private void FailReason_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement element && element.DataContext is ResultTaskInfo taskInfo && taskInfo.HasFailReason)
+                ScoreReasonWindow.Show(this, taskInfo.TaskId, taskInfo.FailReason);
+        }
+
+        private static bool IsFailReasonClick(MouseButtonEventArgs e)
+        {
+            DependencyObject current = e.OriginalSource as DependencyObject;
+            while (current != null)
+            {
+                if (current is FrameworkElement element && Equals(element.Tag, "FailReason"))
+                    return true;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return false;
+        }
+
         private async void TaskRow_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            if (IsFailReasonClick(e))
+                return;
+
             if (sender is FrameworkElement element && element.DataContext is ResultTaskInfo taskInfo)
             {
                 if (taskInfo.ProjectId > 0 && taskInfo.TaskId > 0)
@@ -992,6 +1022,8 @@ namespace MOSExcelMogiApp.Views
         public int ProjectId { get; set; }
         public int TaskId { get; set; }
         public string ResultMark { get; set; }
+        public string FailReason { get; set; }
+        public bool HasFailReason => !string.IsNullOrEmpty(FailReason);
         public Brush ResultColor { get; set; }
     }
 

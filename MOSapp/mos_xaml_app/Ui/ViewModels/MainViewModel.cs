@@ -1911,21 +1911,30 @@ namespace Ui.ViewModels
             })), null, scoringNoticeDelayMs, Timeout.Infinite);
 
             List<bool> results = null;
+            List<string> failReasons = null;
+            var checkerReasons = new List<string>();
             try
             {
                 results = await Task.Run(() =>
                 {
                     ExcelLogReader.RequestOpenTaskBoundaryFlush(projectId);
-                    return ExecuteScoringDirect(libraryName, taskCount);
+                    return ExecuteScoringDirect(libraryName, taskCount, checkerReasons);
                 });
                 if (results != null && results.Count == taskCount)
                 {
+                    failReasons = new List<string>(taskCount);
                     for (int taskIndex = 1; taskIndex <= taskCount; taskIndex++)
                     {
-                        results[taskIndex - 1] = ApplyDestructiveValidationForTask(
+                        string checkerReason = taskIndex - 1 < checkerReasons.Count
+                            ? checkerReasons[taskIndex - 1]
+                            : null;
+                        results[taskIndex - 1] = ExcelScoreExplanation.Apply(
                             projectId,
                             taskIndex,
-                            results[taskIndex - 1]);
+                            results[taskIndex - 1],
+                            checkerReason,
+                            out string reason);
+                        failReasons.Add(results[taskIndex - 1] ? "" : (reason ?? ExcelScoreExplanation.RequirementMissText));
                     }
                 }
             }
@@ -1956,11 +1965,11 @@ namespace Ui.ViewModels
             {
                 try
                 {
-                    MOSExcelMogiApp.Models.ExamResultStorage.SaveProjectResult(projectId, results);
+                    MOSExcelMogiApp.Models.ExamResultStorage.SaveProjectResult(projectId, results, failReasons);
                     var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
                         ?? Application.Current.MainWindow;
                     ShowScoreResultDialog(() =>
-                        ScoringResultDialog.ShowResults(owner, taskCount, results, groupId, projectId));
+                        ScoringResultDialog.ShowResults(owner, taskCount, results, groupId, projectId, failReasons));
                     ResultMessage = $"採点完了: {taskCount}問のタスクを採点しました";
                 }
                 catch (Exception ex)
@@ -2175,9 +2184,16 @@ namespace Ui.ViewModels
             return $"CheckTask_{taskNumber:D2}";
         }
         
-        private List<bool> ExecuteScoringDirect(string libraryName, int taskCount)
+        private List<bool> ExecuteScoringDirect(string libraryName, int taskCount, List<string> checkerReasons)
         {
             var results = new List<bool>();
+            if (checkerReasons == null)
+                checkerReasons = new List<string>();
+            void AddResult(bool passed, string checkerReason)
+            {
+                results.Add(passed);
+                checkerReasons.Add(passed ? "" : (checkerReason ?? ""));
+            }
             
             try
             {
@@ -2377,9 +2393,11 @@ namespace Ui.ViewModels
                                 if (method != null)
                                 {
                                     Console.WriteLine($"[DEBUG] Method found: {methodName}");
+                                    ExcelScoreExplanation.ClearCheckerReason();
                                     bool result = (bool)method.Invoke(checkerInstance, null);
+                                    string checkerReason = ExcelScoreExplanation.TakeCheckerReason();
                                     Console.WriteLine($"[DEBUG] Method {methodName} result: {result}");
-                                    results.Add(result);
+                                    AddResult(result, checkerReason);
                                     methodFound = true;
                                     break;
                                 }
@@ -2392,7 +2410,7 @@ namespace Ui.ViewModels
                             if (!methodFound)
                             {
                                 Console.WriteLine($"[DEBUG] No method found for task {i}, returning false");
-                                results.Add(false);
+                                AddResult(false, ExcelScoreExplanation.UnavailableText);
                             }
                         }
                     }
@@ -2402,7 +2420,7 @@ namespace Ui.ViewModels
                         // Fill with false results if type not found
                         for (int i = 0; i < taskCount; i++)
                         {
-                            results.Add(false);
+                            AddResult(false, ExcelScoreExplanation.UnavailableText);
                         }
                     }
                 }
@@ -2412,7 +2430,7 @@ namespace Ui.ViewModels
                     // Fill with false results if invalid format
                     for (int i = 0; i < taskCount; i++)
                     {
-                        results.Add(false);
+                        AddResult(false, ExcelScoreExplanation.UnavailableText);
                     }
                 }
             }
@@ -2423,53 +2441,15 @@ namespace Ui.ViewModels
                 System.Diagnostics.Debug.WriteLine($"Direct execution error: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 MessageBox.Show($"採点中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                ExcelScoreExplanation.ClearCheckerReason();
                 // Fill with false results in case of error
                 for (int i = 0; i < taskCount; i++)
                 {
-                    results.Add(false);
+                    AddResult(false, ExcelScoreExplanation.UnavailableText);
                 }
             }
             
             return results;
-        }
-
-        /// <summary>
-        /// 破壊的操作検知（一括採点と同じロジック）。<paramref name="projectId"/> は画面上のスロット番号。
-        /// </summary>
-        private static bool ApplyDestructiveValidationForTask(int projectId, int taskId, bool checkerResult)
-        {
-            if (!checkerResult)
-                return false;
-            if (projectId <= 0 || taskId <= 0)
-                return checkerResult;
-
-            try
-            {
-                ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
-
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
-                if (ExcelLogReader.TryGetFirstNonExemptViolation(
-                        projectId,
-                        taskId,
-                        attemptNo,
-                        exemptFlags,
-                        out string violationMsg))
-                {
-                    string line = $"P{projectId}-T{taskId} {violationMsg}";
-                    System.Diagnostics.Debug.WriteLine($"[MainViewModel] Destructive validation failed: {line}");
-                    ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, line);
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainViewModel] ApplyDestructiveValidationForTask error: {ex.Message}");
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
-                ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, $"P{projectId}-T{taskId} 例外: {ex.Message}");
-                return false;
-            }
-
-            return true;
         }
 
         private void ShowAppBar()

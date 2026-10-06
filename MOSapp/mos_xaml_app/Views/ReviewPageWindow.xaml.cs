@@ -1315,8 +1315,9 @@ namespace MOSExcelMogiApp.Views
                             project.libraryName,
                             project.taskCount,
                             project.filePath,
-                            project.projectId);
-                        Models.ExamResultStorage.SaveProjectResult(project.projectId, results);
+                            project.projectId,
+                            out List<string> failReasons);
+                        Models.ExamResultStorage.SaveProjectResult(project.projectId, results, failReasons);
                         ExcelGradingPerf.Log(
                             "ScoreAllProjects.Project",
                             projectSw.ElapsedMilliseconds,
@@ -1356,9 +1357,13 @@ namespace MOSExcelMogiApp.Views
         private static void SaveAllFalse(int projectId, int taskCount)
         {
             var falseResults = new List<bool>();
+            var failReasons = new List<string>();
             for (int i = 0; i < taskCount; i++)
+            {
                 falseResults.Add(false);
-            Models.ExamResultStorage.SaveProjectResult(projectId, falseResults);
+                failReasons.Add(ExcelScoreExplanation.UnavailableText);
+            }
+            Models.ExamResultStorage.SaveProjectResult(projectId, falseResults, failReasons);
         }
 
         private bool OpenProjectWorkbook(string filePath)
@@ -1813,9 +1818,11 @@ namespace MOSExcelMogiApp.Views
             string libraryName,
             int taskCount,
             string expectedFilePath,
-            int slotProjectId)
+            int slotProjectId,
+            out List<string> failReasons)
         {
             var results = new List<bool>();
+            failReasons = new List<string>();
             
             try
             {
@@ -1985,6 +1992,7 @@ namespace MOSExcelMogiApp.Views
                             {
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] No method found for task {i}, returning false");
                                 results.Add(false);
+                                failReasons.Add(ExcelScoreExplanation.UnavailableText);
                                 continue;
                             }
 
@@ -1999,35 +2007,41 @@ namespace MOSExcelMogiApp.Views
                             try
                             {
                                 var taskSw = Stopwatch.StartNew();
+                                ExcelScoreExplanation.ClearCheckerReason();
                                 if (!binding.TryInvoke(checkerInstance, expectedFilePath, out bool invokeResult))
                                 {
                                     ExcelGradingPerf.Log(
                                         "GradeTask.CheckerInvoke",
                                         taskSw.ElapsedMilliseconds,
                                         $"P{slotProjectId} T{i} invoke-failed");
+                                    ExcelScoreExplanation.ClearCheckerReason();
                                     results.Add(false);
+                                    failReasons.Add(ExcelScoreExplanation.UnavailableText);
                                     continue;
                                 }
 
+                                string checkerReason = ExcelScoreExplanation.TakeCheckerReason();
                                 ExcelGradingPerf.Log(
                                     "GradeTask.CheckerInvoke",
                                     taskSw.ElapsedMilliseconds,
                                     $"P{slotProjectId} T{i} passed={invokeResult}");
                                 var gateSw = Stopwatch.StartNew();
                                 // ログ・免除設定は画面上のスロット番号（VSTO の [Task N-...]）に合わせる
-                                invokeResult = ApplyDestructiveValidation(slotProjectId, i, invokeResult);
+                                invokeResult = ExcelScoreExplanation.Apply(slotProjectId, i, invokeResult, checkerReason, out string reason);
                                 ExcelGradingPerf.Log(
                                     "GradeTask.DestructiveValidation",
                                     gateSw.ElapsedMilliseconds,
                                     $"P{slotProjectId} T{i} passed={invokeResult}");
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Method {resolvedName} result: {invokeResult}");
                                 results.Add(invokeResult);
+                                failReasons.Add(invokeResult ? "" : (reason ?? ExcelScoreExplanation.RequirementMissText));
                             }
                             catch (Exception ex)
                             {
                                 System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error invoking method {resolvedName}: {ex.Message}");
                                 System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
                                 results.Add(false);
+                                failReasons.Add(ExcelScoreExplanation.UnavailableText);
                             }
                         }
                     }
@@ -2038,6 +2052,7 @@ namespace MOSExcelMogiApp.Views
                         for (int i = 0; i < taskCount; i++)
                         {
                             results.Add(false);
+                            failReasons.Add(ExcelScoreExplanation.UnavailableText);
                         }
                     }
                 }
@@ -2048,6 +2063,7 @@ namespace MOSExcelMogiApp.Views
                     for (int i = 0; i < taskCount; i++)
                     {
                         results.Add(false);
+                        failReasons.Add(ExcelScoreExplanation.UnavailableText);
                     }
                 }
             }
@@ -2060,6 +2076,7 @@ namespace MOSExcelMogiApp.Views
                 while (results.Count < taskCount)
                 {
                     results.Add(false);
+                    failReasons.Add(ExcelScoreExplanation.UnavailableText);
                 }
             }
             
@@ -2088,49 +2105,6 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
-        /// <summary>
-        /// 破壊的操作検知。入力は常に <c>mos_excel_log.txt</c> の <c>[Op]</c>（<see cref="ExcelLogReader"/>）。
-        /// <list type="bullet">
-        /// <item><b>全プロジェクト（方式A）</b>: <see cref="ExcelLogReader.TryGetFirstNonExemptViolation"/> — 免除に含まれない操作は違反。範囲は <see cref="ExcelTaskValidationConfig.GetAllowedRanges"/>。</item>
-        /// </list>
-        /// ルールは <see cref="ExcelTaskValidationConfig"/>（免除 / 許可範囲）。
-        /// <paramref name="projectId"/> は Checker DLL 名ではなく、画面上のプロジェクトスロット番号（config の projects キー、VSTO ログの Task N）。
-        /// </summary>
-        private bool ApplyDestructiveValidation(int projectId, int taskId, bool checkerResult)
-        {
-            if (!checkerResult) return false;
-            if (projectId <= 0 || taskId <= 0) return checkerResult;
-
-            try
-            {
-                ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
-
-                // 方式A: 免除以外の操作はすべて違反。許可範囲があるタスクは TryGetFirstNonExemptViolation 内で範囲判定する。
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
-                if (ExcelLogReader.TryGetFirstNonExemptViolation(
-                        projectId,
-                        taskId,
-                        attemptNo,
-                        exemptFlags,
-                        out string violationMsgA))
-                {
-                    string line = $"P{projectId}-T{taskId} {violationMsgA}";
-                    System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Destructive validation failed (mode A): {line}");
-                    ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, line);
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] ApplyDestructiveValidation error: {ex.Message}");
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
-                ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, $"P{projectId}-T{taskId} 例外: {ex.Message}");
-                return false;
-            }
-
-            return true;
-        }
-        
         private void CloseExcelApplication()
         {
             ReleaseScoringWorkbookIndex();

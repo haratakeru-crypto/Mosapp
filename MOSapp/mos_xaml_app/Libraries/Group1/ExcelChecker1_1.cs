@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Text;
 using Microsoft.Office.Interop.Excel;
+using Libraries;
 
 namespace Libraries.Group1
 {
@@ -14,14 +18,12 @@ namespace Libraries.Group1
             {
                 string filePath = GetCurrentExcelFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return CheckTask_1_1_01(filePath);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -31,14 +33,12 @@ namespace Libraries.Group1
             {
                 string filePath = GetCurrentExcelFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return CheckTask_1_1_02(filePath);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -52,14 +52,12 @@ namespace Libraries.Group1
             {
                 string filePath = GetCurrentExcelFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return CheckTask_1_1_03(filePath);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -69,14 +67,12 @@ namespace Libraries.Group1
             {
                 string filePath = GetCurrentExcelFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return CheckTask_1_1_04(filePath);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -86,14 +82,12 @@ namespace Libraries.Group1
             {
                 string filePath = GetCurrentExcelFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return CheckTask_1_1_05(filePath);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -103,14 +97,12 @@ namespace Libraries.Group1
             {
                 string filePath = GetCurrentExcelFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return CheckTask_1_1_06(filePath);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -120,14 +112,12 @@ namespace Libraries.Group1
             {
                 string filePath = GetCurrentExcelFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return CheckTask_1_1_07(filePath);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -154,10 +144,11 @@ namespace Libraries.Group1
                 }
 
                 workbook = GetWorkbook(excelApp, filePath);
-                if (workbook == null) return false;
+                if (workbook == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 bool targetSheetOk = false;
-                bool otherSheetsOk = true;
+                var landscapeOthers = new List<string>();
 
                 foreach (Worksheet ws in workbook.Worksheets)
                 {
@@ -181,19 +172,24 @@ namespace Libraries.Group1
                         // 他のシートは「横向き」になっていたらNG（＝縦向きであるべき）
                         if (orientation == XlPageOrientation.xlLandscape)
                         {
-                            otherSheetsOk = false;
+                            landscapeOthers.Add(ws.Name);
                             System.Diagnostics.Debug.WriteLine($"[Task 1-1] Other sheet '{ws.Name}' is Landscape (Should be Portrait).");
                         }
                     }
                 }
 
-                // 両方の条件を満たしている場合のみ正解
-                return targetSheetOk && otherSheetsOk;
+                if (targetSheetOk && landscapeOthers.Count == 0)
+                    return true;
+                if (!targetSheetOk)
+                    ExcelScoreExplanation.Note("シート「売上一覧」の印刷の向きが縦になっています。");
+                if (landscapeOthers.Count > 0)
+                    ExcelScoreExplanation.Note($"シート「{JoinNames(landscapeOthers)}」の印刷の向きが横になっています。");
+                return false;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Task 1-1] Error: {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -219,7 +215,7 @@ namespace Libraries.Group1
                 catch
                 {
                     System.Diagnostics.Debug.WriteLine("[ExcelChecker1_1_02] Excelアプリケーションが見つかりません");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 
                 // デバッグログ追加
@@ -242,21 +238,19 @@ namespace Libraries.Group1
                 if (workbook == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExcelChecker1_1_02] Workbook not found (path/name match).");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
                 // 売上一覧シートを検索
                 worksheet = FindWorksheet(workbook, "売上一覧");
                 if (worksheet == null)
-                {
-                    return false;
-                }
-                
+                    return Miss(ExcelScoreExplanation.UnavailableText);
+
                 return IsSalesListPrintAreaAcceptable(worksheet, worksheet.PageSetup.PrintArea);
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -271,19 +265,21 @@ namespace Libraries.Group1
         /// </summary>
         private static bool IsSalesListPrintAreaAcceptable(Worksheet worksheet, string printArea)
         {
-            if (worksheet == null || string.IsNullOrWhiteSpace(printArea))
-                return false;
+            if (worksheet == null)
+                return Miss(ExcelScoreExplanation.UnavailableText);
+            if (string.IsNullOrWhiteSpace(printArea))
+                return Miss("印刷範囲が設定されていません。");
 
             string normalized = printArea.Replace(" ", "").Replace("$", "").ToUpperInvariant();
             int bang = normalized.LastIndexOf('!');
             if (bang >= 0)
                 normalized = normalized.Substring(bang + 1);
             if (normalized.IndexOf(',') >= 0)
-                return false;
+                return Miss($"印刷範囲が複数に分かれています（いまの設定: 「{Quote(normalized)}」）。");
             if (!TryParseA1Range(normalized, out int startCol, out int startRow, out int endCol, out int endRow))
-                return false;
+                return Miss($"印刷範囲が「{Quote(normalized)}」になっています。");
             if (startCol != 1 || startRow != 4 || endRow != 131 || endCol < 6)
-                return false;
+                return Miss($"印刷範囲が「{normalized}」になっています。");
             if (endCol == 6)
                 return true;
 
@@ -295,7 +291,11 @@ namespace Libraries.Group1
                 if (raw == null)
                     return true;
                 if (!(raw is object[,] values))
-                    return string.IsNullOrWhiteSpace(Convert.ToString(raw));
+                {
+                    if (string.IsNullOrWhiteSpace(Convert.ToString(raw)))
+                        return true;
+                    return Miss($"印刷範囲が「{normalized}」になっており、指定より広い部分に値が入っています。");
+                }
 
                 int rows = values.GetLength(0);
                 int cols = values.GetLength(1);
@@ -304,14 +304,14 @@ namespace Libraries.Group1
                     for (int c = 1; c <= cols; c++)
                     {
                         if (!string.IsNullOrWhiteSpace(Convert.ToString(values[r, c])))
-                            return false;
+                            return Miss($"印刷範囲が「{normalized}」になっており、指定より広い部分に値が入っています。");
                     }
                 }
                 return true;
             }
             catch
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -367,7 +367,7 @@ namespace Libraries.Group1
                 catch
                 {
                     System.Diagnostics.Debug.WriteLine("[ExcelChecker1_1_03] Excelアプリケーションが見つかりません");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 
                 // 既に開いているワークブックを検索
@@ -387,32 +387,30 @@ namespace Libraries.Group1
                 if (workbook == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExcelChecker1_1_03] Workbook not found (path/name match).");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
                 // 売上一覧シートを検索
                 worksheet = FindWorksheet(workbook, "売上一覧");
                 if (worksheet == null)
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 
                 // 印刷タイトル（タイトル行）の設定をチェック
                 string titleRows = worksheet.PageSetup.PrintTitleRows;
                 
                 // 期待される設定: $2:$4 または 2:4
                 if (string.IsNullOrEmpty(titleRows))
-                {
-                    return false;
-                }
-                
+                    return Miss("タイトル行が設定されていません。");
+
                 string normalizedTitleRows = titleRows.Replace("$", "").Replace(" ", "").ToUpper();
-                return normalizedTitleRows == "2:4";
+                if (normalizedTitleRows == "2:4")
+                    return true;
+                return Miss($"タイトル行が「{normalizedTitleRows}」になっています。");
 
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -436,7 +434,7 @@ namespace Libraries.Group1
                 catch
                 {
                     System.Diagnostics.Debug.WriteLine("[ExcelChecker1_1_04] Excelアプリケーションが見つかりません");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 
                 // 既に開いているワークブックを検索
@@ -456,15 +454,13 @@ namespace Libraries.Group1
                 if (workbook == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExcelChecker1_1_04] Workbook not found (path/name match).");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
                 // 販売実績シートを検索
                 worksheet = FindWorksheet(workbook, "販売実績");
                 if (worksheet == null)
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 
                 // 余白設定をチェック（「広い」の設定値）
                 // 広い余白: 上下1インチ(72ポイント)、左右1インチ(72ポイント)
@@ -476,15 +472,26 @@ namespace Libraries.Group1
                 // 72ポイント（1インチ）の許容範囲をチェック
                 const double expectedMargin = 72.0;
                 const double tolerance = 1.0;
-                
-                return Math.Abs(topMargin - expectedMargin) <= tolerance &&
-                    Math.Abs(bottomMargin - expectedMargin) <= tolerance &&
-                    Math.Abs(leftMargin - expectedMargin) <= tolerance &&
-                    Math.Abs(rightMargin - expectedMargin) <= tolerance;
+
+                var wrongSides = new List<string>();
+                if (Math.Abs(topMargin - expectedMargin) > tolerance)
+                    wrongSides.Add("上");
+                if (Math.Abs(bottomMargin - expectedMargin) > tolerance)
+                    wrongSides.Add("下");
+                if (Math.Abs(leftMargin - expectedMargin) > tolerance)
+                    wrongSides.Add("左");
+                if (Math.Abs(rightMargin - expectedMargin) > tolerance)
+                    wrongSides.Add("右");
+
+                if (wrongSides.Count == 0)
+                    return true;
+                if (wrongSides.Count == 4)
+                    return Miss("シート「販売実績」の余白が「広い」になっていません。");
+                return Miss($"シート「販売実績」の余白（{JoinNames(wrongSides)}）が「広い」になっていません。");
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -508,7 +515,7 @@ namespace Libraries.Group1
                 catch
                 {
                     System.Diagnostics.Debug.WriteLine("[ExcelChecker1_1_05] Excelアプリケーションが見つかりません");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 
                 // 既に開いているワークブックを検索
@@ -528,32 +535,40 @@ namespace Libraries.Group1
                 if (workbook == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExcelChecker1_1_05] Workbook not found (path/name match).");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
                 worksheet = FindWorksheet(workbook, "販売実績");
                 if (worksheet == null)
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 
                 // 改ページ位置をチェック
                 var vPageBreaks = worksheet.VPageBreaks;
                 bool hasCorrectPageBreak = false;
+                var manualCols = new List<string>();
                 foreach (VPageBreak pageBreak in vPageBreaks)
                 {
-                    // 手動で設定された改ページのみをチェック
-                    if (pageBreak.Location.Column == 8 && pageBreak.Type == XlPageBreak.xlPageBreakManual)
+                    if (pageBreak.Type != XlPageBreak.xlPageBreakManual)
+                        continue;
+                    int col = pageBreak.Location.Column;
+                    if (col == 8)
                     {
                         hasCorrectPageBreak = true;
                         break;
                     }
+                    string letter = ColumnLetter(col);
+                    if (!manualCols.Contains(letter))
+                        manualCols.Add(letter);
                 }
-                return hasCorrectPageBreak;
+                if (hasCorrectPageBreak)
+                    return true;
+                if (manualCols.Count == 0)
+                    return Miss("手動の改ページがありません。");
+                return Miss($"手動の改ページが{JoinNames(manualCols.Select(c => c + "列").ToList())}にあります。");
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -577,7 +592,7 @@ namespace Libraries.Group1
                 catch
                 {
                     System.Diagnostics.Debug.WriteLine("[ExcelChecker1_1_06] Excelアプリケーションが見つかりません");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 
                 // 既に開いているワークブックを検索
@@ -597,32 +612,35 @@ namespace Libraries.Group1
                 if (workbook == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExcelChecker1_1_06] Workbook not found (path/name match).");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 // スキルアップ検定結果シートを検索
                 worksheet = FindWorksheet(workbook, "スキルアップ検定結果");
                 if (worksheet == null)
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 
                 // A4:K4範囲の「折り返して全体を表示する」設定をチェック
                 Range targetRange = worksheet.Range["A4:K4"];
-                
+                var missingWrap = new List<string>();
+
                 // 範囲内のすべてのセルで「折り返して全体を表示する」が設定されているかチェック
                 foreach (Range cell in targetRange.Cells)
                 {
                     if (!Convert.ToBoolean(cell.WrapText))
                     {
-                        return false; // 一つでも設定されていないセルがあればfalse
+                        string address = cell.Address[false, false];
+                        if (!string.IsNullOrEmpty(address) && !missingWrap.Contains(address))
+                            missingWrap.Add(address);
                     }
                 }
-                
-                return true; // すべてのセルで設定されていればtrue
+
+                if (missingWrap.Count == 0)
+                    return true;
+                return Miss($"{JoinNames(missingWrap)}が折り返して全体を表示するになっていません。");
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -649,7 +667,7 @@ namespace Libraries.Group1
                 catch
                 {
                     System.Diagnostics.Debug.WriteLine("[ExcelChecker1_1_07] Excelアプリケーションが見つかりません");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 
                 // 既に開いているワークブックを検索
@@ -669,80 +687,50 @@ namespace Libraries.Group1
                 if (workbook == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExcelChecker1_1_07] Workbook not found (path/name match).");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
                 // 売上一覧シートを検索
                 worksheet = FindWorksheet(workbook, "売上一覧");
                 if (worksheet == null)
-                {
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 
                 // G4セルのメモをチェック
                 targetCell = worksheet.Range["G4"];
                 targetComment = targetCell.Comment;
-                
-                // セルにメモが存在するかチェック
-                if (targetComment == null)
-                {
-                    return false;
-                }
-                
-                // メモの内容が「最新の商品情報」かチェック
-                string commentText = targetComment.Text() ?? string.Empty;
-                string normalizedText = commentText.Replace("\r", "").Replace("\n", "");
-                int colonIndex = normalizedText.IndexOf(':');
-                if (colonIndex >= 0 && colonIndex < normalizedText.Length - 1)
-                {
-                    normalizedText = normalizedText.Substring(colonIndex + 1);
-                }
-                if (!string.Equals(normalizedText, "最新の商品情報", StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
-                // G4以外にメモが存在しないかチェック
                 comments = worksheet.Comments;
-                if (comments == null || comments.Count != 1)
+                var otherAddresses = CollectCommentAddresses(comments, "G4");
+
+                bool g4Ok = targetComment != null;
+                if (!g4Ok)
                 {
-                    return false;
+                    ExcelScoreExplanation.Note("指定のセル（売上一覧のG4）にメモがありません。");
                 }
-
-                int commentCount = comments.Count;
-                for (int i = 1; i <= commentCount; i++)
+                else
                 {
-                    Comment comment = null;
-                    Range parentRange = null;
-                    try
-                    {
-                        comment = comments.Item(i);
-                        parentRange = comment.Parent as Range;
-                        string address = parentRange?.Address[false, false] ?? string.Empty;
+                    // メモの内容が「最新の商品情報」かチェック
+                    string commentText = targetComment.Text() ?? string.Empty;
+                    string normalizedText = commentText.Replace("\r", "").Replace("\n", "");
+                    int colonIndex = normalizedText.IndexOf(':');
+                    if (colonIndex >= 0 && colonIndex < normalizedText.Length - 1)
+                        normalizedText = normalizedText.Substring(colonIndex + 1);
 
-                        if (!string.Equals(address, "G4", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return false;
-                        }
-                    }
-                    finally
+                    if (!string.Equals(normalizedText, "最新の商品情報", StringComparison.Ordinal))
                     {
-                        if (parentRange != null)
-                        {
-                            Marshal.ReleaseComObject(parentRange);
-                        }
-                        if (comment != null)
-                        {
-                            Marshal.ReleaseComObject(comment);
-                        }
+                        ExcelScoreExplanation.Note($"メモの文章が「{Quote(normalizedText)}」になっています。");
+                        g4Ok = false;
                     }
                 }
 
-                return true;
+                bool othersOk = otherAddresses.Count == 0;
+                if (!othersOk)
+                    ExcelScoreExplanation.Note($"指定以外のセル（{JoinNames(otherAddresses.Select(a => "売上一覧の" + a).ToList())}）にもメモがあります。");
+
+                return g4Ok && othersOk;
             }
             catch (Exception)
             {
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -761,6 +749,92 @@ namespace Libraries.Group1
                 if (worksheet != null)
                     Marshal.ReleaseComObject(worksheet);
             }
+        }
+
+        private static bool Miss(string reason)
+        {
+            ExcelScoreExplanation.Note(reason);
+            return false;
+        }
+
+        private static string Quote(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        private static string JoinNames(IList<string> names)
+        {
+            if (names == null || names.Count == 0)
+                return "";
+            const int maxItems = 5;
+            if (names.Count <= maxItems)
+                return string.Join("、", names);
+            return string.Join("、", names.Take(maxItems)) + "ほか";
+        }
+
+        private static string ColumnLetter(int column)
+        {
+            if (column <= 0)
+                return "?";
+            var sb = new StringBuilder();
+            int n = column;
+            while (n > 0)
+            {
+                n--;
+                sb.Insert(0, (char)('A' + (n % 26)));
+                n /= 26;
+            }
+            return sb.ToString();
+        }
+
+        private static List<string> CollectCommentAddresses(Comments comments, string excludeAddress)
+        {
+            var addresses = new List<string>();
+            if (comments == null)
+                return addresses;
+
+            int count;
+            try { count = comments.Count; }
+            catch { return addresses; }
+
+            for (int i = 1; i <= count; i++)
+            {
+                Comment comment = null;
+                Range parentRange = null;
+                try
+                {
+                    comment = comments.Item(i);
+                    parentRange = comment.Parent as Range;
+                    string address = parentRange?.Address[false, false] ?? string.Empty;
+                    if (string.IsNullOrEmpty(address))
+                        continue;
+                    if (!string.IsNullOrEmpty(excludeAddress)
+                        && string.Equals(address, excludeAddress, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (!addresses.Contains(address))
+                        addresses.Add(address);
+                }
+                catch { }
+                finally
+                {
+                    if (parentRange != null)
+                    {
+                        try { Marshal.ReleaseComObject(parentRange); } catch { }
+                    }
+                    if (comment != null)
+                    {
+                        try { Marshal.ReleaseComObject(comment); } catch { }
+                    }
+                }
+            }
+
+            return addresses;
         }
 
         private string GetCurrentExcelFilePath()

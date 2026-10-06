@@ -68,7 +68,7 @@ namespace Libraries
     /// </summary>
     /// <remarks>
     /// <para>コード内は <c>#region</c> で免除 / 許可 / 禁止 / 許可範囲に分割。</para>
-    /// <para>実際の採点フローは <c>ReviewPageWindow.ApplyDestructiveValidation</c> と
+    /// <para>実際の採点フローは <c>ExcelScoreExplanation.Apply</c> と
     /// <see cref="ExcelLogReader"/>（<c>mos_excel_log.txt</c> の <c>[Op]</c> 解析）。</para>
     /// <para>PowerPoint にある図形数・文字数などのデルタ厳密判定は、Excel は操作ログベースのため未実装。</para>
     /// </remarks>

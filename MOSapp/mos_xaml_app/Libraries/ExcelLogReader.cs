@@ -274,7 +274,29 @@ namespace Libraries
             ExcelValidationExemptFlags exemptFlags,
             out string message)
         {
-            message = null;
+            if (!TryCollectNonExemptViolations(projectId, taskId, attemptNo, exemptFlags, out string firstLogMessage, out _))
+            {
+                message = null;
+                return false;
+            }
+
+            message = firstLogMessage;
+            return true;
+        }
+
+        /// <summary>
+        /// 免除外の操作を、学生向けの理由文として種類ごとに集める。正誤は先頭の1件と同じです。
+        /// </summary>
+        public static bool TryCollectNonExemptViolations(
+            int projectId,
+            int taskId,
+            int attemptNo,
+            ExcelValidationExemptFlags exemptFlags,
+            out string firstLogMessage,
+            out List<string> studentReasons)
+        {
+            firstLogMessage = null;
+            studentReasons = new List<string>();
             // 破壊的操作の判定は、同一タスク内の全試行（セッション）の操作を合算して判定する。
             // 以前は latestOnly: true だったが、タスクを切り替えて戻るだけで違反が消えてしまうのを防ぐため false に変更。
             var ops = GetOperationsForTask(projectId, taskId, attemptNo, latestOnly: false);
@@ -282,13 +304,20 @@ namespace Libraries
             List<string> allowedRanges = useRangeGate
                 ? ExcelTaskValidationConfig.GetAllowedRanges(projectId, taskId)
                 : null;
+            var seenKinds = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var op in ops)
             {
                 if (!Enum.TryParse(op.Type, out ExcelOperationType opType))
                 {
-                    message = $"未対応の操作種別: {op.Type} (detail: {op.Detail})";
-                    return true;
+                    RememberViolation(
+                        ref firstLogMessage,
+                        studentReasons,
+                        seenKinds,
+                        $"未対応の操作種別: {op.Type} (detail: {op.Detail})",
+                        ExcelScoreExplanation.UnknownKind,
+                        ExcelScoreExplanation.UnknownStudentAction);
+                    continue;
                 }
 
                 // タスク切替などで別シートに付いたレイアウト系ログは、対象シート外なら違反にしない
@@ -305,22 +334,56 @@ namespace Libraries
                 {
                     if (!TryParseSheetAndAddress(op.Detail, out string sheetName, out string address))
                     {
-                        message = $"許可範囲外の編集: {op.Type}（アドレス解釈不可: {op.Detail}）";
-                        return true;
+                        RememberViolation(
+                            ref firstLogMessage,
+                            studentReasons,
+                            seenKinds,
+                            $"許可範囲外の編集: {op.Type}（アドレス解釈不可: {op.Detail}）",
+                            ExcelScoreExplanation.OutsideRangeKind,
+                            ExcelScoreExplanation.OutsideRangeStudentAction);
+                        continue;
                     }
 
                     if (IsAddressWithinAllowedRanges(sheetName, address, allowedRanges))
                         continue;
 
-                    message = $"許可範囲外の編集: {op.Type} {op.Detail}";
-                    return true;
+                    RememberViolation(
+                        ref firstLogMessage,
+                        studentReasons,
+                        seenKinds,
+                        $"許可範囲外の編集: {op.Type} {op.Detail}",
+                        ExcelScoreExplanation.OutsideRangeKind,
+                        ExcelScoreExplanation.OutsideRangeStudentAction);
+                    continue;
                 }
 
-                message = $"免除外の操作: {opType} (detail: {op.Detail})";
-                return true;
+                ExcelScoreExplanation.DescribeOperation(opType, out string kind, out string studentText);
+                RememberViolation(
+                    ref firstLogMessage,
+                    studentReasons,
+                    seenKinds,
+                    $"免除外の操作: {opType} (detail: {op.Detail})",
+                    kind,
+                    studentText);
             }
 
-            return false;
+            return firstLogMessage != null;
+        }
+
+        private static void RememberViolation(
+            ref string firstLogMessage,
+            List<string> studentReasons,
+            HashSet<string> seenKinds,
+            string logMessage,
+            string kind,
+            string studentText)
+        {
+            if (firstLogMessage == null)
+                firstLogMessage = logMessage;
+            if (string.IsNullOrEmpty(kind) || !seenKinds.Add(kind))
+                return;
+            if (!string.IsNullOrEmpty(studentText))
+                studentReasons.Add(studentText);
         }
 
 

@@ -17,7 +17,9 @@ namespace MOSExcelMogiApp.Views
         public string Text { get; set; }
         public Brush Color { get; set; }
         public int TaskId { get; set; }
+        public string ReasonText { get; set; }
         public bool IsClickable => Text == "X" || Text == "▲";
+        public bool HasReason => !string.IsNullOrEmpty(ReasonText);
     }
 
     public partial class ScoringResultDialog : Window
@@ -77,21 +79,21 @@ namespace MOSExcelMogiApp.Views
             HookForegroundBehavior();
         }
 
-        public ScoringResultDialog(int taskCount, List<bool> results, int groupId = 1, int projectId = 1)
+        public ScoringResultDialog(int taskCount, List<bool> results, int groupId = 1, int projectId = 1, IList<string> failReasons = null)
         {
             InitializeComponent();
             _groupId = groupId;
             _projectId = projectId;
-            DisplayResults(results);
+            DisplayResults(results, failReasons);
             HookForegroundBehavior();
         }
 
-        public ScoringResultDialog(List<bool> results, int groupId = 1, int projectId = 1)
+        public ScoringResultDialog(List<bool> results, int groupId = 1, int projectId = 1, IList<string> failReasons = null)
         {
             InitializeComponent();
             _groupId = groupId;
             _projectId = projectId;
-            DisplayResults(results);
+            DisplayResults(results, failReasons);
             HookForegroundBehavior();
         }
 
@@ -110,9 +112,9 @@ namespace MOSExcelMogiApp.Views
         /// <summary>
         /// 採点結果を最前面のモーダルで表示する（Excel が前面に出ても維持）。
         /// </summary>
-        public static void ShowResults(Window owner, int taskCount, List<bool> results, int groupId, int projectId)
+        public static void ShowResults(Window owner, int taskCount, List<bool> results, int groupId, int projectId, IList<string> failReasons = null)
         {
-            var w = new ScoringResultDialog(taskCount, results, groupId, projectId)
+            var w = new ScoringResultDialog(taskCount, results, groupId, projectId, failReasons)
             {
                 Owner = owner,
                 Topmost = true,
@@ -351,6 +353,7 @@ namespace MOSExcelMogiApp.Views
                 .Select(i => new ResultItem { Text = "-", Color = Brushes.Gray, TaskId = i })
                 .ToList();
             ResultsControl.ItemsSource = resultItems;
+            ReasonsControl.ItemsSource = resultItems;
         }
 
         private void DisplayVariantResults(int taskCount)
@@ -370,9 +373,10 @@ namespace MOSExcelMogiApp.Views
                 })
                 .ToList();
             ResultsControl.ItemsSource = resultItems;
+            ReasonsControl.ItemsSource = resultItems;
         }
 
-        private void DisplayResults(List<bool> results)
+        private void DisplayResults(List<bool> results, IList<string> failReasons)
         {
             System.Diagnostics.Debug.WriteLine($"[DisplayResults] Called with {results.Count} results, groupId: {_groupId}, projectId: {_projectId}");
 
@@ -380,16 +384,28 @@ namespace MOSExcelMogiApp.Views
             TaskNumbersControl.ItemsSource = taskNumbers;
 
             var resultItems = results.Select((r, index) => {
+                string reason = null;
+                if (!r && failReasons != null && index < failReasons.Count)
+                    reason = failReasons[index];
                 var item = new ResultItem
                 {
                     Text = r ? "O" : "X",
                     Color = r ? Brushes.Green : Brushes.Red,
-                    TaskId = index + 1
+                    TaskId = index + 1,
+                    ReasonText = reason
                 };
                 System.Diagnostics.Debug.WriteLine($"[DisplayResults] Created ResultItem - TaskId: {item.TaskId}, Text: {item.Text}, IsClickable: {item.IsClickable}");
                 return item;
             }).ToList();
             ResultsControl.ItemsSource = resultItems;
+            ReasonsControl.ItemsSource = resultItems;
+        }
+
+        private void ReasonLink_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement element && element.DataContext is ResultItem resultItem && resultItem.HasReason)
+                ScoreReasonWindow.Show(this, resultItem.TaskId, resultItem.ReasonText);
         }
 
         private void ResultItem_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)

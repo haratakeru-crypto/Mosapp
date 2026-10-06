@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.Excel;
 using System.Globalization;
+using Libraries;
 
 namespace Libraries.Group1
 {
@@ -21,6 +23,13 @@ namespace Libraries.Group1
         public bool CheckTask_1_2_04() => RunCheck(CheckTask_1_2_04_Impl, "Task 4 (Filter)");
         public bool CheckTask_1_2_05() => RunCheck(CheckTask_1_2_05_Impl, "Task 5 (Resize)");
 
+        // config tabs["1"] project 1 用エイリアス
+        public bool CheckTask_1_1_01() => CheckTask_1_2_01();
+        public bool CheckTask_1_1_02() => CheckTask_1_2_02();
+        public bool CheckTask_1_1_03() => CheckTask_1_2_03();
+        public bool CheckTask_1_1_04() => CheckTask_1_2_04();
+        public bool CheckTask_1_1_05() => CheckTask_1_2_05();
+
         // 共通エラーハンドリング用ヘルパー
         private bool RunCheck(Func<string, bool> checkImpl, string taskName)
         {
@@ -28,13 +37,14 @@ namespace Libraries.Group1
             {
                 Console.WriteLine($"[DEBUG] {taskName} called");
                 string filePath = GetCurrentExcelFilePath();
-                if (string.IsNullOrEmpty(filePath)) return false;
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 return checkImpl(filePath);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] Exception in {taskName}: {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -45,24 +55,17 @@ namespace Libraries.Group1
         {
             return ProcessTableTask(filePath, "試験結果", (table) =>
             {
-                // 1. プロパティチェック
                 bool hasRowStripes = GetTableProperty<bool>(table, "ShowTableStyleRowStripes", true);
                 bool hasColumnStripes = GetTableProperty<bool>(table, "ShowTableStyleColumnStripes", false);
 
-                // 判定A: プロパティ設定が正しい (行OFF, 列ON)
-                // ここで厳密に判定できれば、視覚チェックを行う必要はありません
                 if (!hasRowStripes && hasColumnStripes)
                 {
                     Console.WriteLine("[DEBUG] Task 1 Passed: Properties correct.");
                     return true;
                 }
 
-                // 2. 視覚的チェック（プロパティ取得失敗時の保険）
-                // ※ 前述のDisplayFormat修正が適用されていることが前提
                 bool visualRowBanding = CheckTableRowBandingVisually(table);
                 bool visualColBanding = CheckTableColumnBandingVisually(table);
-                
-                // 判定B: 見た目が正しい (行の縞模様がなく、列の縞模様がある)
                 bool isRowVisualOk = !visualRowBanding;
                 bool isColVisualOk = visualColBanding;
 
@@ -72,6 +75,14 @@ namespace Libraries.Group1
                     return true;
                 }
 
+                bool rowStillOn = hasRowStripes || visualRowBanding;
+                bool colStillOff = !hasColumnStripes && !visualColBanding;
+                if (rowStillOn)
+                    ExcelScoreExplanation.Note("テーブルの縞模様（行）が解除されていません。");
+                if (colStillOff)
+                    ExcelScoreExplanation.Note("テーブルの縞模様（列）が設定されていません。");
+                if (!rowStillOn && !colStillOff)
+                    ExcelScoreExplanation.Note("テーブルの縞模様（行を解除、列を設定）になっていません。");
                 return false;
             });
         }
@@ -83,40 +94,39 @@ namespace Libraries.Group1
         {
             return ProcessTableTask(filePath, "試験結果", (table) =>
             {
-                // 1. 「最初の列」がONになっていないかチェック (ONなら即不合格)
-                // ユーザーが誤って「最初の列」を強調した場合を弾く
                 bool isFirstColOn = GetTableProperty<bool>(table, "ShowTableStyleFirstColumn", false);
                 if (isFirstColOn)
-                {
-                    Console.WriteLine("[DEBUG] Task 2 Failed: First Column emphasis is incorrectly ON.");
-                    return false;
-                }
+                    ExcelScoreExplanation.Note("最初の列が強調されています。");
 
-                // 2. プロパティチェック: 「最後の列」がONか
                 bool showLastColumn = GetTableProperty<bool>(table, "ShowTableStyleLastColumn", false);
                 if (showLastColumn)
                 {
+                    if (isFirstColOn)
+                        return false;
                     Console.WriteLine("[DEBUG] Task 2 Passed: ShowTableStyleLastColumn is ON.");
                     return true;
                 }
 
-                // 3. 視覚チェック: 最後の列が「普通の列」と違う色か
-                // タスク1の縞模様（列）だけで色差が出る誤合格を除外する
-                if (!TryGetLastColumnVisualEmphasis(table, out bool colorDiff, out bool isBold))
+                bool lastColOk = false;
+                if (TryGetLastColumnVisualEmphasis(table, out bool colorDiff, out bool isBold))
                 {
-                    Console.WriteLine("[DEBUG] Task 2 Failed: Last column not emphasized.");
-                    return false;
+                    bool hasColumnStripes = GetTableProperty<bool>(table, "ShowTableStyleColumnStripes", false);
+                    // 列の縞模様による色差だけでは「最後の列の強調」とみなさない
+                    lastColOk = !(hasColumnStripes && colorDiff && !isBold);
+                    if (lastColOk)
+                        Console.WriteLine($"[DEBUG] Task 2: VisualLastCol colorDiff={colorDiff}, bold={isBold}");
                 }
 
-                bool hasColumnStripes = GetTableProperty<bool>(table, "ShowTableStyleColumnStripes", false);
-                if (hasColumnStripes && colorDiff && !isBold)
+                if (!lastColOk)
+                    ExcelScoreExplanation.Note("最後の列が強調されていません。");
+
+                if (!isFirstColOn && lastColOk)
                 {
-                    Console.WriteLine("[DEBUG] Task 2 Failed: Visual diff likely from column stripes (task 1), not last column emphasis.");
-                    return false;
+                    Console.WriteLine("[DEBUG] Task 2 Passed.");
+                    return true;
                 }
 
-                Console.WriteLine($"[DEBUG] Task 2 Passed: VisualLastCol colorDiff={colorDiff}, bold={isBold}");
-                return true;
+                return false;
             });
         }
 
@@ -130,40 +140,27 @@ namespace Libraries.Group1
                 string tableStyle = GetTableStyleName(table);
                 Console.WriteLine($"[DEBUG] Current Style Name: {tableStyle}");
 
-                // 厳密な判定リスト: 曖昧な "Medium", "10", "Orange" 単体を除外
                 string[] strictValidStyles = {
-                    "TableStyleMedium10",        // 内部名(英語)
-                    "Medium10",                  // 短縮名
-                    "Medium 10",                 // 空白あり
-                    "テーブルスタイル（中間）10", // 日本語正式名
-                    "TableStyleMedium10"         // 重複確認
+                    "TableStyleMedium10",
+                    "Medium10",
+                    "Medium 10",
+                    "テーブルスタイル（中間）10",
+                    "TableStyleMedium10"
                 };
 
-                bool matchFound = false;
                 foreach (string validStyle in strictValidStyles)
                 {
-                    // 完全一致または、末尾が明確に一致することを確認
-                    // "BlueMedium10" などが "Medium10" にヒットしないように注意が必要だが、
-                    // Excelの内部名体系的に末尾一致でほぼ特定可能
-                    if (!string.IsNullOrEmpty(tableStyle) && 
+                    if (!string.IsNullOrEmpty(tableStyle) &&
                         tableStyle.EndsWith(validStyle, StringComparison.OrdinalIgnoreCase))
                     {
-                        matchFound = true;
-                        break;
+                        Console.WriteLine("[DEBUG] Task 3 Passed: Style matches.");
+                        return true;
                     }
                 }
 
-                // 色による補完チェック（スタイル名が取得できない場合のみ）
-                if (!matchFound)
-                {
-                    // オレンジ色(RGB)が含まれているか厳密にチェックするロジックがあれば良いが、
-                    // ここではスタイル名の不一致は不合格とする（厳格化のため）
-                    Console.WriteLine("[DEBUG] Task 3 Failed: Style name does not match required 'Medium 10'.");
-                    return false;
-                }
-
-                Console.WriteLine("[DEBUG] Task 3 Passed: Style matches.");
-                return true;
+                if (string.IsNullOrEmpty(tableStyle))
+                    return Miss("テーブルスタイルが設定されていません。");
+                return Miss($"テーブルスタイルが「{Quote(DescribeTableStyle(tableStyle))}」になっています。");
             });
         }
 
@@ -172,10 +169,8 @@ namespace Libraries.Group1
         // ==========================================
         private bool CheckTask_1_2_04_Impl(string filePath)
         {
-            // ワークシートとテーブル名が異なるため個別実装
             return ProcessTableTask(filePath, "担当者リスト", (table) =>
             {
-                // 学科列を探す
                 int gakkaColIndex = -1;
                 for (int i = 1; i <= table.ListColumns.Count; i++)
                 {
@@ -187,65 +182,56 @@ namespace Libraries.Group1
                 }
 
                 if (gakkaColIndex == -1)
-                {
-                    Console.WriteLine("[DEBUG] Task 4 Failed: Column '学科' not found.");
-                    return false;
-                }
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
-                // AutoFilterがOFFなら即不合格
                 if (table.AutoFilter == null)
-                {
-                    Console.WriteLine("[DEBUG] Task 4 Failed: AutoFilter is not enabled.");
-                    return false;
-                }
+                    return Miss("フィルターが使われていません。");
 
-                // 実際のフィルタリング状態を確認
-
-                // 2. 可視行の実データ確認 (これが最重要)
                 Range dataBody = table.DataBodyRange;
-                if (dataBody == null) return false;
+                if (dataBody == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
-                bool wrongDataFound = false;
                 bool correctDataFound = false;
                 int visibleRows = 0;
+                var wrongValues = new List<string>();
 
                 foreach (Range row in dataBody.Rows)
                 {
-                    if (!(bool)row.EntireRow.Hidden)
+                    if ((bool)row.EntireRow.Hidden)
+                        continue;
+
+                    visibleRows++;
+                    string val = ((Range)row.Cells[1, gakkaColIndex]).Value2?.ToString() ?? "";
+                    if (!val.Contains("法学科"))
                     {
-                        visibleRows++;
-                        string val = ((Range)row.Cells[1, gakkaColIndex]).Value2?.ToString() ?? "";
-                        if (!val.Contains("法学科"))
-                        {
-                            wrongDataFound = true; // 法学科以外が見えている＝不正解
-                            Console.WriteLine($"[DEBUG] Found wrong visible data: {val}");
-                            break;
-                        }
-                        else
-                        {
-                            correctDataFound = true;
-                        }
+                        string shown = Quote(string.IsNullOrWhiteSpace(val) ? "（空）" : val.Trim());
+                        if (!wrongValues.Contains(shown))
+                            wrongValues.Add(shown);
+                    }
+                    else
+                    {
+                        correctDataFound = true;
                     }
                 }
 
-                // 厳密な判定:
-                // - 間違ったデータが見えていないこと
-                // - 正しいデータが少なくとも1つ見えていること
-                // - (オプション) 全行が表示されているわけではないこと（フィルタが効いている証拠）
-                int totalRows = dataBody.Rows.Count;
-                bool isFiltered = (visibleRows < totalRows); 
-
-                // データセットによっては全件法学科の可能性もあるため isFiltered は必須にしないが、通常は必須。
-                // ここでは「間違ったデータが見えていない」ことを最優先。
-                if (!wrongDataFound && correctDataFound)
+                if (wrongValues.Count == 0 && correctDataFound)
                 {
                     Console.WriteLine("[DEBUG] Task 4 Passed: Only '法学科' is visible.");
                     return true;
                 }
 
-                Console.WriteLine("[DEBUG] Task 4 Failed.");
+                if (visibleRows == 0)
+                {
+                    ExcelScoreExplanation.Note("フィルター後に表示されている行がありません。");
+                    return false;
+                }
+
+                if (wrongValues.Count > 0)
+                    ExcelScoreExplanation.Note($"法学科以外の行（学科が「{JoinNames(wrongValues)}」）も表示されています。");
+                if (!correctDataFound)
+                    ExcelScoreExplanation.Note("法学科の行が表示されていません。");
                 return false;
-            }, sheetNameOrNull: "担当者リスト"); // FindTableロジックのためにシート名を渡す設計に変更が必要だが、ここでは簡易化
+            }, sheetNameOrNull: "担当者リスト");
         }
 
         // ==========================================
@@ -255,58 +241,60 @@ namespace Libraries.Group1
         {
             return ProcessTableTask(filePath, "イベント売上", (table) =>
             {
-                // A. 範囲チェック (A4:G16)
                 string rangeAddr = table.Range.Address.Replace("$", "").Replace(" ", "").ToUpper();
-                if (!rangeAddr.EndsWith("G16") || table.Range.Columns.Count != 7)
-                {
-                    Console.WriteLine($"[DEBUG] Task 5 Failed: Range is {rangeAddr} (Expected ...G16).");
-                    return false;
-                }
+                bool rangeOk = rangeAddr.EndsWith("G16") && table.Range.Columns.Count == 7;
+                if (!rangeOk)
+                    ExcelScoreExplanation.Note($"テーブルの範囲が「{Quote(rangeAddr)}」になっています。");
 
-                // B. 残留ゴミチェック (H列: H4:H16)
-                // 範囲を一度広げてから戻すと、H列に「塗りつぶし」や「罫線」が残るためこれを検知する
+                bool residualOk = true;
                 try
                 {
                     Worksheet ws = table.Parent as Worksheet;
                     Range ghostRange = ws.Range["H4:H16"];
+                    var residual = new List<string>();
 
                     foreach (Range cell in ghostRange)
                     {
-                        // チェック1: 背景色の残留 (Interior.ColorIndex)
-                        // xlNone (-4142) でなければ、色が残っているとみなす
+                        string address = cell.Address[false, false];
                         if ((int)cell.Interior.ColorIndex != -4142)
                         {
-                            Console.WriteLine($"[DEBUG] Task 5 Failed: Residual fill color found at {cell.Address}.");
-                            return false;
+                            if (!residual.Contains(address))
+                                residual.Add(address);
+                            continue;
                         }
 
-                        // チェック2: 罫線の残留
-                        // 左辺(xlEdgeLeft)はテーブルと接しているため無視し、右・上・下のみチェックする
-                        // xlEdgeRight=10, xlEdgeTop=8, xlEdgeBottom=9
-                        int[] bordersToCheck = { 10, 8, 9 }; 
-                        
+                        int[] bordersToCheck = { 10, 8, 9 };
                         foreach (int borderIndex in bordersToCheck)
                         {
-                            // LineStyle が xlNone (-4142) でなければ線が残っている
-                            // ※ cell.Borders[...] を使うとCOMエラーが出にくいため個別に取得
                             Border border = cell.Borders[(XlBordersIndex)borderIndex];
                             if ((int)border.LineStyle != -4142)
                             {
-                                 Console.WriteLine($"[DEBUG] Task 5 Failed: Residual border found at {cell.Address} (Side: {borderIndex}).");
-                                 return false;
+                                if (!residual.Contains(address))
+                                    residual.Add(address);
+                                break;
                             }
                         }
+                    }
+
+                    if (residual.Count > 0)
+                    {
+                        residualOk = false;
+                        ExcelScoreExplanation.Note($"テーブル外の{JoinNames(residual)}に書式が残っています。");
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[DEBUG] Error checking ghost range: {ex.Message}");
-                    // チェック中にエラーが出た場合は安全策として不合格にする（厳密性優先）
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
-                Console.WriteLine("[DEBUG] Task 5 Passed: Range correct and clean.");
-                return true;
+                if (rangeOk && residualOk)
+                {
+                    Console.WriteLine("[DEBUG] Task 5 Passed: Range correct and clean.");
+                    return true;
+                }
+
+                return false;
             });
         }
 
@@ -355,13 +343,15 @@ namespace Libraries.Group1
                         break;
                     }
                 }
-                if (workbook == null) return false;
+                if (workbook == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 // ワークシート特定 (Task4の場合、部分一致などで探すロジックが必要ならここに実装)
                 foreach(Worksheet ws in workbook.Worksheets) {
                     if(ws.Name == targetSheet) { worksheet = ws; break; }
                 }
-                if (worksheet == null) return false;
+                if (worksheet == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 // テーブル特定 (Task4の「学科」列を持つテーブル検索ロジックはTask4内に記述推奨だが、ここでは簡易的に1つ目を取得)
                 // 注: 元コードに合わせて ListObjects[1] を基本としますが、Task4用にロジック分岐が必要
@@ -380,7 +370,8 @@ namespace Libraries.Group1
                     if (worksheet.ListObjects.Count > 0) table = worksheet.ListObjects[1];
                 }
 
-                if (table == null) return false;
+                if (table == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 // 実際の判定ロジックを実行
                 return checkLogic(table);
@@ -388,7 +379,7 @@ namespace Libraries.Group1
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] Error in ProcessTableTask: {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -555,6 +546,55 @@ namespace Libraries.Group1
                 return colorDiff || isBold;
             }
             catch { return false; }
+        }
+
+        private static bool Miss(string reason)
+        {
+            ExcelScoreExplanation.Note(reason);
+            return false;
+        }
+
+        private static string Quote(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        private static string JoinNames(IList<string> names)
+        {
+            if (names == null || names.Count == 0)
+                return "";
+            const int maxItems = 5;
+            if (names.Count <= maxItems)
+                return string.Join("、", names);
+            return string.Join("、", names.Take(maxItems)) + "ほか";
+        }
+
+        private static string DescribeTableStyle(string styleName)
+        {
+            if (string.IsNullOrEmpty(styleName))
+                return "（なし）";
+            if (styleName.IndexOf("TableStyleMedium", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                string num = styleName.Replace("TableStyleMedium", "").Replace("tableStyleMedium", "");
+                return "テーブルスタイル（中間）" + num;
+            }
+            if (styleName.IndexOf("TableStyleLight", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                string num = styleName.Replace("TableStyleLight", "").Replace("tableStyleLight", "");
+                return "テーブルスタイル（淡色）" + num;
+            }
+            if (styleName.IndexOf("TableStyleDark", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                string num = styleName.Replace("TableStyleDark", "").Replace("tableStyleDark", "");
+                return "テーブルスタイル（濃色）" + num;
+            }
+            return styleName;
         }
 
     }

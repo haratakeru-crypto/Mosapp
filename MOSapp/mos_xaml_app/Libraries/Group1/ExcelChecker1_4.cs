@@ -18,6 +18,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Xdr = DocumentFormat.OpenXml.Drawing.Spreadsheet; // 描画(Spreadsheet)
 using A = DocumentFormat.OpenXml.Drawing; // 描画(共通)
+using Libraries;
 
 namespace Libraries.Group1
 {
@@ -42,14 +43,14 @@ namespace Libraries.Group1
                 if (string.IsNullOrEmpty(filePath))
                 {
                     Console.WriteLine($"[DEBUG] {taskName}: File path not found.");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
                 return checkImpl(filePath);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] Exception in {taskName}: {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
         }
 
@@ -61,30 +62,79 @@ namespace Libraries.Group1
             return CheckTaskBasic(filePath, "上半期売上", (ws) =>
             {
                 Excel.SparklineGroups groups = ws.Cells.SparklineGroups;
-                if (groups.Count == 0) return false;
+                if (groups.Count == 0)
+                    return Miss("縦棒スパークラインがありません。");
+
+                int bestScore = -1;
+                var bestNotes = new List<string>();
 
                 foreach (Excel.SparklineGroup group in groups)
                 {
-                    if (group.Type != Excel.XlSparkType.xlSparkColumn) continue;
-                    if (group.Count != 6) continue;
+                    if (group.Type != Excel.XlSparkType.xlSparkColumn)
+                        continue;
 
+                    int score = 0;
+                    var notes = new List<string>();
+
+                    if (group.Count == 6)
+                        score++;
+                    else
+                        notes.Add("スパークラインの個数が指定と違います。");
+
+                    string addr = null;
+                    string source = null;
                     try
                     {
                         Excel.Range location = group.Location;
-                        string addr = location.Address.Replace("$", "").Replace(" ", "");
-                        
-                        if (!addr.Contains("I5") || !addr.Contains("I10")) continue;
-                        
-                        string source = group.SourceData.Replace("$", "").Replace(" ", "").ToUpper();
-                        if (!source.Contains("B5") || !source.Contains("G10")) continue;
+                        addr = location.Address.Replace("$", "").Replace(" ", "");
+                        source = group.SourceData.Replace("$", "").Replace(" ", "").ToUpper();
+                    }
+                    catch
+                    {
+                        notes.Add("スパークラインの位置が指定と違います。");
+                        notes.Add("スパークラインのデータ範囲が指定と違います。");
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            bestNotes = notes;
+                        }
+                        continue;
+                    }
 
+                    bool locationOk = addr.Contains("I5") && addr.Contains("I10");
+                    if (locationOk)
+                        score++;
+                    else
+                        notes.Add(string.IsNullOrEmpty(addr)
+                            ? "スパークラインの位置が指定と違います。"
+                            : $"スパークラインの位置が「{Quote(addr)}」になっています。");
+
+                    bool sourceOk = source.Contains("B5") && source.Contains("G10");
+                    if (sourceOk)
+                        score++;
+                    else
+                        notes.Add(string.IsNullOrEmpty(source)
+                            ? "スパークラインのデータ範囲が指定と違います。"
+                            : $"スパークラインのデータ範囲が「{Quote(source)}」になっています。");
+
+                    if (notes.Count == 0)
+                    {
                         Console.WriteLine("[DEBUG] Task 4-1 Passed.");
                         return true;
                     }
-                    catch { continue; }
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestNotes = notes;
+                    }
                 }
 
-                Console.WriteLine("[DEBUG] Task 4-1 Failed: No matching Sparkline found.");
+                if (bestScore < 0)
+                    return Miss("縦棒スパークラインがありません。");
+
+                foreach (string note in bestNotes)
+                    ExcelScoreExplanation.Note(note);
                 return false;
             });
         }
@@ -97,29 +147,57 @@ namespace Libraries.Group1
             return CheckTaskBasic(filePath, "5年間売上", (ws) =>
             {
                 Excel.ChartObjects charts = (Excel.ChartObjects)ws.ChartObjects();
-                if (charts.Count == 0) return false;
+                if (charts.Count == 0)
+                    return Miss("積み上げ縦棒グラフがありません。");
+
+                int bestScore = -1;
+                var bestNotes = new List<string>();
 
                 foreach (Excel.ChartObject co in charts)
                 {
                     Excel.Chart chart = co.Chart;
-                    if (chart.ChartType != Excel.XlChartType.xlColumnStacked) continue;
+                    if (chart.ChartType != Excel.XlChartType.xlColumnStacked)
+                        continue;
+
+                    int score = 0;
+                    var notes = new List<string>();
 
                     Excel.SeriesCollection seriesColl = (Excel.SeriesCollection)chart.SeriesCollection();
-                    if (seriesColl.Count != 2) continue;
+                    if (seriesColl.Count == 2)
+                        score++;
+                    else
+                        notes.Add("積み上げ縦棒グラフの系列数が指定と違います。");
 
-                    // 作成時の選択範囲をチェック (プロジェクト4, タスク2)
                     string targetSheet = "5年間売上";
                     string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 2, ExcelTaskAttemptRegistry.GetAttempt(4, 2), chart.Name, targetSheet);
-                    if (loggedSelection == null) return false;
-
-                    if (!IsSelectionCorrect(loggedSelection, targetSheet, "A4:C10"))
+                    if (loggedSelection == null)
                     {
-                        return false;
+                        notes.Add("グラフ作成時の選択範囲の記録がありません。");
+                    }
+                    else if (!IsSelectionCorrect(loggedSelection, targetSheet, "A4:C10"))
+                    {
+                        notes.Add($"グラフ作成時の選択範囲が「{Quote(FormatSelection(loggedSelection))}」になっています。");
+                    }
+                    else
+                    {
+                        score++;
                     }
 
-                    return true;
+                    if (notes.Count == 0)
+                        return true;
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestNotes = notes;
+                    }
                 }
 
+                if (bestScore < 0)
+                    return Miss("積み上げ縦棒グラフがありません。");
+
+                foreach (string note in bestNotes)
+                    ExcelScoreExplanation.Note(note);
                 return false;
             });
         }
@@ -132,9 +210,12 @@ namespace Libraries.Group1
             return CheckTaskBasic(filePath, "下半期売上", (ws) =>
             {
                 Excel.ChartObjects charts = (Excel.ChartObjects)ws.ChartObjects();
-                if (charts.Count == 0) return false;
+                if (charts.Count == 0)
+                    return Miss("3-D円グラフがありません。");
 
                 double boundaryX = ws.Range["I1"].Left;
+                int bestScore = -1;
+                var bestNotes = new List<string>();
 
                 foreach (Excel.ChartObject co in charts)
                 {
@@ -144,29 +225,51 @@ namespace Libraries.Group1
                     bool isPie = (type == -4102) || (type == 5) || (type == -4103) || (type == (int)Excel.XlChartType.xl3DPie);
                     if (!isPie) continue;
 
+                    int score = 0;
+                    var notes = new List<string>();
+
                     Excel.SeriesCollection sc = (Excel.SeriesCollection)chart.SeriesCollection();
-                    if (sc.Count != 1) continue;
+                    if (sc.Count == 1)
+                        score++;
+                    else
+                        notes.Add("3-D円グラフの系列数が指定と違います。");
 
-                    if (co.Left > boundaryX + 10)
+                    bool onRight = co.Left > boundaryX + 10;
+                    if (onRight)
+                        score++;
+                    else
+                        notes.Add("3-D円グラフが表の右側にありません。");
+
+                    string targetSheet = "下半期売上";
+                    string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 3, ExcelTaskAttemptRegistry.GetAttempt(4, 3), chart.Name, targetSheet);
+                    if (loggedSelection == null)
                     {
-                        // 作成時の選択範囲をチェック (プロジェクト4, タスク3)
-                        string targetSheet = "下半期売上";
-                        string loggedSelection = ExcelLogReader.GetChartCreationSelection(4, 3, ExcelTaskAttemptRegistry.GetAttempt(4, 3), chart.Name, targetSheet);
-                        if (loggedSelection == null)
-                        {
-                            Console.WriteLine($"[DEBUG] Task 4-3 Failed: Chart creation log not found for {chart.Name}.");
-                            return false;
-                        }
+                        notes.Add("グラフ作成時の選択範囲の記録がありません。");
+                    }
+                    else if (!IsSelectionCorrect(loggedSelection, targetSheet, "A4:A10,H4:H10"))
+                    {
+                        notes.Add($"グラフ作成時の選択範囲が「{Quote(FormatSelection(loggedSelection))}」になっています。");
+                    }
+                    else
+                    {
+                        score++;
+                    }
 
-                        if (!IsSelectionCorrect(loggedSelection, targetSheet, "A4:A10,H4:H10"))
-                        {
-                            return false;
-                        }
-
+                    if (notes.Count == 0)
                         return true;
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestNotes = notes;
                     }
                 }
 
+                if (bestScore < 0)
+                    return Miss("3-D円グラフがありません。");
+
+                foreach (string note in bestNotes)
+                    ExcelScoreExplanation.Note(note);
                 return false;
             });
         }
@@ -186,13 +289,13 @@ namespace Libraries.Group1
                 if (excelApp == null)
                 {
                     Console.WriteLine("[DEBUG] Task 4-4: Excel application not found.");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
                 if (!TryGetTargetWorkbookForTask4_4(excelApp, out targetWorkbook))
                 {
                     Console.WriteLine("[DEBUG] Task 4-4: Target workbook not found.");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
 
                 if (!TryPrepareValidationWorkbookPath(
@@ -201,15 +304,16 @@ namespace Libraries.Group1
                     out shouldDeleteValidationPath))
                 {
                     Console.WriteLine("[DEBUG] Task 4-4: Failed to prepare validation workbook.");
-                    return false;
+                    return Miss(ExcelScoreExplanation.UnavailableText);
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] Task 4-4: Failed to acquire workbook. {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
 
+            var foundAltTexts = new List<string>();
             try
             {
                 using (SpreadsheetDocument document = SpreadsheetDocument.Open(validationPath, false))
@@ -226,17 +330,18 @@ namespace Libraries.Group1
                     if (sheet == null)
                     {
                         Console.WriteLine($"[DEBUG] Task 4-4 Failed: Sheet '{targetSheetName}' not found.");
-                        return false;
+                        return Miss(ExcelScoreExplanation.UnavailableText);
                     }
 
                     // 2. WorksheetPartを取得
-                    if (!(wbPart.GetPartById(sheet.Id) is WorksheetPart wsPart)) return false;
+                    if (!(wbPart.GetPartById(sheet.Id) is WorksheetPart wsPart))
+                        return Miss(ExcelScoreExplanation.UnavailableText);
 
                     // 3. DrawingsPartの確認 (グラフはここにある)
                     if (wsPart.DrawingsPart == null)
                     {
                         Console.WriteLine("[DEBUG] Task 4-4 Failed: No DrawingsPart found (No charts/images).");
-                        return false;
+                        return Miss("シート「商品別売上」にグラフがありません。");
                     }
 
                     Xdr.WorksheetDrawing wsDrawing = wsPart.DrawingsPart.WorksheetDrawing;
@@ -244,6 +349,7 @@ namespace Libraries.Group1
                     // 4. すべてのGraphicFrame (グラフのコンテナ) を走査
                     // TwoCellAnchor / OneCellAnchor の区別なく取得
                     var graphicFrames = wsDrawing.Descendants<Xdr.GraphicFrame>();
+                    bool foundChart = false;
 
                     foreach (var gf in graphicFrames)
                     {
@@ -254,6 +360,7 @@ namespace Libraries.Group1
                         {
                             continue; // グラフ以外はスキップ
                         }
+                        foundChart = true;
 
                         // 6. NonVisualDrawingProperties (cNvPr) の取得
                         // 階層: graphicFrame -> nvGraphicFramePr -> cNvPr
@@ -267,6 +374,7 @@ namespace Libraries.Group1
                         
                         string combinedText = title + description; // 連結
                         string normalizedFullText = NormalizeString(combinedText);
+                        string displayText = (title + description).Trim();
                         
                         Console.WriteLine($"[DEBUG] Chart Found (ID:{nvPr.Id}). AltText Content: '{normalizedFullText}'");
 
@@ -277,17 +385,23 @@ namespace Libraries.Group1
                             Console.WriteLine("[DEBUG] Task 4-4 Passed: Exact match found in OpenXML.");
                             return true;
                         }
+
+                        if (!string.IsNullOrEmpty(displayText))
+                            foundAltTexts.Add(Quote(displayText));
                         else
-                        {
-                            Console.WriteLine($"[DEBUG] Chart (ID:{nvPr.Id}) - Mismatch. Expected: '{targetAltText}', Found: '{normalizedFullText}'");
-                        }
+                            foundAltTexts.Add("（空）");
+
+                        Console.WriteLine($"[DEBUG] Chart (ID:{nvPr.Id}) - Mismatch. Expected: '{targetAltText}', Found: '{normalizedFullText}'");
                     }
+
+                    if (!foundChart)
+                        return Miss("シート「商品別売上」にグラフがありません。");
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] Task 4-4 OpenXML Error: {ex.Message}");
-                return false;
+                return Miss(ExcelScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -306,7 +420,9 @@ namespace Libraries.Group1
             }
 
             Console.WriteLine("[DEBUG] Task 4-4 Failed: Target AltText not found in any chart.");
-            return false;
+            if (foundAltTexts.Count > 0)
+                return Miss($"グラフの代替テキストが「{JoinNames(foundAltTexts)}」になっています。");
+            return Miss("グラフに代替テキストが設定されていません。");
         }
 
         // ==========================================
@@ -321,17 +437,19 @@ namespace Libraries.Group1
             try
             {
                 try { excelApp = (Excel.Application)Marshal.GetActiveObject("Excel.Application"); }
-                catch { return false; }
+                catch { return Miss(ExcelScoreExplanation.UnavailableText); }
 
                 workbook = GetWorkbook(excelApp, filePath);
-                if (workbook == null) return false;
+                if (workbook == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 worksheet = FindWorksheetFuzzy(workbook, sheetName);
-                if (worksheet == null) return false;
+                if (worksheet == null)
+                    return Miss(ExcelScoreExplanation.UnavailableText);
 
                 return checkLogic(worksheet);
             }
-            catch { return false; }
+            catch { return Miss(ExcelScoreExplanation.UnavailableText); }
             finally
             {
                 if (worksheet != null) Marshal.ReleaseComObject(worksheet);
@@ -530,6 +648,43 @@ namespace Libraries.Group1
             // プロジェクトの構造に合わせてパスを返してください
             // 例: return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "project4.xlsx");
             return "project4.xlsx"; 
+        }
+
+        private static bool Miss(string reason)
+        {
+            ExcelScoreExplanation.Note(reason);
+            return false;
+        }
+
+        private static string Quote(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        private static string JoinNames(IList<string> names)
+        {
+            if (names == null || names.Count == 0)
+                return "";
+            const int maxItems = 5;
+            if (names.Count <= maxItems)
+                return string.Join("、", names);
+            return string.Join("、", names.Take(maxItems)) + "ほか";
+        }
+
+        private static string FormatSelection(string loggedSelection)
+        {
+            if (string.IsNullOrEmpty(loggedSelection))
+                return "（空）";
+            string selection = loggedSelection.Contains("!")
+                ? loggedSelection.Substring(loggedSelection.IndexOf("!") + 1)
+                : loggedSelection;
+            return selection.Replace("$", "").Replace(" ", "");
         }
     }
 }
