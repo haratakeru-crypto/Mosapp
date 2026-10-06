@@ -63,6 +63,12 @@ namespace MOSExcelMogiApp
             main.Show();
 
             CloseStartupSplash();
+
+            // MainWindow 表示後に VSTO 準備（UI スレッドをブロックしない）
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                Libraries.ExcelVstoInstallerHelper.StartBackgroundPrepForExam();
+            }), DispatcherPriority.ApplicationIdle);
         }
 
         protected override void OnExit(ExitEventArgs e)

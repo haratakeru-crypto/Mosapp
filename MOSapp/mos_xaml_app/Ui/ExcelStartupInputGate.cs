@@ -180,6 +180,14 @@ namespace Ui.ViewModels
                     + " elapsed=" + elapsed
                     + "ms pid=" + pid
                     + " file=" + file);
+                if (string.Equals(reason, "timeout", StringComparison.OrdinalIgnoreCase)
+                    && pid > 0
+                    && !ExcelVstoReadiness.HasAnyStartupForProcess(pid))
+                {
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "gate timeout without VSTO startup pid=" + pid
+                        + " (add-in may be missing; next open will restart Excel if still unloaded)");
+                }
             }
         }
 

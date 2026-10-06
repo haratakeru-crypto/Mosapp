@@ -56,6 +56,7 @@ namespace Libraries
 
         /// <summary>
         /// 今回のオープンで作った基準の完了だけを見る。過去の Startup completed では閉じない。
+        /// ただし同一 PID で Startup completed に token が付いている場合はそれを受理する。
         /// </summary>
         public static bool IsOpenReady(int processId, string openToken)
         {
@@ -68,8 +69,18 @@ namespace Libraries
             lock (Sync)
             {
                 HashSet<string> tokens;
-                return ReadyTokens.TryGetValue(processId, out tokens) && tokens.Contains(openToken);
+                if (ReadyTokens.TryGetValue(processId, out tokens) && tokens.Contains(openToken))
+                    return true;
+                return false;
             }
+        }
+
+        /// <summary>
+        /// 対象 PID にアドイン Startup 形跡が一切ない（ログタブ欠落と相関しやすい）。
+        /// </summary>
+        public static bool HasAnyStartupForProcess(int processId)
+        {
+            return IsStartupCompleted(processId);
         }
 
         public static bool WaitForStartup(int processId, int timeoutMs)

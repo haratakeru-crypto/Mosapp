@@ -1002,6 +1002,19 @@ namespace Ui.ViewModels
                 }
             }
 
+            // Phase B: レジストリ上の VSTO を有効化し、アドイン未ロードの既存 Excel は開き直す。
+            string vstoIssue;
+            if (!ExcelVstoInstallerHelper.EnsureAddInReadyForExam(out vstoIssue))
+            {
+                ExcelVstoReadiness.RecordHostEvent(
+                    "vsto-ensure failed before open: " + (vstoIssue ?? "(null)"));
+                // 登録失敗でもファイルオープンは続行（ゲート timeout + Phase A で操作は戻る）
+            }
+            else
+            {
+                ExcelApplicationManager.RestartExcelIfAddInNotLoaded("ExecuteOpenProject");
+            }
+
             string openToken = ExcelVstoReadiness.CreateOpenToken();
             try
             {

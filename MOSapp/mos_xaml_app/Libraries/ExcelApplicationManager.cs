@@ -221,6 +221,53 @@ namespace Libraries
         }
 
         /// <summary>
+        /// 起動中 Excel に VSTO Startup が無いとき、試験オープン前に終了させる（Word と同様）。
+        /// LoadBehavior を直しても、既に動いている Excel にはアドインが載らないため。
+        /// </summary>
+        public static void RestartExcelIfAddInNotLoaded(string logContext = null)
+        {
+            ExcelApp app = null;
+            int pid = -1;
+            try
+            {
+                app = TryGetHealthyExcelApplication();
+                if (app == null)
+                    return;
+
+                pid = TryGetExcelProcessId(app);
+                if (pid > 0 && ExcelVstoReadiness.IsStartupCompleted(pid))
+                    return;
+
+                string ctx = string.IsNullOrEmpty(logContext) ? nameof(RestartExcelIfAddInNotLoaded) : logContext;
+                ExcelVstoReadiness.RecordHostEvent(
+                    "excel restart: no VSTO startup pid=" + pid + " context=" + ctx);
+                try { app.DisplayAlerts = false; } catch { /* ignore */ }
+                try { app.Quit(); } catch { /* ignore */ }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[RestartExcelIfAddInNotLoaded] {ex.Message}");
+            }
+            finally
+            {
+                ReleaseComObjectSafe(app);
+            }
+
+            if (pid > 0)
+            {
+                EnsureExcelProcessExited(
+                    pid,
+                    waitAfterQuitMs: 8000,
+                    waitAfterKillMs: 4000,
+                    logContext: logContext ?? nameof(RestartExcelIfAddInNotLoaded));
+            }
+            else
+            {
+                WaitForAllExcelProcessesGone(8000);
+            }
+        }
+
+        /// <summary>
         /// Quit 後も同一 PID が残る場合に VSTO が再ロードされないため、待機してから必要なら Kill する。
         /// </summary>
         public static bool WaitForExcelProcessExit(int pid, int timeoutMs)
