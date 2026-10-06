@@ -1938,6 +1938,10 @@ namespace MOSExcelMogiApp
             ExcelApp excelApp = null;
             int excelPid = -1;
 
+            ExcelVstoReadiness.RecordHostEvent(
+                "return-to-result close begin excelCount="
+                + ExcelApplicationManager.CountExcelProcesses());
+
             try
             {
                 try
@@ -1947,10 +1951,12 @@ namespace MOSExcelMogiApp
                 catch (COMException)
                 {
                     System.Diagnostics.Debug.WriteLine("[ReturnToResult] No Excel application");
+                    ExcelVstoReadiness.RecordHostEvent("return-to-result no-rot");
                     return;
                 }
 
                 excelPid = ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                ExcelVstoReadiness.RecordHostEvent("return-to-result rot pid=" + excelPid);
 
                 bool originalDisplayAlerts = true;
                 try
@@ -2005,10 +2011,14 @@ namespace MOSExcelMogiApp
                 try
                 {
                     excelApp.Quit();
+                    ExcelVstoReadiness.RecordHostEvent("return-to-result Quit requested pid=" + excelPid);
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ReturnToResult] Quit: {ex.Message}");
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "return-to-result Quit failed pid=" + excelPid
+                        + " error=" + ex.GetType().Name + ":" + ex.Message);
                 }
 
                 try
@@ -2035,10 +2045,17 @@ namespace MOSExcelMogiApp
                 {
                     ExcelApplicationManager.WaitForAllExcelProcessesGone(quitWaitMs);
                 }
+
+                ExcelVstoReadiness.RecordHostEvent(
+                    "return-to-result close end pid=" + excelPid
+                    + " alive=" + (ExcelApplicationManager.IsProcessAlive(excelPid) ? "1" : "0")
+                    + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ReturnToResult] {ex.Message}");
+                ExcelVstoReadiness.RecordHostEvent(
+                    "return-to-result exception error=" + ex.GetType().Name + ":" + ex.Message);
                 if (excelPid > 0)
                 {
                     ExcelApplicationManager.EnsureExcelProcessExited(

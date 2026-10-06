@@ -277,15 +277,52 @@ namespace Libraries
 
         public static void EnsureExcelProcessExited(int pid, int waitAfterQuitMs = 10000, int waitAfterKillMs = 5000, string logContext = null)
         {
-            if (pid <= 0) return;
-
-            if (WaitForProcessExitById(pid, waitAfterQuitMs))
+            if (pid <= 0)
+            {
+                ExcelVstoReadiness.RecordHostEvent(
+                    "excel-exit skip pid<=0 context=" + (logContext ?? nameof(EnsureExcelProcessExited)));
                 return;
+            }
 
             string ctx = string.IsNullOrEmpty(logContext) ? nameof(EnsureExcelProcessExited) : logContext;
+            var sw = Stopwatch.StartNew();
+            ExcelVstoReadiness.RecordHostEvent(
+                "excel-exit begin context=" + ctx
+                + " pid=" + pid
+                + " waitQuitMs=" + waitAfterQuitMs
+                + " waitKillMs=" + waitAfterKillMs
+                + " alive=" + (IsProcessAlive(pid) ? "1" : "0")
+                + " excelCount=" + CountExcelProcesses());
+
+            if (WaitForProcessExitById(pid, waitAfterQuitMs))
+            {
+                ExcelVstoReadiness.RecordHostEvent(
+                    "excel-exit ok context=" + ctx
+                    + " pid=" + pid
+                    + " how=wait-after-quit"
+                    + " elapsed=" + sw.ElapsedMilliseconds + "ms"
+                    + " excelCount=" + CountExcelProcesses());
+                return;
+            }
+
             Debug.WriteLine($"[{ctx}] Excel PID {pid} still running after Quit; forcing kill.");
-            TryKillProcessById(pid);
-            WaitForProcessExitById(pid, waitAfterKillMs);
+            ExcelVstoReadiness.RecordHostEvent(
+                "excel-exit kill context=" + ctx
+                + " pid=" + pid
+                + " afterQuitWaitMs=" + waitAfterQuitMs
+                + " alive=" + (IsProcessAlive(pid) ? "1" : "0"));
+
+            bool killOk = TryKillProcessById(pid);
+            bool exitedAfterKill = WaitForProcessExitById(pid, waitAfterKillMs);
+            ExcelVstoReadiness.RecordHostEvent(
+                "excel-exit " + (exitedAfterKill ? "ok" : "FAILED")
+                + " context=" + ctx
+                + " pid=" + pid
+                + " how=kill"
+                + " killOk=" + (killOk ? "1" : "0")
+                + " alive=" + (IsProcessAlive(pid) ? "1" : "0")
+                + " elapsed=" + sw.ElapsedMilliseconds + "ms"
+                + " excelCount=" + CountExcelProcesses());
         }
 
         /// <summary>
@@ -294,6 +331,9 @@ namespace Libraries
         public static void WaitForAllExcelProcessesGone(int timeoutMs)
         {
             var sw = Stopwatch.StartNew();
+            ExcelVstoReadiness.RecordHostEvent(
+                "excel-exit wait-all begin timeoutMs=" + timeoutMs
+                + " excelCount=" + CountExcelProcesses());
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
                 Process[] procs = null;
@@ -301,7 +341,11 @@ namespace Libraries
                 {
                     procs = Process.GetProcessesByName("EXCEL");
                     if (procs.Length == 0)
+                    {
+                        ExcelVstoReadiness.RecordHostEvent(
+                            "excel-exit wait-all ok elapsed=" + sw.ElapsedMilliseconds + "ms");
                         return;
+                    }
                 }
                 finally
                 {
@@ -315,6 +359,55 @@ namespace Libraries
                 }
 
                 Thread.Sleep(200);
+            }
+
+            ExcelVstoReadiness.RecordHostEvent(
+                "excel-exit wait-all FAILED timeoutMs=" + timeoutMs
+                + " excelCount=" + CountExcelProcesses());
+        }
+
+        public static int CountExcelProcesses()
+        {
+            Process[] procs = null;
+            try
+            {
+                procs = Process.GetProcessesByName("EXCEL");
+                return procs.Length;
+            }
+            catch
+            {
+                return -1;
+            }
+            finally
+            {
+                if (procs != null)
+                {
+                    foreach (var p in procs)
+                    {
+                        try { p.Dispose(); } catch { /* ignore */ }
+                    }
+                }
+            }
+        }
+
+        public static bool IsProcessAlive(int pid)
+        {
+            if (pid <= 0)
+                return false;
+            try
+            {
+                using (var p = Process.GetProcessById(pid))
+                {
+                    return !p.HasExited;
+                }
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -354,25 +447,30 @@ namespace Libraries
             }
         }
 
-        private static void TryKillProcessById(int pid)
+        private static bool TryKillProcessById(int pid)
         {
-            if (pid <= 0) return;
+            if (pid <= 0) return true;
 
             try
             {
                 using (var p = Process.GetProcessById(pid))
                 {
-                    if (!p.HasExited)
-                        p.Kill();
+                    if (p.HasExited)
+                        return true;
+                    p.Kill();
+                    return true;
                 }
             }
             catch (ArgumentException)
             {
-                /* already exited */
+                return true;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ExcelApplicationManager.TryKillProcessById] PID {pid}: {ex.Message}");
+                ExcelVstoReadiness.RecordHostEvent(
+                    "excel-exit kill-exception pid=" + pid + " error=" + ex.GetType().Name + ":" + ex.Message);
+                return false;
             }
         }
 

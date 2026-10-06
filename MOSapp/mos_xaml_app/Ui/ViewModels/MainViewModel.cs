@@ -1431,6 +1431,10 @@ namespace Ui.ViewModels
             if (!windowClosed)
                 return;
 
+            ExcelVstoReadiness.RecordHostEvent(
+                "window-closed pid=" + pid
+                + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
+
             _examExcelPid = 0;
             _examExcelWindowSeen = false;
             StopExamExcelWindowWatch();
@@ -1443,6 +1447,11 @@ namespace Ui.ViewModels
         {
             if (processId <= 0 && shared == null)
                 return;
+
+            ExcelVstoReadiness.RecordHostEvent(
+                "window-closed release begin context=" + (logContext ?? "")
+                + " pid=" + processId
+                + " hasShared=" + (shared != null ? "1" : "0"));
 
             var thread = new Thread(() =>
             {
@@ -1463,6 +1472,10 @@ namespace Ui.ViewModels
                             800,
                             logContext);
                     }
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "window-closed release end pid=" + processId
+                        + " alive=" + (ExcelApplicationManager.IsProcessAlive(processId) ? "1" : "0")
+                        + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
                 }
             })
             {
@@ -2519,6 +2532,11 @@ namespace Ui.ViewModels
                 DetachSharedExcelApplication();
                 _excelShutdownFinished.Reset();
 
+                ExcelVstoReadiness.RecordHostEvent(
+                    "review-shutdown begin knownPid=" + examPid
+                    + " file=" + (filePath ?? "")
+                    + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
+
                 var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 var thread = new Thread(() =>
                 {
@@ -2530,10 +2548,16 @@ namespace Ui.ViewModels
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine("[BeginExcelShutdownForReview] " + ex.Message);
+                        ExcelVstoReadiness.RecordHostEvent(
+                            "review-shutdown exception error=" + ex.GetType().Name + ":" + ex.Message);
                         tcs.TrySetResult(false);
                     }
                     finally
                     {
+                        ExcelVstoReadiness.RecordHostEvent(
+                            "review-shutdown end knownPid=" + examPid
+                            + " alive=" + (ExcelApplicationManager.IsProcessAlive(examPid) ? "1" : "0")
+                            + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
                         _excelShutdownFinished.Set();
                         if (onCompleted != null)
                         {
@@ -2584,6 +2608,16 @@ namespace Ui.ViewModels
             ExcelApp excelApp = null;
             int excelPid = knownExamPid;
             bool ownsExamWorkbook = false;
+            bool quitRequested = false;
+            bool skippedQuit = false;
+            int rotPid = -1;
+            var sw = Stopwatch.StartNew();
+
+            ExcelVstoReadiness.RecordHostEvent(
+                "shutdown begin knownPid=" + knownExamPid
+                + " file=" + (preferredFilePath ?? "")
+                + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
+
             try
             {
                 using (OleMessageFilterScope.Enter())
@@ -2595,16 +2629,25 @@ namespace Ui.ViewModels
                     catch (COMException)
                     {
                         System.Diagnostics.Debug.WriteLine("[ExcelShutdown] No Excel application is running");
+                        ExcelVstoReadiness.RecordHostEvent(
+                            "shutdown no-rot knownPid=" + knownExamPid
+                            + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
                         excelApp = null;
                     }
 
                     if (excelApp != null)
                     {
-                        int rotPid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                        rotPid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
                         ownsExamWorkbook = ExcelInstanceOwnsExamWorkbook(excelApp, preferredFilePath);
                         bool isExamProcess = knownExamPid > 0
                             ? rotPid == knownExamPid
                             : ownsExamWorkbook;
+                        ExcelVstoReadiness.RecordHostEvent(
+                            "shutdown rot pid=" + rotPid
+                            + " knownPid=" + knownExamPid
+                            + " ownsExamWb=" + (ownsExamWorkbook ? "1" : "0")
+                            + " isExamProcess=" + (isExamProcess ? "1" : "0"));
+
                         if (isExamProcess || ownsExamWorkbook)
                         {
                             if (excelPid <= 0)
@@ -2617,12 +2660,26 @@ namespace Ui.ViewModels
                             try
                             {
                                 excelApp.Quit();
+                                quitRequested = true;
                                 System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit requested");
+                                ExcelVstoReadiness.RecordHostEvent(
+                                    "shutdown Quit requested pid=" + excelPid);
                             }
                             catch (Exception ex)
                             {
                                 System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit: " + ex.Message);
+                                ExcelVstoReadiness.RecordHostEvent(
+                                    "shutdown Quit failed pid=" + excelPid
+                                    + " error=" + ex.GetType().Name + ":" + ex.Message);
                             }
+                        }
+                        else
+                        {
+                            skippedQuit = true;
+                            ExcelVstoReadiness.RecordHostEvent(
+                                "shutdown skip-Quit rotPid=" + rotPid
+                                + " knownPid=" + knownExamPid
+                                + " (not exam process / workbook)");
                         }
                     }
                 }
@@ -2630,6 +2687,8 @@ namespace Ui.ViewModels
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ExcelShutdown] " + ex.Message);
+                ExcelVstoReadiness.RecordHostEvent(
+                    "shutdown exception error=" + ex.GetType().Name + ":" + ex.Message);
             }
             finally
             {
@@ -2640,11 +2699,25 @@ namespace Ui.ViewModels
             }
 
             if (excelPid <= 0)
+            {
+                ExcelVstoReadiness.RecordHostEvent(
+                    "shutdown end no-pid knownPid=" + knownExamPid
+                    + " quit=" + (quitRequested ? "1" : "0")
+                    + " skippedQuit=" + (skippedQuit ? "1" : "0")
+                    + " elapsed=" + sw.ElapsedMilliseconds + "ms"
+                    + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
                 return;
+            }
 
             const int normalExitWaitMs = 1500;
             const int forceKillWaitMs = 800;
             bool exited = Libraries.ExcelApplicationManager.WaitForExcelProcessExit(excelPid, normalExitWaitMs);
+            ExcelVstoReadiness.RecordHostEvent(
+                "shutdown after-quit-wait pid=" + excelPid
+                + " exited=" + (exited ? "1" : "0")
+                + " waitMs=" + normalExitWaitMs
+                + " willKill=" + ((!exited && (knownExamPid > 0 || ownsExamWorkbook)) ? "1" : "0"));
+
             if (!exited && (knownExamPid > 0 || ownsExamWorkbook))
             {
                 Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
@@ -2653,6 +2726,20 @@ namespace Ui.ViewModels
                     forceKillWaitMs,
                     "[ExcelShutdown]");
             }
+            else if (!exited)
+            {
+                ExcelVstoReadiness.RecordHostEvent(
+                    "shutdown leftover pid=" + excelPid
+                    + " (kill skipped: knownPid=" + knownExamPid
+                    + " ownsExamWb=" + (ownsExamWorkbook ? "1" : "0") + ")");
+            }
+
+            ExcelVstoReadiness.RecordHostEvent(
+                "shutdown end pid=" + excelPid
+                + " alive=" + (ExcelApplicationManager.IsProcessAlive(excelPid) ? "1" : "0")
+                + " quit=" + (quitRequested ? "1" : "0")
+                + " elapsed=" + sw.ElapsedMilliseconds + "ms"
+                + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
         }
 
         private static bool ExcelInstanceOwnsExamWorkbook(ExcelApp excelApp, string preferredFilePath)
@@ -3476,6 +3563,7 @@ namespace Ui.ViewModels
             if (Interlocked.CompareExchange(ref _endExamShutdownStarted, 1, 0) != 0)
             {
                 System.Diagnostics.Debug.WriteLine("[ExecuteEndExam] duplicate call ignored");
+                ExcelVstoReadiness.RecordHostEvent("end-exam duplicate ignored");
                 return;
             }
 
@@ -3487,6 +3575,12 @@ namespace Ui.ViewModels
             DetachSharedExcelApplication();
             CurrentProject = null;
             ResultMessage = "試験を終了しました。";
+
+            ExcelVstoReadiness.RecordHostEvent(
+                "end-exam begin knownPid=" + examPid
+                + " file=" + (examFilePath ?? "")
+                + " hasShared=" + (shared != null ? "1" : "0")
+                + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
 
             _excelShutdownFinished.Reset();
 
@@ -3504,9 +3598,15 @@ namespace Ui.ViewModels
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ExecuteEndExam] Excel shutdown: {ex.Message}");
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "end-exam exception error=" + ex.GetType().Name + ":" + ex.Message);
                 }
                 finally
                 {
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "end-exam thread done knownPid=" + examPid
+                        + " alive=" + (ExcelApplicationManager.IsProcessAlive(examPid) ? "1" : "0")
+                        + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
                     _excelShutdownFinished.Set();
                 }
             })
