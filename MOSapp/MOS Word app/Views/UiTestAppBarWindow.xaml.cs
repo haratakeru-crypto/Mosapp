@@ -622,11 +622,10 @@ namespace MOS_Word_app.Views
         {
             try
             {
+                WordStartupInputGate.EnsureWordInputEnabled();
                 IntPtr hwnd = TryGetWordMainWindowHandle();
                 if (hwnd == IntPtr.Zero)
                     return;
-                if (!IsWindowEnabled(hwnd))
-                    EnableWindow(hwnd, true);
                 TryForceForeground(hwnd);
             }
             catch

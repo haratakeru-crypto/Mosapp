@@ -34,7 +34,13 @@ namespace MOS_Word_app.Views
         static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
 
         [DllImport("user32.dll")]
+        static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
         static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool IsWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -50,7 +56,7 @@ namespace MOS_Word_app.Views
                 return;
             }
 
-            End();
+            Finish(_active);
             // 残っている心拍ファイルだけでは足りない。Word が動いていて心拍が新しいときだけ案内を出さない。
             if (IsWordRunning() && LogReader.IsVstoHeartbeatFresh(HeartbeatMaxAgeSeconds))
                 return;
@@ -75,6 +81,47 @@ namespace MOS_Word_app.Views
                 return;
             }
 
+            Finish(_active);
+        }
+
+        /// <summary>
+        /// ゲート外からも呼べる保険。無効のまま残った Word トップレベルを有効に戻す。
+        /// </summary>
+        public static void EnsureWordInputEnabled()
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(EnsureWordInputEnabled));
+                return;
+            }
+
+            RestoreWordInput(releaseTrackedOnly: false);
+        }
+
+        /// <summary>起動待ちのあいだに新しく出た Word ウィンドウも無効にする。</summary>
+        public static void DisableWordWindows()
+        {
+            if (!_active)
+                return;
+
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (!IsWordTopLevelWindow(hWnd))
+                    return true;
+
+                if (DisabledWindows.Contains(hWnd))
+                    return true;
+
+                // EnableWindow の戻り値は「直前が有効だったか」。既に無効でも追跡する。
+                try { EnableWindow(hWnd, false); } catch { }
+                DisabledWindows.Add(hWnd);
+                return true;
+            }, IntPtr.Zero);
+        }
+
+        static void Finish(bool wasActive)
+        {
             _active = false;
             if (_timer != null)
             {
@@ -89,43 +136,77 @@ namespace MOS_Word_app.Views
                 _dialog = null;
             }
 
-            foreach (IntPtr hwnd in DisabledWindows)
-            {
-                try { EnableWindow(hwnd, true); } catch { }
-            }
-            DisabledWindows.Clear();
+            // 追跡漏れがあっても Word を操作不能のまま残さない。
+            if (wasActive || DisabledWindows.Count > 0)
+                RestoreWordInput(releaseTrackedOnly: false);
+
+            _waiting = null;
         }
 
-        /// <summary>起動待ちのあいだに新しく出た Word ウィンドウも無効にする。</summary>
-        public static void DisableWordWindows()
+        static void OnTick(object sender, EventArgs e)
         {
             if (!_active)
                 return;
 
+            DisableWordWindows();
+            bool timedOut = _waiting != null && _waiting.ElapsedMilliseconds >= TimeoutMs;
+            if (timedOut || LogReader.IsVstoHeartbeatFresh(HeartbeatMaxAgeSeconds))
+                End();
+        }
+
+        static void RestoreWordInput(bool releaseTrackedOnly)
+        {
+            foreach (IntPtr hwnd in DisabledWindows)
+            {
+                try
+                {
+                    if (IsWindow(hwnd))
+                        EnableWindow(hwnd, true);
+                }
+                catch { }
+            }
+            DisabledWindows.Clear();
+
+            if (releaseTrackedOnly)
+                return;
+
+            ForceEnableWordWindows();
+        }
+
+        static void ForceEnableWordWindows()
+        {
             EnumWindows((hWnd, lParam) =>
             {
-                if (!IsWindowVisible(hWnd))
-                    return true;
-                GetWindowThreadProcessId(hWnd, out uint pid);
-                if (pid == 0)
+                if (!IsWordTopLevelWindow(hWnd))
                     return true;
                 try
                 {
-                    using (Process process = Process.GetProcessById((int)pid))
-                    {
-                        if (!string.Equals(process.ProcessName, "WINWORD", StringComparison.OrdinalIgnoreCase))
-                            return true;
-                    }
+                    if (!IsWindowEnabled(hWnd))
+                        EnableWindow(hWnd, true);
                 }
-                catch
-                {
-                    return true;
-                }
-
-                if (EnableWindow(hWnd, false))
-                    DisabledWindows.Add(hWnd);
+                catch { }
                 return true;
             }, IntPtr.Zero);
+        }
+
+        static bool IsWordTopLevelWindow(IntPtr hWnd)
+        {
+            if (!IsWindowVisible(hWnd))
+                return false;
+            GetWindowThreadProcessId(hWnd, out uint pid);
+            if (pid == 0)
+                return false;
+            try
+            {
+                using (Process process = Process.GetProcessById((int)pid))
+                {
+                    return string.Equals(process.ProcessName, "WINWORD", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         static bool IsWordRunning()
@@ -151,17 +232,6 @@ namespace MOS_Word_app.Views
                     try { process.Dispose(); } catch { }
                 }
             }
-        }
-
-        static void OnTick(object sender, EventArgs e)
-        {
-            if (!_active)
-                return;
-
-            DisableWordWindows();
-            bool timedOut = _waiting != null && _waiting.ElapsedMilliseconds >= TimeoutMs;
-            if (timedOut || LogReader.IsVstoHeartbeatFresh(HeartbeatMaxAgeSeconds))
-                End();
         }
 
         static Window CreateDialog()
