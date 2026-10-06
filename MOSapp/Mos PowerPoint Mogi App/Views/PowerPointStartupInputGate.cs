@@ -34,7 +34,13 @@ namespace MOS_PowerPoint_app.Views
         static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
 
         [DllImport("user32.dll")]
+        static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
         static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool IsWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -50,7 +56,7 @@ namespace MOS_PowerPoint_app.Views
                 return;
             }
 
-            End();
+            Finish(_active);
             // 残っている心拍ファイルだけでは足りない。PowerPoint が動いていて心拍が新しいときだけ案内を出さない。
             if (IsPowerPointRunning() && PPLogReader.IsVstoHeartbeatFresh(HeartbeatMaxAgeSeconds))
                 return;
@@ -75,6 +81,46 @@ namespace MOS_PowerPoint_app.Views
                 return;
             }
 
+            Finish(_active);
+        }
+
+        /// <summary>
+        /// ゲート外からも呼べる保険。無効のまま残った PowerPoint トップレベルを有効に戻す。
+        /// </summary>
+        public static void EnsurePowerPointInputEnabled()
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(EnsurePowerPointInputEnabled));
+                return;
+            }
+
+            RestorePowerPointInput(releaseTrackedOnly: false);
+        }
+
+        public static void DisablePowerPointWindows()
+        {
+            if (!_active)
+                return;
+
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (!IsPowerPointTopLevelWindow(hWnd))
+                    return true;
+
+                if (DisabledWindows.Contains(hWnd))
+                    return true;
+
+                // EnableWindow の戻り値は「直前が有効だったか」。既に無効でも追跡する。
+                try { EnableWindow(hWnd, false); } catch { }
+                DisabledWindows.Add(hWnd);
+                return true;
+            }, IntPtr.Zero);
+        }
+
+        static void Finish(bool wasActive)
+        {
             _active = false;
             if (_timer != null)
             {
@@ -89,42 +135,78 @@ namespace MOS_PowerPoint_app.Views
                 _dialog = null;
             }
 
-            foreach (IntPtr hwnd in DisabledWindows)
-            {
-                try { EnableWindow(hwnd, true); } catch { }
-            }
-            DisabledWindows.Clear();
+            // 追跡漏れがあっても PowerPoint を操作不能のまま残さない。
+            if (wasActive || DisabledWindows.Count > 0)
+                RestorePowerPointInput(releaseTrackedOnly: false);
+
+            _waiting = null;
         }
 
-        public static void DisablePowerPointWindows()
+        static void OnTick(object sender, EventArgs e)
         {
             if (!_active)
                 return;
 
+            DisablePowerPointWindows();
+            bool timedOut = _waiting != null && _waiting.ElapsedMilliseconds >= TimeoutMs;
+            bool addInReady = IsPowerPointRunning() && PPLogReader.IsVstoHeartbeatFresh(HeartbeatMaxAgeSeconds);
+            if (timedOut || addInReady)
+                End();
+        }
+
+        static void RestorePowerPointInput(bool releaseTrackedOnly)
+        {
+            foreach (IntPtr hwnd in DisabledWindows)
+            {
+                try
+                {
+                    if (IsWindow(hwnd))
+                        EnableWindow(hwnd, true);
+                }
+                catch { }
+            }
+            DisabledWindows.Clear();
+
+            if (releaseTrackedOnly)
+                return;
+
+            ForceEnablePowerPointWindows();
+        }
+
+        static void ForceEnablePowerPointWindows()
+        {
             EnumWindows((hWnd, lParam) =>
             {
-                if (!IsWindowVisible(hWnd))
-                    return true;
-                GetWindowThreadProcessId(hWnd, out uint pid);
-                if (pid == 0)
+                if (!IsPowerPointTopLevelWindow(hWnd))
                     return true;
                 try
                 {
-                    using (Process process = Process.GetProcessById((int)pid))
-                    {
-                        if (!string.Equals(process.ProcessName, "POWERPNT", StringComparison.OrdinalIgnoreCase))
-                            return true;
-                    }
+                    if (!IsWindowEnabled(hWnd))
+                        EnableWindow(hWnd, true);
                 }
-                catch
-                {
-                    return true;
-                }
-
-                if (EnableWindow(hWnd, false))
-                    DisabledWindows.Add(hWnd);
+                catch { }
                 return true;
             }, IntPtr.Zero);
+        }
+
+        static bool IsPowerPointTopLevelWindow(IntPtr hWnd)
+        {
+            if (!IsWindowVisible(hWnd))
+                return false;
+            GetWindowThreadProcessId(hWnd, out uint pid);
+            if (pid == 0)
+                return false;
+            try
+            {
+                using (Process process = Process.GetProcessById((int)pid))
+                {
+                    return string.Equals(process.ProcessName, "POWERPNT", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         static bool IsPowerPointRunning()
@@ -150,18 +232,6 @@ namespace MOS_PowerPoint_app.Views
                     try { process.Dispose(); } catch { }
                 }
             }
-        }
-
-        static void OnTick(object sender, EventArgs e)
-        {
-            if (!_active)
-                return;
-
-            DisablePowerPointWindows();
-            bool timedOut = _waiting != null && _waiting.ElapsedMilliseconds >= TimeoutMs;
-            bool addInReady = IsPowerPointRunning() && PPLogReader.IsVstoHeartbeatFresh(HeartbeatMaxAgeSeconds);
-            if (timedOut || addInReady)
-                End();
         }
 
         static Window CreateDialog()

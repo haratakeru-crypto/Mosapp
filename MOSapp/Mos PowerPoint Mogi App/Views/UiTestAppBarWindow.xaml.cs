@@ -1299,11 +1299,10 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
+                PowerPointStartupInputGate.EnsurePowerPointInputEnabled();
                 IntPtr hwnd = TryGetPowerPointMainWindowHandle();
                 if (hwnd == IntPtr.Zero)
                     return;
-                if (!IsWindowEnabled(hwnd))
-                    EnableWindow(hwnd, true);
                 TryForceForeground(hwnd);
             }
             catch
