@@ -2694,7 +2694,20 @@ namespace Ui.ViewModels
             {
                 if (excelApp != null)
                 {
-                    try { Marshal.ReleaseComObject(excelApp); } catch { /* ignore */ }
+                    if (quitRequested)
+                    {
+                        // Quit 後の同期 ReleaseComObject はブロックし Kill に届かないことがある。
+                        Libraries.ExcelApplicationManager.AbandonComObjectAfterQuit(
+                            excelApp,
+                            "[ExcelShutdown]");
+                    }
+                    else
+                    {
+                        ExcelVstoReadiness.RecordHostEvent("shutdown ReleaseComObject begin");
+                        try { Marshal.ReleaseComObject(excelApp); } catch { /* ignore */ }
+                        ExcelVstoReadiness.RecordHostEvent("shutdown ReleaseComObject end");
+                    }
+                    excelApp = null;
                 }
             }
 
@@ -2711,14 +2724,15 @@ namespace Ui.ViewModels
 
             const int normalExitWaitMs = 1500;
             const int forceKillWaitMs = 800;
+            bool shouldForceKill = knownExamPid > 0 || ownsExamWorkbook || quitRequested;
             bool exited = Libraries.ExcelApplicationManager.WaitForExcelProcessExit(excelPid, normalExitWaitMs);
             ExcelVstoReadiness.RecordHostEvent(
                 "shutdown after-quit-wait pid=" + excelPid
                 + " exited=" + (exited ? "1" : "0")
                 + " waitMs=" + normalExitWaitMs
-                + " willKill=" + ((!exited && (knownExamPid > 0 || ownsExamWorkbook)) ? "1" : "0"));
+                + " willKill=" + ((!exited && shouldForceKill) ? "1" : "0"));
 
-            if (!exited && (knownExamPid > 0 || ownsExamWorkbook))
+            if (!exited && shouldForceKill)
             {
                 Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
                     excelPid,
@@ -3064,15 +3078,9 @@ namespace Ui.ViewModels
                 }
 
                 _sharedExcelApp = null;
-                try
-                {
-                    Marshal.ReleaseComObject(excelApp);
-                }
-                catch
-                {
-                    /* ignore */
-                }
-
+                Libraries.ExcelApplicationManager.AbandonComObjectAfterQuit(
+                    excelApp,
+                    "[QuitExcelForProjectReset]");
                 excelApp = null;
 
                 const int quitWaitMs = 10000;

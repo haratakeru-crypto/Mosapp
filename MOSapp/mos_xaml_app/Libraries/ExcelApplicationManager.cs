@@ -180,6 +180,21 @@ namespace Libraries
             try { Marshal.ReleaseComObject(comObject); } catch { }
         }
 
+        /// <summary>
+        /// Quit 後の同期 <see cref="Marshal.ReleaseComObject"/> はブロックし、プロセス Kill に到達できないことがある。
+        /// RCW は破棄して参照を切るだけにし、プロセス終了は PID 単位で行う。
+        /// </summary>
+        public static void AbandonComObjectAfterQuit(object comObject, string logContext = null)
+        {
+            if (comObject == null)
+                return;
+
+            ExcelVstoReadiness.RecordHostEvent(
+                "com abandon-after-quit context=" + (logContext ?? "")
+                + " (skip sync ReleaseComObject)");
+            // 意図的に ReleaseComObject しない
+        }
+
         private static void TrySetVisible(ExcelApp app, bool makeVisible)
         {
             if (app == null) return;
@@ -228,6 +243,7 @@ namespace Libraries
         {
             ExcelApp app = null;
             int pid = -1;
+            bool quitRequested = false;
             try
             {
                 app = TryGetHealthyExcelApplication();
@@ -242,7 +258,12 @@ namespace Libraries
                 ExcelVstoReadiness.RecordHostEvent(
                     "excel restart: no VSTO startup pid=" + pid + " context=" + ctx);
                 try { app.DisplayAlerts = false; } catch { /* ignore */ }
-                try { app.Quit(); } catch { /* ignore */ }
+                try
+                {
+                    app.Quit();
+                    quitRequested = true;
+                }
+                catch { /* ignore */ }
             }
             catch (Exception ex)
             {
@@ -250,7 +271,11 @@ namespace Libraries
             }
             finally
             {
-                ReleaseComObjectSafe(app);
+                if (quitRequested)
+                    AbandonComObjectAfterQuit(app, logContext ?? nameof(RestartExcelIfAddInNotLoaded));
+                else
+                    ReleaseComObjectSafe(app);
+                app = null;
             }
 
             if (pid > 0)

@@ -2150,13 +2150,22 @@ namespace MOSExcelMogiApp.Views
             }
             finally
             {
-                try
+                if (quitCalled)
                 {
-                    if (excelApp.Workbooks != null)
-                        Marshal.ReleaseComObject(excelApp.Workbooks);
+                    // Workbooks / Application の同期 Release は Quit 後にブロックし得る。
+                    ExcelApplicationManager.AbandonComObjectAfterQuit(excelApp, "[CloseExcelApplication]");
                 }
-                catch { }
-                try { Marshal.ReleaseComObject(excelApp); } catch { }
+                else
+                {
+                    try
+                    {
+                        if (excelApp.Workbooks != null)
+                            Marshal.ReleaseComObject(excelApp.Workbooks);
+                    }
+                    catch { }
+                    try { Marshal.ReleaseComObject(excelApp); } catch { }
+                }
+
                 ExcelGradingPerf.Log("CloseExcel.Quit", quitSw.ElapsedMilliseconds, quitCalled ? "quit" : "released");
             }
 

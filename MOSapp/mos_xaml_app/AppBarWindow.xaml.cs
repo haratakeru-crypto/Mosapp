@@ -2021,15 +2021,8 @@ namespace MOSExcelMogiApp
                         + " error=" + ex.GetType().Name + ":" + ex.Message);
                 }
 
-                try
-                {
-                    Marshal.ReleaseComObject(excelApp);
-                }
-                catch
-                {
-                    /* ignore */
-                }
-
+                // Quit 後の同期 ReleaseComObject はブロックし得るため破棄のみ。
+                ExcelApplicationManager.AbandonComObjectAfterQuit(excelApp, "[ReturnToResult]");
                 excelApp = null;
 
                 const int quitWaitMs = 10000;
@@ -2056,6 +2049,11 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"[ReturnToResult] {ex.Message}");
                 ExcelVstoReadiness.RecordHostEvent(
                     "return-to-result exception error=" + ex.GetType().Name + ":" + ex.Message);
+                if (excelApp != null)
+                {
+                    ExcelApplicationManager.AbandonComObjectAfterQuit(excelApp, "[ReturnToResult]");
+                    excelApp = null;
+                }
                 if (excelPid > 0)
                 {
                     ExcelApplicationManager.EnsureExcelProcessExited(
