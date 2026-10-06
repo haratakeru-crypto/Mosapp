@@ -195,6 +195,197 @@ namespace Libraries
             // 意図的に ReleaseComObject しない
         }
 
+        /// <summary>
+        /// 対象 PID の起動時刻を取得する。PID 再利用誤認防止用。失敗時は null。
+        /// </summary>
+        public static DateTime? TryGetProcessStartTime(int pid)
+        {
+            if (pid <= 0)
+                return null;
+            try
+            {
+                using (var p = Process.GetProcessById(pid))
+                {
+                    if (p.HasExited)
+                        return null;
+                    return p.StartTime;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 診断ログを一切書かずに対象 Excel PID を強制終了する。
+        /// PID 再利用防止のためプロセス名・起動時刻を照合する。
+        /// </summary>
+        public static bool ForceKillExcelProcessWithoutDiagnostics(
+            int pid,
+            DateTime? expectedStartTime,
+            int waitAfterKillMs)
+        {
+            if (pid <= 0)
+                return false;
+
+            try
+            {
+                using (var p = Process.GetProcessById(pid))
+                {
+                    if (p.HasExited)
+                        return true;
+
+                    if (!string.Equals(p.ProcessName, "EXCEL", StringComparison.OrdinalIgnoreCase))
+                        return false;
+
+                    if (expectedStartTime.HasValue)
+                    {
+                        try
+                        {
+                            // 秒未満の差は許容（計測タイミング差）
+                            if (Math.Abs((p.StartTime - expectedStartTime.Value).TotalSeconds) > 2.0)
+                                return false;
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    }
+
+                    p.Kill();
+                }
+            }
+            catch (ArgumentException)
+            {
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+
+            return WaitForProcessExitById(pid, Math.Max(0, waitAfterKillMs));
+        }
+
+        /// <summary>
+        /// COM 終了処理が固まっても、遅延後に対象 PID を落とす保険。
+        /// Kill をログより先に実行する。Dispose でキャンセルする。
+        /// </summary>
+        public static IDisposable StartKillInsurance(int pid, int delayMs, string logContext)
+        {
+            return StartKillInsurance(pid, TryGetProcessStartTime(pid), delayMs, logContext);
+        }
+
+        public static IDisposable StartKillInsurance(
+            int pid,
+            DateTime? expectedStartTime,
+            int delayMs,
+            string logContext)
+        {
+            if (pid <= 0)
+                return EmptyDisposable.Instance;
+
+            var cts = new CancellationTokenSource();
+            string ctx = string.IsNullOrEmpty(logContext) ? "insurance" : logContext;
+            DateTime? startTime = expectedStartTime ?? TryGetProcessStartTime(pid);
+
+            // armed ログは制御経路を止めないよう保険スレッド外で書く（呼び出し元が固まっても可）
+            ExcelVstoReadiness.RecordHostEvent(
+                "excel-exit insurance armed pid=" + pid
+                + " delayMs=" + delayMs
+                + " context=" + ctx
+                + " startTime=" + (startTime.HasValue
+                    ? startTime.Value.ToString("o", System.Globalization.CultureInfo.InvariantCulture)
+                    : "(unknown)"));
+
+            var thread = new Thread(() =>
+            {
+                bool cancelled = false;
+                bool alreadyDead = false;
+                bool killed = false;
+                try
+                {
+                    cancelled = cts.Token.WaitHandle.WaitOne(Math.Max(0, delayMs));
+                    if (cancelled)
+                        return;
+
+                    if (!IsProcessAlive(pid))
+                    {
+                        alreadyDead = true;
+                        return;
+                    }
+
+                    // ログより先に Kill（診断 I/O が止まっても救済する）
+                    killed = ForceKillExcelProcessWithoutDiagnostics(pid, startTime, 1000);
+                }
+                catch
+                {
+                    /* Kill 優先。ログは finally で試みる */
+                }
+                finally
+                {
+                    try
+                    {
+                        if (cancelled)
+                        {
+                            ExcelVstoReadiness.RecordHostEvent(
+                                "excel-exit insurance cancelled pid=" + pid + " context=" + ctx);
+                        }
+                        else if (alreadyDead)
+                        {
+                            ExcelVstoReadiness.RecordHostEvent(
+                                "excel-exit insurance skip pid=" + pid
+                                + " already-dead context=" + ctx);
+                        }
+                        else
+                        {
+                            ExcelVstoReadiness.RecordHostEvent(
+                                "excel-exit insurance result pid=" + pid
+                                + " killed=" + (killed ? "1" : "0")
+                                + " alive=" + (IsProcessAlive(pid) ? "1" : "0")
+                                + " context=" + ctx);
+                        }
+                    }
+                    catch
+                    {
+                        /* ignore */
+                    }
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "ExcelKillInsurance-" + pid
+            };
+            thread.Start();
+            return new KillInsuranceTicket(cts);
+        }
+
+        private sealed class KillInsuranceTicket : IDisposable
+        {
+            private CancellationTokenSource _cts;
+
+            public KillInsuranceTicket(CancellationTokenSource cts)
+            {
+                _cts = cts;
+            }
+
+            public void Dispose()
+            {
+                CancellationTokenSource cts = Interlocked.Exchange(ref _cts, null);
+                if (cts == null)
+                    return;
+                try { cts.Cancel(); } catch { /* ignore */ }
+                try { cts.Dispose(); } catch { /* ignore */ }
+            }
+        }
+
+        private sealed class EmptyDisposable : IDisposable
+        {
+            public static readonly EmptyDisposable Instance = new EmptyDisposable();
+            public void Dispose() { }
+        }
+
         private static void TrySetVisible(ExcelApp app, bool makeVisible)
         {
             if (app == null) return;

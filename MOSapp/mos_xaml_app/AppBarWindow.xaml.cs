@@ -55,10 +55,18 @@ namespace MOSExcelMogiApp
         [DllImport("user32.dll", SetLastError = true)]
         static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
         [DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         private const int SW_RESTORE = 9;
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_SHOWWINDOW = 0x0040;
 
         [DllImport("user32.dll")]
         static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
@@ -172,14 +180,18 @@ namespace MOSExcelMogiApp
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] Constructor completed");
         }
 
-        private void SetWindowPosition()
+        /// <param name="bringExcelToForeground">
+        /// true のときだけ Excel を前面化する。自動リトライ・初期配置では false にし、
+        /// リセット完了ダイアログや入力中のフォーカスを奪わない。□ボタンなど明示操作時のみ true。
+        /// </param>
+        private void SetWindowPosition(bool bringExcelToForeground = false)
         {
             // Excel の共有参照が確立した後のみ配置を行う（初期化中の新規起動・競合を避ける）
             try
             {
                 var sharedExcel = _viewModel?.TryGetSharedExcelApplication();
                 if (sharedExcel != null)
-                    PositionExcelWindow();
+                    PositionExcelWindow(bringExcelToForeground);
                 ScoringResultDialog.TryBringOpenToFront();
             }
             catch
@@ -219,7 +231,32 @@ namespace MOSExcelMogiApp
             int h = barH   + borderHeight;
 
             MoveWindow(hWnd, x, y, w, h, true);
+            EnsureAppBarTopmost(hWnd);
+        }
+
+        /// <summary>
+        /// アプリバーをタスクバーより上の Z 順に保つ。フォーカスは奪わない。
+        /// </summary>
+        private void EnsureAppBarTopmost(IntPtr hWnd)
+        {
             this.Topmost = true;
+            if (hWnd == IntPtr.Zero)
+                return;
+            try
+            {
+                SetWindowPos(
+                    hWnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            }
+            catch
+            {
+                // ignore
+            }
         }
 
         /// <summary>
@@ -233,14 +270,15 @@ namespace MOSExcelMogiApp
             delayTimer.Tick += (s, args) =>
             {
                 delayTimer.Stop();
-                SetWindowPosition();
+                // ユーザー明示操作なので Excel も前面へ戻す
+                SetWindowPosition(bringExcelToForeground: true);
             };
             delayTimer.Start();
         }
 
-        /// <param name="bringToForeground">true のときのみ Excel を前面に出す。タイマーから呼ぶ場合は false にし、ダイアログ入力中のフォーカスを奪わない。</param>
+        /// <param name="bringToForeground">true のときのみ Excel を前面に出す。自動配置・リトライでは false。□ボタンなど明示操作時のみ true。</param>
         /// <returns>XLMAIN ウィンドウを検出して MoveWindow できた場合 true。</returns>
-        private bool PositionExcelWindow(bool bringToForeground = true)
+        private bool PositionExcelWindow(bool bringToForeground = false)
         {
             try
             {
@@ -370,7 +408,8 @@ namespace MOSExcelMogiApp
                 return;
             }
 
-            SetWindowPosition();
+            // 自動リトライでは Excel を前面化しない（リセット完了 MessageBox の裏隠れ防止）
+            SetWindowPosition(bringExcelToForeground: false);
 
             if (_viewModel?.TryGetSharedExcelApplication() != null &&
                 PositionExcelWindow(bringToForeground: false))
@@ -1126,6 +1165,7 @@ namespace MOSExcelMogiApp
                         : $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）";
 
                     var result = MessageBox.Show(
+                        this,
                         confirmMessage,
                         "確認",
                         MessageBoxButton.YesNo,
@@ -1148,6 +1188,7 @@ namespace MOSExcelMogiApp
                         ShowInTaskbar = false,
                         ResizeMode = ResizeMode.NoResize,
                         Topmost = true,
+                        Owner = this,
                         Background = System.Windows.Media.Brushes.White,
                         BorderBrush = System.Windows.Media.Brushes.SteelBlue,
                         BorderThickness = new Thickness(2)
@@ -1193,7 +1234,7 @@ namespace MOSExcelMogiApp
                         if (resetError != null)
                         {
                             System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Reset error: {resetError.Message}");
-                            MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
+                            MessageBox.Show(this, $"リセット中にエラーが発生しました: {resetError.Message}",
                                 "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                         else
@@ -1205,7 +1246,7 @@ namespace MOSExcelMogiApp
                             string doneMessage = isVariantMode
                                 ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。"
                                 : $"プロジェクト {groupId}-{projectId} をリセットしました。";
-                            MessageBox.Show(doneMessage,
+                            MessageBox.Show(this, doneMessage,
                                 "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
                     }
@@ -1213,21 +1254,21 @@ namespace MOSExcelMogiApp
                     {
                         waitWindow.Close();
                         System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow not found");
-                        MessageBox.Show("メインウィンドウが見つかりませんでした。", "エラー",
+                        MessageBox.Show(this, "メインウィンドウが見つかりませんでした。", "エラー",
                             MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
                 else
                 {
                     System.Diagnostics.Debug.WriteLine("[AppBarWindow] CurrentProject is null");
-                    MessageBox.Show("リセットするプロジェクトが選択されていません。",
+                    MessageBox.Show(this, "リセットするプロジェクトが選択されていません。",
                         "情報", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error in ProjectResetButton_Click: {ex.Message}\n{ex.StackTrace}");
-                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
+                MessageBox.Show(this, $"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
                     "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }

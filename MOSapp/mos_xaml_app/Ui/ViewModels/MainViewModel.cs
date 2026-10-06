@@ -2607,11 +2607,21 @@ namespace Ui.ViewModels
         {
             ExcelApp excelApp = null;
             int excelPid = knownExamPid;
+            DateTime? excelStartTime = null;
             bool ownsExamWorkbook = false;
             bool quitRequested = false;
+            bool quitFailed = false;
             bool skippedQuit = false;
+            bool shouldQuit = false;
+            bool forceKilled = false;
+            bool exitedAfterWait = false;
+            string quitError = null;
             int rotPid = -1;
             var sw = Stopwatch.StartNew();
+            IDisposable killInsurance = null;
+
+            // 診断用。Quit〜Kill 区間では同期ログを書かない。
+            var deferredLogs = new List<string>();
 
             ExcelVstoReadiness.RecordHostEvent(
                 "shutdown begin knownPid=" + knownExamPid
@@ -2620,6 +2630,7 @@ namespace Ui.ViewModels
 
             try
             {
+                // OleMessageFilter は取得・保存・クローズのみ。Quit は using の外。
                 using (OleMessageFilterScope.Enter())
                 {
                     try
@@ -2652,25 +2663,36 @@ namespace Ui.ViewModels
                         {
                             if (excelPid <= 0)
                                 excelPid = rotPid;
+                            if (excelPid > 0)
+                                excelStartTime = ExcelApplicationManager.TryGetProcessStartTime(excelPid);
+
                             try { excelApp.DisplayAlerts = false; } catch { /* ignore */ }
 
+                            ExcelVstoReadiness.RecordHostEvent("shutdown save/close begin pid=" + excelPid);
                             SaveOpenWorkbooks(excelApp, preferredFilePath);
                             CloseAllWorkbooks(excelApp, "[ExcelShutdown]");
+                            ExcelVstoReadiness.RecordHostEvent("shutdown save/close end pid=" + excelPid);
+                            shouldQuit = true;
 
-                            try
+                            // 保存・Close 完了後に保険を武装
+                            // - 外部プロセス: MOS 即終了でも Excel を落とせる
+                            // - プロセス内: 外部 exe 欠落時のフォールバック
+                            if (excelPid > 0)
                             {
-                                excelApp.Quit();
-                                quitRequested = true;
-                                System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit requested");
-                                ExcelVstoReadiness.RecordHostEvent(
-                                    "shutdown Quit requested pid=" + excelPid);
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit: " + ex.Message);
-                                ExcelVstoReadiness.RecordHostEvent(
-                                    "shutdown Quit failed pid=" + excelPid
-                                    + " error=" + ex.GetType().Name + ":" + ex.Message);
+                                ExcelExternalKillWatch.TryArm(
+                                    excelPid,
+                                    excelStartTime,
+                                    2500,
+                                    "[ExcelShutdown]");
+
+                                if (killInsurance == null)
+                                {
+                                    killInsurance = ExcelApplicationManager.StartKillInsurance(
+                                        excelPid,
+                                        excelStartTime,
+                                        3000,
+                                        "[ExcelShutdown]");
+                                }
                             }
                         }
                         else
@@ -2683,77 +2705,94 @@ namespace Ui.ViewModels
                         }
                     }
                 }
+
+                deferredLogs.Add("shutdown ole-filter exited pid=" + excelPid);
+
+                if (shouldQuit && excelApp != null)
+                {
+                    try
+                    {
+                        // Quit 前後の同期 Host ログは書かない（I/O 待ちで Kill に届かないため）
+                        excelApp.Quit();
+                        quitRequested = true;
+                        System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit requested");
+                        deferredLogs.Add("shutdown Quit requested pid=" + excelPid);
+                    }
+                    catch (Exception ex)
+                    {
+                        quitFailed = true;
+                        quitError = ex.GetType().Name + ":" + ex.Message;
+                        System.Diagnostics.Debug.WriteLine("[ExcelShutdown] Quit: " + ex.Message);
+                        deferredLogs.Add("shutdown Quit failed pid=" + excelPid + " error=" + quitError);
+                    }
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ExcelShutdown] " + ex.Message);
-                ExcelVstoReadiness.RecordHostEvent(
-                    "shutdown exception error=" + ex.GetType().Name + ":" + ex.Message);
+                deferredLogs.Add("shutdown exception error=" + ex.GetType().Name + ":" + ex.Message);
             }
             finally
             {
-                if (excelApp != null)
+                // Quit 後は RCW に触れない（ReleaseComObject / Abandon 引数渡しもしない）
+                excelApp = null;
+            }
+
+            try
+            {
+                if (excelPid <= 0)
                 {
-                    if (quitRequested)
-                    {
-                        // Quit 後の同期 ReleaseComObject はブロックし Kill に届かないことがある。
-                        Libraries.ExcelApplicationManager.AbandonComObjectAfterQuit(
-                            excelApp,
-                            "[ExcelShutdown]");
-                    }
-                    else
-                    {
-                        ExcelVstoReadiness.RecordHostEvent("shutdown ReleaseComObject begin");
-                        try { Marshal.ReleaseComObject(excelApp); } catch { /* ignore */ }
-                        ExcelVstoReadiness.RecordHostEvent("shutdown ReleaseComObject end");
-                    }
-                    excelApp = null;
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "shutdown end no-pid knownPid=" + knownExamPid
+                        + " quit=" + (quitRequested ? "1" : "0")
+                        + " skippedQuit=" + (skippedQuit ? "1" : "0")
+                        + " elapsed=" + sw.ElapsedMilliseconds + "ms"
+                        + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
+                    return;
                 }
-            }
 
-            if (excelPid <= 0)
+                const int normalExitWaitMs = 1500;
+                const int forceKillWaitMs = 800;
+                bool shouldForceKill = knownExamPid > 0 || ownsExamWorkbook || quitRequested || shouldQuit || quitFailed;
+
+                // 待機・Kill は診断ログより先
+                exitedAfterWait = ExcelApplicationManager.WaitForExcelProcessExit(excelPid, normalExitWaitMs);
+                if (!exitedAfterWait && shouldForceKill)
+                {
+                    forceKilled = ExcelApplicationManager.ForceKillExcelProcessWithoutDiagnostics(
+                        excelPid,
+                        excelStartTime,
+                        forceKillWaitMs);
+                }
+
+                deferredLogs.Add(
+                    "shutdown after-quit-wait pid=" + excelPid
+                    + " exited=" + (exitedAfterWait ? "1" : "0")
+                    + " waitMs=" + normalExitWaitMs
+                    + " forceKilled=" + (forceKilled ? "1" : "0")
+                    + " alive=" + (ExcelApplicationManager.IsProcessAlive(excelPid) ? "1" : "0"));
+            }
+            finally
             {
-                ExcelVstoReadiness.RecordHostEvent(
-                    "shutdown end no-pid knownPid=" + knownExamPid
-                    + " quit=" + (quitRequested ? "1" : "0")
-                    + " skippedQuit=" + (skippedQuit ? "1" : "0")
-                    + " elapsed=" + sw.ElapsedMilliseconds + "ms"
-                    + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
-                return;
-            }
+                try { killInsurance?.Dispose(); } catch { /* ignore */ }
 
-            const int normalExitWaitMs = 1500;
-            const int forceKillWaitMs = 800;
-            bool shouldForceKill = knownExamPid > 0 || ownsExamWorkbook || quitRequested;
-            bool exited = Libraries.ExcelApplicationManager.WaitForExcelProcessExit(excelPid, normalExitWaitMs);
-            ExcelVstoReadiness.RecordHostEvent(
-                "shutdown after-quit-wait pid=" + excelPid
-                + " exited=" + (exited ? "1" : "0")
-                + " waitMs=" + normalExitWaitMs
-                + " willKill=" + ((!exited && shouldForceKill) ? "1" : "0"));
+                foreach (string line in deferredLogs)
+                {
+                    try { ExcelVstoReadiness.RecordHostEvent(line); } catch { /* ignore */ }
+                }
 
-            if (!exited && shouldForceKill)
-            {
-                Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
-                    excelPid,
-                    0,
-                    forceKillWaitMs,
-                    "[ExcelShutdown]");
+                try
+                {
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "shutdown end pid=" + excelPid
+                        + " alive=" + (ExcelApplicationManager.IsProcessAlive(excelPid) ? "1" : "0")
+                        + " quit=" + (quitRequested ? "1" : "0")
+                        + " forceKilled=" + (forceKilled ? "1" : "0")
+                        + " elapsed=" + sw.ElapsedMilliseconds + "ms"
+                        + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
+                }
+                catch { /* ignore */ }
             }
-            else if (!exited)
-            {
-                ExcelVstoReadiness.RecordHostEvent(
-                    "shutdown leftover pid=" + excelPid
-                    + " (kill skipped: knownPid=" + knownExamPid
-                    + " ownsExamWb=" + (ownsExamWorkbook ? "1" : "0") + ")");
-            }
-
-            ExcelVstoReadiness.RecordHostEvent(
-                "shutdown end pid=" + excelPid
-                + " alive=" + (ExcelApplicationManager.IsProcessAlive(excelPid) ? "1" : "0")
-                + " quit=" + (quitRequested ? "1" : "0")
-                + " elapsed=" + sw.ElapsedMilliseconds + "ms"
-                + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
         }
 
         private static bool ExcelInstanceOwnsExamWorkbook(ExcelApp excelApp, string preferredFilePath)

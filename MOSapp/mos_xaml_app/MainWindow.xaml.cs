@@ -109,6 +109,16 @@ namespace MOSExcelMogiApp
                 // AppBar が残ると OnLastWindowClose でプロセスが残ることがある
                 CloseAppBarForExit();
 
+                // 試験終了スレッドが動いていれば、Kill 完了まで短時間待つ（即アプリ落とし対策）
+                try
+                {
+                    _viewModel?.WaitForExcelShutdownToCompleteBeforeOpeningProject();
+                }
+                catch (Exception waitEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[MainWindow] Wait shutdown: {waitEx.Message}");
+                }
+
                 // Excel を確実に閉じる（同期実行して完了を待つことでゾンビプロセスを防止）
                 _viewModel?.CloseExcelApplication();
             }

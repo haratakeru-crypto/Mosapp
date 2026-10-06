@@ -222,6 +222,7 @@
     <Compile Include="Libraries\ResetPerfLog.cs" />
     <Compile Include="Libraries\ExcelResetReadyWatch.cs" />
     <Compile Include="Libraries\ExcelApplicationManager.cs" />
+    <Compile Include="Libraries\ExcelExternalKillWatch.cs" />
     <Compile Include="Libraries\ExcelVstoInstallerHelper.cs" />
     <Compile Include="Libraries\ExcelVstoReadiness.cs" />
     <Compile Include="Libraries\ExcelTaskValidationConfig.cs" />
