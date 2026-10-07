@@ -18,6 +18,16 @@ namespace MOSExcelMogiApp.Vocabulary
         const int WsExLayered = 0x00080000;
         const int WsExNoActivate = 0x08000000;
 
+        const int SmXVirtualScreen = 76;
+        const int SmYVirtualScreen = 77;
+        const int SmCxVirtualScreen = 78;
+        const int SmCyVirtualScreen = 79;
+        static readonly IntPtr HwndTopmost = new IntPtr(-1);
+        const uint SwpNomove = 0x0002;
+        const uint SwpNosize = 0x0001;
+        const uint SwpNoactivate = 0x0010;
+        const uint SwpShowwindow = 0x0040;
+
         [DllImport("user32.dll")]
         static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
@@ -26,6 +36,12 @@ namespace MOSExcelMogiApp.Vocabulary
 
         [DllImport("user32.dll")]
         static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int nIndex);
+
+        [DllImport("user32.dll")]
+        static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
         [StructLayout(LayoutKind.Sequential)]
         struct RECT
@@ -42,18 +58,39 @@ namespace MOSExcelMogiApp.Vocabulary
 
         bool _clickThrough;
         bool _captureClicks;
+        bool _coverScreen;
+        bool _singleClick;
+        Rect _bubbleScreen;
+        Rect _bubbleAboveScreen;
+        Rect _pinAboveScreen;
+        bool _centerBubble;
+        bool _showOkButton;
+        Action _singleClickAction;
         double _dpiScaleX = 1.0;
         double _dpiScaleY = 1.0;
         RECT _excelPhysical;
         IntPtr _excelHwnd;
         IReadOnlyList<Rect> _lastHighlightScreens = Array.Empty<Rect>();
         readonly List<Point> _markerLocals = new List<Point>();
+        bool _dragging;
+        bool _applyingPlacement;
+        Point _dragStart;
+        double _dragLeft;
+        double _dragTop;
 
         public CoachMarkOverlayWindow()
         {
             InitializeComponent();
             ShowActivated = false;
             CaptureLayer.MouseLeftButtonDown += CaptureLayer_MouseLeftButtonDown;
+            Bubble.MouseLeftButtonDown += Bubble_MouseLeftButtonDown;
+            Bubble.MouseMove += Bubble_MouseMove;
+            Bubble.MouseLeftButtonUp += Bubble_MouseLeftButtonUp;
+            SizeChanged += (_, __) =>
+            {
+                if (_dragging || _applyingPlacement) return;
+                PaintHighlightHoles(_lastHighlightScreens);
+            };
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -61,6 +98,35 @@ namespace MOSExcelMogiApp.Vocabulary
             base.OnSourceInitialized(e);
             RefreshDpiScale();
             ApplyClickThrough(_clickThrough);
+            var src = PresentationSource.FromVisual(this) as HwndSource;
+            src?.AddHook(WndProc);
+        }
+
+        /// <summary>吹き出し以外のクリックは下のウィンドウへ通す。吹き出しはドラッグできる。</summary>
+        IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int wmNcHitTest = 0x0084;
+            const int htTransparent = -1;
+            if (msg != wmNcHitTest || _captureClicks || _singleClick)
+                return IntPtr.Zero;
+
+            int packed = lParam.ToInt32();
+            int sx = (short)(packed & 0xFFFF);
+            int sy = (short)((packed >> 16) & 0xFFFF);
+            Point local;
+            try { local = PointFromScreen(new Point(sx, sy)); }
+            catch { return IntPtr.Zero; }
+
+            double bw = Bubble.ActualWidth > 8 ? Bubble.ActualWidth : 320;
+            double bh = Bubble.ActualHeight > 8 ? Bubble.ActualHeight : 120;
+            var box = new Rect(Bubble.Margin.Left, Bubble.Margin.Top, bw, bh);
+            box.Inflate(12, 12);
+            if (!box.Contains(local))
+            {
+                handled = true;
+                return new IntPtr(htTransparent);
+            }
+            return IntPtr.Zero;
         }
 
         void RefreshDpiScale()
@@ -102,12 +168,25 @@ namespace MOSExcelMogiApp.Vocabulary
             string message,
             bool allowDismiss = true,
             bool clickThrough = false,
-            bool appendSelectHint = true)
+            bool appendSelectHint = true,
+            bool coverScreen = false,
+            Rect bubbleScreen = default,
+            Rect bubbleAboveScreen = default,
+            bool centerBubble = false,
+            Rect pinAboveScreen = default,
+            bool showOkButton = false)
         {
             _clickThrough = clickThrough;
+            _coverScreen = coverScreen;
+            _bubbleScreen = bubbleScreen;
+            _bubbleAboveScreen = bubbleAboveScreen;
+            _pinAboveScreen = pinAboveScreen;
+            _centerBubble = centerBubble;
+            _showOkButton = showOkButton;
             _excelHwnd = excelHwnd;
             _lastHighlightScreens = highlightScreens ?? Array.Empty<Rect>();
-            DismissButton.Visibility = allowDismiss ? Visibility.Visible : Visibility.Collapsed;
+            DismissButton.Content = showOkButton ? "OK" : "閉じる";
+            DismissButton.Visibility = (allowDismiss || showOkButton) ? Visibility.Visible : Visibility.Collapsed;
 
             TitleText.Text = title ?? "";
             MessageText.Text = message ?? "";
@@ -117,27 +196,80 @@ namespace MOSExcelMogiApp.Vocabulary
             {
                 MessageText.Text = MessageText.Text.TrimEnd() + "\n（ハイライト箇所を選択すると次へ進みます）";
             }
-
-            PositionOverExcel(excelHwnd);
+            bool placementLocked = CoachBubblePlacementStore.IsLocked(MessageText.Text);
+            Bubble.Cursor = placementLocked ? Cursors.Arrow : Cursors.SizeAll;
+            Bubble.ToolTip = placementLocked ? null : "ドラッグで位置を動かせます";
+            PositionOverlay();
             PaintHighlightHoles(_lastHighlightScreens);
 
-            Bubble.IsHitTestVisible = allowDismiss && !clickThrough;
+            Bubble.IsHitTestVisible = !_captureClicks;
             Caret.IsHitTestVisible = false;
             HoleCanvas.IsHitTestVisible = false;
 
             if (!IsVisible)
                 Show();
+            RaiseAboveAppBar();
+            if (coverScreen)
+            {
+                var keepTop = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                int raises = 0;
+                keepTop.Tick += (s, e) =>
+                {
+                    raises++;
+                    if (!IsVisible || raises > 8)
+                    {
+                        keepTop.Stop();
+                        return;
+                    }
+                    RaiseAboveAppBar();
+                };
+                keepTop.Start();
+            }
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 RefreshDpiScale();
-                PositionOverExcel(_excelHwnd);
+                PositionOverlay();
                 PaintHighlightHoles(_lastHighlightScreens);
-                ApplyClickThrough(_clickThrough && !_captureClicks);
+                RaiseAboveAppBar();
+                ApplyClickThrough(_clickThrough && !_captureClicks && !_singleClick);
             }), System.Windows.Threading.DispatcherPriority.Loaded);
 
             if (!clickThrough || _captureClicks)
                 Activate();
+        }
+
+        void PositionOverlay()
+        {
+            if (_coverScreen)
+                PositionOverVirtualScreen();
+            else
+                PositionOverExcel(_excelHwnd);
+        }
+
+        void PositionOverVirtualScreen()
+        {
+            int x = GetSystemMetrics(SmXVirtualScreen);
+            int y = GetSystemMetrics(SmYVirtualScreen);
+            int w = Math.Max(100, GetSystemMetrics(SmCxVirtualScreen));
+            int h = Math.Max(100, GetSystemMetrics(SmCyVirtualScreen));
+            _excelPhysical = new RECT { Left = x, Top = y, Right = x + w, Bottom = y + h };
+            RefreshDpiScale();
+            Left = x / _dpiScaleX;
+            Top = y / _dpiScaleY;
+            Width = Math.Max(100, w / _dpiScaleX);
+            Height = Math.Max(100, h / _dpiScaleY);
+        }
+
+        void RaiseAboveAppBar()
+        {
+            try
+            {
+                IntPtr hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd == IntPtr.Zero) return;
+                SetWindowPos(hwnd, HwndTopmost, 0, 0, 0, 0, SwpNomove | SwpNosize | SwpNoactivate | SwpShowwindow);
+            }
+            catch { }
         }
 
         void PositionOverExcel(IntPtr excelHwnd)
@@ -166,7 +298,7 @@ namespace MOSExcelMogiApp.Vocabulary
             if (!IsVisible) return;
             _lastHighlightScreens = highlightScreens ?? Array.Empty<Rect>();
             RefreshDpiScale();
-            PositionOverExcel(_excelHwnd);
+            PositionOverlay();
             PaintHighlightHoles(_lastHighlightScreens);
         }
 
@@ -177,8 +309,21 @@ namespace MOSExcelMogiApp.Vocabulary
         }
 
         /// <summary>左上・右下クリック校正を開始。完了まで Excel へクリックを通さない。</summary>
+        /// <summary>オーバーレイ上の1クリックで進む（キーワード案内など）。</summary>
+        public void BeginSingleClick(Action onClick)
+        {
+            _singleClick = true;
+            _singleClickAction = onClick;
+            _captureClicks = false;
+            CaptureLayer.Visibility = Visibility.Visible;
+            CaptureLayer.IsHitTestVisible = true;
+            ApplyClickThrough(false);
+            Activate();
+        }
+
         public void BeginClickCapture()
         {
+            _singleClick = false;
             _captureClicks = true;
             _markerLocals.Clear();
             CaptureLayer.Visibility = Visibility.Visible;
@@ -225,6 +370,23 @@ namespace MOSExcelMogiApp.Vocabulary
 
         void CaptureLayer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (_singleClick)
+            {
+                if (!IsClickInsideHole(e.GetPosition(this)))
+                {
+                    e.Handled = true;
+                    return;
+                }
+                var action = _singleClickAction;
+                _singleClick = false;
+                _singleClickAction = null;
+                CaptureLayer.Visibility = Visibility.Collapsed;
+                CaptureLayer.IsHitTestVisible = false;
+                action?.Invoke();
+                e.Handled = true;
+                return;
+            }
+
             if (!_captureClicks) return;
             RefreshDpiScale();
             PositionOverExcel(_excelHwnd);
@@ -290,25 +452,157 @@ namespace MOSExcelMogiApp.Vocabulary
             }
 
             Rect primary = holes.Count > 0
-                ? holes.OrderBy(h => h.Y).First()
+                ? holes.OrderByDescending(h => h.Y).First()
                 : new Rect(Width * 0.5 - 80, 40, 160, 1);
-            double bubbleLeft = Math.Max(12, Math.Min(Width - 380, primary.X + primary.Width / 2 - 160));
-            double bubbleTop = primary.Bottom + 16;
-            if (holes.Count == 0)
+
+            Bubble.Measure(new Size(340, 2000));
+            double bubbleHeight = Bubble.DesiredSize.Height;
+            double bubbleWidth = Bubble.DesiredSize.Width;
+            if (double.IsNaN(bubbleHeight) || bubbleHeight < 96) bubbleHeight = 140;
+            if (double.IsNaN(bubbleWidth) || bubbleWidth < 220) bubbleWidth = 320;
+            bubbleWidth = Math.Min(340, bubbleWidth);
+
+            Rect bubbleHost = Rect.Empty;
+            if (_bubbleScreen.Width >= 8 && _bubbleScreen.Height >= 8)
+                bubbleHost = PhysicalScreenToLocalDip(_bubbleScreen);
+            Rect aboveHost = Rect.Empty;
+            if (_bubbleAboveScreen.Width >= 8 && _bubbleAboveScreen.Height >= 8)
+                aboveHost = PhysicalScreenToLocalDip(_bubbleAboveScreen);
+            Rect pinHost = Rect.Empty;
+            if (_pinAboveScreen.Width >= 8 && _pinAboveScreen.Height >= 8)
+                pinHost = PhysicalScreenToLocalDip(_pinAboveScreen);
+
+            const double gap = 28;
+            double bubbleLeft;
+            double bubbleTop;
+            bool caretVisible = true;
+            if (pinHost.Height >= 8)
             {
-                bubbleLeft = Math.Max(12, Width * 0.5 - 180);
-                bubbleTop = Math.Max(48, Height * 0.12);
+                // 描画した穴（オレンジ枠）のすぐ上。ピン座標が上端に飛んでも、枠から離さない。
+                Rect anchor = holes.Count > 0 ? primary : pinHost;
+                if (pinHost.Height >= 8
+                    && pinHost.Y >= anchor.Y - 80
+                    && pinHost.Y <= anchor.Bottom + 24)
+                    anchor = pinHost;
+                bubbleLeft = anchor.X + (anchor.Width - bubbleWidth) / 2.0;
+                bubbleTop = anchor.Y - bubbleHeight - 8;
+                caretVisible = false;
             }
-            else if (bubbleTop + 160 > Height)
+            else if (_centerBubble)
             {
-                bubbleTop = Math.Max(12, primary.Y - 160);
+                bubbleLeft = (Width - bubbleWidth) / 2.0;
+                bubbleTop = Math.Max(48, (Height - bubbleHeight) / 2.0);
+                caretVisible = false;
+            }
+            else if (bubbleHost.Width >= 8 && bubbleHost.Height >= 8)
+            {
+                // 問題文エリアの中に吹き出しを置く。
+                bubbleLeft = bubbleHost.X + (bubbleHost.Width - bubbleWidth) / 2.0;
+                bubbleTop = bubbleHost.Y + Math.Max(8, (bubbleHost.Height - bubbleHeight) / 2.0);
+                caretVisible = false;
+            }
+            else if (aboveHost.Width >= 8)
+            {
+                bubbleLeft = aboveHost.X + aboveHost.Width / 2.0 - bubbleWidth / 2.0;
+                bubbleTop = aboveHost.Y - bubbleHeight - gap;
+                if (bubbleTop < 12)
+                    bubbleTop = aboveHost.Bottom + gap;
+            }
+            else if (holes.Count == 0)
+            {
+                bubbleLeft = Width * 0.5 - bubbleWidth / 2.0;
+                bubbleTop = Math.Max(48, Height * 0.72);
+            }
+            else
+            {
+                bubbleLeft = primary.X + primary.Width / 2.0 - bubbleWidth / 2.0;
+                // 上端のタブはすぐ下、それ以外は穴のすぐ上。画面上端へは戻さない。
+                bool holeNearTop = primary.Y < Math.Max(160, Height * 0.22);
+                double above = primary.Y - bubbleHeight - gap;
+                bubbleTop = holeNearTop || above < 12
+                    ? primary.Bottom + gap
+                    : above;
             }
 
-            Bubble.Margin = new Thickness(bubbleLeft, bubbleTop, 0, 0);
+            double extentW = Width;
+            double extentH = Height;
+            if (double.IsNaN(extentW) || extentW < 100) extentW = ActualWidth;
+            if (double.IsNaN(extentH) || extentH < 100) extentH = ActualHeight;
+            if (double.IsNaN(extentW) || extentW < 100) extentW = SystemParameters.PrimaryScreenWidth;
+            if (holes.Count > 0)
+                extentH = Math.Max(double.IsNaN(extentH) ? 0 : extentH, primary.Bottom + bubbleHeight + 48);
+            if (double.IsNaN(extentH) || extentH < bubbleHeight + 40)
+                extentH = SystemParameters.PrimaryScreenHeight;
+            if (double.IsNaN(bubbleLeft)) bubbleLeft = (extentW - bubbleWidth) / 2.0;
+            if (double.IsNaN(bubbleTop)) bubbleTop = holes.Count > 0 ? primary.Y - bubbleHeight - 8 : extentH * 0.7;
+            if (holes.Count > 0 && bubbleTop < extentH * 0.18 && primary.Y > extentH * 0.25)
+            {
+                double aboveHole = primary.Y - bubbleHeight - gap;
+                bubbleTop = aboveHole >= 12 ? aboveHole : primary.Bottom + gap;
+                bubbleLeft = primary.X + (primary.Width - bubbleWidth) / 2.0;
+            }
+
+            // 確定時はオーバーレイに設定した幅・高さで比率を作っている。Actual はレイアウト前に
+            // 小さい値のままなので、それを使うと「問題文のキーワード」だけ上にずれる。
+            double layoutW = Width >= 100 ? Width : (ActualWidth >= 50 ? ActualWidth : extentW);
+            double layoutH = Height >= 100 ? Height : (ActualHeight >= 50 ? ActualHeight : extentH);
+            bool placedFromSaved = false;
+            if (!_dragging && CoachBubblePlacementStore.TryGet(MessageText.Text, layoutW, layoutH, out double savedLeft, out double savedTop))
+            {
+                bubbleLeft = savedLeft;
+                bubbleTop = savedTop;
+                placedFromSaved = true;
+            }
+
+            if (placedFromSaved)
+            {
+                bubbleLeft = Math.Max(0, Math.Min(Math.Max(0, layoutW - 32), bubbleLeft));
+                bubbleTop = Math.Max(0, Math.Min(Math.Max(0, layoutH - 32), bubbleTop));
+            }
+            else
+            {
+                double clampW = extentW;
+                double clampH = extentH;
+                bubbleLeft = Math.Max(12, Math.Min(Math.Max(12, clampW - bubbleWidth - 12), bubbleLeft));
+                double maxTop = Math.Max(12, clampH - bubbleHeight - 12);
+                bubbleTop = Math.Max(12, Math.Min(maxTop, bubbleTop));
+            }
+
+            if (_dragging)
+                return;
+
+            _applyingPlacement = true;
+            try
+            {
+                Bubble.Margin = new Thickness(bubbleLeft, bubbleTop, 0, 0);
+            }
+            finally
+            {
+                _applyingPlacement = false;
+            }
+            Caret.Visibility = caretVisible ? Visibility.Visible : Visibility.Collapsed;
+            double caretTop = bubbleTop < primary.Y
+                ? bubbleTop + bubbleHeight + 4
+                : primary.Bottom + 6;
+            if (aboveHost.Width >= 8 && bubbleTop < aboveHost.Y)
+                caretTop = Math.Min(bubbleTop + bubbleHeight + 2, aboveHost.Y - 10);
             Caret.Margin = new Thickness(
-                holes.Count > 0 ? primary.X + primary.Width / 2 - 8 : bubbleLeft + 160,
-                bubbleTop < primary.Y && holes.Count > 0 ? bubbleTop + 130 : (holes.Count > 0 ? primary.Bottom + 8 : bubbleTop - 8),
+                holes.Count > 0 ? primary.X + primary.Width / 2 - 8 : bubbleLeft + bubbleWidth / 2 - 8,
+                caretTop,
                 0, 0);
+        }
+
+        bool IsClickInsideHole(Point localDip)
+        {
+            if (_lastHighlightScreens == null || _lastHighlightScreens.Count == 0)
+                return true;
+            foreach (var screen in _lastHighlightScreens)
+            {
+                Rect local = PhysicalScreenToLocalDip(screen);
+                if (local.Width >= 8 && local.Height >= 8 && local.Contains(localDip))
+                    return true;
+            }
+            return false;
         }
 
         Rect PhysicalScreenToLocalDip(Rect screenPhysical)
@@ -324,19 +618,71 @@ namespace MOSExcelMogiApp.Vocabulary
 
         void ApplyClickThrough(bool enable)
         {
+            // 引数は呼び出し側との互換用。全面透過にはしない。
+            ApplyClickThroughCore();
+        }
+
+        void ApplyClickThroughCore()
+        {
             try
             {
                 var helper = new WindowInteropHelper(this);
                 IntPtr hwnd = helper.Handle;
                 if (hwnd == IntPtr.Zero) return;
                 int ex = GetWindowLong(hwnd, GwlExstyle);
-                if (enable)
-                    ex |= WsExTransparent | WsExLayered | WsExNoActivate;
-                else
-                    ex = (ex | WsExLayered | WsExNoActivate) & ~WsExTransparent;
+                // 全面透過にすると吹き出しをドラッグできない。外側だけ WM_NCHITTEST で通す。
+                ex = (ex | WsExLayered | WsExNoActivate) & ~WsExTransparent;
                 SetWindowLong(hwnd, GwlExstyle, ex);
             }
             catch { }
+        }
+
+        bool IsInsideBubbleButton(DependencyObject src)
+        {
+            while (src != null)
+            {
+                if (src == DismissButton || src == SecondaryButton) return true;
+                src = VisualTreeHelper.GetParent(src);
+            }
+            return false;
+        }
+
+        void Bubble_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_captureClicks || CoachBubblePlacementStore.IsLocked(MessageText.Text)
+                || IsInsideBubbleButton(e.OriginalSource as DependencyObject))
+                return;
+            _dragging = true;
+            _dragStart = e.GetPosition(this);
+            _dragLeft = Bubble.Margin.Left;
+            _dragTop = Bubble.Margin.Top;
+            Bubble.CaptureMouse();
+            e.Handled = true;
+        }
+
+        void Bubble_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_dragging || !Bubble.IsMouseCaptured) return;
+            Point p = e.GetPosition(this);
+            double dx = p.X - _dragStart.X;
+            double dy = p.Y - _dragStart.Y;
+            double width = ActualWidth > 50 ? ActualWidth : Width;
+            double height = ActualHeight > 50 ? ActualHeight : Height;
+            double bw = Bubble.ActualWidth > 8 ? Bubble.ActualWidth : 320;
+            double bh = Bubble.ActualHeight > 8 ? Bubble.ActualHeight : 120;
+            double left = Math.Max(8, Math.Min(Math.Max(8, width - bw - 8), _dragLeft + dx));
+            double top = Math.Max(8, Math.Min(Math.Max(8, height - bh - 8), _dragTop + dy));
+            Bubble.Margin = new Thickness(left, top, 0, 0);
+            e.Handled = true;
+        }
+
+        void Bubble_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!_dragging) return;
+            _dragging = false;
+            if (Bubble.IsMouseCaptured)
+                Bubble.ReleaseMouseCapture();
+            e.Handled = true;
         }
 
         void PaintDimWithHoles(List<Rect> holes)
@@ -386,6 +732,231 @@ namespace MOSExcelMogiApp.Vocabulary
         {
             Close();
             Dismissed?.Invoke();
+        }
+
+        Action _secondaryAction;
+
+        /// <summary>OK／閉じるボタンの文字を変える。ShowCoachMark のあとに呼ぶ。</summary>
+        public void SetPrimaryButtonText(string text)
+        {
+            if (!string.IsNullOrEmpty(text))
+                DismissButton.Content = text;
+        }
+
+        /// <summary>左側に2つ目のボタンを出す。押すと閉じて onClick を呼ぶ（Dismissed は出さない）。</summary>
+        public void SetSecondaryButton(string text, Action onClick)
+        {
+            _secondaryAction = onClick;
+            SecondaryButton.Content = text ?? "";
+            SecondaryButton.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        void SecondaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            var action = _secondaryAction;
+            _secondaryAction = null;
+            Close();
+            action?.Invoke();
+        }
+    }
+
+    /// <summary>吹き出しをドラッグした位置を、文面ごとに覚えておく。</summary>
+    static class CoachBubblePlacementStore
+    {
+        /// <summary>画面幅・高さに対する比率。ドラッグ済みのチュートリアル文面はここを優先し、上書きしない。</summary>
+        static readonly Dictionary<string, Point> Locked = new Dictionary<string, Point>(StringComparer.Ordinal)
+        {
+            { "問題文に出てくるキーワードがここに表示されます！", new Point(0.3953125, 0.587037037037037) },
+            { "ハイライトされたテーブルをクリックして選択してください。", new Point(0.0760046487603306, 0.755716004813478) },
+            { "リボンの『テーブルデザイン』タブをクリックしてください。", new Point(0.257489669421488, 0.128760529482551) },
+            { "正解です！こちらのOKボタンを押して次の問題に行きましょう！", new Point(0.41171875, 0.541546869656319) },
+            { "正解したら次の問題に行きましょう！", new Point(0.798978298611111, 0.827200901812819) },
+            { "それでは、問題を解いてみましょう！", new Point(0.423958333333333, 0.363027777777778) },
+        };
+
+        static readonly object Gate = new object();
+        static Dictionary<string, Point> _ratios;
+        static Dictionary<string, Point> _confirmed;
+
+        public static bool IsLocked(string message)
+        {
+            return TryFindRatio(message, out _);
+        }
+
+        static bool TryFindRatio(string message, out Point ratio)
+        {
+            ratio = default(Point);
+            if (string.IsNullOrWhiteSpace(message)) return false;
+            EnsureConfirmed();
+            if (TryMatch(_confirmed, message, out ratio)) return true;
+            if (Locked.TryGetValue(message, out ratio)) return true;
+            string normalized = message.Replace("\r\n", "\n").Trim();
+            foreach (var pair in Locked)
+            {
+                if (string.Equals(pair.Key, normalized, StringComparison.Ordinal))
+                {
+                    ratio = pair.Value;
+                    return true;
+                }
+                if (normalized.StartsWith(pair.Key, StringComparison.Ordinal))
+                {
+                    ratio = pair.Value;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static bool TryMatch(Dictionary<string, Point> map, string message, out Point ratio)
+        {
+            ratio = default(Point);
+            if (map == null) return false;
+            if (map.TryGetValue(message, out ratio)) return true;
+            string normalized = message.Replace("\r\n", "\n").Trim();
+            foreach (var pair in map)
+            {
+                if (string.Equals(pair.Key, normalized, StringComparison.Ordinal)
+                    || normalized.StartsWith(pair.Key, StringComparison.Ordinal))
+                {
+                    ratio = pair.Value;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static void Confirm(string message, double left, double top, double width, double height)
+        {
+            if (string.IsNullOrWhiteSpace(message) || width < 50 || height < 50) return;
+            EnsureConfirmed();
+            var ratio = new Point(left / width, top / height);
+            lock (Gate)
+            {
+                _confirmed[message] = ratio;
+                WriteMap(ConfirmedPath, _confirmed);
+            }
+        }
+
+        static string ConfirmedPath => System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MOSapp",
+            "CoachBubbleConfirmed.txt");
+
+        static string FilePath => System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MOSapp",
+            "CoachBubblePlacements.txt");
+
+        public static bool TryGet(string message, double width, double height, out double left, out double top)
+        {
+            left = 0;
+            top = 0;
+            if (string.IsNullOrWhiteSpace(message) || width < 50 || height < 50)
+                return false;
+            Point ratio;
+            if (TryFindRatio(message, out ratio))
+            {
+                left = ratio.X * width;
+                top = ratio.Y * height;
+                return true;
+            }
+            EnsureLoaded();
+            lock (Gate)
+            {
+                if (_ratios == null || !_ratios.TryGetValue(message, out ratio))
+                    return false;
+            }
+            left = ratio.X * width;
+            top = ratio.Y * height;
+            return true;
+        }
+
+        public static void Save(string message, double left, double top, double width, double height)
+        {
+            if (string.IsNullOrWhiteSpace(message) || width < 50 || height < 50 || IsLocked(message))
+                return;
+            EnsureLoaded();
+            var ratio = new Point(left / width, top / height);
+            lock (Gate)
+            {
+                _ratios[message] = ratio;
+                try
+                {
+                    string dir = System.IO.Path.GetDirectoryName(FilePath);
+                    if (!string.IsNullOrEmpty(dir))
+                        System.IO.Directory.CreateDirectory(dir);
+                    var lines = new List<string>();
+                    foreach (var pair in _ratios)
+                    {
+                        lines.Add(string.Join("\t",
+                            Uri.EscapeDataString(pair.Key),
+                            pair.Value.X.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            pair.Value.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                    }
+                    System.IO.File.WriteAllLines(FilePath, lines);
+                }
+                catch { }
+            }
+        }
+
+        static void EnsureConfirmed()
+        {
+            lock (Gate)
+            {
+                if (_confirmed != null) return;
+                _confirmed = ReadMap(ConfirmedPath);
+            }
+        }
+
+        static void EnsureLoaded()
+        {
+            lock (Gate)
+            {
+                if (_ratios != null) return;
+                _ratios = ReadMap(FilePath);
+            }
+        }
+
+        static Dictionary<string, Point> ReadMap(string path)
+        {
+            var map = new Dictionary<string, Point>(StringComparer.Ordinal);
+            try
+            {
+                if (!System.IO.File.Exists(path)) return map;
+                foreach (string line in System.IO.File.ReadAllLines(path))
+                {
+                    string[] parts = line.Split('\t');
+                    if (parts.Length != 3) continue;
+                    double x, y;
+                    if (!double.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x))
+                        continue;
+                    if (!double.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y))
+                        continue;
+                    map[Uri.UnescapeDataString(parts[0])] = new Point(x, y);
+                }
+            }
+            catch { }
+            return map;
+        }
+
+        static void WriteMap(string path, Dictionary<string, Point> map)
+        {
+            try
+            {
+                string dir = System.IO.Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                var lines = new List<string>();
+                foreach (var pair in map)
+                {
+                    lines.Add(string.Join("\t",
+                        Uri.EscapeDataString(pair.Key),
+                        pair.Value.X.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        pair.Value.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                }
+                System.IO.File.WriteAllLines(path, lines);
+            }
+            catch { }
         }
     }
 }

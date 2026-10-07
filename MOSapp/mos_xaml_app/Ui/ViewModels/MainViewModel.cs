@@ -36,6 +36,8 @@ namespace Ui.ViewModels
         public int ProjectNumber { get; set; }
     }
 
+    public delegate bool VocabularyUiAnchorHandler(string which, out IntPtr hwnd, out Rect screenPhysical);
+
     public class MainViewModel : INotifyPropertyChanged
     {
         [ComImport]
@@ -109,6 +111,9 @@ namespace Ui.ViewModels
 
         /// <summary>試験終了スレッドの保存・Quit が終わるまでシグナル。初期は完了済み。</summary>
         private readonly ManualResetEventSlim _excelShutdownFinished = new ManualResetEventSlim(true);
+
+        /// <summary>Excel を新しく開くたびに進める。終了処理は開始時の世代と違う Excel を Quit しない。</summary>
+        private int _excelSessionGeneration;
 
         /// <summary>
         /// アプリが利用する Excel インスタンスを取得（無ければ作成）。
@@ -219,6 +224,9 @@ namespace Ui.ViewModels
 
         public event EventHandler ExamEnded;
         public event EventHandler ShowAppBarRequested;
+
+        /// <summary>単語帳チュートリアルがアプリバー上の矩形を取るための委譲。</summary>
+        public VocabularyUiAnchorHandler VocabularyUiAnchorProvider { get; set; }
         public event EventHandler HideMainWindowRequested;
         public event EventHandler ShowMainWindowRequested;
         public event EventHandler CurrentProjectChanged;
@@ -313,6 +321,22 @@ namespace Ui.ViewModels
                 if (string.IsNullOrEmpty(path) || !File.Exists(path))
                     throw new FileNotFoundException("単語帳用ブックを用意できませんでした。", path);
 
+                // 前回の終了スレッドが GetActiveObject で、これから開く Excel を Quit しないように先に待つ。
+                if (!WaitForExcelShutdownToCompleteBeforeOpeningProject())
+                {
+                    MessageBox.Show(
+                        string.IsNullOrEmpty(ResultMessage)
+                            ? "終了処理の完了に時間がかかっています。少し待ってから、もう一度単語帳を開いてください。"
+                            : ResultMessage,
+                        "単語帳",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                Interlocked.Increment(ref _excelSessionGeneration);
+                Interlocked.Exchange(ref _endExamShutdownStarted, 0);
+
                 // 演習開始と同様: 共有参照の掃除のみ（Quit で UI を固めない）
                 ClearStaleSharedExcelBeforeOpen(path);
 
@@ -371,7 +395,16 @@ namespace Ui.ViewModels
                             return IntPtr.Zero;
                         }
                     },
-                    () => TryGetSharedExcelApplication());
+                    () => TryGetSharedExcelApplication(),
+                    (string which, out IntPtr hwnd, out Rect rect) =>
+                    {
+                        var provider = VocabularyUiAnchorProvider;
+                        if (provider != null)
+                            return provider(which, out hwnd, out rect);
+                        hwnd = IntPtr.Zero;
+                        rect = Rect.Empty;
+                        return false;
+                    });
 
                 // Excel 接続完了後 → AppBar が配置してからチュートリアル（配置待ち）
                 _vocabularyAttachHandler = (s, e) =>
@@ -2481,42 +2514,58 @@ namespace Ui.ViewModels
         
         public void CloseExcelApplication()
         {
+            int generation = Volatile.Read(ref _excelSessionGeneration);
+            int pid = TryReadRunningExcelPid();
+            CloseExcelApplication(generation, pid);
+        }
+
+        /// <summary>
+        /// 開始時に掴んだ世代と PID の Excel だけを終了する。
+        /// 保存で待っている間に別の Excel が開いていたら、そちらは Quit しない。
+        /// </summary>
+        void CloseExcelApplication(int generation, int expectedPid)
+        {
+            if (Volatile.Read(ref _excelSessionGeneration) != generation)
+                return;
+            if (expectedPid <= 0)
+                return;
+
             ExcelApp excelApp = null;
             ExcelWorkbook activeWorkbook = null;
-            int excelPid = -1;
+            bool quitStarted = false;
 
             try
             {
-                // Excel COMオブジェクトを使用して保存してから閉じる
                 try
                 {
-                    // アプリが保持しているインスタンスを優先して閉じる
-                    excelApp = _sharedExcelApp ?? (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                    if (excelApp != null)
+                    excelApp = TryGetExcelApplicationIfPid(expectedPid);
+                    if (excelApp == null)
+                        return;
+
+                    activeWorkbook = excelApp.ActiveWorkbook;
+                    if (activeWorkbook != null)
                     {
-                        excelPid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
-                        activeWorkbook = excelApp.ActiveWorkbook;
-                        if (activeWorkbook != null)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[CloseExcelApplication] Saving workbook: {activeWorkbook.Name}");
-                            // ワークブックを保存
-                            activeWorkbook.Save();
-                            System.Diagnostics.Debug.WriteLine("[CloseExcelApplication] Workbook saved successfully");
-                            
-                            // ワークブックを閉じる
-                            activeWorkbook.Close(SaveChanges: false);
-                            Marshal.ReleaseComObject(activeWorkbook);
-                            activeWorkbook = null;
-                        }
-                        // 結果へ戻る経路と同様に、Excel インスタンス自体を終了する。
-                        try { excelApp.Quit(); } catch { }
-                        Marshal.ReleaseComObject(excelApp);
-                        excelApp = null;
+                        System.Diagnostics.Debug.WriteLine($"[CloseExcelApplication] Saving workbook: {activeWorkbook.Name}");
+                        activeWorkbook.Save();
+                        System.Diagnostics.Debug.WriteLine("[CloseExcelApplication] Workbook saved successfully");
+                        activeWorkbook.Close(SaveChanges: false);
+                        Marshal.ReleaseComObject(activeWorkbook);
+                        activeWorkbook = null;
                     }
+
+                    if (!IsSameExcelSession(generation, excelApp, expectedPid))
+                        return;
+
+                    try { excelApp.Quit(); } catch { }
+                    quitStarted = true;
+                    if (!ReferenceEquals(_sharedExcelApp, excelApp))
+                    {
+                        try { Marshal.ReleaseComObject(excelApp); } catch { }
+                    }
+                    excelApp = null;
                 }
                 catch (COMException)
                 {
-                    // Excelが開いていない場合は無視
                     System.Diagnostics.Debug.WriteLine("[CloseExcelApplication] No Excel application is running");
                 }
                 catch (Exception ex)
@@ -2524,10 +2573,10 @@ namespace Ui.ViewModels
                     System.Diagnostics.Debug.WriteLine($"[CloseExcelApplication] Error saving/closing Excel: {ex.Message}");
                 }
 
-                if (excelPid > 0)
+                if (quitStarted)
                 {
                     Libraries.ExcelApplicationManager.EnsureExcelProcessExited(
-                        excelPid,
+                        expectedPid,
                         8000,
                         3000,
                         "[CloseExcelApplication]");
@@ -2539,16 +2588,114 @@ namespace Ui.ViewModels
             }
             finally
             {
-                // リソースのクリーンアップ
                 if (activeWorkbook != null)
                 {
                     try { Marshal.ReleaseComObject(activeWorkbook); } catch { }
                 }
-                if (excelApp != null)
+                if (excelApp != null && !ReferenceEquals(excelApp, _sharedExcelApp))
                 {
                     try { Marshal.ReleaseComObject(excelApp); } catch { }
                 }
-                _sharedExcelApp = null;
+                if (quitStarted)
+                    _sharedExcelApp = null;
+            }
+        }
+
+        /// <summary>今つながっている Excel の PID。いなければ 0。新規起動はしない。</summary>
+        int TryReadRunningExcelPid()
+        {
+            ExcelApp excelApp = null;
+            bool release = false;
+            try
+            {
+                excelApp = _sharedExcelApp;
+                if (excelApp != null)
+                {
+                    try { _ = excelApp.Hwnd; }
+                    catch
+                    {
+                        excelApp = null;
+                        _sharedExcelApp = null;
+                    }
+                }
+
+                if (excelApp == null)
+                {
+                    try
+                    {
+                        excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                        release = true;
+                    }
+                    catch (COMException)
+                    {
+                        return 0;
+                    }
+                }
+
+                int pid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                return pid > 0 ? pid : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+            finally
+            {
+                if (release && excelApp != null)
+                {
+                    try { Marshal.ReleaseComObject(excelApp); } catch { }
+                }
+            }
+        }
+
+        ExcelApp TryGetExcelApplicationIfPid(int expectedPid)
+        {
+            if (expectedPid <= 0)
+                return null;
+
+            ExcelApp excelApp = _sharedExcelApp;
+            if (excelApp != null)
+            {
+                try
+                {
+                    if (Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp) == expectedPid)
+                        return excelApp;
+                }
+                catch
+                {
+                    excelApp = null;
+                    _sharedExcelApp = null;
+                }
+            }
+
+            try
+            {
+                var active = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                if (Libraries.ExcelApplicationManager.TryGetExcelProcessId(active) == expectedPid)
+                    return active;
+                try { Marshal.ReleaseComObject(active); } catch { }
+            }
+            catch (COMException)
+            {
+                /* 起動していない */
+            }
+
+            return null;
+        }
+
+        bool IsSameExcelSession(int generation, ExcelApp excelApp, int expectedPid)
+        {
+            if (Volatile.Read(ref _excelSessionGeneration) != generation)
+                return false;
+            if (excelApp == null || expectedPid <= 0)
+                return false;
+            try
+            {
+                return Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp) == expectedPid;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -3110,13 +3257,19 @@ namespace Ui.ViewModels
 
             _excelShutdownFinished.Reset();
 
+            // 保存で待っている間に単語帳が別の Excel を開いても、ここで掴んだ PID だけを閉じる。
+            int shutdownGeneration = Volatile.Read(ref _excelSessionGeneration);
+            int shutdownPid = TryReadRunningExcelPid();
+
             // Office COM は STA 上で扱う（スレッドプール MTA の Task.Run は不安定になり得る）
             var shutdownThread = new Thread(() =>
             {
                 try
                 {
+                    if (Volatile.Read(ref _excelSessionGeneration) != shutdownGeneration)
+                        return;
                     SaveAllExcelWorkbooks();
-                    CloseExcelApplication();
+                    CloseExcelApplication(shutdownGeneration, shutdownPid);
                 }
                 catch (Exception ex)
                 {

@@ -130,6 +130,15 @@ namespace MOSExcelMogiApp
                 _appBarWindow.ShowActivated = false;
             }
 
+            _viewModel.VocabularyUiAnchorProvider = delegate (string which, out IntPtr hwnd, out Rect rect)
+            {
+                if (_appBarWindow != null && _appBarWindow.TryGetVocabularyAnchor(which, out hwnd, out rect))
+                    return true;
+                hwnd = IntPtr.Zero;
+                rect = Rect.Empty;
+                return false;
+            };
+
             if (!_appBarWindow.IsVisible)
             {
                 _appBarWindow.Show();

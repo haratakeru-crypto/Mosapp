@@ -25,7 +25,8 @@
                 VerticalAlignment="Top"
                 BorderBrush="#E5E7EB"
                 BorderThickness="1"
-                IsHitTestVisible="False">
+                Cursor="Arrow"
+                IsHitTestVisible="True">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.35"/>
             </Border.Effect>
@@ -42,18 +43,32 @@
                            TextWrapping="Wrap"
                            Foreground="#374151"
                            LineHeight="22"/>
-                <Button x:Name="DismissButton"
-                        Content="閉じる"
-                        Margin="0,14,0,0"
-                        Padding="16,8"
-                        HorizontalAlignment="Right"
-                        Background="#1E40AF"
-                        Foreground="White"
-                        BorderThickness="0"
-                        FontWeight="SemiBold"
-                        Cursor="Hand"
-                        IsHitTestVisible="True"
-                        Click="DismissButton_Click"/>
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,14,0,0">
+                    <Button x:Name="SecondaryButton"
+                            Content=""
+                            Margin="0,0,10,0"
+                            Padding="16,8"
+                            Background="#F59E0B"
+                            Foreground="White"
+                            BorderThickness="0"
+                            FontWeight="SemiBold"
+                            Cursor="Hand"
+                            IsHitTestVisible="True"
+                            Visibility="Collapsed"
+                            Click="SecondaryButton_Click"/>
+                    <Button x:Name="DismissButton"
+                            Content="閉じる"
+                            Padding="16,8"
+                            Background="#1E40AF"
+                            Foreground="White"
+                            BorderThickness="0"
+                            FontWeight="SemiBold"
+                            Cursor="Hand"
+                            IsHitTestVisible="True"
+                            Click="DismissButton_Click"/>
+                </StackPanel>
             </StackPanel>
         </Border>
         <Path x:Name="Caret"

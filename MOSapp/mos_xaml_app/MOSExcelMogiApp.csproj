@@ -222,10 +222,14 @@
     <Compile Include="Vocabulary\VocabularyEventWatcher.cs" />
     <Compile Include="Vocabulary\VocabularyWorkbookFactory.cs" />
     <Compile Include="Vocabulary\VocabularySessionController.cs" />
+    <Compile Include="Vocabulary\VocabularyTutorialOkWindow.cs" />
     <Compile Include="Vocabulary\VocabularyHwndHelper.cs" />
     <Compile Include="Vocabulary\VocabularyHighlightHelper.cs" />
     <Compile Include="Vocabulary\VocabularyHighlightCalibration.cs" />
     <Compile Include="Vocabulary\VocabularyRibbonTabProbe.cs" />
+    <Compile Include="Vocabulary\VocabularyRibbonClickWatcher.cs" />
+    <Compile Include="Vocabulary\VocabularyExcelDialogProbe.cs" />
+    <Compile Include="Vocabulary\VocabularyMistakeStore.cs" />
     <Compile Include="Vocabulary\CoachMarkOverlayWindow.xaml.cs">
       <DependentUpon>CoachMarkOverlayWindow.xaml</DependentUpon>
     </Compile>
@@ -301,6 +305,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\JSON\ExcelVocabularyKeywords.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\CSV\ExcelVocabularyKeywords.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\JSON\VocabHighlightCalibration.json" Condition="Exists('References\JSON\VocabHighlightCalibration.json')">

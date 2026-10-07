@@ -6,6 +6,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Documents;
 using System.Windows.Input;
 using Ui.ViewModels;
@@ -809,6 +810,59 @@ namespace MOSExcelMogiApp
             {
                 ApplyVocabularyModeUi();
             }
+        }
+
+        /// <summary>単語帳チュートリアル用。keyword / next の画面物理ピクセル矩形。</summary>
+        public bool TryGetVocabularyAnchor(string which, out IntPtr hwnd, out Rect screenPhysical)
+        {
+            hwnd = IntPtr.Zero;
+            screenPhysical = Rect.Empty;
+            try { UpdateLayout(); } catch { }
+
+            hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out RECT windowRect))
+                return false;
+            if (string.Equals(which, "appbar", StringComparison.OrdinalIgnoreCase))
+            {
+                screenPhysical = new Rect(
+                    windowRect.left,
+                    windowRect.top,
+                    Math.Max(8, windowRect.right - windowRect.left),
+                    Math.Max(8, windowRect.bottom - windowRect.top));
+                return true;
+            }
+
+            FrameworkElement el = null;
+            if (string.Equals(which, "keyword", StringComparison.OrdinalIgnoreCase))
+            {
+                var text = FindName("TaskDescriptionTextBlock") as FrameworkElement;
+                // 問題文カード（白枠）全体を穴にする。テキストだけだと中央の細い帯になる。
+                if (text?.Parent is FrameworkElement grid && grid.Parent is FrameworkElement card)
+                    el = card;
+                else
+                    el = text;
+            }
+            else if (string.Equals(which, "next", StringComparison.OrdinalIgnoreCase))
+                el = NextProjectButton;
+            if (el == null || !el.IsVisible || el.ActualWidth < 4 || el.ActualHeight < 4)
+                return false;
+
+            RECT wr = windowRect;
+
+            double winW = Math.Max(1, wr.right - wr.left);
+            double winH = Math.Max(1, wr.bottom - wr.top);
+            double scaleX = ActualWidth > 1 ? winW / ActualWidth : 1;
+            double scaleY = ActualHeight > 1 ? winH / ActualHeight : 1;
+            if (scaleX < 0.5 || scaleX > 4) scaleX = 1;
+            if (scaleY < 0.5 || scaleY > 4) scaleY = 1;
+
+            Point origin = el.TranslatePoint(new Point(0, 0), this);
+            screenPhysical = new Rect(
+                wr.left + origin.X * scaleX,
+                wr.top + origin.Y * scaleY,
+                Math.Max(8, el.ActualWidth * scaleX),
+                Math.Max(8, el.ActualHeight * scaleY));
+            return screenPhysical.Width >= 8 && screenPhysical.Height >= 8;
         }
 
         void ApplyVocabularyModeUi()

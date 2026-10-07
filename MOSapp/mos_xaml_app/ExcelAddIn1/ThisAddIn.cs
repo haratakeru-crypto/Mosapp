@@ -183,6 +183,9 @@ namespace ExcelAddIn1
                 try { lo = target.ListObject; } catch { }
                 if (lo != null)
                     EmitVocabSelectionOnce("SelectTable");
+                else if (string.Equals(_lastVocabSelectionKey, "SelectTable", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(_lastVocabSelectionKey, "SelectChart", StringComparison.OrdinalIgnoreCase))
+                    _lastVocabSelectionKey = null;
             }
             catch { }
         }
@@ -190,31 +193,41 @@ namespace ExcelAddIn1
         void TryEmitVocabSelectionFromApplication()
         {
             if (!VocabLogger.IsVocabModeEnabled()) return;
+            string key = PeekVocabSelectionKey();
+            if (string.IsNullOrEmpty(key))
+            {
+                _lastVocabSelectionKey = null;
+                return;
+            }
+            EmitVocabSelectionOnce(key);
+        }
+
+        /// <summary>今の選択に対応するキー。テーブルでもグラフでもなければ null。ログは出さない。</summary>
+        string PeekVocabSelectionKey()
+        {
             try
             {
                 object sel = Application.Selection;
-                if (sel == null) return;
+                if (sel == null) return null;
 
                 if (sel is Excel.Chart || sel is Excel.ChartObject)
-                {
-                    EmitVocabSelectionOnce("SelectChart");
-                    return;
-                }
+                    return "SelectChart";
 
-                // Chart の PlotArea / ChartArea など
                 string typeName = "";
                 try { typeName = sel.GetType().Name ?? ""; } catch { }
                 if (typeName.IndexOf("Chart", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    EmitVocabSelectionOnce("SelectChart");
-                    return;
-                }
+                    return "SelectChart";
 
                 var range = sel as Excel.Range;
-                if (range != null)
-                    TryEmitVocabSelectionFromRange(range);
+                if (range == null) return null;
+                Excel.ListObject lo = null;
+                try { lo = range.ListObject; } catch { }
+                return lo != null ? "SelectTable" : null;
             }
-            catch { }
+            catch
+            {
+                return null;
+            }
         }
 
         void EmitVocabSelectionOnce(string key)
@@ -391,14 +404,23 @@ namespace ExcelAddIn1
         {
             try
             {
-                // 単語帳: チャート選択など Range 以外の選択を補足検知
+                // 単語帳: チャート選択など Range 以外の選択を補足検知。
+                // モードがオンになった瞬間の選択はユーザー操作ではないので送らない。
                 bool vocabOn = VocabLogger.IsVocabModeEnabled();
-                if (vocabOn && !_vocabModeWasEnabled)
-                    _lastVocabSelectionKey = null;
                 if (!vocabOn)
+                {
                     _lastVocabSelectionKey = null;
-                _vocabModeWasEnabled = vocabOn;
-                TryEmitVocabSelectionFromApplication();
+                    _vocabModeWasEnabled = false;
+                }
+                else if (!_vocabModeWasEnabled)
+                {
+                    _vocabModeWasEnabled = true;
+                    _lastVocabSelectionKey = PeekVocabSelectionKey();
+                }
+                else
+                {
+                    TryEmitVocabSelectionFromApplication();
+                }
 
                 if (!File.Exists(CurrentTaskFilePath)) return;
 

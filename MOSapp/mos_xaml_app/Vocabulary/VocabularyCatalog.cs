@@ -21,6 +21,8 @@ namespace MOSExcelMogiApp.Vocabulary
         public string CoachMessage { get; set; }
         public string FormulaName { get; set; }
         public string Prefix3 { get; set; }
+        /// <summary>問題カードに出す文。CSV の表示テキスト。</summary>
+        public string DisplayText { get; set; }
 
         public bool IsFunction =>
             string.Equals(Category, "Function", StringComparison.OrdinalIgnoreCase)
@@ -54,24 +56,205 @@ namespace MOSExcelMogiApp.Vocabulary
 
         public static IReadOnlyList<VocabularyKeywordItem> Filter(VocabularyCategory category)
         {
-            var catalog = Load();
-            IEnumerable<VocabularyKeywordItem> items = catalog.Items ?? Enumerable.Empty<VocabularyKeywordItem>();
+            int minLine;
+            int maxLine;
             switch (category)
             {
                 case VocabularyCategory.TabButton:
-                    items = items.Where(i => !i.IsFunction);
+                    minLine = 2;
+                    maxLine = 18;
                     break;
                 case VocabularyCategory.Function:
-                    items = items.Where(i => i.IsFunction);
+                    minLine = 19;
+                    maxLine = 37;
                     break;
                 case VocabularyCategory.Both:
+                    minLine = 2;
+                    maxLine = 37;
                     break;
                 default:
-                    items = Enumerable.Empty<VocabularyKeywordItem>();
-                    break;
+                    return new List<VocabularyKeywordItem>();
             }
 
-            return items.ToList();
+            var templates = Load().Items ?? new List<VocabularyKeywordItem>();
+            var rows = LoadCsvRows().Where(r => r.StartLine >= minLine && r.StartLine <= maxLine);
+            var list = new List<VocabularyKeywordItem>();
+            foreach (var row in rows)
+            {
+                var template = FindTemplate(templates, row);
+                list.Add(CloneForRow(template, row, category));
+            }
+            return list;
+        }
+
+        sealed class CsvKeywordRow
+        {
+            public int StartLine;
+            public string Keyword;
+            public string Answer;
+            public string DisplayText;
+        }
+
+        static VocabularyKeywordItem FindTemplate(List<VocabularyKeywordItem> templates, CsvKeywordRow row)
+        {
+            var exact = templates.FirstOrDefault(i =>
+                string.Equals(i.Keyword, row.Keyword, StringComparison.Ordinal));
+            if (exact != null) return exact;
+
+            var byAnswer = templates.FirstOrDefault(i =>
+                string.Equals(i.FormulaName, row.Answer, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(i.Answer, row.Answer, StringComparison.OrdinalIgnoreCase));
+            if (byAnswer != null) return byAnswer;
+
+            return templates.FirstOrDefault(i =>
+                !string.IsNullOrEmpty(i.Keyword)
+                && i.Keyword.IndexOf(row.Keyword ?? "", StringComparison.Ordinal) >= 0);
+        }
+
+        static VocabularyKeywordItem CloneForRow(VocabularyKeywordItem template, CsvKeywordRow row, VocabularyCategory category)
+        {
+            bool functionRow = row.StartLine >= 19;
+            var item = new VocabularyKeywordItem
+            {
+                Id = template?.Id,
+                Category = template?.Category ?? (functionRow ? "Function" : "TabButton"),
+                Keyword = row.Keyword,
+                Answer = string.IsNullOrWhiteSpace(row.Answer) ? template?.Answer : row.Answer,
+                Kind = template?.Kind ?? (functionRow ? "Function" : "Button"),
+                TargetTab = template?.TargetTab,
+                TargetControl = template?.TargetControl,
+                DetectKeys = template?.DetectKeys != null
+                    ? new List<string>(template.DetectKeys)
+                    : new List<string>(),
+                HighlightHint = template?.HighlightHint ?? (functionRow ? "FormulaBar" : null),
+                CoachMessage = template?.CoachMessage,
+                FormulaName = template?.FormulaName,
+                Prefix3 = template?.Prefix3,
+                DisplayText = NormalizeDisplay(row.DisplayText)
+            };
+
+            if (functionRow && item.DetectKeys.Count == 0 && !string.IsNullOrWhiteSpace(item.Answer))
+                item.DetectKeys.Add("Formula:" + item.Answer.Trim());
+            if (functionRow && string.IsNullOrWhiteSpace(item.FormulaName))
+                item.FormulaName = item.Answer;
+            if (category == VocabularyCategory.Function)
+                item.Category = "Function";
+            else if (category == VocabularyCategory.TabButton)
+                item.Category = "TabButton";
+            return item;
+        }
+
+        static string NormalizeDisplay(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            return text.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+        }
+
+        static List<CsvKeywordRow> LoadCsvRows()
+        {
+            string path = ResolveCsvPath();
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return new List<CsvKeywordRow>();
+            return ParseCsv(File.ReadAllText(path));
+        }
+
+        static string ResolveCsvPath()
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string[] candidates =
+            {
+                Path.Combine(baseDir, "References", "CSV", "ExcelVocabularyKeywords.csv"),
+                Path.Combine(baseDir, "..", "..", "References", "CSV", "ExcelVocabularyKeywords.csv"),
+                Path.Combine(Directory.GetCurrentDirectory(), "References", "CSV", "ExcelVocabularyKeywords.csv"),
+            };
+            return candidates.FirstOrDefault(File.Exists);
+        }
+
+        static List<CsvKeywordRow> ParseCsv(string text)
+        {
+            var rows = new List<CsvKeywordRow>();
+            var field = new System.Text.StringBuilder();
+            var fields = new List<string>();
+            int line = 1;
+            int recordStart = 1;
+            bool inQuotes = false;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (inQuotes)
+                {
+                    if (c == '"')
+                    {
+                        if (i + 1 < text.Length && text[i + 1] == '"')
+                        {
+                            field.Append('"');
+                            i++;
+                        }
+                        else
+                        {
+                            inQuotes = false;
+                        }
+                    }
+                    else
+                    {
+                        if (c == '\n') line++;
+                        else if (c == '\r')
+                        {
+                            line++;
+                            if (i + 1 < text.Length && text[i + 1] == '\n') i++;
+                        }
+                        field.Append(c == '\r' ? '\n' : c);
+                    }
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    inQuotes = true;
+                }
+                else if (c == ',')
+                {
+                    fields.Add(field.ToString());
+                    field.Clear();
+                }
+                else if (c == '\n' || c == '\r')
+                {
+                    if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                    fields.Add(field.ToString());
+                    field.Clear();
+                    AddRow(rows, recordStart, fields);
+                    fields.Clear();
+                    line++;
+                    recordStart = line;
+                }
+                else
+                {
+                    field.Append(c);
+                }
+            }
+
+            if (field.Length > 0 || fields.Count > 0)
+            {
+                fields.Add(field.ToString());
+                AddRow(rows, recordStart, fields);
+            }
+
+            if (rows.Count > 0 && string.Equals(rows[0].Keyword, "キーワード", StringComparison.Ordinal))
+                rows.RemoveAt(0);
+            return rows;
+        }
+
+        static void AddRow(List<CsvKeywordRow> rows, int startLine, List<string> fields)
+        {
+            if (fields.All(f => string.IsNullOrWhiteSpace(f))) return;
+            rows.Add(new CsvKeywordRow
+            {
+                StartLine = startLine,
+                Keyword = fields.Count > 0 ? fields[0].Trim() : "",
+                Answer = fields.Count > 1 ? fields[1].Trim() : "",
+                DisplayText = fields.Count > 2 ? fields[2].Trim() : ""
+            });
         }
 
         public static VocabularyKeywordItem FindById(string id)

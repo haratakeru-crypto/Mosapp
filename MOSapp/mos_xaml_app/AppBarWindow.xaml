@@ -229,7 +229,8 @@
                             </Button.Style>
                         </Button>
                         
-                        <Button Content="{Binding NextProjectButtonLabel}" 
+                        <Button x:Name="NextProjectButton"
+                                Content="{Binding NextProjectButtonLabel}" 
                                 Command="{Binding NextProjectCommand}"
                                 Visibility="{Binding IsNextProjectVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Background="White" 

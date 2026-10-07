@@ -46,6 +46,7 @@ namespace MOSExcelMogiApp.Vocabulary
             string highlightHint)
         {
             ExcelApp excel = null;
+            int resolvedTries = 0;
             for (int attempt = 0; attempt < 15; attempt++)
             {
                 try { excel = getExcelApp?.Invoke(); } catch { excel = null; }
@@ -67,6 +68,8 @@ namespace MOSExcelMogiApp.Vocabulary
 
                     var result = ResolveWithExcel(hwnd, excel, highlightHint);
                     if (result.Count > 0) return result;
+                    // Excel は取れているのに位置が無いときは待っても変わらない。呼び出し側の再試行に任せる。
+                    if (++resolvedTries >= 2) return result;
                 }
 
                 Thread.Sleep(100);
@@ -144,7 +147,7 @@ namespace MOSExcelMogiApp.Vocabulary
                 return list;
             }
 
-            list.Add(new Rect(left + width * 0.16, top + 28, Math.Min(300, width * 0.30), 38));
+            // タブ位置は UIA 実座標のみ。割合の仮矩形は使わない。
             return list;
         }
 
@@ -261,6 +264,18 @@ namespace MOSExcelMogiApp.Vocabulary
                 int x2 = win.PointsToScreenPixelsX((int)Math.Round(rightPt));
                 int y2 = win.PointsToScreenPixelsY((int)Math.Round(bottomPt));
 
+                var unscaled = new Rect(
+                    Math.Min(x1, x2),
+                    Math.Min(y1, y2),
+                    Math.Max(8, Math.Abs(x2 - x1)),
+                    Math.Max(8, Math.Abs(y2 - y1)));
+                if (unscaled.Width >= 16 && unscaled.Height >= 16)
+                {
+                    // Excel と同じ画面座標で、対象セルの外側まで走査して範囲を合わせる。
+                    Rect? snapped = SnapRectToRange(win, range, unscaled);
+                    if (snapped.HasValue) return snapped;
+                }
+
                 // Excel が論理ピクセルを返す環境向け: 物理ウィンドウ幅と期待サイズで補正
                 double dpiScale = 1.0;
                 try
@@ -320,6 +335,122 @@ namespace MOSExcelMogiApp.Vocabulary
             catch
             {
                 return null;
+            }
+        }
+
+        /// <summary>RangeFromPoint で穴の四辺を対象セル範囲に合わせる。</summary>
+        static Rect? SnapRectToRange(ExcelWindow win, ExcelRange range, Rect approx)
+        {
+            if (win == null || range == null) return null;
+            int row1, col1, row2, col2;
+            try
+            {
+                row1 = range.Row;
+                col1 = range.Column;
+                row2 = row1 + range.Rows.Count - 1;
+                col2 = col1 + range.Columns.Count - 1;
+            }
+            catch { return null; }
+
+            if (!TryFindInside(win, approx, row1, col1, row2, col2, out int cx, out int cy))
+                return null;
+
+            int limitTop = (int)approx.Y - 160;
+            int limitBottom = (int)approx.Bottom + 160;
+            int limitLeft = (int)approx.X - 160;
+            int limitRight = (int)approx.Right + 160;
+
+            int top = FindBoundary(y => IsInRange(win, cx, y, row1, col1, row2, col2), cy, -1, limitTop);
+            int bottom = FindBoundary(y => IsInRange(win, cx, y, row1, col1, row2, col2), cy, 1, limitBottom);
+            int left = FindBoundary(x => IsInRange(win, x, cy, row1, col1, row2, col2), cx, -1, limitLeft);
+            int right = FindBoundary(x => IsInRange(win, x, cy, row1, col1, row2, col2), cx, 1, limitRight);
+
+            int w = right - left;
+            int h = bottom - top;
+            if (w < 16 || h < 16) return null;
+            return new Rect(left, top, w, h);
+        }
+
+        static bool TryFindInside(
+            ExcelWindow win, Rect approx, int row1, int col1, int row2, int col2, out int x, out int y)
+        {
+            x = (int)Math.Round(approx.X + approx.Width / 2.0);
+            y = (int)Math.Round(approx.Y + approx.Height / 2.0);
+            if (IsInRange(win, x, y, row1, col1, row2, col2)) return true;
+
+            int y0 = (int)approx.Y;
+            int y1 = (int)approx.Bottom;
+            int x0 = (int)approx.X;
+            int x1 = (int)approx.Right;
+            for (int yy = y0; yy <= y1; yy += 14)
+            {
+                for (int xx = x0; xx <= x1; xx += 18)
+                {
+                    if (!IsInRange(win, xx, yy, row1, col1, row2, col2)) continue;
+                    x = xx;
+                    y = yy;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static int FindBoundary(Func<int, bool> inside, int start, int dir, int limit)
+        {
+            int lastInside = start;
+            int cursor = start;
+            for (int i = 0; i < 80; i++)
+            {
+                int next = cursor + dir * 4;
+                if (dir < 0 && next < limit) break;
+                if (dir > 0 && next > limit) break;
+                if (!inside(next))
+                {
+                    int best = lastInside;
+                    for (int p = lastInside + dir; p != next + dir; p += dir)
+                    {
+                        if (inside(p)) best = p;
+                        else break;
+                    }
+                    return dir > 0 ? best + 1 : best;
+                }
+                cursor = next;
+                lastInside = next;
+            }
+            return lastInside;
+        }
+
+        static bool IsInRange(ExcelWindow win, int x, int y, int row1, int col1, int row2, int col2)
+        {
+            return TryCellAt(win, x, y, out int row, out int col)
+                   && row >= row1 && row <= row2
+                   && col >= col1 && col <= col2;
+        }
+
+        static bool TryCellAt(ExcelWindow win, int x, int y, out int row, out int col)
+        {
+            row = 0;
+            col = 0;
+            object obj = null;
+            try
+            {
+                obj = win.RangeFromPoint(x, y);
+                var cell = obj as ExcelRange;
+                if (cell == null) return false;
+                row = cell.Row;
+                col = cell.Column;
+                return row > 0 && col > 0;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (obj != null && Marshal.IsComObject(obj))
+                {
+                    try { Marshal.ReleaseComObject(obj); } catch { }
+                }
             }
         }
 
