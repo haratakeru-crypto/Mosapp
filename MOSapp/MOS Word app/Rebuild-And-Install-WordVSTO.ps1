@@ -1,5 +1,7 @@
 # Rebuild-And-Install-WordVSTO.ps1
-# Uninstall -> Release build -> install Word VSTO add-in
+# Recovery / Release reinstall: Uninstall -> Release build -> install New_MOSWordVSTOAddIn.
+# Normal Debug workflow: build New_MOSWordVSTOAddIn (or MOS Word app) in VS Debug; Install=true registers bin\Debug.
+# Product MSI uses registry key WordMosVsto (separate from New_MOSWordVSTOAddIn).
 
 $ErrorActionPreference = "Stop"
 $AddInName = "New_MOSWordVSTOAddIn"

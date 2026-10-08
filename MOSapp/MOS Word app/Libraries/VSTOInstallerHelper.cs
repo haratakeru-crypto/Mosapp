@@ -211,7 +211,8 @@ namespace Libraries
         }
 
         /// <summary>
-        /// 試験開始前に Release 版 VSTO を有効化する（Debug 登録の上書き、LoadBehavior=3）。
+        /// 試験開始前に VSTO を有効化する（排他 LoadBehavior、必要なら silent install）。
+        /// DEBUG では bin\Debug の New_MOSWordVSTOAddIn を許容し、Release への勝手な付け替えはしない。
         /// バックグラウンド準備が走っていれば完了を待つ。
         /// </summary>
         public static bool EnsureAddInReadyForExam(out string issue)
@@ -248,6 +249,18 @@ namespace Libraries
                     && !string.IsNullOrEmpty(releaseVsto)
                     && !PathsEqual(installed, releaseVsto);
 
+#if DEBUG
+                // 開発中は New_ キーが無ければ bin\Debug を登録。Release への勝手な再インストールはしない。
+                if (!KeyHasManifest(RegistryAddInKeyNameFromManifest))
+                {
+                    string dev = GetBuildOutputPath();
+                    if (!string.IsNullOrEmpty(dev) && File.Exists(dev))
+                    {
+                        if (!TrySilentInstall(dev, out issue))
+                            return false;
+                    }
+                }
+#else
                 if ((!IsInstalled() || pointsToDebug || pointsToWrongBuild)
                     && !string.IsNullOrEmpty(releaseVsto)
                     && File.Exists(releaseVsto))
@@ -255,10 +268,11 @@ namespace Libraries
                     if (!TrySilentInstall(releaseVsto, out issue))
                         return false;
                 }
+#endif
 
                 if (!IsInstalled())
                 {
-                    issue = "VSTO add-in is not registered. Run Rebuild-And-Install-WordVSTO.ps1.";
+                    issue = "VSTO add-in is not registered. Build New_MOSWordVSTOAddIn (Debug) or run Rebuild-And-Install-WordVSTO.ps1.";
                     return false;
                 }
 
@@ -519,7 +533,7 @@ namespace Libraries
         private const string InstallerManufacturer = "Rabbit";
         private const string InstallerProductName = "wordvstosetup";
 
-        /// <summary>試験用の Release 版 .vsto のみを返す（Debug は登録対象外）。</summary>
+        /// <summary>Release 版 .vsto のパスを返す（製品 / Release 試験用）。</summary>
         public static string GetReleaseBuildOutputPath()
         {
             string vstoFileName = AddInName + ".vsto";
@@ -548,9 +562,18 @@ namespace Libraries
 
         /// <summary>
         /// VSTOアドインのビルド出力パス（または配布配置パス）を取得する。
+        /// DEBUG では bin\Debug を優先（VS Debug 登録と同じ成果物）。
         /// </summary>
         public static string GetBuildOutputPath()
         {
+#if DEBUG
+            string debugPath = FindBuildOutputPath(new[]
+            {
+                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Debug", AddInName + ".vsto"),
+            });
+            if (!string.IsNullOrEmpty(debugPath) && File.Exists(debugPath))
+                return debugPath;
+#endif
             return GetReleaseBuildOutputPath()
                 ?? FindBuildOutputPath(new[]
                 {

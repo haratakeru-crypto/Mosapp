@@ -100,7 +100,12 @@
       <Name>MosPracticeSessionWatch</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <!-- VSTO は Rebuild-And-Install-WordVSTO.ps1 / RegisterReleaseWordVsto で別途 Release 登録（Debug ビルド参照で上書きしない） -->
+    <!-- Debug: VS が New_MOSWordVSTOAddIn (bin\Debug) を登録。製品 MSI は WordMosVsto。Release 再登録は RegisterReleaseWordVsto / Rebuild-And-Install-WordVSTO.ps1 -->
+    <ProjectReference Include="New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn.csproj">
+      <Project>{07F6198F-2781-45A3-B41A-F75F992D27CF}</Project>
+      <Name>New_MOSWordVSTOAddIn</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
