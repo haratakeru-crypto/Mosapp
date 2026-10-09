@@ -842,6 +842,8 @@ namespace MOSExcelMogiApp
                 else
                     el = text;
             }
+            else if (string.Equals(which, "review", StringComparison.OrdinalIgnoreCase))
+                el = FlagButton;
             else if (string.Equals(which, "next", StringComparison.OrdinalIgnoreCase))
                 el = NextProjectButton;
             if (el == null || !el.IsVisible || el.ActualWidth < 4 || el.ActualHeight < 4)
@@ -870,7 +872,12 @@ namespace MOSExcelMogiApp
             if (_viewModel == null || !_viewModel.IsVocabularyMode)
             {
                 if (CompleteButton != null) CompleteButton.Visibility = Visibility.Visible;
-                if (FlagButton != null) FlagButton.Visibility = Visibility.Visible;
+                if (CommentLaterButton != null) CommentLaterButton.Visibility = Visibility.Visible;
+                if (FlagButton != null)
+                {
+                    FlagButton.Visibility = Visibility.Visible;
+                    FlagButton.Content = "あとで見直す";
+                }
                 if (ReviewPageButton != null) ReviewPageButton.Visibility = Visibility.Visible;
                 if (ProjectResetButton != null) ProjectResetButton.Visibility = Visibility.Visible;
                 try
@@ -884,7 +891,15 @@ namespace MOSExcelMogiApp
 
             if (ReviewPageButton != null) ReviewPageButton.Visibility = Visibility.Collapsed;
             if (CompleteButton != null) CompleteButton.Visibility = Visibility.Collapsed;
-            if (FlagButton != null) FlagButton.Visibility = Visibility.Collapsed;
+            if (CommentLaterButton != null) CommentLaterButton.Visibility = Visibility.Collapsed;
+            bool manual = _viewModel.VocabularyManualAnswerEnabled;
+            if (FlagButton != null)
+            {
+                // チュートリアルで枠を出すため、設定中もボタン自体は出しておく。
+                FlagButton.Visibility = Visibility.Visible;
+                FlagButton.Content = "あとで見直す";
+                FlagButton.IsEnabled = manual;
+            }
             if (ProjectResetButton != null) ProjectResetButton.Visibility = Visibility.Collapsed;
 
             var projectInfoTextBlock = FindName("ProjectInfoTextBlock") as TextBlock;
@@ -1701,6 +1716,11 @@ namespace MOSExcelMogiApp
 
         private void FlagButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel != null && _viewModel.IsVocabularyMode)
+            {
+                _viewModel.VocabularyMarkReviewLater();
+                return;
+            }
             System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Current TaskId={_currentTaskId}, ProjectId={_currentProjectId}");
             
             // 現在のプロジェクトの状態を取得または初期化
@@ -1750,6 +1770,11 @@ namespace MOSExcelMogiApp
 
         private void CompleteButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel != null && _viewModel.IsVocabularyMode)
+            {
+                _viewModel.VocabularyMarkAnswered();
+                return;
+            }
             System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Current TaskId={_currentTaskId}, ProjectId={_currentProjectId}");
             
             // 現在のプロジェクトの状態を取得または初期化

@@ -9,14 +9,15 @@ using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 
 namespace MOSExcelMogiApp.Vocabulary
 {
-    public sealed class VocabularySessionController : IDisposable
+    public sealed partial class VocabularySessionController : IDisposable
     {
         public enum Phase
         {
             Idle,
             Tutorial,
             Quiz,
-            Finished
+            Finished,
+            Settings
         }
 
         readonly Dispatcher _dispatcher;
@@ -86,16 +87,21 @@ namespace MOSExcelMogiApp.Vocabulary
         string _lastBackstagePage;
         /// <summary>不正解の案内の段階（WrongStep*）。</summary>
         int _wrongStep;
+        /// <summary>3段目がある問題で、情報まで進んだ。</summary>
+        bool _infoReached;
+        /// <summary>情報ページの本文の範囲（物理座標）。本文の別の場所のクリックを不正解にする。</summary>
+        Rect? _backstageContentRect;
 
         sealed class RibbonSnapshot
         {
+            public Rect? DetailRect;
+            public Rect? ContentRect;
             public string SelectedTab;
             public Rect? TabRect;
             public Rect? ControlRect;
             public bool BackstageOpen;
             public string BackstagePage;
             public Rect? InfoRect;
-            public Rect? BackRect;
         }
 
         public VocabularySessionController(
@@ -298,6 +304,43 @@ namespace MOSExcelMogiApp.Vocabulary
             return ratio != null && ratio.IsValid;
         }
 
+        /// <summary>問題文の「解答済みにする」。間違いにはせず、次の問題へ進む。</summary>
+        public void MarkAnsweredAndAdvance()
+        {
+            if (!IsActive || _current == null) return;
+            if (!_currentSolved)
+            {
+                _currentSolved = true;
+                RemoveMistakeIfSolvedCleanly();
+            }
+            LeaveCurrentQuestion();
+            GoNext();
+        }
+
+        /// <summary>問題文の「後で見直す」。わからなかった扱いで記録し、解き直しに出す。</summary>
+        public void MarkReviewLaterAndAdvance()
+        {
+            if (!IsActive || _current == null) return;
+            // この案内中にボタン自体を押しても、チュートリアルは飛ばさない。
+            if (_phase == Phase.Tutorial && _tutorialSubStep == ReviewLaterStep) return;
+            if (!_currentSolved)
+            {
+                _currentMissed = true;
+                try { VocabularyMistakeStore.Record(_current); } catch { }
+                _currentSolved = true;
+            }
+            LeaveCurrentQuestion();
+            GoNext();
+        }
+
+        void LeaveCurrentQuestion()
+        {
+            try { CloseBackstage(ExcelHwnd()); } catch { }
+            CloseSettingsTransient();
+            CloseCoach();
+            _awaitingDismiss = false;
+        }
+
         public void GoNext()
         {
             if (_awaitingDismiss) return;
@@ -366,6 +409,8 @@ namespace MOSExcelMogiApp.Vocabulary
             _targetControlRect = null;
             _lastBackstagePage = null;
             _wrongStep = 0;
+            _infoReached = false;
+            _backstageContentRect = null;
             RebuildAcceptedKeys();
             // 残留選択をイベントにする前に切り、A1・ホームへ戻してから判定を始める
             WriteVocabModeFlag(false);
@@ -691,6 +736,13 @@ namespace MOSExcelMogiApp.Vocabulary
                 return;
             }
 
+            // T1 と T2 の間。既存の 1〜4 はずらさない。
+            if (_tutorialSubStep == ReviewLaterStep)
+            {
+                ShowReviewLaterCoach();
+                return;
+            }
+
             if (_tutorialSubStep == 1)
             {
                 ShowCoach(
@@ -719,9 +771,32 @@ namespace MOSExcelMogiApp.Vocabulary
                 ShowNextButtonCoach();
         }
 
+        const int ReviewLaterStep = 6;
+
+        void ShowReviewLaterCoach()
+        {
+            ShowAnchoredCoach(
+                which: "review",
+                message: "すぐに分からなかった場合は「あとで見直す」ボタンを押してください。",
+                clickThrough: false,
+                onOverlayClick: null,
+                expectedStep: ReviewLaterStep,
+                attempt: 0,
+                showOkButton: true,
+                onOk: AdvanceFromReviewLaterStep);
+        }
+
         void AdvanceFromKeywordStep()
         {
             if (!IsTableKeyword(_current) || _tutorialSubStep != 0 || _currentSolved) return;
+            _tutorialSubStep = ReviewLaterStep;
+            CloseCoach();
+            ShowReviewLaterCoach();
+        }
+
+        void AdvanceFromReviewLaterStep()
+        {
+            if (!IsTableKeyword(_current) || _tutorialSubStep != ReviewLaterStep || _currentSolved) return;
             _tutorialSubStep = 1;
             CloseCoach();
             PrepareChartOrTableSelection();
@@ -736,6 +811,7 @@ namespace MOSExcelMogiApp.Vocabulary
         void ShowTableCorrectDialog()
         {
             var dialog = new VocabularyTutorialOkWindow(CurrentDisplayText());
+            _tutorialOkDialog = dialog;
             dialog.OkClicked += () =>
             {
                 try { dialog.Close(); } catch { }
@@ -758,7 +834,7 @@ namespace MOSExcelMogiApp.Vocabulary
                 {
                     if (_tutorialSubStep != 3 || _coach == null) return;
                     try { dialog.UpdateLayout(); } catch { }
-                    Rect window = dialog.TryGetWindowScreenRect();
+                    Rect window = SavedHole(CoachHoleOverrideStore.CorrectDialogKey) ?? dialog.TryGetWindowScreenRect();
                     if (window.Width >= 8 && window.Height >= 8)
                     {
                         try { _coach.UpdateHighlights(new List<Rect> { window }); } catch { }
@@ -769,7 +845,7 @@ namespace MOSExcelMogiApp.Vocabulary
 
         void ShowCorrectDialogCoach(VocabularyTutorialOkWindow dialog)
         {
-            Rect window = dialog.TryGetWindowScreenRect();
+            Rect window = SavedHole(CoachHoleOverrideStore.CorrectDialogKey) ?? dialog.TryGetWindowScreenRect();
             ShowCoach(
                 title: "チュートリアル",
                 message: "正解です！こちらのOKボタンを押して次の問題に行きましょう！",
@@ -802,6 +878,12 @@ namespace MOSExcelMogiApp.Vocabulary
             IntPtr hwnd;
             Rect rect;
             bool ok = TryGetUiAnchor(which, out hwnd, out rect);
+            var saved = SavedHole(AnchorKey(which));
+            if (saved.HasValue)
+            {
+                rect = saved.Value;
+                ok = true;
+            }
             if (!ok && attempt < 6)
             {
                 var retry = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
@@ -818,6 +900,8 @@ namespace MOSExcelMogiApp.Vocabulary
             Rect problem;
             if (!TryGetUiAnchor("keyword", out problemHwnd, out problem) || problem.Width < 8)
                 problem = Rect.Empty;
+            var savedProblem = SavedHole(CoachHoleOverrideStore.KeywordAnchorKey);
+            if (savedProblem.HasValue) problem = savedProblem.Value;
 
             // 吹き出しはアプリバー全体ではなく、案内しているコントロールのすぐ上に置く。
             Rect pin = ok && rect.Height >= 8 ? rect : problem;
@@ -836,6 +920,15 @@ namespace MOSExcelMogiApp.Vocabulary
                 coverScreen: true,
                 pinAboveScreen: pin,
                 showOkButton: showOkButton);
+        }
+
+        static string AnchorKey(string which)
+        {
+            if (string.Equals(which, "next", StringComparison.OrdinalIgnoreCase))
+                return CoachHoleOverrideStore.NextAnchorKey;
+            if (string.Equals(which, "review", StringComparison.OrdinalIgnoreCase))
+                return CoachHoleOverrideStore.ReviewAnchorKey;
+            return CoachHoleOverrideStore.KeywordAnchorKey;
         }
 
         void ShowTutorialCoachStep()
@@ -1081,7 +1174,17 @@ namespace MOSExcelMogiApp.Vocabulary
 
         bool IsTabOnlyQuestion()
         {
-            return !UsesSequentialDetect() && string.IsNullOrWhiteSpace(_current?.TargetControl);
+            return !UsesSequentialDetect()
+                   && (string.IsNullOrWhiteSpace(_current?.TargetControl) || IsGroupQuestion());
+        }
+
+        /// <summary>タブで正解にし、正解のときにグループを明るく見せる問題か。</summary>
+        bool IsGroupQuestion()
+        {
+            return _current != null
+                   && !IsFileTarget()
+                   && string.Equals(_current.Kind, "Group", StringComparison.OrdinalIgnoreCase)
+                   && !string.IsNullOrWhiteSpace(_current.TargetControl);
         }
 
         /// <summary>UIA はバックグラウンドで読み、結果だけ UI スレッドで判定する。</summary>
@@ -1094,6 +1197,7 @@ namespace MOSExcelMogiApp.Vocabulary
             string targetControl = item.TargetControl;
             bool fileTarget = IsFileTarget();
             bool wantRects = _wrongCoachVisible;
+            string detailControl = HasDetailStep() ? item.DetailControl : null;
 
             System.Threading.Tasks.Task.Run(() =>
             {
@@ -1107,8 +1211,11 @@ namespace MOSExcelMogiApp.Vocabulary
                         if (fileTarget)
                             snap.InfoRect = VocabularyRibbonTabProbe.TryGetBackstageItemScreenRect(
                                 hwnd, string.IsNullOrWhiteSpace(targetControl) ? "情報" : targetControl);
-                        else if (wantRects)
-                            snap.BackRect = VocabularyRibbonTabProbe.TryGetBackstageItemScreenRect(hwnd, "戻る");
+                        if (detailControl != null && IsInfoPage(snap.BackstagePage))
+                        {
+                            snap.DetailRect = VocabularyRibbonTabProbe.TryGetBackstageContentScreenRect(hwnd, detailControl);
+                            snap.ContentRect = VocabularyRibbonTabProbe.TryGetBackstageContentArea(hwnd);
+                        }
                         return snap;
                     }
 
@@ -1151,13 +1258,33 @@ namespace MOSExcelMogiApp.Vocabulary
             {
                 if (fileTarget)
                 {
-                    _targetControlRect = snap.InfoRect;
                     string page = snap.BackstagePage;
                     bool infoSelected = IsInfoPage(page);
-                    if (infoSelected && !_awaitingDismiss)
+                    if (HasDetailStep())
                     {
-                        HandleButtonCorrect();
-                        return;
+                        if (infoSelected && !_infoReached)
+                            MarkInfoReached();
+                        else if (!infoSelected && !string.IsNullOrEmpty(page) && _infoReached)
+                            _infoReached = false;
+
+                        if (_infoReached)
+                        {
+                            _targetControlRect = SavedHole(WrongStepKey(WrongStepBackstageDetail)) ?? snap.DetailRect;
+                            if (snap.ContentRect.HasValue) _backstageContentRect = snap.ContentRect;
+                        }
+                        else
+                        {
+                            _targetControlRect = SavedHole(WrongStepKey(WrongStepBackstageInfo)) ?? snap.InfoRect;
+                        }
+                    }
+                    else
+                    {
+                        _targetControlRect = SavedHole(WrongStepKey(WrongStepBackstageInfo)) ?? snap.InfoRect;
+                        if (infoSelected && !_awaitingDismiss)
+                        {
+                            HandleButtonCorrect();
+                            return;
+                        }
                     }
                     bool pageChanged = !backstageOpened
                         && !string.IsNullOrEmpty(page)
@@ -1182,6 +1309,8 @@ namespace MOSExcelMogiApp.Vocabulary
                 return;
             }
             _lastBackstagePage = null;
+            _infoReached = false;
+            _backstageContentRect = null;
 
             if (!string.IsNullOrEmpty(snap.SelectedTab))
             {
@@ -1211,7 +1340,9 @@ namespace MOSExcelMogiApp.Vocabulary
                 }
             }
 
-            _targetControlRect = (!fileTarget && _onTargetTab) ? snap.ControlRect : null;
+            _targetControlRect = (!fileTarget && _onTargetTab && !IsGroupQuestion())
+                ? (SavedHole(WrongStepKey(WrongStepButton)) ?? snap.ControlRect)
+                : null;
             UpdateWrongCoach(snap);
         }
 
@@ -1219,7 +1350,28 @@ namespace MOSExcelMogiApp.Vocabulary
         const int WrongStepButton = 2;
         const int WrongStepFileTab = 3;
         const int WrongStepBackstageInfo = 4;
-        const int WrongStepBackstageBack = 5;
+        const int WrongStepBackstageDetail = 6;
+
+        /// <summary>ファイルタブ → 情報 のあとに、もう1つボタンを押す問題か。</summary>
+        bool HasDetailStep()
+        {
+            return IsFileTarget() && !string.IsNullOrWhiteSpace(_current?.DetailControl);
+        }
+
+        /// <summary>情報まで進んだ。正解にはせず、3段目のボタンを待つ。</summary>
+        void MarkInfoReached()
+        {
+            if (_infoReached) return;
+            _infoReached = true;
+            _suppressWrongUntil = DateTime.UtcNow.AddMilliseconds(500);
+            LogQuiz("info reached keyword=" + _current?.Keyword + " detail=" + _current?.DetailControl);
+        }
+
+        static bool IsInfoKey(string key)
+        {
+            return string.Equals(key, "FileInfo", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(key, "BackstageInfo", StringComparison.OrdinalIgnoreCase);
+        }
 
         static bool IsInfoPage(string page)
         {
@@ -1231,9 +1383,13 @@ namespace MOSExcelMogiApp.Vocabulary
         int CurrentWrongStep()
         {
             if (_backstageOpen)
-                return IsFileTarget() ? WrongStepBackstageInfo : WrongStepBackstageBack;
+            {
+                if (!IsFileTarget())
+                    return WrongStepTab;
+                return HasDetailStep() && _infoReached ? WrongStepBackstageDetail : WrongStepBackstageInfo;
+            }
             if (IsFileTarget()) return WrongStepFileTab;
-            if (_onTargetTab && !string.IsNullOrWhiteSpace(_current?.TargetControl)) return WrongStepButton;
+            if (_onTargetTab && !IsGroupQuestion() && !string.IsNullOrWhiteSpace(_current?.TargetControl)) return WrongStepButton;
             return WrongStepTab;
         }
 
@@ -1241,7 +1397,7 @@ namespace MOSExcelMogiApp.Vocabulary
         string AnswerPart(int index)
         {
             var parts = (_current?.Answer ?? "").Split('/');
-            if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[index]))
+            if (parts.Length >= 2 && index < parts.Length && !string.IsNullOrWhiteSpace(parts[index]))
                 return parts[index].Trim();
             if (index == 0)
             {
@@ -1253,7 +1409,6 @@ namespace MOSExcelMogiApp.Vocabulary
 
         string WrongStepMessage(int step)
         {
-            string tab = (_current?.TargetTab ?? "").Trim();
             switch (step)
             {
                 case WrongStepButton:
@@ -1262,8 +1417,8 @@ namespace MOSExcelMogiApp.Vocabulary
                     return "『ファイル』タブをクリックしてください。";
                 case WrongStepBackstageInfo:
                     return "『" + (string.IsNullOrWhiteSpace(_current?.TargetControl) ? "情報" : _current.TargetControl.Trim()) + "』をクリックしてください。";
-                case WrongStepBackstageBack:
-                    return "左上の『←』で戻り、『" + tab + "』タブをクリックしてください。";
+                case WrongStepBackstageDetail:
+                    return "『" + (_current?.DetailControl ?? "").Trim() + "』をクリックしてください。";
                 default:
                     return "『" + AnswerPart(0) + "』をクリックしてください。";
             }
@@ -1275,7 +1430,12 @@ namespace MOSExcelMogiApp.Vocabulary
             var holes = new List<Rect>();
             IntPtr hwnd = IntPtr.Zero;
             try { hwnd = _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { }
-            Rect? rect = null;
+            Rect? rect = SavedHole(WrongStepKey(step));
+            if (rect.HasValue)
+            {
+                holes.Add(rect.Value);
+                return holes;
+            }
             switch (step)
             {
                 case WrongStepButton:
@@ -1289,8 +1449,8 @@ namespace MOSExcelMogiApp.Vocabulary
                     rect = VocabularyRibbonTabProbe.TryGetBackstageItemScreenRect(
                         hwnd, string.IsNullOrWhiteSpace(_current.TargetControl) ? "情報" : _current.TargetControl);
                     break;
-                case WrongStepBackstageBack:
-                    rect = VocabularyRibbonTabProbe.TryGetBackstageItemScreenRect(hwnd, "戻る");
+                case WrongStepBackstageDetail:
+                    rect = VocabularyRibbonTabProbe.TryGetBackstageContentScreenRect(hwnd, _current.DetailControl);
                     break;
             }
             if (rect.HasValue) holes.Add(rect.Value);
@@ -1308,14 +1468,17 @@ namespace MOSExcelMogiApp.Vocabulary
             if (!_wrongCoachVisible || _coach == null || UsesSequentialDetect()) return;
 
             int step = CurrentWrongStep();
-            Rect? rect = null;
-            switch (step)
+            Rect? rect = SavedHole(WrongStepKey(step));
+            if (!rect.HasValue)
             {
-                case WrongStepButton: rect = snap.ControlRect; break;
-                case WrongStepTab:
-                case WrongStepFileTab: rect = snap.TabRect; break;
-                case WrongStepBackstageInfo: rect = snap.InfoRect; break;
-                case WrongStepBackstageBack: rect = snap.BackRect; break;
+                switch (step)
+                {
+                    case WrongStepButton: rect = snap.ControlRect; break;
+                    case WrongStepTab:
+                    case WrongStepFileTab: rect = snap.TabRect; break;
+                    case WrongStepBackstageInfo: rect = snap.InfoRect; break;
+                    case WrongStepBackstageDetail: rect = snap.DetailRect; break;
+                }
             }
 
             if (step != _wrongStep)
@@ -1354,6 +1517,27 @@ namespace MOSExcelMogiApp.Vocabulary
             if (_awaitingDismiss || !UsesRibbonJudge() || UsesSequentialDetect()) return;
             if (DateTime.UtcNow < _suppressWrongUntil) return;
             var rect = _targetControlRect;
+
+            if (HasDetailStep() && _backstageOpen)
+            {
+                if (!_infoReached)
+                {
+                    if (rect.HasValue && rect.Value.Contains(physical))
+                        MarkInfoReached();
+                    return;
+                }
+                if (rect.HasValue && rect.Value.Contains(physical))
+                {
+                    HandleButtonCorrect();
+                    return;
+                }
+                // 情報ページの本文の別の場所を押したら不正解。位置が取れていないときは判定しない。
+                var content = _backstageContentRect;
+                if (rect.HasValue && content.HasValue && content.Value.Contains(physical))
+                    ShowWrongCoach();
+                return;
+            }
+
             if (!rect.HasValue || !rect.Value.Contains(physical)) return;
             HandleButtonCorrect();
         }
@@ -1530,6 +1714,12 @@ namespace MOSExcelMogiApp.Vocabulary
                 return;
             }
 
+            if (HasDetailStep() && IsInfoKey(key))
+            {
+                MarkInfoReached();
+                return;
+            }
+
             if (IsMatch(key))
             {
                 if (_current.IsFunction)
@@ -1650,6 +1840,8 @@ namespace MOSExcelMogiApp.Vocabulary
         /// <summary>正解はコーチマークのテキストボックスに、CSVの表示テキストを出す。</summary>
         void ShowCorrectBubble(Action onDismiss = null)
         {
+            bool group = IsGroupQuestion();
+            Rect? saved = group ? SavedHole(CoachHoleOverrideStore.QuizKey(_current.Keyword, "group")) : null;
             ShowCoach(
                 title: "正解！",
                 message: CurrentDisplayText(),
@@ -1657,18 +1849,82 @@ namespace MOSExcelMogiApp.Vocabulary
                 allowDismiss: true,
                 clickThrough: false,
                 onDismiss: onDismiss,
-                holesOverride: new List<Rect>(),
+                holesOverride: saved.HasValue ? new List<Rect> { saved.Value } : new List<Rect>(),
                 appendSelectHint: false,
                 coverScreen: true,
                 centerBubble: true,
-                showOkButton: true);
+                showOkButton: true,
+                alignAnchorMessage: group ? null : TableCorrectAnchorMessage());
+            if (group && !saved.HasValue)
+                HighlightGroupLater(_coach);
+        }
+
+        /// <summary>グループの位置は UIA で裏で探し、見つかったら正解のコーチマークに枠を出す。</summary>
+        void HighlightGroupLater(CoachMarkOverlayWindow coach)
+        {
+            if (coach == null) return;
+            IntPtr hwnd = ExcelHwnd();
+            string group = _current.TargetControl;
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                Rect? rect = null;
+                for (int i = 0; i < 3 && !rect.HasValue; i++)
+                {
+                    rect = VocabularyRibbonTabProbe.TryGetRibbonGroupScreenRect(hwnd, group)
+                           ?? VocabularyRibbonTabProbe.TryGetRibbonControlScreenRect(hwnd, group);
+                    if (!rect.HasValue) System.Threading.Thread.Sleep(150);
+                }
+                return rect;
+            }).ContinueWith(t =>
+            {
+                if (t.Status != System.Threading.Tasks.TaskStatus.RanToCompletion || !t.Result.HasValue) return;
+                _dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (_coach != coach) return;
+                    LogQuiz("group highlight " + group + " " + HolesKey(new List<Rect> { t.Result.Value }));
+                    try { coach.UpdateHighlights(new List<Rect> { t.Result.Value }); } catch { }
+                }));
+            });
+        }
+
+        /// <summary>テーブルを正解にしたときの表示文。他の正解テキストの位置の基準。</summary>
+        string TableCorrectAnchorMessage()
+        {
+            var table = VocabularyCatalog.Filter(VocabularyCategory.TabButton).FirstOrDefault(IsTableKeyword);
+            if (table != null && !string.IsNullOrWhiteSpace(table.DisplayText))
+                return BreakAfterLeadIn(table.DisplayText);
+            return BreakAfterLeadIn("「テーブル」と問題文に出たらテーブルを選択して、「テーブルデザイン」タブを使います");
         }
 
         string CurrentDisplayText()
         {
             if (!string.IsNullOrWhiteSpace(_current?.DisplayText))
-                return _current.DisplayText;
+                return BreakAfterLeadIn(_current.DisplayText);
             return _current?.Keyword ?? "正解！";
+        }
+
+        /// <summary>正解文は「と問題文にあったら」などの直後で改行し、単語の途中で折り返さない。</summary>
+        static string BreakAfterLeadIn(string text)
+        {
+            string[] marks =
+            {
+                "と問題文にあったら",
+                "と問題文にあれば",
+                "と問題文に出たら",
+                "と問題に出たら",
+                "がシートにある場合は"
+            };
+            foreach (var mark in marks)
+            {
+                int index = text.IndexOf(mark, StringComparison.Ordinal);
+                if (index < 0) continue;
+                int end = index + mark.Length;
+                if (end < text.Length && text[end] == '、') end++;
+                if (end >= text.Length) return text;
+                if (text[end] == '\n' || text[end] == '\r') return text;
+                return text.Substring(0, end) + "\n" + text.Substring(end).TrimStart();
+            }
+            return text;
         }
 
         /// <summary>チュートリアル中の選択でステップ進行。処理したら true。</summary>
@@ -1782,7 +2038,8 @@ namespace MOSExcelMogiApp.Vocabulary
             Rect bubbleAboveScreen = default,
             bool centerBubble = false,
             Rect pinAboveScreen = default,
-            bool showOkButton = false)
+            bool showOkButton = false,
+            string alignAnchorMessage = null)
         {
             try
             {
@@ -1813,7 +2070,7 @@ namespace MOSExcelMogiApp.Vocabulary
                     onDismiss?.Invoke();
                 };
                 _coach.Dismissed += dismissAction;
-                _coach.ShowCoachMark(hwnd, holes, title, message, allowDismiss, clickThrough, appendSelectHint, coverScreen, bubbleScreen, bubbleAboveScreen, centerBubble, pinAboveScreen, showOkButton);
+                _coach.ShowCoachMark(hwnd, holes, title, message, allowDismiss, clickThrough, appendSelectHint, coverScreen, bubbleScreen, bubbleAboveScreen, centerBubble, pinAboveScreen, showOkButton, alignAnchorMessage);
 
                 if (beginClickCapture)
                 {
@@ -1849,6 +2106,21 @@ namespace MOSExcelMogiApp.Vocabulary
             if (holesOverride != null)
             {
                 holes.AddRange(holesOverride);
+                try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
+                return holes;
+            }
+
+            // 設定画面で合わせた枠があれば、その部分は自動の位置より優先する。
+            var parts = HintComponents(hint);
+            if (parts.Any(p => CoachHoleOverrideStore.Has(CoachHoleOverrideStore.HintKey(p))))
+            {
+                foreach (var p in parts)
+                {
+                    if (CoachHoleOverrideStore.TryGet(CoachHoleOverrideStore.HintKey(p), hwnd, out Rect saved))
+                        holes.Add(saved);
+                    else
+                        holes.AddRange(BuildCoachHoles(hwnd, excel, p, null));
+                }
                 try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
                 return holes;
             }
@@ -1902,6 +2174,40 @@ namespace MOSExcelMogiApp.Vocabulary
             try { VocabularyHighlightHelper.ClearNativeTableHighlight(excel); } catch { }
             holes.AddRange(VocabularyHighlightHelper.ResolveHighlights(hwnd, _getExcelApp, hint));
             return holes;
+        }
+
+        /// <summary>「テーブル→デザインタブ」のような複合の指定を、枠ごとの指定に分ける。</summary>
+        static string[] HintComponents(string hint)
+        {
+            if (string.IsNullOrEmpty(hint)) return new string[0];
+            if (hint.Equals("TableThenDesignTab", StringComparison.OrdinalIgnoreCase))
+                return new[] { "Table", "TableDesignTab" };
+            if (hint.Equals("ChartThenDesignTab", StringComparison.OrdinalIgnoreCase))
+                return new[] { "Chart", "ChartDesignTab" };
+            return new[] { hint };
+        }
+
+        IntPtr ExcelHwnd()
+        {
+            try { return _getExcelHwnd?.Invoke() ?? IntPtr.Zero; } catch { return IntPtr.Zero; }
+        }
+
+        Rect? SavedHole(string key)
+        {
+            return CoachHoleOverrideStore.TryGet(key, ExcelHwnd(), out Rect r) ? r : (Rect?)null;
+        }
+
+        /// <summary>不正解の案内の段階ごとの、保存した枠のキー。</summary>
+        string WrongStepKey(int step)
+        {
+            string kw = _current?.Keyword;
+            switch (step)
+            {
+                case WrongStepButton: return CoachHoleOverrideStore.QuizKey(kw, "button");
+                case WrongStepBackstageInfo: return CoachHoleOverrideStore.QuizKey(kw, "info");
+                case WrongStepBackstageDetail: return CoachHoleOverrideStore.QuizKey(kw, "detail");
+                default: return CoachHoleOverrideStore.QuizKey(kw, "tab");
+            }
         }
 
         bool ShouldRetryCalibratedHole(string hint, List<Rect> holes)
@@ -2068,6 +2374,7 @@ namespace MOSExcelMogiApp.Vocabulary
 
         public void Cancel()
         {
+            CloseSettingsUi();
             CloseCoach();
             StopWatcher();
             WriteVocabModeFlag(false);

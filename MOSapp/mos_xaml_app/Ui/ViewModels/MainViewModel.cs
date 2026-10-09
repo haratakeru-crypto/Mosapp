@@ -298,15 +298,37 @@ namespace Ui.ViewModels
 
         public string NextProjectButtonLabel => IsVocabularyMode ? "次のキーワードへ" : "次のプロジェクト";
 
+        /// <summary>単語帳の出題中だけ、問題文の「解答済みにする」「後で見直す」を出す。</summary>
+        public bool VocabularyManualAnswerEnabled
+        {
+            get
+            {
+                var phase = _vocabularySession?.CurrentPhase;
+                return phase == VocabularySessionController.Phase.Tutorial
+                       || phase == VocabularySessionController.Phase.Quiz;
+            }
+        }
+
+        public void VocabularyMarkAnswered() => _vocabularySession?.MarkAnsweredAndAdvance();
+
+        public void VocabularyMarkReviewLater() => _vocabularySession?.MarkReviewLaterAndAdvance();
+
         /// <summary>単語帳中は採点ボタンを出さない。</summary>
         public bool ShowScoreButtonEffective => ShowScoreButton && !IsVocabularyMode;
 
         private VocabularyCategory _pendingVocabularyCategory;
+        private bool _pendingVocabularySettings;
         private EventHandler _vocabularyAttachHandler;
         private DispatcherTimer _vocabularyStartFallbackTimer;
 
+        /// <summary>単語帳のテキストボックスとコーチマークの位置を設定するモードを開く。</summary>
+        public void StartVocabularySettings()
+        {
+            StartVocabularySession(VocabularyCategory.Both, settingsMode: true);
+        }
+
         /// <summary>単語帳（キーワードのみ）セッションを開始する。</summary>
-        public void StartVocabularySession(VocabularyCategory category)
+        public void StartVocabularySession(VocabularyCategory category, bool settingsMode = false)
         {
             try
             {
@@ -374,6 +396,7 @@ namespace Ui.ViewModels
                 VocabularyKeywordText = "準備中…";
                 VocabularyProgressText = "-/-";
                 _pendingVocabularyCategory = category;
+                _pendingVocabularySettings = settingsMode;
 
                 // HWND 取得で新規 Excel を絶対に起動しない（二重起動・COM 嵐の原因）
                 _vocabularySession = new VocabularySessionController(
@@ -466,7 +489,10 @@ namespace Ui.ViewModels
                 if (_vocabularySession == null) return;
                 if (_vocabularySession.CurrentPhase != VocabularySessionController.Phase.Idle)
                     return;
-                _vocabularySession.Start(_pendingVocabularyCategory);
+                if (_pendingVocabularySettings)
+                    _vocabularySession.StartSettings();
+                else
+                    _vocabularySession.Start(_pendingVocabularyCategory);
             }
             catch (Exception ex)
             {

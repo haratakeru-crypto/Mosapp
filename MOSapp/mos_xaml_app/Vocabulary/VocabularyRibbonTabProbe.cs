@@ -268,6 +268,111 @@ namespace MOSExcelMogiApp.Vocabulary
             catch { return null; }
         }
 
+        /// <summary>リボンのグループ（例: ページ設定）の画面上の位置。名前が一致するものを優先する。</summary>
+        public static Rect? TryGetRibbonGroupScreenRect(IntPtr excelHwnd, string groupName)
+        {
+            if (excelHwnd == IntPtr.Zero || string.IsNullOrWhiteSpace(groupName)) return null;
+            try
+            {
+                var root = AutomationElement.FromHandle(excelHwnd);
+                if (root == null) return null;
+                var condition = new OrCondition(
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Group),
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ToolBar));
+                var found = root.FindAll(TreeScope.Descendants, condition);
+                if (found == null) return null;
+
+                string wanted = groupName.Trim();
+                System.Windows.Rect best = System.Windows.Rect.Empty;
+                bool bestExact = false;
+                foreach (AutomationElement el in found)
+                {
+                    try
+                    {
+                        if (el.Current.IsOffscreen) continue;
+                        string n = (el.Current.Name ?? "").Trim();
+                        if (n.IndexOf(wanted, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        var br = el.Current.BoundingRectangle;
+                        if (br.IsEmpty || br.Width < 16 || br.Height < 16 || br.Height > 400) continue;
+                        bool exact = string.Equals(n, wanted, StringComparison.OrdinalIgnoreCase);
+                        if (best.IsEmpty || (exact && !bestExact))
+                        {
+                            best = br;
+                            bestExact = exact;
+                        }
+                    }
+                    catch { }
+                }
+                if (best.IsEmpty) return null;
+                return new Rect(best.X, best.Y, best.Width, best.Height);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>バックステージの右側（本文）の範囲。左側のナビゲーションは含めない。</summary>
+        public static Rect? TryGetBackstageContentArea(IntPtr excelHwnd)
+        {
+            if (excelHwnd == IntPtr.Zero) return null;
+            try
+            {
+                var root = BackstageRoot(excelHwnd);
+                if (root == null) return null;
+                var box = root.Current.BoundingRectangle;
+                if (box.IsEmpty || box.Width <= 480 || box.Height < 100) return null;
+                return new Rect(box.X + 420, box.Y, box.Width - 420, box.Height);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>バックステージの右側（本文）にある、名前が前方一致する要素の画面上の位置。</summary>
+        public static Rect? TryGetBackstageContentScreenRect(IntPtr excelHwnd, string name)
+        {
+            if (excelHwnd == IntPtr.Zero || string.IsNullOrWhiteSpace(name)) return null;
+            string wanted = name.Trim();
+            try
+            {
+                var root = BackstageRoot(excelHwnd);
+                if (root == null) return null;
+                System.Windows.Rect rootBox;
+                try { rootBox = root.Current.BoundingRectangle; }
+                catch { rootBox = System.Windows.Rect.Empty; }
+
+                var condition = new OrCondition(
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.SplitButton),
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem),
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Hyperlink));
+                var found = root.FindAll(TreeScope.Descendants, condition);
+                if (found == null) return null;
+
+                System.Windows.Rect best = System.Windows.Rect.Empty;
+                bool bestExact = false;
+                foreach (AutomationElement el in found)
+                {
+                    try
+                    {
+                        if (el.Current.IsOffscreen) continue;
+                        string n = (el.Current.Name ?? "").Trim();
+                        if (!n.StartsWith(wanted, StringComparison.OrdinalIgnoreCase)) continue;
+                        var br = el.Current.BoundingRectangle;
+                        if (br.IsEmpty || br.Width < 8 || br.Height < 8) continue;
+                        // 左側のナビゲーションは除く。
+                        if (!rootBox.IsEmpty && br.X <= rootBox.X + 420) continue;
+                        bool exact = string.Equals(n, wanted, StringComparison.OrdinalIgnoreCase);
+                        if (best.IsEmpty || (exact && !bestExact))
+                        {
+                            best = br;
+                            bestExact = exact;
+                        }
+                    }
+                    catch { }
+                }
+                if (best.IsEmpty) return null;
+                return new Rect(best.X, best.Y, best.Width, best.Height);
+            }
+            catch { return null; }
+        }
+
         static AutomationElement BackstageRoot(IntPtr excelHwnd)
         {
             try
@@ -407,6 +512,17 @@ namespace MOSExcelMogiApp.Vocabulary
             }
             catch { }
             return false;
+        }
+
+        /// <summary>名前のタブへ切り替える（設定画面でボタンを見える状態にするため）。</summary>
+        public static bool TrySelectTab(IntPtr excelHwnd, string tabName)
+        {
+            if (string.IsNullOrWhiteSpace(tabName)) return false;
+            string name = tabName.Trim();
+            string withoutTab = name.EndsWith("タブ", StringComparison.Ordinal)
+                ? name.Substring(0, name.Length - 2).Trim()
+                : name;
+            return TrySelectNamedTab(excelHwnd, new[] { name, withoutTab });
         }
 
         /// <summary>ホームタブへ切り替え（2/2 開始時にデザインタブ既選択を解除するため）。</summary>

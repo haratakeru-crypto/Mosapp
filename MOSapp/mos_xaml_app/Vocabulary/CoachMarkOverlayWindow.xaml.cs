@@ -64,6 +64,9 @@ namespace MOSExcelMogiApp.Vocabulary
         Rect _bubbleAboveScreen;
         Rect _pinAboveScreen;
         bool _centerBubble;
+        /// <summary>正解の吹き出しを、基準文面（テーブル）と同じ左上に置く。</summary>
+        bool _alignToAnchor;
+        string _alignAnchorMessage;
         bool _showOkButton;
         Action _singleClickAction;
         double _dpiScaleX = 1.0;
@@ -86,6 +89,9 @@ namespace MOSExcelMogiApp.Vocabulary
             Bubble.MouseLeftButtonDown += Bubble_MouseLeftButtonDown;
             Bubble.MouseMove += Bubble_MouseMove;
             Bubble.MouseLeftButtonUp += Bubble_MouseLeftButtonUp;
+            EditLayer.MouseLeftButtonDown += EditLayer_MouseLeftButtonDown;
+            EditLayer.MouseMove += EditLayer_MouseMove;
+            EditLayer.MouseLeftButtonUp += EditLayer_MouseLeftButtonUp;
             SizeChanged += (_, __) =>
             {
                 if (_dragging || _applyingPlacement) return;
@@ -107,7 +113,7 @@ namespace MOSExcelMogiApp.Vocabulary
         {
             const int wmNcHitTest = 0x0084;
             const int htTransparent = -1;
-            if (msg != wmNcHitTest || _captureClicks || _singleClick)
+            if (msg != wmNcHitTest || _captureClicks || _singleClick || _editMode)
                 return IntPtr.Zero;
 
             int packed = lParam.ToInt32();
@@ -174,7 +180,8 @@ namespace MOSExcelMogiApp.Vocabulary
             Rect bubbleAboveScreen = default,
             bool centerBubble = false,
             Rect pinAboveScreen = default,
-            bool showOkButton = false)
+            bool showOkButton = false,
+            string alignAnchorMessage = null)
         {
             _clickThrough = clickThrough;
             _coverScreen = coverScreen;
@@ -182,6 +189,8 @@ namespace MOSExcelMogiApp.Vocabulary
             _bubbleAboveScreen = bubbleAboveScreen;
             _pinAboveScreen = pinAboveScreen;
             _centerBubble = centerBubble;
+            _alignAnchorMessage = alignAnchorMessage;
+            _alignToAnchor = !string.IsNullOrWhiteSpace(alignAnchorMessage);
             _showOkButton = showOkButton;
             _excelHwnd = excelHwnd;
             _lastHighlightScreens = highlightScreens ?? Array.Empty<Rect>();
@@ -296,6 +305,14 @@ namespace MOSExcelMogiApp.Vocabulary
         public void UpdateHighlights(IReadOnlyList<Rect> highlightScreens)
         {
             if (!IsVisible) return;
+            if (_editMode)
+            {
+                // 編集中は、まだ枠が無いときだけ後から取れた位置を入れる（手で合わせた枠を消さない）。
+                if (_lastHighlightScreens != null && _lastHighlightScreens.Count > 0) return;
+                _lastHighlightScreens = new List<Rect>(highlightScreens ?? Array.Empty<Rect>());
+                PaintHighlightHoles(_lastHighlightScreens);
+                return;
+            }
             _lastHighlightScreens = highlightScreens ?? Array.Empty<Rect>();
             RefreshDpiScale();
             PositionOverlay();
@@ -451,6 +468,31 @@ namespace MOSExcelMogiApp.Vocabulary
                 HoleCanvas.Children.Add(mark);
             }
 
+            if (_editMode)
+            {
+                foreach (var localHole in holes)
+                {
+                    foreach (var corner in Corners(localHole))
+                    {
+                        var handle = new Rectangle
+                        {
+                            Width = HandleSize,
+                            Height = HandleSize,
+                            Fill = Brushes.White,
+                            Stroke = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x20)),
+                            StrokeThickness = 2,
+                            IsHitTestVisible = false
+                        };
+                        Canvas.SetLeft(handle, corner.X - HandleSize / 2);
+                        Canvas.SetTop(handle, corner.Y - HandleSize / 2);
+                        HoleCanvas.Children.Add(handle);
+                    }
+                }
+                // 吹き出しを動かしたあと、または枠を動かしている間は、吹き出しを自動で置き直さない。
+                if (_editBubbleMoved || _editHoleIndex >= 0)
+                    return;
+            }
+
             Rect primary = holes.Count > 0
                 ? holes.OrderByDescending(h => h.Y).First()
                 : new Rect(Width * 0.5 - 80, 40, 160, 1);
@@ -547,7 +589,12 @@ namespace MOSExcelMogiApp.Vocabulary
             double layoutW = Width >= 100 ? Width : (ActualWidth >= 50 ? ActualWidth : extentW);
             double layoutH = Height >= 100 ? Height : (ActualHeight >= 50 ? ActualHeight : extentH);
             bool placedFromSaved = false;
-            if (!_dragging && CoachBubblePlacementStore.TryGet(MessageText.Text, layoutW, layoutH, out double savedLeft, out double savedTop))
+            if (_alignToAnchor)
+            {
+                PlaceAtAnchor(layoutW, layoutH, ref bubbleLeft, ref bubbleTop);
+                placedFromSaved = true;
+            }
+            else if (!_dragging && CoachBubblePlacementStore.TryGet(MessageText.Text, layoutW, layoutH, out double savedLeft, out double savedTop))
             {
                 bubbleLeft = savedLeft;
                 bubbleTop = savedTop;
@@ -649,9 +696,11 @@ namespace MOSExcelMogiApp.Vocabulary
 
         void Bubble_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (_captureClicks || CoachBubblePlacementStore.IsLocked(MessageText.Text)
+            if (_captureClicks
+                || (!_editMode && CoachBubblePlacementStore.IsLocked(MessageText.Text))
                 || IsInsideBubbleButton(e.OriginalSource as DependencyObject))
                 return;
+            if (_editMode) _editBubbleMoved = true;
             _dragging = true;
             _dragStart = e.GetPosition(this);
             _dragLeft = Bubble.Margin.Left;
@@ -683,6 +732,7 @@ namespace MOSExcelMogiApp.Vocabulary
             if (Bubble.IsMouseCaptured)
                 Bubble.ReleaseMouseCapture();
             e.Handled = true;
+            if (_editMode) Edited?.Invoke();
         }
 
         void PaintDimWithHoles(List<Rect> holes)
@@ -732,6 +782,205 @@ namespace MOSExcelMogiApp.Vocabulary
         {
             Close();
             Dismissed?.Invoke();
+        }
+
+        const double HandleSize = 12;
+        bool _editMode;
+        bool _editBubbleMoved;
+        int _editHoleIndex = -1;
+        /// <summary>-1 は枠の移動、0〜3 は左上・右上・右下・左下の角。</summary>
+        int _editCorner = -1;
+        Point _editStartLocal;
+        Rect _editStartPhysical;
+
+        /// <summary>設定画面で吹き出しか枠を動かした。</summary>
+        public event Action Edited;
+
+        /// <summary>表示中の文面（保存のキー）。</summary>
+        public string CurrentMessage => MessageText.Text;
+
+        /// <summary>設定の保存先。正解文はテーブルの正解と同じ位置を共有する。</summary>
+        public string PlacementMessage =>
+            _alignToAnchor ? _alignAnchorMessage : MessageText.Text;
+
+        /// <summary>テーブルの正解テキストが今ある左上へ、この吹き出しも置く。</summary>
+        void PlaceAtAnchor(double layoutW, double layoutH, ref double bubbleLeft, ref double bubbleTop)
+        {
+            if (CoachBubblePlacementStore.TryGet(_alignAnchorMessage, layoutW, layoutH, out double savedLeft, out double savedTop))
+            {
+                bubbleLeft = savedLeft;
+                bubbleTop = savedTop;
+                return;
+            }
+
+            string title = TitleText.Text;
+            string message = MessageText.Text;
+            TitleText.Text = "正解！";
+            MessageText.Text = _alignAnchorMessage;
+            Bubble.Measure(new Size(340, 2000));
+            double refWidth = Bubble.DesiredSize.Width;
+            double refHeight = Bubble.DesiredSize.Height;
+            TitleText.Text = title;
+            MessageText.Text = message;
+            Bubble.Measure(new Size(340, 2000));
+
+            if (double.IsNaN(refHeight) || refHeight < 96) refHeight = 140;
+            if (double.IsNaN(refWidth) || refWidth < 220) refWidth = 320;
+            refWidth = Math.Min(340, refWidth);
+            double extentW = Width >= 100 ? Width : layoutW;
+            double extentH = Height >= 100 ? Height : layoutH;
+            bubbleLeft = (extentW - refWidth) / 2.0;
+            bubbleTop = Math.Max(48, (extentH - refHeight) / 2.0);
+        }
+
+        /// <summary>
+        /// 設定画面用。クリックを通さず、吹き出しのドラッグと、枠の移動・四隅での大きさ変更を受け付ける。
+        /// </summary>
+        public void BeginEditMode()
+        {
+            _editMode = true;
+            _editBubbleMoved = false;
+            _lastHighlightScreens = new List<Rect>(_lastHighlightScreens ?? Array.Empty<Rect>());
+            EditLayer.Visibility = Visibility.Visible;
+            EditLayer.IsHitTestVisible = true;
+            Bubble.Cursor = Cursors.SizeAll;
+            Bubble.ToolTip = "ドラッグで位置を動かせます";
+            DismissButton.IsEnabled = false;
+            SecondaryButton.IsEnabled = false;
+            PaintHighlightHoles(_lastHighlightScreens);
+        }
+
+        /// <summary>枠が無い画面に、中央へ枠を1つ足す。</summary>
+        public void AddEditHole()
+        {
+            if (!_editMode) return;
+            double sx = _dpiScaleX <= 0 ? 1 : _dpiScaleX;
+            double sy = _dpiScaleY <= 0 ? 1 : _dpiScaleY;
+            double w = 160, h = 60;
+            var local = new Rect(Width / 2 - w / 2, Height / 2 - h / 2, w, h);
+            var list = new List<Rect>(_lastHighlightScreens ?? Array.Empty<Rect>())
+            {
+                new Rect(_excelPhysical.Left + local.X * sx, _excelPhysical.Top + local.Y * sy, local.Width * sx, local.Height * sy)
+            };
+            _lastHighlightScreens = list;
+            PaintHighlightHoles(_lastHighlightScreens);
+            Edited?.Invoke();
+        }
+
+        /// <summary>編集後の枠（画面の物理ピクセル）。</summary>
+        public List<Rect> GetEditedHoles()
+        {
+            return new List<Rect>(_lastHighlightScreens ?? Array.Empty<Rect>());
+        }
+
+        /// <summary>編集後の吹き出し位置と、比率の基準になるオーバーレイの大きさ（DIP）。</summary>
+        public void GetEditedBubble(out double left, out double top, out double layoutW, out double layoutH)
+        {
+            left = Bubble.Margin.Left;
+            top = Bubble.Margin.Top;
+            layoutW = Width >= 100 ? Width : ActualWidth;
+            layoutH = Height >= 100 ? Height : ActualHeight;
+        }
+
+        static Point[] Corners(Rect r)
+        {
+            return new[] { r.TopLeft, r.TopRight, r.BottomRight, r.BottomLeft };
+        }
+
+        void EditLayer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_editMode) return;
+            Point p = e.GetPosition(this);
+            var list = _lastHighlightScreens as List<Rect>;
+            if (list == null) return;
+
+            _editHoleIndex = -1;
+            _editCorner = -1;
+            for (int i = list.Count - 1; i >= 0 && _editHoleIndex < 0; i--)
+            {
+                Rect local = PhysicalScreenToLocalDip(list[i]);
+                var corners = Corners(local);
+                for (int c = 0; c < corners.Length; c++)
+                {
+                    if (Math.Abs(p.X - corners[c].X) <= HandleSize && Math.Abs(p.Y - corners[c].Y) <= HandleSize)
+                    {
+                        _editHoleIndex = i;
+                        _editCorner = c;
+                        break;
+                    }
+                }
+                if (_editHoleIndex < 0 && local.Contains(p))
+                    _editHoleIndex = i;
+            }
+            if (_editHoleIndex < 0) return;
+
+            _editStartLocal = p;
+            _editStartPhysical = list[_editHoleIndex];
+            EditLayer.CaptureMouse();
+            e.Handled = true;
+        }
+
+        void EditLayer_MouseMove(object sender, MouseEventArgs e)
+        {
+            var list = _lastHighlightScreens as List<Rect>;
+            if (!_editMode || _editHoleIndex < 0 || list == null || _editHoleIndex >= list.Count)
+            {
+                UpdateEditCursor(e.GetPosition(this));
+                return;
+            }
+
+            Point p = e.GetPosition(this);
+            double sx = _dpiScaleX <= 0 ? 1 : _dpiScaleX;
+            double sy = _dpiScaleY <= 0 ? 1 : _dpiScaleY;
+            double dx = (p.X - _editStartLocal.X) * sx;
+            double dy = (p.Y - _editStartLocal.Y) * sy;
+            Rect r = _editStartPhysical;
+            double min = 16 * sx;
+
+            double left = r.Left, top = r.Top, right = r.Right, bottom = r.Bottom;
+            switch (_editCorner)
+            {
+                case 0: left = Math.Min(left + dx, right - min); top = Math.Min(top + dy, bottom - min); break;
+                case 1: right = Math.Max(right + dx, left + min); top = Math.Min(top + dy, bottom - min); break;
+                case 2: right = Math.Max(right + dx, left + min); bottom = Math.Max(bottom + dy, top + min); break;
+                case 3: left = Math.Min(left + dx, right - min); bottom = Math.Max(bottom + dy, top + min); break;
+                default: left += dx; right += dx; top += dy; bottom += dy; break;
+            }
+            list[_editHoleIndex] = new Rect(new Point(left, top), new Point(right, bottom));
+            PaintHighlightHoles(list);
+            e.Handled = true;
+        }
+
+        void EditLayer_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_editHoleIndex < 0) return;
+            _editHoleIndex = -1;
+            _editCorner = -1;
+            if (EditLayer.IsMouseCaptured) EditLayer.ReleaseMouseCapture();
+            e.Handled = true;
+            Edited?.Invoke();
+        }
+
+        void UpdateEditCursor(Point p)
+        {
+            var list = _lastHighlightScreens;
+            Cursor cursor = Cursors.Arrow;
+            if (list != null)
+            {
+                foreach (var screen in list)
+                {
+                    Rect local = PhysicalScreenToLocalDip(screen);
+                    var corners = Corners(local);
+                    for (int c = 0; c < corners.Length; c++)
+                    {
+                        if (Math.Abs(p.X - corners[c].X) <= HandleSize && Math.Abs(p.Y - corners[c].Y) <= HandleSize)
+                            cursor = c % 2 == 0 ? Cursors.SizeNWSE : Cursors.SizeNESW;
+                    }
+                    if (cursor == Cursors.Arrow && local.Contains(p))
+                        cursor = Cursors.SizeAll;
+                }
+            }
+            EditLayer.Cursor = cursor;
         }
 
         Action _secondaryAction;
@@ -834,6 +1083,18 @@ namespace MOSExcelMogiApp.Vocabulary
             {
                 _confirmed[message] = ratio;
                 WriteMap(ConfirmedPath, _confirmed);
+            }
+        }
+
+        /// <summary>設定画面の「元に戻す」。確定した位置を消し、固定位置か自動の位置に戻す。</summary>
+        public static void Unconfirm(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            EnsureConfirmed();
+            lock (Gate)
+            {
+                if (_confirmed.Remove(message))
+                    WriteMap(ConfirmedPath, _confirmed);
             }
         }
 

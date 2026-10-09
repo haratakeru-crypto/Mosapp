@@ -53,6 +53,9 @@ namespace MosPracticeClient
 
         public event EventHandler<VocabularyStartEventArgs> StartRequested;
 
+        /// <summary>パスワードが合ったときだけ出る。位置設定モードを開く。</summary>
+        public event EventHandler SettingsRequested;
+
         public VocabularyTabControl()
         {
             InitializeComponent();
@@ -102,6 +105,15 @@ namespace MosPracticeClient
                 _category));
         }
 
+        void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new VocabularySettingsPasswordWindow();
+            var owner = Window.GetWindow(this);
+            if (owner != null) dialog.Owner = owner;
+            if (dialog.ShowDialog() == true)
+                SettingsRequested?.Invoke(this, EventArgs.Empty);
+        }
+
         static SolidColorBrush Freeze(Color color)
         {
             var brush = new SolidColorBrush(color);
@@ -116,6 +128,7 @@ namespace MosPracticeClient
 
             bool keywordMode = _mode == Mode.KeywordOnly;
             CategoryPanel.Visibility = keywordMode ? Visibility.Visible : Visibility.Collapsed;
+            SettingsButton.Visibility = keywordMode ? Visibility.Visible : Visibility.Collapsed;
 
             bool canStart = keywordMode && _category != VocabularyCategory.None;
             StartButton.Visibility = canStart ? Visibility.Visible : Visibility.Collapsed;

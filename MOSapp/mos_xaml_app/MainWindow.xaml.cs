@@ -89,6 +89,11 @@ namespace MOSExcelMogiApp
             _viewModel.StartVocabularySession(e.Category);
         }
 
+        private void VocabularyTab_SettingsRequested(object sender, EventArgs e)
+        {
+            _viewModel.StartVocabularySettings();
+        }
+
         private void ScoringLog_EntryClicked(object sender, MosPracticeClient.ScoringLogEntry entry)
         {
             if (entry == null) return;

@@ -222,6 +222,9 @@
     <Compile Include="Vocabulary\VocabularyEventWatcher.cs" />
     <Compile Include="Vocabulary\VocabularyWorkbookFactory.cs" />
     <Compile Include="Vocabulary\VocabularySessionController.cs" />
+    <Compile Include="Vocabulary\VocabularySessionController.Settings.cs" />
+    <Compile Include="Vocabulary\VocabularySettingsPanel.cs" />
+    <Compile Include="Vocabulary\CoachHoleOverrideStore.cs" />
     <Compile Include="Vocabulary\VocabularyTutorialOkWindow.cs" />
     <Compile Include="Vocabulary\VocabularyHwndHelper.cs" />
     <Compile Include="Vocabulary\VocabularyHighlightHelper.cs" />

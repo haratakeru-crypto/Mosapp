@@ -519,7 +519,7 @@
                                     </Button.Style>
                                 </Button>
 
-                                <Button Content="試験後にコメントする" 
+                                <Button Name="CommentLaterButton" Content="試験後にコメントする" 
                                         Background="Transparent"
                                         Foreground="#1E40AF" 
                                         BorderThickness="0"

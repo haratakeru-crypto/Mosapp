@@ -3,6 +3,22 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#F0F0F3">
     <Grid>
+        <Button x:Name="SettingsButton"
+                Content="設定"
+                Visibility="Collapsed"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,12,24,0"
+                MinWidth="96"
+                Height="36"
+                FontSize="14"
+                FontWeight="SemiBold"
+                Background="#4B5563"
+                Foreground="White"
+                BorderThickness="0"
+                Cursor="Hand"
+                Panel.ZIndex="10"
+                Click="SettingsButton_Click"/>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="720" Margin="24">
             <TextBlock Text="タブやボタンを探そう！"
                        FontFamily="HG創英角ポップ体, HGP創英角ポップ体, メイリオ"

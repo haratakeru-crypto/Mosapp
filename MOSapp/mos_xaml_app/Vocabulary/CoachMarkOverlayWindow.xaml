@@ -16,6 +16,11 @@
                 IsHitTestVisible="False"
                 Cursor="Cross"/>
         <Canvas x:Name="HoleCanvas" IsHitTestVisible="False"/>
+        <!-- 設定画面の編集用（枠の移動と四隅）。通常は非表示 -->
+        <Canvas x:Name="EditLayer"
+                Background="#01000000"
+                Visibility="Collapsed"
+                IsHitTestVisible="False"/>
         <Border x:Name="Bubble"
                 Background="White"
                 CornerRadius="8"

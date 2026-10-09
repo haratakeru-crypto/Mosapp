@@ -109,7 +109,7 @@
       "targetControl": "情報",
       "detectKeys": ["FileInfo", "BackstageInfo"],
       "highlightHint": "File.Info",
-      "coachMessage": "「ファイル」タブの「情報」です。"
+      "coachMessage": "「プロパティ」と問題文にあれば、「ファイル」タブの「情報」の中の「プロパティ」ボタンです。"
     },
     {
       "id": "tab_name_in_formula",
@@ -169,7 +169,7 @@
       "targetControl": "情報",
       "detectKeys": ["FileInfo", "BackstageInfo", "AccessibilityChecker"],
       "highlightHint": "File.Info",
-      "coachMessage": "「ファイル」タブの「情報」からアクセスします。"
+      "coachMessage": "「アクセシビリティチェック」と問題文にあれば「ファイル」タブの「情報」の「問題のチェック」ボタンを使います。"
     },
     {
       "id": "tab_header",

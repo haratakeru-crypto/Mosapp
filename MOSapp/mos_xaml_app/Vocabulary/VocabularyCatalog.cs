@@ -23,6 +23,8 @@ namespace MOSExcelMogiApp.Vocabulary
         public string Prefix3 { get; set; }
         /// <summary>問題カードに出す文。CSV の表示テキスト。</summary>
         public string DisplayText { get; set; }
+        /// <summary>情報のあとに押すボタン（CSV の正解の3つ目）。無ければ null。</summary>
+        public string DetailControl { get; set; }
 
         public bool IsFunction =>
             string.Equals(Category, "Function", StringComparison.OrdinalIgnoreCase)
@@ -132,6 +134,15 @@ namespace MOSExcelMogiApp.Vocabulary
                 Prefix3 = template?.Prefix3,
                 DisplayText = NormalizeDisplay(row.DisplayText)
             };
+
+            var answerParts = (row.Answer ?? "").Split('/');
+            if (!functionRow && answerParts.Length >= 3)
+            {
+                string detail = answerParts[2].Trim();
+                if (detail.EndsWith("ボタン", StringComparison.Ordinal))
+                    detail = detail.Substring(0, detail.Length - "ボタン".Length).Trim();
+                if (detail.Length > 0) item.DetailControl = detail;
+            }
 
             if (functionRow && item.DetectKeys.Count == 0 && !string.IsNullOrWhiteSpace(item.Answer))
                 item.DetectKeys.Add("Formula:" + item.Answer.Trim());
