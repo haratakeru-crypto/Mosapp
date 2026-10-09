@@ -59,8 +59,41 @@ namespace MosPracticeClient
             SessionWatchLauncher.EnsureRunning();
         }
 
+        public static string VocabMistakesPath => Path.Combine(DataDirectory, "vocab_mistakes.json");
+
+        /// <summary>単語帳の間違い記録のキー。大学名か名前が空なら null。</summary>
+        public static string VocabUserKey(ExamineeProfile profile)
+        {
+            if (profile == null
+                || string.IsNullOrWhiteSpace(profile.UniversityName)
+                || string.IsNullOrWhiteSpace(profile.PersonName))
+                return null;
+            return profile.UniversityName.Trim() + "\u001F" + profile.PersonName.Trim();
+        }
+
+        static void RemoveVocabMistakes(ExamineeProfile profile)
+        {
+            try
+            {
+                string key = VocabUserKey(profile);
+                if (key == null || !File.Exists(VocabMistakesPath)) return;
+                var all = JsonConvert.DeserializeObject<Dictionary<string, object>>(File.ReadAllText(VocabMistakesPath))
+                          ?? new Dictionary<string, object>();
+                if (!all.Remove(key)) return;
+                if (all.Count == 0)
+                    File.Delete(VocabMistakesPath);
+                else
+                    File.WriteAllText(VocabMistakesPath, JsonConvert.SerializeObject(all, Formatting.Indented));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExamineeStore] RemoveVocabMistakes: " + ex.Message);
+            }
+        }
+
         public static void Delete()
         {
+            RemoveVocabMistakes(Load());
             try
             {
                 if (File.Exists(ExamineePath))

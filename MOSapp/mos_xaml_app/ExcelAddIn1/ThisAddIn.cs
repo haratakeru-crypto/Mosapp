@@ -9,7 +9,6 @@ namespace ExcelAddIn1
     public partial class ThisAddIn
     {
         private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_excel_current_task.txt");
-        private static readonly string BoundaryFlushRequestPath = Path.Combine(Path.GetTempPath(), "mos_excel_flush_boundary.txt");
         private static readonly string DiagnosticLogFilePath = Path.Combine(Path.GetTempPath(), "mos_excel_addin_diag.txt");
         private bool _eventHooksRegistered;
         private Timer _taskFilePollTimer;
@@ -18,6 +17,10 @@ namespace ExcelAddIn1
         private int _currentTaskAttemptNo = 1;
         private bool _ignoreNextAutoLayoutChangeAfterTaskStart;
         private string _lastRangeSelectionAddress;
+
+        // 単語帳: 選択種別の重複ログ防止
+        private string _lastVocabSelectionKey;
+        private bool _vocabModeWasEnabled;
 
         // ダブルクリック編集モード→確定（実値変更なし）でも SheetChange が飛ぶケース対策
         private string _pendingDoubleClickEditKey;
@@ -33,17 +36,11 @@ namespace ExcelAddIn1
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Add-in started. Log file: " + Logger.GetLogFilePath());
-            var startup = System.Diagnostics.Stopwatch.StartNew();
             WriteDiagnostic("Startup begin");
             RegisterApplicationEventHooks();
-            WriteDiagnostic("Hooks ready elapsed=" + startup.ElapsedMilliseconds + "ms");
-            // タスク文脈は 500ms タイマーを待たず、初期基準より前に確定する。
-            ApplyCurrentTaskFile();
-            // 起動完了はイベント登録と表示中シートの基準作成まで。未表示シートは初回表示時に遅延する。
-            // PageSetup と改ページは非印刷タスクの無断変更も検知するため、操作許可前に取る。
             InitializeLayoutSnapshotsForAllOpenWorkbooks("Startup");
             StartTaskFilePolling();
-            WriteDiagnostic(WithOpenToken("Startup completed elapsed=" + startup.ElapsedMilliseconds + "ms"));
+            WriteDiagnostic("Startup completed");
         }
 
         private void ThisAddIn_Shutdown(object sender, System.EventArgs e)
@@ -140,9 +137,14 @@ namespace ExcelAddIn1
                 }
                 else
                 {
-                Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
-                WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
-                InvalidateFreshBaseline();
+                    Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
+                    WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
+                    InvalidateFreshBaseline();
+                    if (string.Equals(operationType, "EditCellFormula", StringComparison.Ordinal))
+                    {
+                        try { VocabLogger.LogFormulaIfAny(SafeRangeFormulaText(target)); }
+                        catch { }
+                    }
                 }
 
                 ClearPendingDoubleClickCapture();
@@ -160,23 +162,81 @@ namespace ExcelAddIn1
         {
             try
             {
-                string incoming = NormalizeExternalAddress(
-                    target?.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing) ?? "");
-
-                // グラフ挿入で選択が範囲の先頭1セルへ縮むと、作成ログが指定範囲でなくなる。
-                // 直前の複数セル範囲の内側の1セルでは、覚えていた範囲を残す。
-                if (string.IsNullOrEmpty(incoming)
-                    || IsMultiCellAddress(incoming)
-                    || string.IsNullOrEmpty(_lastRangeSelectionAddress)
-                    || !IsCellInsideAddress(incoming, _lastRangeSelectionAddress))
+                _lastRangeSelectionAddress = target?.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing) ?? "";
+                if (_lastRangeSelectionAddress.Contains("]"))
                 {
-                    _lastRangeSelectionAddress = incoming;
+                    _lastRangeSelectionAddress = _lastRangeSelectionAddress.Substring(_lastRangeSelectionAddress.IndexOf("]") + 1);
                 }
 
                 // 選択変更のたびにハイパーリンク集合を照合（ダイアログ挿入後に別セルを選ぶまで SheetChange が無いケースの補足）
                 TryDetectHyperlinkChangeAfterSheetChange(sheet);
+                TryEmitVocabSelectionFromRange(target);
             }
             catch { }
+        }
+
+        void TryEmitVocabSelectionFromRange(Excel.Range target)
+        {
+            if (!VocabLogger.IsVocabModeEnabled() || target == null) return;
+            try
+            {
+                Excel.ListObject lo = null;
+                try { lo = target.ListObject; } catch { }
+                if (lo != null)
+                    EmitVocabSelectionOnce("SelectTable");
+                else if (string.Equals(_lastVocabSelectionKey, "SelectTable", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(_lastVocabSelectionKey, "SelectChart", StringComparison.OrdinalIgnoreCase))
+                    _lastVocabSelectionKey = null;
+            }
+            catch { }
+        }
+
+        void TryEmitVocabSelectionFromApplication()
+        {
+            if (!VocabLogger.IsVocabModeEnabled()) return;
+            string key = PeekVocabSelectionKey();
+            if (string.IsNullOrEmpty(key))
+            {
+                _lastVocabSelectionKey = null;
+                return;
+            }
+            EmitVocabSelectionOnce(key);
+        }
+
+        /// <summary>今の選択に対応するキー。テーブルでもグラフでもなければ null。ログは出さない。</summary>
+        string PeekVocabSelectionKey()
+        {
+            try
+            {
+                object sel = Application.Selection;
+                if (sel == null) return null;
+
+                if (sel is Excel.Chart || sel is Excel.ChartObject)
+                    return "SelectChart";
+
+                string typeName = "";
+                try { typeName = sel.GetType().Name ?? ""; } catch { }
+                if (typeName.IndexOf("Chart", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return "SelectChart";
+
+                var range = sel as Excel.Range;
+                if (range == null) return null;
+                Excel.ListObject lo = null;
+                try { lo = range.ListObject; } catch { }
+                return lo != null ? "SelectTable" : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        void EmitVocabSelectionOnce(string key)
+        {
+            if (string.Equals(_lastVocabSelectionKey, key, StringComparison.OrdinalIgnoreCase))
+                return;
+            _lastVocabSelectionKey = key;
+            VocabLogger.LogKey(key);
         }
 
         private void Application_SheetBeforeDoubleClick(object sh, Excel.Range target, ref bool cancel)
@@ -291,25 +351,27 @@ namespace ExcelAddIn1
         {
             try
             {
-                // 挿入直後の Selection はグラフ本体か1セルになりやすい。
-                // 複数セルのままならそれを使い、そうでなければ挿入前に選んでいた範囲を書く。
-                string live = "";
+                string selectionAddress = "";
                 Excel.Range selection = Application.Selection as Excel.Range;
                 if (selection != null)
                 {
-                    live = NormalizeExternalAddress(
-                        selection.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing));
+                    selectionAddress = selection.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing);
+                }
+                else
+                {
+                    selectionAddress = _lastRangeSelectionAddress;
                 }
 
-                string selectionAddress;
-                if (IsMultiCellAddress(live))
-                    selectionAddress = live;
-                else if (!string.IsNullOrEmpty(_lastRangeSelectionAddress))
-                    selectionAddress = _lastRangeSelectionAddress;
-                else if (!string.IsNullOrEmpty(live))
-                    selectionAddress = live;
-                else
+                if (string.IsNullOrEmpty(selectionAddress))
+                {
                     selectionAddress = "NoSelection";
+                }
+
+                // Remove workbook name from address if present (e.g. [book.xlsx]Sheet1!$A$1 -> Sheet1!$A$1)
+                if (selectionAddress.Contains("]"))
+                {
+                    selectionAddress = selectionAddress.Substring(selectionAddress.IndexOf("]") + 1);
+                }
 
                 Logger.LogOperation("AddChart", $"Name={Ch.Name} Selection={selectionAddress}");
                 WriteDiagnostic($"AddChart: Name={Ch.Name} Selection={selectionAddress}");
@@ -319,95 +381,6 @@ namespace ExcelAddIn1
                 System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Application_WorkbookNewChart: " + ex.Message);
                 WriteDiagnostic("Application_WorkbookNewChart error: " + ex.Message);
             }
-        }
-
-        private static string NormalizeExternalAddress(string address)
-        {
-            if (string.IsNullOrEmpty(address)) return "";
-            int bracket = address.LastIndexOf(']');
-            if (bracket >= 0 && bracket < address.Length - 1)
-                return address.Substring(bracket + 1);
-            return address;
-        }
-
-        private static bool IsMultiCellAddress(string address)
-        {
-            if (string.IsNullOrWhiteSpace(address)) return false;
-            string[] areas = address.Split(',');
-            if (areas.Length > 1) return true;
-            return AreaSpanCellCount(areas[0]) > 1;
-        }
-
-        private static bool IsCellInsideAddress(string singleCellAddress, string rangeAddress)
-        {
-            if (!TryParseA1Area(singleCellAddress, out string sheet, out int c1, out int r1, out int c2, out int r2))
-                return false;
-            if (c1 != c2 || r1 != r2) return false;
-
-            foreach (string area in (rangeAddress ?? "").Split(','))
-            {
-                if (!TryParseA1Area(area, out string areaSheet, out int ac1, out int ar1, out int ac2, out int ar2))
-                    continue;
-                if (!string.Equals(sheet, areaSheet, StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (c1 >= ac1 && c1 <= ac2 && r1 >= ar1 && r1 <= ar2)
-                    return true;
-            }
-            return false;
-        }
-
-        private static int AreaSpanCellCount(string area)
-        {
-            if (!TryParseA1Area(area, out _, out int c1, out int r1, out int c2, out int r2))
-                return 0;
-            return (c2 - c1 + 1) * (r2 - r1 + 1);
-        }
-
-        private static bool TryParseA1Area(string area, out string sheet, out int col1, out int row1, out int col2, out int row2)
-        {
-            sheet = "";
-            col1 = row1 = col2 = row2 = 0;
-            if (string.IsNullOrWhiteSpace(area)) return false;
-
-            string local = area.Trim();
-            int bang = local.LastIndexOf('!');
-            if (bang >= 0)
-            {
-                sheet = local.Substring(0, bang).Trim().Trim('\'');
-                local = local.Substring(bang + 1);
-            }
-            local = local.Replace("$", "");
-            string start = local;
-            string end = local;
-            int colon = local.IndexOf(':');
-            if (colon >= 0)
-            {
-                start = local.Substring(0, colon);
-                end = local.Substring(colon + 1);
-            }
-            if (!TryParseA1Cell(start, out col1, out row1)) return false;
-            if (!TryParseA1Cell(end, out col2, out row2)) return false;
-            if (col1 > col2) { int t = col1; col1 = col2; col2 = t; }
-            if (row1 > row2) { int t = row1; row1 = row2; row2 = t; }
-            return true;
-        }
-
-        private static bool TryParseA1Cell(string cell, out int col, out int row)
-        {
-            col = 0;
-            row = 0;
-            if (string.IsNullOrEmpty(cell)) return false;
-            int i = 0;
-            while (i < cell.Length && char.IsLetter(cell[i])) i++;
-            if (i == 0 || i >= cell.Length) return false;
-            string letters = cell.Substring(0, i).ToUpperInvariant();
-            if (!int.TryParse(cell.Substring(i), out row) || row <= 0) return false;
-            foreach (char ch in letters)
-            {
-                if (ch < 'A' || ch > 'Z') return false;
-                col = col * 26 + (ch - 'A' + 1);
-            }
-            return col > 0;
         }
 
         private void StartTaskFilePolling()
@@ -430,16 +403,26 @@ namespace ExcelAddIn1
 
         private void TaskFilePollTimer_Tick(object sender, EventArgs e)
         {
-            ApplyCurrentTaskFile();
-        }
-
-        /// <summary>
-        /// タスクファイルをその場で読み、前回タスクの境界を確定してから新しい基準を作る。
-        /// </summary>
-        private void ApplyCurrentTaskFile()
-        {
             try
             {
+                // 単語帳: チャート選択など Range 以外の選択を補足検知。
+                // モードがオンになった瞬間の選択はユーザー操作ではないので送らない。
+                bool vocabOn = VocabLogger.IsVocabModeEnabled();
+                if (!vocabOn)
+                {
+                    _lastVocabSelectionKey = null;
+                    _vocabModeWasEnabled = false;
+                }
+                else if (!_vocabModeWasEnabled)
+                {
+                    _vocabModeWasEnabled = true;
+                    _lastVocabSelectionKey = PeekVocabSelectionKey();
+                }
+                else
+                {
+                    TryEmitVocabSelectionFromApplication();
+                }
+
                 if (!File.Exists(CurrentTaskFilePath)) return;
 
                 string line;
@@ -465,8 +448,6 @@ namespace ExcelAddIn1
                     if (attemptNo < 1) attemptNo = 1;
                 }
 
-                TryConsumeBoundaryFlushRequest();
-
                 if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId && attemptNo == _currentTaskAttemptNo)
                     return;
 
@@ -488,75 +469,15 @@ namespace ExcelAddIn1
                 Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
                 Logger.LogTaskStart(projectId, taskId, attemptNo);
                 // TaskStart 直後の自動イベント（SheetActivate/WindowActivate）で出る
-                // 最初のレイアウト差分だけ無視する。旧タスクの境界フラッシュ後に、
-                // 新タスクの基準は表示中シートだけ更新する。
+                // 最初のレイアウト差分だけ無視する。
                 _ignoreNextAutoLayoutChangeAfterTaskStart = true;
-                if (Application != null)
-                    InitializeLayoutSnapshotsForWorkbook(Application.ActiveWorkbook, readFreeze: false, "TaskStart");
+                InitializeLayoutSnapshotsForAllOpenWorkbooks("Startup");
                 WriteDiagnostic($"Task context updated: {projectId}-{taskId}-{attemptNo} (ignore next auto layout change)");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] TaskFilePollTimer_Tick: " + ex.Message);
                 WriteDiagnostic("TaskFilePollTimer_Tick error: " + ex.Message);
-            }
-        }
-
-        /// <summary>採点開始の依頼があり、いまのタスクと一致するときだけ未記録差分をログへ書く。</summary>
-        private void TryConsumeBoundaryFlushRequest()
-        {
-            if (!File.Exists(BoundaryFlushRequestPath))
-                return;
-
-            string line;
-            try
-            {
-                line = File.ReadAllText(BoundaryFlushRequestPath).Trim();
-            }
-            catch
-            {
-                return;
-            }
-
-            var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 3
-                || !int.TryParse(parts[0].Trim(), out int projectId)
-                || !int.TryParse(parts[1].Trim(), out int taskId)
-                || !int.TryParse(parts[2].Trim(), out int attemptNo))
-            {
-                TryDeleteBoundaryFlushRequest();
-                return;
-            }
-
-            if (projectId != _currentTaskProjectId || taskId != _currentTaskTaskId || attemptNo != _currentTaskAttemptNo)
-                return;
-
-            FlushPendingBoundaryDiffsForTask(projectId, taskId, attemptNo);
-            TryDeleteBoundaryFlushRequest();
-        }
-
-        private static void TryDeleteBoundaryFlushRequest()
-        {
-            try
-            {
-                if (File.Exists(BoundaryFlushRequestPath))
-                    File.Delete(BoundaryFlushRequestPath);
-            }
-            catch { }
-        }
-
-        private static void WriteDiagnostic(string message)
-        {
-            try
-            {
-                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                int pid = 0;
-                try { pid = System.Diagnostics.Process.GetCurrentProcess().Id; } catch { }
-                File.AppendAllText(DiagnosticLogFilePath, $"[{timestamp}] [PID:{pid}] {message}{Environment.NewLine}");
-            }
-            catch
-            {
-                // Ignore diagnostic logging errors.
             }
         }
 
@@ -567,6 +488,8 @@ namespace ExcelAddIn1
                 return message;
             return message + " token=" + token;
         }
+
+
 
         private static string ReadOpenToken()
         {
@@ -589,6 +512,23 @@ namespace ExcelAddIn1
             catch
             {
                 return "";
+            }
+        }
+
+
+
+        private static void WriteDiagnostic(string message)
+        {
+            try
+            {
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                int pid = 0;
+                try { pid = System.Diagnostics.Process.GetCurrentProcess().Id; } catch { }
+                File.AppendAllText(DiagnosticLogFilePath, $"[{timestamp}] [PID:{pid}] {message}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Ignore diagnostic logging errors.
             }
         }
 

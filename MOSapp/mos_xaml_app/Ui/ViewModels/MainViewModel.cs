@@ -23,6 +23,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 using ExcelWorkbook = Microsoft.Office.Interop.Excel.Workbook;
+using MOSExcelMogiApp.Vocabulary;
+using MosPracticeClient;
 
 namespace Ui.ViewModels
 {
@@ -33,6 +35,8 @@ namespace Ui.ViewModels
         public string Group { get; set; }
         public int ProjectNumber { get; set; }
     }
+
+    public delegate bool VocabularyUiAnchorHandler(string which, out IntPtr hwnd, out Rect screenPhysical);
 
     public class MainViewModel : INotifyPropertyChanged
     {
@@ -98,6 +102,10 @@ namespace Ui.ViewModels
         private bool _isInstantScoring;
         private ProjectInfo _currentProject;
         private ExcelApp _sharedExcelApp;
+        private bool _isVocabularyMode;
+        private string _vocabularyKeywordText = "";
+        private string _vocabularyProgressText = "";
+        private VocabularySessionController _vocabularySession;
 
         /// <summary>試験終了処理の二重起動防止（タイマー経路と終了ボタン確認の競合など）。新規プロジェクト開始時に 0 に戻す。</summary>
         private int _endExamShutdownStarted;
@@ -108,6 +116,9 @@ namespace Ui.ViewModels
         private readonly object _excelReviewShutdownGate = new object();
         private readonly object _excelStaShutdownGate = new object();
         private Task _excelReviewShutdownTask;
+
+        /// <summary>Excel を新しく開くたびに進める。終了処理は開始時の世代と違う Excel を Quit しない。</summary>
+        private int _excelSessionGeneration;
 
         /// <summary>
         /// アプリが利用する Excel インスタンスを取得（無ければ作成）。
@@ -216,6 +227,7 @@ namespace Ui.ViewModels
                 DispatcherPriority.Background);
         }
 
+        public VocabularyUiAnchorHandler VocabularyUiAnchorProvider { get; set; }
         public event EventHandler ExamEnded;
         public event EventHandler ShowAppBarRequested;
         public event EventHandler HideMainWindowRequested;
@@ -255,6 +267,330 @@ namespace Ui.ViewModels
             GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode);
             GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant);
     }
+
+        public bool IsVocabularyMode
+        {
+            get => _isVocabularyMode;
+            private set
+            {
+                if (_isVocabularyMode == value) return;
+                _isVocabularyMode = value;
+                OnPropertyChanged(nameof(IsVocabularyMode));
+                OnPropertyChanged(nameof(IsNextProjectVisible));
+                OnPropertyChanged(nameof(NextProjectButtonLabel));
+                OnPropertyChanged(nameof(ShowScoreButtonEffective));
+                OnPropertyChanged(nameof(ShowVocabularyChrome));
+            }
+        }
+
+        public bool ShowVocabularyChrome => IsVocabularyMode;
+
+        public string VocabularyKeywordText
+        {
+            get => _vocabularyKeywordText;
+            private set
+            {
+                _vocabularyKeywordText = value ?? "";
+                OnPropertyChanged(nameof(VocabularyKeywordText));
+            }
+        }
+
+        public string VocabularyProgressText
+        {
+            get => _vocabularyProgressText;
+            private set
+            {
+                _vocabularyProgressText = value ?? "";
+                OnPropertyChanged(nameof(VocabularyProgressText));
+            }
+        }
+
+        public string NextProjectButtonLabel => IsVocabularyMode ? "次のキーワードへ" : "次のプロジェクト";
+
+        /// <summary>単語帳の出題中だけ、問題文の「解答済みにする」「後で見直す」を出す。</summary>
+        public bool VocabularyManualAnswerEnabled
+        {
+            get
+            {
+                var phase = _vocabularySession?.CurrentPhase;
+                return phase == VocabularySessionController.Phase.Tutorial
+                       || phase == VocabularySessionController.Phase.Quiz;
+            }
+        }
+
+        public void VocabularyMarkAnswered() => _vocabularySession?.MarkAnsweredAndAdvance();
+
+        public void VocabularyMarkReviewLater() => _vocabularySession?.MarkReviewLaterAndAdvance();
+
+        /// <summary>単語帳中は採点ボタンを出さない。</summary>
+        public bool ShowScoreButtonEffective => ShowScoreButton && !IsVocabularyMode;
+
+        private VocabularyCategory _pendingVocabularyCategory;
+        private bool _pendingVocabularySettings;
+        private EventHandler _vocabularyAttachHandler;
+        private DispatcherTimer _vocabularyStartFallbackTimer;
+
+        /// <summary>単語帳のテキストボックスとコーチマークの位置を設定するモードを開く。</summary>
+        public void StartVocabularySettings()
+        {
+            StartVocabularySession(VocabularyCategory.Both, settingsMode: true);
+        }
+
+        /// <summary>単語帳（キーワードのみ）セッションを開始する。</summary>
+        public void StartVocabularySession(VocabularyCategory category, bool settingsMode = false)
+        {
+            try
+            {
+                _vocabularySession?.Cancel();
+                _vocabularySession = null;
+                DetachVocabularyAttachHandler();
+                StopVocabularyStartFallbackTimer();
+
+                // 先にデータ検証（Excel 起動前に失敗理由を明確にする）
+                VocabularyCatalog.Load();
+                string path = EnsureVocabularyWorkbookReady();
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                    throw new FileNotFoundException("単語帳用ブックを用意できませんでした。", path);
+
+                // 前回の終了スレッドが GetActiveObject で、これから開く Excel を Quit しないように先に待つ。
+                if (!WaitForExcelShutdownToCompleteBeforeOpeningProject())
+                {
+                    MessageBox.Show(
+                        string.IsNullOrEmpty(ResultMessage)
+                            ? "終了処理の完了に時間がかかっています。少し待ってから、もう一度単語帳を開いてください。"
+                            : ResultMessage,
+                        "単語帳",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                Interlocked.Increment(ref _excelSessionGeneration);
+                Interlocked.Exchange(ref _endExamShutdownStarted, 0);
+
+                // 演習開始と同様: 共有参照の掃除のみ（Quit で UI を固めない）
+                ClearStaleSharedExcelBeforeOpen(path);
+
+                bool opened = false;
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = path,
+                        UseShellExecute = true
+                    });
+                    opened = true;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StartVocabularySession] shell-open failed: {ex.Message}");
+                }
+
+                if (!opened)
+                    opened = StartExcelWithFile(path);
+
+                if (!opened)
+                    throw new InvalidOperationException("Excel で単語帳ブックを開けませんでした。");
+
+                CurrentProject = new ProjectInfo
+                {
+                    Name = "単語帳",
+                    FilePath = path,
+                    Group = "Group 1",
+                    ProjectNumber = 1
+                };
+
+                IsVocabularyMode = true;
+                ShowScoreButton = false;
+                VocabularyKeywordText = "準備中…";
+                VocabularyProgressText = "-/-";
+                _pendingVocabularyCategory = category;
+                _pendingVocabularySettings = settingsMode;
+
+                // HWND 取得で新規 Excel を絶対に起動しない（二重起動・COM 嵐の原因）
+                _vocabularySession = new VocabularySessionController(
+                    System.Windows.Application.Current.Dispatcher,
+                    text => VocabularyKeywordText = text,
+                    progress => VocabularyProgressText = progress,
+                    () => EndVocabularySession(),
+                    () =>
+                    {
+                        try
+                        {
+                            var app = TryGetSharedExcelApplication();
+                            return app != null
+                                ? VocabularyHwndHelper.FindExcelMainWindow(app)
+                                : IntPtr.Zero;
+                        }
+                        catch
+                        {
+                            return IntPtr.Zero;
+                        }
+                    },
+                    () => TryGetSharedExcelApplication(),
+                    (string which, out IntPtr hwnd, out Rect rect) =>
+                    {
+                        var provider = VocabularyUiAnchorProvider;
+                        if (provider != null)
+                            return provider(which, out hwnd, out rect);
+                        hwnd = IntPtr.Zero;
+                        rect = Rect.Empty;
+                        return false;
+                    });
+
+                // Excel 接続完了後 → AppBar が配置してからチュートリアル（配置待ち）
+                _vocabularyAttachHandler = (s, e) =>
+                {
+                    DetachVocabularyAttachHandler();
+                    StopVocabularyStartFallbackTimer();
+                    ScheduleVocabularyQuizAfterLayout();
+                };
+                SharedExcelApplicationAttached += _vocabularyAttachHandler;
+
+                ShowAppBar();
+                TryAttachSharedExcelApplicationAfterShellOpen();
+
+                // 接続イベントが来ない場合のフォールバック
+                _vocabularyStartFallbackTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(4)
+                };
+                _vocabularyStartFallbackTimer.Tick += VocabularyStartFallbackTimer_Tick;
+                _vocabularyStartFallbackTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                IsVocabularyMode = false;
+                DetachVocabularyAttachHandler();
+                StopVocabularyStartFallbackTimer();
+                try { VocabularySessionController.WriteVocabModeFlag(false); } catch { }
+                System.Diagnostics.Debug.WriteLine($"[StartVocabularySession] {ex}");
+                MessageBox.Show("単語帳の開始に失敗しました: " + ex.Message, "単語帳", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        void VocabularyStartFallbackTimer_Tick(object sender, EventArgs e)
+        {
+            StopVocabularyStartFallbackTimer();
+            DetachVocabularyAttachHandler();
+            ScheduleVocabularyQuizAfterLayout();
+        }
+
+        /// <summary>AppBar の Excel 配置が終わるのを待ってから出題開始。</summary>
+        void ScheduleVocabularyQuizAfterLayout()
+        {
+            var delay = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(1400)
+            };
+            delay.Tick += (s, e) =>
+            {
+                delay.Stop();
+                BeginVocabularyQuizSafe();
+            };
+            delay.Start();
+        }
+
+        void BeginVocabularyQuizSafe()
+        {
+            try
+            {
+                if (_vocabularySession == null) return;
+                if (_vocabularySession.CurrentPhase != VocabularySessionController.Phase.Idle)
+                    return;
+                if (_pendingVocabularySettings)
+                    _vocabularySession.StartSettings();
+                else
+                    _vocabularySession.Start(_pendingVocabularyCategory);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[BeginVocabularyQuizSafe] {ex}");
+                MessageBox.Show("単語帳の出題開始に失敗しました: " + ex.Message, "単語帳", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        void DetachVocabularyAttachHandler()
+        {
+            if (_vocabularyAttachHandler == null) return;
+            SharedExcelApplicationAttached -= _vocabularyAttachHandler;
+            _vocabularyAttachHandler = null;
+        }
+
+        void StopVocabularyStartFallbackTimer()
+        {
+            if (_vocabularyStartFallbackTimer == null) return;
+            try { _vocabularyStartFallbackTimer.Stop(); } catch { }
+            _vocabularyStartFallbackTimer.Tick -= VocabularyStartFallbackTimer_Tick;
+            _vocabularyStartFallbackTimer = null;
+        }
+
+        /// <summary>
+        /// 単語帳教材 xlsx を用意する。同梱ファイルがあればそれを使い、無ければ COM で作成（リトライ付き）。
+        /// </summary>
+        string EnsureVocabularyWorkbookReady()
+        {
+            string path = VocabularyWorkbookFactory.GetWorkbookPath();
+            if (File.Exists(path))
+                return path;
+
+            // 出力フォルダに無い場合、プロジェクト同梱 Assets を探す
+            string bundled = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Vocabulary", "vocab_workbook.xlsx");
+            if (File.Exists(bundled) && !string.Equals(bundled, path, StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
+                File.Copy(bundled, path, overwrite: true);
+                return path;
+            }
+
+            Exception last = null;
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                try
+                {
+                    using (OleMessageFilterScope.Enter())
+                    {
+                        var excel = GetOrCreateExcelApplication();
+                        excel.DisplayAlerts = false;
+                        path = VocabularyWorkbookFactory.EnsureWorkbook(excel);
+                        if (File.Exists(path))
+                            return path;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    System.Diagnostics.Debug.WriteLine($"[EnsureVocabularyWorkbookReady] attempt {attempt}: {ex.Message}");
+                    Thread.Sleep(400 * attempt);
+                }
+            }
+
+            if (last != null)
+                throw last;
+            return path;
+        }
+
+        public void EndVocabularySession()
+        {
+            DetachVocabularyAttachHandler();
+            StopVocabularyStartFallbackTimer();
+            try { _vocabularySession?.Cancel(); } catch { }
+            _vocabularySession = null;
+            IsVocabularyMode = false;
+            VocabularyKeywordText = "";
+            VocabularyProgressText = "";
+            VocabularySessionController.WriteVocabModeFlag(false);
+
+            try
+            {
+                // アプリバーを閉じてメインへ
+                ExamEnded?.Invoke(this, EventArgs.Empty);
+            }
+            catch { }
+
+            ShowMainWindowRequested?.Invoke(this, EventArgs.Empty);
+            try { CloseExcelApplication(); } catch { }
+        }
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
 
@@ -1963,6 +2299,10 @@ namespace Ui.ViewModels
                             results[taskIndex - 1],
                             checkerReason,
                             out string reason);
+                        results[taskIndex - 1] = ApplyDestructiveValidationForTask(
+                            projectId,
+                            taskIndex,
+                            results[taskIndex - 1]);
                         failReasons.Add(results[taskIndex - 1] ? "" : (reason ?? ExcelScoreExplanation.RequirementMissText));
                     }
                 }
@@ -2488,6 +2828,44 @@ namespace Ui.ViewModels
             ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
         }
         
+        /// <summary>
+        /// 破壊的操作検知（一括採点と同じロジック）。<paramref name="projectId"/> は画面上のスロット番号。
+        /// </summary>
+        private static bool ApplyDestructiveValidationForTask(int projectId, int taskId, bool checkerResult)
+        {
+            if (!checkerResult)
+                return false;
+            if (projectId <= 0 || taskId <= 0)
+                return checkerResult;
+
+            try
+            {
+                ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
+
+                if (ExcelLogReader.TryGetFirstNonExemptViolation(
+                        projectId,
+                        taskId,
+                        1,
+                        exemptFlags,
+                        out string violationMsg))
+                {
+                    string line = $"P{projectId}-T{taskId} {violationMsg}";
+                    System.Diagnostics.Debug.WriteLine($"[MainViewModel] Destructive validation failed: {line}");
+                    ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, line);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainViewModel] ApplyDestructiveValidationForTask error: {ex.Message}");
+                ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, $"P{projectId}-T{taskId} 例外: {ex.Message}");
+                return false;
+            }
+
+            return true;
+        }
+
+
         public void CloseExcelApplication()
         {
             int examPid = _examExcelPid;
@@ -3069,6 +3447,104 @@ namespace Ui.ViewModels
         /// プロジェクトリセット前に全ワークブックを保存せずに閉じ、Excel を終了し、共有 COM 参照をクリアする。
         /// 読み取り専用二重オープンやファイルロック残りを防ぐため終了ボタン経路に近いクリーンアップを行う。
         /// </summary>
+        /// <summary>今つながっている Excel の PID。いなければ 0。新規起動はしない。</summary>
+        int TryReadRunningExcelPid()
+        {
+            ExcelApp excelApp = null;
+            bool release = false;
+            try
+            {
+                excelApp = _sharedExcelApp;
+                if (excelApp != null)
+                {
+                    try { _ = excelApp.Hwnd; }
+                    catch
+                    {
+                        excelApp = null;
+                        _sharedExcelApp = null;
+                    }
+                }
+
+                if (excelApp == null)
+                {
+                    try
+                    {
+                        excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                        release = true;
+                    }
+                    catch (COMException)
+                    {
+                        return 0;
+                    }
+                }
+
+                int pid = Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                return pid > 0 ? pid : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+            finally
+            {
+                if (release && excelApp != null)
+                {
+                    try { Marshal.ReleaseComObject(excelApp); } catch { }
+                }
+            }
+        }
+
+        ExcelApp TryGetExcelApplicationIfPid(int expectedPid)
+        {
+            if (expectedPid <= 0)
+                return null;
+
+            ExcelApp excelApp = _sharedExcelApp;
+            if (excelApp != null)
+            {
+                try
+                {
+                    if (Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp) == expectedPid)
+                        return excelApp;
+                }
+                catch
+                {
+                    excelApp = null;
+                    _sharedExcelApp = null;
+                }
+            }
+
+            try
+            {
+                var active = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
+                if (Libraries.ExcelApplicationManager.TryGetExcelProcessId(active) == expectedPid)
+                    return active;
+                try { Marshal.ReleaseComObject(active); } catch { }
+            }
+            catch (COMException)
+            {
+                /* 起動していない */
+            }
+
+            return null;
+        }
+
+        bool IsSameExcelSession(int generation, ExcelApp excelApp, int expectedPid)
+        {
+            if (Volatile.Read(ref _excelSessionGeneration) != generation)
+                return false;
+            if (excelApp == null || expectedPid <= 0)
+                return false;
+            try
+            {
+                return Libraries.ExcelApplicationManager.TryGetExcelProcessId(excelApp) == expectedPid;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public void QuitExcelForProjectReset()
         {
             ExcelApp excelApp = null;
@@ -3473,6 +3949,12 @@ namespace Ui.ViewModels
 
         private async void ExecuteNextProject(object parameter)
         {
+            if (IsVocabularyMode)
+            {
+                _vocabularySession?.GoNext();
+                return;
+            }
+
             if (_isSwitchingProject || CurrentProject == null)
                 return;
 

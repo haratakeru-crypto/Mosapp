@@ -207,6 +207,9 @@
                     </Grid>
                 </ScrollViewer>
             </TabItem>
+            <TabItem Header="単語帳">
+                <mos:VocabularyTabControl/>
+            </TabItem>
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">
                     <Grid Margin="20">

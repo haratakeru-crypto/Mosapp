@@ -207,6 +207,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
     <Compile Include="Logger.cs" />
+    <Compile Include="VocabLogger.cs" />
     <Compile Include="LogPaneUserControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

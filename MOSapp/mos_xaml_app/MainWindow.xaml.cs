@@ -79,6 +79,22 @@ namespace MOSExcelMogiApp
             _viewModel.ResultMessage = "類題は後から接続します";
         }
 
+        private void VocabularyTab_StartRequested(object sender, MosPracticeClient.VocabularyStartEventArgs e)
+        {
+            if (e.Mode != MosPracticeClient.VocabularyStartMode.KeywordOnly)
+            {
+                MessageBox.Show("「問題文から」モードは準備中です。", "単語帳", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            _viewModel.StartVocabularySession(e.Category);
+        }
+
+        private void VocabularyTab_SettingsRequested(object sender, EventArgs e)
+        {
+            _viewModel.StartVocabularySettings();
+        }
+
         private void ScoringLog_EntryClicked(object sender, MosPracticeClient.ScoringLogEntry entry)
         {
             if (entry == null) return;
@@ -155,6 +171,15 @@ namespace MOSExcelMogiApp
                 // Excel の前面化を優先するため、表示時にフォーカスを奪わない。
                 _appBarWindow.ShowActivated = false;
             }
+
+            _viewModel.VocabularyUiAnchorProvider = delegate (string which, out IntPtr hwnd, out Rect rect)
+            {
+                if (_appBarWindow != null && _appBarWindow.TryGetVocabularyAnchor(which, out hwnd, out rect))
+                    return true;
+                hwnd = IntPtr.Zero;
+                rect = Rect.Empty;
+                return false;
+            };
 
             if (!_appBarWindow.IsVisible)
             {

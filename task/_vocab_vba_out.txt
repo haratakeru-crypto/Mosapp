@@ -1,0 +1,23 @@
+﻿powershell : 発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_vba.ps1:60 文字:25
+発生場所 C:\Users\kouza\AppData\Local\Temp\ps-script-d6f3900f-4b13-48b5-9b18-93e919a8deff.ps1:80 文字:227
++ ... oding utf8; powershell -NoProfile -ExecutionPolicy Bypass -File "c:\U ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (発生場所 C:\Users\k...ba.ps1:60 文字:25:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
++ Write-Host "`n=== Near 'Module' / 'VBA' markers ==="
++                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+式またはステートメントのトークン 'Module' / 'VBA' markers ==="
+$text = [System.Text.Encoding]::GetEncoding(1252).GetString($bytes)
+$patterns = @('Module','ThisWorkbook','Sheet','Attribute' を使用できません。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_vba.ps1:69 文字:73
++ ...     $snip = $text.Substring($start, $len) -replace '[\x00-\x1F]', '.'
++                                                                         ~
+文字列に終端記号 ' がありません。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_vba.ps1:49 文字:23
++ $ascii | Where-Object {
++                       ~
+ステートメント ブロックまたは型定義に終わりの '}' が存在しません。
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+ 

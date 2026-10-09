@@ -159,7 +159,7 @@
 
                         <Button Name="ScoreButton" Content="採点" 
                                 Command="{Binding ScoreCommand}"
-                                Visibility="{Binding ShowScoreButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Visibility="{Binding ShowScoreButtonEffective, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Background="White" 
                                 Foreground="#1E40AF" 
                                 Padding="24,10" 
@@ -229,7 +229,8 @@
                             </Button.Style>
                         </Button>
                         
-                        <Button Name="NextProjectButton" Content="次のプロジェクト" 
+                        <Button x:Name="NextProjectButton"
+                                Content="{Binding NextProjectButtonLabel}" 
                                 Command="{Binding NextProjectCommand}"
                                 Visibility="{Binding IsNextProjectVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Background="White" 
@@ -518,7 +519,7 @@
                                     </Button.Style>
                                 </Button>
 
-                                <Button Content="試験後にコメントする" 
+                                <Button Name="CommentLaterButton" Content="試験後にコメントする" 
                                         Background="Transparent"
                                         Foreground="#1E40AF" 
                                         BorderThickness="0"
@@ -538,7 +539,7 @@
                                 </Button>
 
                                 <!-- 右側: 終了ボタン（ここに配置） -->
-                                <Button Name="EndExamButton" Content="終了" 
+                                <Button Content="終了" 
                                         Click="EndButton_Click"
                                         Background="#EF4444" 
                                         Foreground="White" 

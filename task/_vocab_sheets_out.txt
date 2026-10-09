@@ -1,0 +1,59 @@
+﻿powershell : 発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_sheets.ps1:73 文字:6
+発生場所 C:\Users\kouza\AppData\Local\Temp\ps-script-d6f3900f-4b13-48b5-9b18-93e919a8deff.ps1:80 文字:1
++ powershell -NoProfile -ExecutionPolicy Bypass -File "c:\Users\kouza\s ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (発生場所 C:\Users\k...ets.ps1:73 文字:6:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
++     'sheet3.xml'='髢｢謨ｰ蜊倩ｪ槫ｸｳ'
++      ~~~~~~~~~~~~~~~~~~~~~~~~
+式またはステートメントのトークン 'sheet3.xml'='髢｢謨ｰ蜊倩ｪ槫ｸｳ'
+    'sheet4.xml'='髢｢謨ｰ繝・せ繝・' を使用できません。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_sheets.ps1:73 文字:6
++     'sheet3.xml'='髢｢謨ｰ蜊倩ｪ槫ｸｳ'
++      ~
+ハッシュ リテラルが不完全です。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_sheets.ps1:99 文字:57
++ ... dItem (Join-Path $extracted 'xl\worksheets\_rels') | ForEach-Object {
++                                                     ~~~~~~~~~~~~~~~~~~~~~
+文字列に終端記号 ' がありません。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_sheets.ps1:83 文字:49
++ ... ath (Join-Path $extracted 'xl\tables\table1.xml') -Raw -Encoding UTF8
++                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+式またはステートメントのトークン 'xl\tables\table1.xml') -Raw -Encoding UTF8
+# ctrlProps / vml
+Write-Host "`n=== ctrlProps ==="
+Get-ChildItem (Join-Path $extracted 'xl\ctrlProps') | ForEach-Object {
+    Write-Host $_.Name
+    Get-Content $_.FullName -Raw -Encoding UTF8
+}
+Write-Host "`n=== vml drawings ==="
+Get-ChildItem (Join-Path $extracted 'xl\drawings') -Filter '*.vml' | ForEach-Object {
+    Write-Host $_.Name
+    Get-Content $_.FullName -Raw -Encoding UTF8
+}
+# sheet rels for controls
+Write-Host "`n=== sheet rels ==="
+Get-ChildItem (Join-Path $extracted 'xl\worksheets\_rels') | ForEach-Object {
+    Write-Host $_.Name
+    Get-Content $_.FullName -Raw -Encoding UTF8
+}
+' を使用できません。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_sheets.ps1:75 文字:5
++     'sheet5.xml'='髢｢謨ｰ繝・せ繝・1-8'
++     ~~~~~~~~~~~~
+代入式が無効です。代入演算子に対する入力には、代入を受け入れることができるオブジェクト (変数やプロパティなど) を指定する
+必要があります。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_sheets.ps1:76 文字:5
++     'sheet6.xml'='髢｢謨ｰ'
++     ~~~~~~~~~~~~
+代入式が無効です。代入演算子に対する入力には、代入を受け入れることができるオブジェクト (変数やプロパティなど) を指定する
+必要があります。
+発生場所 C:\Users\kouza\source\repos\MOSapp\task\_inspect_vocab_sheets.ps1:77 文字:5
++     'sheet7.xml'='繧ｿ繝悶・繧ｿ繝ｳ蟇ｾ蠢・
++     ~~~~~~~~~~~~
+代入式が無効です。代入演算子に対する入力には、代入を受け入れることができるオブジェクト (変数やプロパティなど) を指定する
+必要があります。
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+ 
