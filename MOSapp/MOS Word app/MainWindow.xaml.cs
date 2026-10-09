@@ -57,6 +57,7 @@ namespace MOS_Word_app
 
         private void UniversityRegistration_Deleted(object sender, EventArgs e)
         {
+            ScoringLogList?.Reload();
             _viewModel.SelectedTabIndex = 0;
         }
 

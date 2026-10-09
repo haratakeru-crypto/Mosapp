@@ -94,6 +94,7 @@ namespace MosPracticeClient
         public static void Delete()
         {
             RemoveVocabMistakes(Load());
+            ScoringLogStore.ClearAll();
             try
             {
                 if (File.Exists(ExamineePath))

@@ -102,6 +102,24 @@ namespace MosPracticeClient
             Save(subject, entries);
         }
 
+        /// <summary>大学情報の削除時に、Excel / Word / PowerPoint の採点ログをすべて消す。</summary>
+        public static void ClearAll()
+        {
+            foreach (string subject in new[] { SubjectExcel, SubjectWord, SubjectPowerPoint })
+            {
+                try
+                {
+                    string path = GetPath(subject);
+                    if (File.Exists(path))
+                        File.Delete(path);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ScoringLogStore] ClearAll: " + ex.Message);
+                }
+            }
+        }
+
         static void Save(string subject, List<ScoringLogEntry> entries)
         {
             Directory.CreateDirectory(ExamineeStore.DataDirectory);

@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MOSアプリの使い方</title>
+  <style>
+    :root {
+      --green: #028760;
+      --green-d: #016b50;
+      --excel: #217346;
+      --word: #2b579a;
+      --ppt: #d04423;
+      --ink: #111827;
+      --muted: #4b5563;
+      --line: #e5e7eb;
+      --paper: #f8faf9;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "Yu Gothic", "YuGothic", "Hiragino Sans", Meiryo, sans-serif;
+      background: #0f172a;
+      color: var(--ink);
+      overflow: hidden;
+    }
+    .deck {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .stage {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      padding: 36px 48px 88px;
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #d1fae5 0%, transparent 55%),
+        radial-gradient(900px 420px at 110% 10%, #dbeafe 0%, transparent 50%),
+        var(--paper);
+    }
+    .slide.on { display: grid; grid-template-rows: auto 1fr; gap: 18px; animation: rise .45s ease; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: none; }
+    }
+    h1 { margin: 0; font-size: 42px; letter-spacing: .02em; }
+    .lead { margin: 8px 0 0; color: var(--muted); font-size: 18px; }
+    .kicker {
+      display: inline-block;
+      background: var(--green);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+    .grid { display: grid; gap: 16px; align-content: start; }
+    .cards-3 { grid-template-columns: repeat(3, 1fr); }
+    .cards-2 { grid-template-columns: 1.15fr .85fr; }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px 18px 16px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+    }
+    .card h3 { margin: 8px 0 6px; font-size: 20px; }
+    .card p, .card li { color: var(--muted); font-size: 15px; line-height: 1.65; }
+    .card ol, .card ul { margin: 8px 0 0; padding-left: 1.2em; }
+    .badge { font-size: 12px; font-weight: 700; color: var(--green-d); }
+    .nav {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      background: rgba(255,255,255,.86);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid var(--line);
+    }
+    .dots { display: flex; gap: 8px; flex-wrap: wrap; max-width: 58%; }
+    .dots button {
+      width: 10px; height: 10px; border: 0; border-radius: 50%;
+      background: #cbd5e1; cursor: pointer;
+    }
+    .dots button.on { background: var(--green); transform: scale(1.25); }
+    .btns { display: flex; gap: 10px; }
+    .btns button, .hint {
+      border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 700;
+    }
+    .btns .prev { background: #e5e7eb; color: #111827; }
+    .btns .next { background: var(--green); color: #fff; }
+    .hint { background: transparent; color: #64748b; font-weight: 500; font-size: 13px; }
+    svg { display: block; max-width: 100%; height: auto; }
+    .art { width: 100%; height: 240px; }
+    .art-tall { height: 280px; }
+    .flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .pill {
+      background: #ecfdf5; color: var(--green-d); border-radius: 999px;
+      padding: 8px 14px; font-weight: 700; font-size: 14px;
+    }
+    .arrow { color: #94a3b8; font-weight: 700; }
+    .note { font-size: 13px; color: #64748b; margin-top: 10px; }
+    .title-slide { place-items: center; text-align: center; }
+    .title-slide h1 { font-size: 56px; }
+    .brand {
+      width: 92px; height: 92px; margin: 0 auto 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+    <div class="stage" id="stage"></div>
+    <div class="nav">
+      <div class="dots" id="dots"></div>
+      <div class="btns">
+        <span class="hint">← → またはクリック</span>
+        <button class="prev" type="button" id="prev">前へ</button>
+        <button class="next" type="button" id="next">次へ</button>
+      </div>
+    </div>
+  </div>
+
+  <template id="slides">
+    <section class="slide title-slide">
+      <div>
+        <svg class="brand" viewBox="0 0 92 92" aria-hidden="true">
+          <rect x="8" y="8" width="76" height="76" rx="18" fill="#028760"/>
+          <path d="M24 58 V34 h8 l14 18 14-18 h8 v24 h-8 V42 L46 58 32 42 v16z" fill="#fff">
+            <animate attributeName="opacity" values="0;1" dur="0.6s" fill="freeze"/>
+          </path>
+        </svg>
+        <div class="kicker">Excel / Word / PowerPoint</div>
+        <h1>MOSアプリの使い方</h1>
+        <p class="lead">起動から、演習・採点・単語帳までの流れです。</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">全体</div>
+        <h1>いちばんよく使う流れ</h1>
+        <p class="lead">教室では、この順で進めます。</p>
+      </div>
+      <div class="grid">
+        <div class="flow">
+          <span class="pill">1. 起動</span><span class="arrow">→</span>
+          <span class="pill">2. 科目を選ぶ</span><span class="arrow">→</span>
+          <span class="pill">3. 大学名を登録</span><span class="arrow">→</span>
+          <span class="pill">4. 演習を解く</span><span class="arrow">→</span>
+          <span class="pill">5. 採点する</span>
+        </div>
+        <svg class="art" viewBox="0 0 920 220">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1">
+              <stop offset="0" stop-color="#028760"/>
+              <stop offset="1" stop-color="#4caf80"/>
+            </linearGradient>
+          </defs>
+          <path d="M40 110 H880" stroke="#d1fae5" stroke-width="8" fill="none"/>
+          <circle r="10" fill="url(#g1)">
+            <animateMotion dur="3.6s" repeatCount="indefinite" path="M40 110 H880"/>
+          </circle>
+          <g font-size="14" font-weight="700" fill="#065f46" text-anchor="middle">
+            <circle cx="80" cy="110" r="28" fill="#fff" stroke="#028760" stroke-width="3"/>
+            <text x="80" y="116">起動</text>
+            <circle cx="280" cy="110" r="28" fill="#fff" stroke="#028760" stroke-width="3"/>
+            <text x="280" y="116">科目</text>
+            <circle cx="480" cy="110" r="28" fill="#fff" stroke="#028760" stroke-width="3"/>
+            <text x="480" y="116">登録</text>
+            <circle cx="680" cy="110" r="28" fill="#fff" stroke="#028760" stroke-width="3"/>
+            <text x="680" y="116">演習</text>
+            <circle cx="840" cy="110" r="28" fill="#fff" stroke="#028760" stroke-width="3"/>
+            <text x="840" y="116">採点</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">起動</div>
+        <h1>アプリの開き方</h1>
+        <p class="lead">表紙アプリを開くと、まずパスワード画面が出ます。</p>
+      </div>
+      <div class="grid cards-2">
+        <div class="card">
+          <span class="badge">手順</span>
+          <h3>1. MOSアプリを起動する</h3>
+          <ol>
+            <li>デスクトップや配布フォルダの MOS アプリを開きます。</li>
+            <li>「パスワードを入力してください」と出ます。</li>
+            <li>担当者から案内されたパスワードを入れて OK します。</li>
+            <li>間違えると赤いエラーが出て、もう一度入力できます。</li>
+            <li>キャンセルするとアプリは終了します。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <svg class="art" viewBox="0 0 360 220">
+            <rect x="50" y="28" width="260" height="164" rx="12" fill="#fff" stroke="#cbd5e1"/>
+            <rect x="50" y="28" width="260" height="36" rx="12" fill="#1e40af"/>
+            <rect x="50" y="52" width="260" height="12" fill="#1e40af"/>
+            <text x="180" y="52" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">パスワード入力</text>
+            <text x="78" y="96" fill="#374151" font-size="12">パスワードを入力してください</text>
+            <rect x="78" y="108" width="204" height="28" rx="6" fill="#f3f4f6" stroke="#d1d5db"/>
+            <circle cx="96" cy="122" r="3" fill="#6b7280"><animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/></circle>
+            <rect x="168" y="152" width="54" height="24" rx="6" fill="#1e40af"/>
+            <text x="195" y="168" text-anchor="middle" fill="#fff" font-size="11">OK</text>
+            <rect x="228" y="152" width="54" height="24" rx="6" fill="#6b7280"/>
+            <text x="255" y="168" text-anchor="middle" fill="#fff" font-size="11">キャンセル</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">起動</div>
+        <h1>科目を選ぶ</h1>
+        <p class="lead">パスワードが通ると、Excel / Word / PowerPoint の選択画面になります。</p>
+      </div>
+      <div class="grid">
+        <svg class="art-tall" viewBox="0 0 900 280">
+          <rect x="40" y="16" width="820" height="248" rx="16" fill="#f5f5f5" stroke="#e5e7eb"/>
+          <rect x="40" y="16" width="820" height="52" fill="#d04423"/>
+          <text x="450" y="50" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">科目を選択してください</text>
+          <g>
+            <rect x="80" y="96" width="220" height="130" rx="14" fill="#217346">
+              <animate attributeName="y" values="110;96;96" dur="1.1s" fill="freeze"/>
+            </rect>
+            <text x="190" y="170" text-anchor="middle" fill="#fff" font-size="24" font-weight="700">Excel</text>
+          </g>
+          <g>
+            <rect x="340" y="96" width="220" height="130" rx="14" fill="#2b579a">
+              <animate attributeName="y" values="110;96;96" dur="1.1s" begin="0.15s" fill="freeze"/>
+            </rect>
+            <text x="450" y="170" text-anchor="middle" fill="#fff" font-size="24" font-weight="700">Word</text>
+          </g>
+          <g>
+            <rect x="600" y="96" width="220" height="130" rx="14" fill="#d04423">
+              <animate attributeName="y" values="110;96;96" dur="1.1s" begin="0.3s" fill="freeze"/>
+            </rect>
+            <text x="710" y="170" text-anchor="middle" fill="#fff" font-size="20" font-weight="700">PowerPoint</text>
+          </g>
+        </svg>
+        <p class="note">選んだ科目のアプリが開きます。科目アプリを閉じると、表紙の科目選択に戻れます。</p>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">準備</div>
+        <h1>大学名タブで登録する</h1>
+        <p class="lead">演習を始める前に、必ず登録します。座席表と同じ漢字で書いてください。</p>
+      </div>
+      <div class="grid cards-3">
+        <div class="card">
+          <span class="badge">大学名</span>
+          <h3>一覧から選ぶ</h3>
+          <p>入力すると候補が出ます。座席表の表記に合わせて選んでください。</p>
+        </div>
+        <div class="card">
+          <span class="badge">お名前</span>
+          <h3>漢字の氏名</h3>
+          <p>座席表に載っている氏名を入力します。ここが空だと座席表へ送れません。</p>
+        </div>
+        <div class="card">
+          <span class="badge">教室</span>
+          <h3>必要なときだけ</h3>
+          <p>大学に教室が複数あるときは、一覧から選びます。1つだけのときは自動で入ります。</p>
+        </div>
+      </div>
+      <p class="note">登録すると演習タブへ進みます。登録前に演習を開くと「先に大学名タブで登録してください」と出ます。「大学情報を削除」では、大学名・氏名・教室と採点ログがすべて消えます。</p>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">画面</div>
+        <h1>タブの役割</h1>
+        <p class="lead">科目アプリの上に並ぶタブです。3科目とも同じ並びです。</p>
+      </div>
+      <div class="grid cards-3">
+        <div class="card"><h3>大学名</h3><p>氏名と大学を登録・削除します。</p></div>
+        <div class="card"><h3>演習</h3><p>プロジェクトを選んで、本番と同じ操作で問題を解きます。</p></div>
+        <div class="card"><h3>単語帳</h3><p>キーワードからタブや関数の場所を探す練習です。Excel で使えます。</p></div>
+        <div class="card"><h3>類題</h3><p>似た問題のセットです。準備中の表示になることがあります。</p></div>
+        <div class="card"><h3>採点ログ</h3><p>以前出した採点結果の一覧です。押すと当時の結果を見られます。</p></div>
+        <div class="card"><h3>右上</h3><p>全プロジェクトリセットで、解き直し用にファイルを初期状態へ戻します。</p></div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">演習</div>
+        <h1>プロジェクトを開く</h1>
+        <p class="lead">演習タブのボタンを押すと、Office が開き、上に試験バーが出ます。</p>
+      </div>
+      <div class="grid cards-2">
+        <div class="card">
+          <ol>
+            <li>演習タブでプロジェクト番号を選びます。</li>
+            <li>Excel / Word / PowerPoint が開きます。</li>
+            <li>画面の上に、タイマーと問題文のバーが出ます。</li>
+            <li>問題文どおりに、リボンやシートを操作します。</li>
+            <li>終わったら「レビューページ」へ進みます。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <svg class="art-tall" viewBox="0 0 420 260">
+            <rect width="420" height="48" fill="#1e40af"/>
+            <text x="18" y="30" fill="#fff" font-size="14">50:00　レビューページ　次のプロジェクト</text>
+            <rect y="48" width="420" height="212" fill="#217346" opacity=".12"/>
+            <rect x="24" y="72" width="372" height="88" rx="10" fill="#fff" stroke="#d1d5db"/>
+            <text x="40" y="108" fill="#111827" font-size="14">シート［売上一覧］の印刷の向きを</text>
+            <text x="40" y="130" fill="#111827" font-size="14">横向きに設定します。</text>
+            <g>
+              <rect x="70" y="176" width="70" height="28" rx="6" fill="#d1d5db"/>
+              <rect x="150" y="176" width="70" height="28" rx="6" fill="#1e40af"/>
+              <rect x="230" y="176" width="70" height="28" rx="6" fill="#d1d5db"/>
+              <animateTransform attributeName="transform" type="translate" values="0 0; 0 -4; 0 0" dur="1.4s" repeatCount="indefinite"/>
+            </g>
+            <text x="185" y="194" text-anchor="middle" fill="#fff" font-size="12">2</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">試験バー</div>
+        <h1>問題の進め方</h1>
+        <p class="lead">上のバーで、今の問題と次の操作が分かります。</p>
+      </div>
+      <div class="grid cards-3">
+        <div class="card">
+          <h3>問題番号</h3>
+          <p>1〜8 のボタンで問題を切り替えます。済んだ問題にはチェックが付きます。</p>
+        </div>
+        <div class="card">
+          <h3>あとで見直す</h3>
+          <p>分からない問題に印を付けます。あとから戻りやすくなります。</p>
+        </div>
+        <div class="card">
+          <h3>終了 / 次へ</h3>
+          <p>「次のプロジェクト」で次のファイルへ進めます。終わったらレビューページへ。</p>
+        </div>
+      </div>
+      <p class="note">単語帳のときは、問題文の下に「後で見直す」が出ます。押すと、最後の「間違えた問題だけを解く」に入ります。</p>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">採点</div>
+        <h1>レビューページと結果</h1>
+        <p class="lead">操作が終わったら採点し、点数を座席表へ送ります。</p>
+      </div>
+      <div class="grid cards-2">
+        <div class="card">
+          <h3>結果の表示</h3>
+          <ol>
+            <li>試験バーの「レビューページ」を開きます。</li>
+            <li>「結果の表示」を押すと採点が始まります。</li>
+            <li>少し待つと、プロジェクトごとの〇×が出ます。</li>
+            <li>結果は採点ログにも残ります。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>座席表へ送る</h3>
+          <p>大学名を登録していれば、結果画面から座席表へ送れます。</p>
+          <p>送れないときは QR が出ます。スマートフォンで読み取って送ってください。</p>
+          <svg viewBox="0 0 220 90" width="220">
+            <rect x="10" y="10" width="70" height="70" fill="#111827"/>
+            <rect x="18" y="18" width="18" height="18" fill="#fff"/>
+            <rect x="54" y="18" width="18" height="18" fill="#fff"/>
+            <rect x="18" y="54" width="18" height="18" fill="#fff"/>
+            <rect x="46" y="46" width="10" height="10" fill="#fff"/>
+            <g>
+              <rect x="110" y="22" width="36" height="58" rx="6" fill="#111827"/>
+              <rect x="116" y="30" width="24" height="38" fill="#ecfdf5"/>
+              <animateTransform attributeName="transform" type="translate" values="0 0; 8 0; 0 0" dur="1.8s" repeatCount="indefinite"/>
+            </g>
+            <text x="168" y="56" font-size="12" fill="#047857" font-weight="700">読取</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">Excel</div>
+        <h1>単語帳</h1>
+        <p class="lead">問題文のキーワードから、正しいタブや関数の場所を探す練習です。</p>
+      </div>
+      <div class="grid cards-2">
+        <div class="card">
+          <ol>
+            <li>単語帳タブで「キーワード」を選びます。</li>
+            <li>タブ・ボタン、関数、または両方を選びます。</li>
+            <li>スタートすると Excel が開き、案内が出ます。</li>
+            <li>最初はテーブルのチュートリアルです。OK を押して進みます。</li>
+            <li>分からなければ「後で見直す」を押します。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>正解と不正解</h3>
+          <p>正しい場所を操作すると「正解！」が出ます。違う場所だと、次に押す場所をオレンジの枠で示します。</p>
+          <p>最後に、間違えた問題だけをもう一度解けます。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">片付け</div>
+        <h1>リセットと削除</h1>
+        <p class="lead">次の人や、もう一度解くときに使います。</p>
+      </div>
+      <div class="grid cards-2">
+        <div class="card">
+          <h3>全プロジェクトリセット</h3>
+          <p>右上のボタンです。演習ファイルを最初の状態に戻します。解き直しのときに使います。</p>
+        </div>
+        <div class="card">
+          <h3>大学情報を削除</h3>
+          <p>大学名タブにあります。大学名・お名前・教室と、Excel / Word / PowerPoint の採点ログがすべて消えます。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="kicker">まとめ</div>
+        <h1>これだけ覚えれば進めます</h1>
+      </div>
+      <div class="grid cards-3">
+        <div class="card"><h3>1</h3><p>MOSアプリを開き、パスワードのあと科目を選びます。</p></div>
+        <div class="card"><h3>2</h3><p>大学名タブで、座席表どおりに登録します。</p></div>
+        <div class="card"><h3>3</h3><p>演習のプロジェクトを開き、上のバーの問題を解きます。</p></div>
+        <div class="card"><h3>4</h3><p>レビューページから採点し、結果を座席表へ送ります。</p></div>
+        <div class="card"><h3>5</h3><p>Excel では単語帳でも、タブと関数の位置を練習できます。</p></div>
+        <div class="card"><h3>6</h3><p>終わったらリセット。次の人の前には大学情報も削除します。</p></div>
+      </div>
+    </section>
+  </template>
+
+  <script>
+    const stage = document.getElementById("stage");
+    const dots = document.getElementById("dots");
+    const slides = [...document.getElementById("slides").content.querySelectorAll(".slide")];
+    let i = 0;
+    slides.forEach((s, n) => {
+      stage.appendChild(s);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.addEventListener("click", () => show(n));
+      dots.appendChild(b);
+    });
+    function show(n) {
+      i = (n + slides.length) % slides.length;
+      slides.forEach((s, k) => s.classList.toggle("on", k === i));
+      [...dots.children].forEach((d, k) => d.classList.toggle("on", k === i));
+    }
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.getElementById("next").onclick = () => show(i + 1);
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(i + 1); }
+      if (e.key === "ArrowLeft") show(i - 1);
+      if (e.key === "Home") show(0);
+      if (e.key === "End") show(slides.length - 1);
+    });
+    show(0);
+  </script>
+</body>
+</html>
