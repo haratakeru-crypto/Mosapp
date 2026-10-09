@@ -18,6 +18,8 @@ namespace New_MOSWordVSTOAddIn
             (1, 1, "ShowAll"),
             // 1-1: 離脱時・トグル実績ありかつ最終表示ONのときだけ付く（初期ON放置の偽○防止）
             (1, 1, "ShowAllFinalOn"),
+            // 1-1: 最終がOFFのとき（FinalOn の sticky を last-wins で無効化）
+            (1, 1, "ShowAllFinalOff"),
             // 1-1-5: 環境により FontClearFormatting 等の idMso が無効のため、Ribbon では ClearFormatting のみフック
             (1, 5, "ClearFormatting"),
             (2, 1, "Cut"),
@@ -327,6 +329,7 @@ namespace New_MOSWordVSTOAddIn
         {
             return string.Equals(commandId, "ShowAll", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "ShowAllFinalOn", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandId, "ShowAllFinalOff", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "FileSaveAsTxt", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "FileSaveAsDocm", StringComparison.OrdinalIgnoreCase);
         }

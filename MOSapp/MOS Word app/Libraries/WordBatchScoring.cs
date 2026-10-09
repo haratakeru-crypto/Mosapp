@@ -142,15 +142,20 @@ namespace Libraries
                         if (!opened)
                         {
                             for (int t = 1; t <= taskCount; t++)
-                                ScoreResultStore.RecordResult(groupId, project.ProjectId, t, false);
+                            {
+                                ScoreResultStore.RecordResult(
+                                    groupId, project.ProjectId, t, false,
+                                    WordScoreExplanation.UnavailableText);
+                            }
                             continue;
                         }
 
                         var results = ScoreProject(groupId, project.ProjectId, taskCount, batchMode: true);
                         for (int i = 0; i < taskCount; i++)
                         {
-                            bool passed = i < results.Count && results[i];
-                            ScoreResultStore.RecordResult(groupId, project.ProjectId, i + 1, passed);
+                            bool passed = i < results.Count && results[i].Passed;
+                            string failReason = i < results.Count ? results[i].FailReason : WordScoreExplanation.UnavailableText;
+                            ScoreResultStore.RecordResult(groupId, project.ProjectId, i + 1, passed, failReason);
                         }
                     }
                     catch (Exception ex)
@@ -160,7 +165,11 @@ namespace Libraries
                         AppendScoringErrorLog(
                             $"ScoreAllProjects group={groupId} project={project.ProjectId}", ex);
                         for (int t = 1; t <= taskCount; t++)
-                            ScoreResultStore.RecordResult(groupId, project.ProjectId, t, false);
+                        {
+                            ScoreResultStore.RecordResult(
+                                groupId, project.ProjectId, t, false,
+                                WordScoreExplanation.UnavailableText);
+                        }
                     }
                     finally
                     {
@@ -265,11 +274,20 @@ namespace Libraries
                     return null;
                 }
                 int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
-                if (!WordGradingGate.TryPass(groupId, projectId, taskId, attemptNo, out _))
+                WordScoreExplanation.ClearCheckerReason();
+                if (!WordGradingGate.TryPass(groupId, projectId, taskId, attemptNo, out string gateReason))
+                {
+                    string failReason = WordScoreExplanation.ResolveFailReason(
+                        passed: false, gateFailed: true, gateInternalReason: gateReason);
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, false, failReason);
                     return false;
+                }
                 bool? result = InvokeCheckTask(groupId, projectId, taskId);
                 if (result.HasValue)
-                    ScoreResultStore.RecordResult(groupId, projectId, taskId, result.Value);
+                {
+                    string failReason = WordScoreExplanation.ResolveFailReason(result.Value);
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, result.Value, failReason);
+                }
                 return result;
             }
             catch (Exception ex)
@@ -434,9 +452,15 @@ namespace Libraries
             _batchVstoFlushFallbackCount = 0;
         }
 
-        private static List<bool> ScoreProject(int groupId, int projectId, int taskCount, bool batchMode = false)
+        private struct TaskScoreResult
         {
-            var results = new List<bool>();
+            public bool Passed;
+            public string FailReason;
+        }
+
+        private static List<TaskScoreResult> ScoreProject(int groupId, int projectId, int taskCount, bool batchMode = false)
+        {
+            var results = new List<TaskScoreResult>();
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string dllPath = Path.Combine(baseDir, "Dlls", $"WordChecker{groupId}_{projectId}.dll");
 
@@ -444,7 +468,7 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] DLL not found: {dllPath}");
                 for (int i = 0; i < taskCount; i++)
-                    results.Add(false);
+                    results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
                 return results;
             }
 
@@ -457,7 +481,7 @@ namespace Libraries
                 if (checkerType == null)
                 {
                     for (int i = 0; i < taskCount; i++)
-                        results.Add(false);
+                        results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
                     return results;
                 }
 
@@ -471,23 +495,26 @@ namespace Libraries
                     if (method == null)
                     {
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: method not found ({methodName})");
-                        results.Add(false);
+                        results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
                         continue;
                     }
 
                     var taskSw = Stopwatch.StartNew();
                     try
                     {
+                        WordScoreExplanation.ClearCheckerReason();
                         int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskNum);
                         var gateSw = Stopwatch.StartNew();
-                        bool gatePassed = WordGradingGate.TryPass(groupId, projectId, taskNum, attemptNo, out _);
+                        bool gatePassed = WordGradingGate.TryPass(groupId, projectId, taskNum, attemptNo, out string gateReason);
                         WordGradingPerf.Log(
                             "GradeTask.WordGradingGate",
                             gateSw.ElapsedMilliseconds,
                             $"P{projectId}-{taskNum} passed={gatePassed}");
                         if (!gatePassed)
                         {
-                            results.Add(false);
+                            string failReason = WordScoreExplanation.ResolveFailReason(
+                                passed: false, gateFailed: true, gateInternalReason: gateReason);
+                            results.Add(new TaskScoreResult { Passed = false, FailReason = failReason });
                             System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: fail (grading gate)");
                             WordGradingPerf.Log("GradeTask.total", taskSw.ElapsedMilliseconds, $"P{projectId}-{taskNum} gate");
                             continue;
@@ -499,14 +526,20 @@ namespace Libraries
                             "GradeTask.CheckerInvoke",
                             checkerSw.ElapsedMilliseconds,
                             $"P{projectId}-{taskNum} passed={taskResult}");
-                        results.Add(taskResult);
+                        string reason = WordScoreExplanation.ResolveFailReason(taskResult);
+                        results.Add(new TaskScoreResult { Passed = taskResult, FailReason = reason });
                         WordGradingPerf.Log("GradeTask.total", taskSw.ElapsedMilliseconds, $"P{projectId}-{taskNum}");
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: {(taskResult ? "pass" : "fail")}");
                     }
                     catch (Exception exTask)
                     {
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum} error: {exTask.Message}");
-                        results.Add(false);
+                        WordScoreExplanation.ClearCheckerReason();
+                        results.Add(new TaskScoreResult
+                        {
+                            Passed = false,
+                            FailReason = WordScoreExplanation.ResolveFailReason(passed: false, unavailable: true)
+                        });
                         WordGradingPerf.Log("GradeTask.total", taskSw.ElapsedMilliseconds, $"P{projectId}-{taskNum} error");
                     }
                 }
@@ -515,7 +548,7 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] ScoreProject error: {ex.Message}");
                 while (results.Count < taskCount)
-                    results.Add(false);
+                    results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
             }
 
             return results;

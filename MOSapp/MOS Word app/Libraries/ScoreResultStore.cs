@@ -6,16 +6,18 @@ namespace Libraries
 {
     /// <summary>
     /// 採点結果をプロセス内で共有するためのストア。
-    /// グループID＋プロジェクトID＋タスク番号をキーに、全問の正誤を保持する。
+    /// グループID＋プロジェクトID＋タスク番号をキーに、全問の正誤と×理由を保持する。
     /// </summary>
     public static class ScoreResultStore
     {
         private static readonly object _lock = new object();
         // key 形式: "{groupId}-{projectId}-{taskNumber}"
         private static readonly Dictionary<string, bool> _taskResults = new Dictionary<string, bool>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> _taskFailReasons = new Dictionary<string, string>(StringComparer.Ordinal);
         private static readonly HashSet<string> _incorrectTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         /// <summary>試験終了直後の初回採点スナップショット（キーは MakeKey と同形式）</summary>
         private static readonly Dictionary<string, bool> _initialTaskResults = new Dictionary<string, bool>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> _initialTaskFailReasons = new Dictionary<string, string>(StringComparer.Ordinal);
 
         private static string MakeKey(int groupId, int projectId, int taskNumber)
         {
@@ -32,9 +34,13 @@ namespace Libraries
             {
                 foreach (var key in _taskResults.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
                     _taskResults.Remove(key);
+                foreach (var key in _taskFailReasons.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+                    _taskFailReasons.Remove(key);
                 _incorrectTaskKeys.RemoveWhere(k => k.StartsWith(prefix, StringComparison.Ordinal));
                 foreach (var key in _initialTaskResults.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
                     _initialTaskResults.Remove(key);
+                foreach (var key in _initialTaskFailReasons.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+                    _initialTaskFailReasons.Remove(key);
             }
         }
 
@@ -48,8 +54,12 @@ namespace Libraries
             {
                 foreach (var key in _initialTaskResults.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
                     _initialTaskResults.Remove(key);
+                foreach (var key in _initialTaskFailReasons.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+                    _initialTaskFailReasons.Remove(key);
                 foreach (var kv in _taskResults.Where(k => k.Key.StartsWith(prefix, StringComparison.Ordinal)))
                     _initialTaskResults[kv.Key] = kv.Value;
+                foreach (var kv in _taskFailReasons.Where(k => k.Key.StartsWith(prefix, StringComparison.Ordinal)))
+                    _initialTaskFailReasons[kv.Key] = kv.Value;
             }
         }
 
@@ -65,6 +75,20 @@ namespace Libraries
                     return true;
                 isPassed = false;
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// 初回スナップショットから×理由を取得する。合格・未採点は空文字。
+        /// </summary>
+        public static string GetInitialFailReason(int groupId, int projectId, int taskNumber)
+        {
+            var key = MakeKey(groupId, projectId, taskNumber);
+            lock (_lock)
+            {
+                if (_initialTaskFailReasons.TryGetValue(key, out string reason))
+                    return reason ?? "";
+                return "";
             }
         }
 
@@ -130,18 +154,33 @@ namespace Libraries
         }
 
         /// <summary>
-        /// 1 問分の採点結果を記録する。
+        /// 1 問分の採点結果を記録する。合格時は failReason を空にする。
         /// </summary>
-        public static void RecordResult(int groupId, int projectId, int taskNumber, bool isPassed)
+        public static void RecordResult(int groupId, int projectId, int taskNumber, bool isPassed, string failReason = null)
         {
             var key = MakeKey(groupId, projectId, taskNumber);
             lock (_lock)
             {
                 _taskResults[key] = isPassed;
+                _taskFailReasons[key] = isPassed ? "" : (failReason ?? "");
                 if (!isPassed)
                     _incorrectTaskKeys.Add(key);
                 else
                     _incorrectTaskKeys.Remove(key);
+            }
+        }
+
+        /// <summary>
+        /// ×理由を取得する。合格・未採点は空文字。
+        /// </summary>
+        public static string GetFailReason(int groupId, int projectId, int taskNumber)
+        {
+            var key = MakeKey(groupId, projectId, taskNumber);
+            lock (_lock)
+            {
+                if (_taskFailReasons.TryGetValue(key, out string reason))
+                    return reason ?? "";
+                return "";
             }
         }
 

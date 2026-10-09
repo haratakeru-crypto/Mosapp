@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
@@ -185,6 +186,17 @@ namespace MOS_Word_app.Views
                     SetForegroundWindow(helper.Handle);
             }
             catch { }
+        }
+
+        private void ReasonLink_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement element
+                && element.DataContext is MOS_Word_app.TaskResult item
+                && item.HasFailReason)
+            {
+                ScoreReasonWindow.Show(this, item.TaskNumber, item.FailReason);
+            }
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)

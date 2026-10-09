@@ -285,6 +285,56 @@ namespace Libraries
             return CountTaskEvidence(projectId, taskId, commandId) >= minCount;
         }
 
+        /// <summary>
+        /// 1-1 用: ShowAllFinalOn / ShowAllFinalOff の時系列 last-wins。
+        /// 最後が FinalOn なら true。どちらも無い、または最後が FinalOff なら false。
+        /// </summary>
+        public static bool IsLatestShowAllFinalOn(int projectId, int taskId)
+        {
+            string path = GetLogFilePath();
+            if (!File.Exists(path))
+                return false;
+
+            DateTime? bestTs = null;
+            string bestCmd = null;
+            int bestOrder = -1;
+            int order = 0;
+            try
+            {
+                foreach (string line in ReadCachedLines(path))
+                {
+                    order++;
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+                    if (!TryParseScoringLine(line, out var e) || !e.IsValid)
+                        continue;
+                    if (e.ProjectId != projectId || e.TaskId != taskId)
+                        continue;
+
+                    bool isOn = string.Equals(e.CommandId, "ShowAllFinalOn", StringComparison.OrdinalIgnoreCase);
+                    bool isOff = string.Equals(e.CommandId, "ShowAllFinalOff", StringComparison.OrdinalIgnoreCase);
+                    if (!isOn && !isOff)
+                        continue;
+
+                    if (!bestTs.HasValue
+                        || e.Timestamp > bestTs.Value
+                        || (e.Timestamp == bestTs.Value && order > bestOrder))
+                    {
+                        bestTs = e.Timestamp;
+                        bestCmd = e.CommandId;
+                        bestOrder = order;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] IsLatestShowAllFinalOn: {ex.Message}");
+                return false;
+            }
+
+            return string.Equals(bestCmd, "ShowAllFinalOn", StringComparison.OrdinalIgnoreCase);
+        }
+
         public static int CountTaskEvidenceForProject(int projectId, string commandId)
         {
             if (string.IsNullOrWhiteSpace(commandId))

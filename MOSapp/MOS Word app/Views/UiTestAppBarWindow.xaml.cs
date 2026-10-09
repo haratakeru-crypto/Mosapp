@@ -418,7 +418,7 @@ namespace MOS_Word_app.Views
                     // 各タスクをチェック
                     int passedCount = 0;
                     int totalTasks = 0;
-                    var taskResults = new List<(int taskId, bool result, string error)>();
+                    var taskResults = new List<(int taskId, bool result, string failReason)>();
 
                     for (int taskNum = 1; taskNum <= taskCount; taskNum++)
                     {
@@ -430,17 +430,20 @@ namespace MOS_Word_app.Views
                             totalTasks++;
                             try
                             {
+                                WordScoreExplanation.ClearCheckerReason();
                                 int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, taskNum);
                                 if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out string gateReason))
                                 {
-                                    taskResults.Add((taskNum, false, gateReason));
-                                    ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false);
+                                    string failReason = WordScoreExplanation.ResolveFailReason(
+                                        passed: false, gateFailed: true, gateInternalReason: gateReason);
+                                    taskResults.Add((taskNum, false, failReason));
+                                    ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
                                     continue;
                                 }
                                 bool taskResult = (bool)method.Invoke(checkerInstance, null);
-                                taskResults.Add((taskNum, taskResult, null));
-                                // 採点結果を共有ストアに記録
-                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, taskResult);
+                                string reason = WordScoreExplanation.ResolveFailReason(taskResult);
+                                taskResults.Add((taskNum, taskResult, reason));
+                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, taskResult, reason);
 
                                 if (taskResult)
                                 {
@@ -451,7 +454,11 @@ namespace MOS_Word_app.Views
                             }
                             catch (Exception exTask)
                             {
-                                taskResults.Add((taskNum, false, exTask.Message));
+                                WordScoreExplanation.ClearCheckerReason();
+                                string failReason = WordScoreExplanation.ResolveFailReason(
+                                    passed: false, unavailable: true);
+                                taskResults.Add((taskNum, false, failReason));
+                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
                                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] タスク{taskNum} エラー: {exTask.Message}");
                             }
                         }
@@ -462,7 +469,8 @@ namespace MOS_Word_app.Views
                         {
                             TaskNumber = t.taskId,
                             IsPassed = t.result,
-                            TaskName = $"タスク{t.taskId}"
+                            TaskName = $"タスク{t.taskId}",
+                            FailReason = t.failReason ?? ""
                         })
                         .ToList();
 

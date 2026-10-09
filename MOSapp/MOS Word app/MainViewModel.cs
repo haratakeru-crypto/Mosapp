@@ -687,6 +687,9 @@ namespace MOS_Word_app
         public int TaskNumber { get; set; }
         public bool IsPassed { get; set; }
         public string TaskName { get; set; }
+        /// <summary>×のときの学生向け理由。合格時は空。</summary>
+        public string FailReason { get; set; }
+        public bool HasFailReason => !IsPassed && !string.IsNullOrEmpty(FailReason);
     }
 }
 

@@ -400,7 +400,7 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 1-1 離脱時: 滞在中にトグル実績があり、かついま編集記号表示ONなら ShowAllFinalOn を補記する。
+        /// 1-1 離脱時: 滞在中にトグル実績があるとき、いまの表示状態を FinalOn / FinalOff で補記する。
         /// 初期ONのまま無操作で離脱しても補記しない（偽○防止）。常時ポーリングは増やさない。
         /// </summary>
         internal void EnsureTask11ShowAllFinalOnBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
@@ -421,6 +421,8 @@ namespace New_MOSWordVSTOAddIn
 
                 if (app.ActiveWindow.View.ShowAll)
                     WordEvidenceHelper.LogCommandWithEvidence("ShowAllFinalOn");
+                else
+                    WordEvidenceHelper.LogCommandWithEvidence("ShowAllFinalOff");
             }
             catch (Exception ex)
             {
@@ -1568,7 +1570,8 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 1-1 その場採点: 離脱前でも、滞在中トグル実績ありかつ表示ONなら FinalOn を残す（一括で View が消えても救済）。
+        /// 1-1 その場採点: 離脱前でも、滞在中トグル実績があればいまの表示状態を FinalOn / FinalOff で残す。
+        /// （一括で View が消えても last-wins で揃える）
         /// </summary>
         private void TryLogTask11ShowAllFinalOnForScore(Word.Application app)
         {
@@ -1582,6 +1585,8 @@ namespace New_MOSWordVSTOAddIn
             {
                 if (app.ActiveWindow.View.ShowAll)
                     WordEvidenceHelper.LogCommandWithEvidence("ShowAllFinalOn");
+                else
+                    WordEvidenceHelper.LogCommandWithEvidence("ShowAllFinalOff");
             }
             catch { /* ignore */ }
         }
@@ -1696,7 +1701,12 @@ namespace New_MOSWordVSTOAddIn
                 WordEvidenceHelper.LogCommandWithEvidence("ShowAll");
                 // 1-1 滞在中のトグルのみ離脱補記のガードに使う（フラッシュ時の他タスクでは立てない）
                 if (IsShowAllEvidenceTaskActive())
+                {
                     _showAllToggledThisVisit = true;
+                    // last-wins: OFF にした瞬間に FinalOff を残し、以前の FinalOn を無効化する
+                    WordEvidenceHelper.LogCommandWithEvidence(
+                        viewShowAll ? "ShowAllFinalOn" : "ShowAllFinalOff");
+                }
             }
             _lastShowAllState = viewShowAll;
         }
