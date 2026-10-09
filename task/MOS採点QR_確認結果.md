@@ -2,7 +2,7 @@
 
 `task/MOS採点QR_確認チェックリスト.md`（正本: `kouzakanri/docs/MOS採点QR_確認チェックリスト.md`）に沿って確認した記録。
 
-**結論: MOSアプリ側の設定と画面コードは揃っている。本番サイトにはまだ載っていない。**
+**結論: MOSアプリ側の設定と画面コードは揃っている。kouzakanri ローカル公開経路は 2026-10-09 に通った。Preview / 本番 URL はまだ 404（`NETLIFY_AUTH_TOKEN` 失効）。**
 
 公開URL（3科目の `practiceSubmit.baseUrl`）:
 
@@ -155,6 +155,17 @@ MOSアプリ側は変更不要。`baseUrl` / `qrPathId` / `ingestKey` は現状�
 5. 座席表の氏名セルに時刻と ×の数が入ることを確認する
 
 ここまで通れば、旧 Formzu 相当の受講生フローは確認完了。
+
+---
+
+## 追記（10/09）Preview 確認
+
+詳細は kouzakanri の `docs/MOS採点QR_確認結果.md`。
+
+- 3科目 `practiceSubmit.baseUrl` は本番 URL のまま（リポジトリは変えない）
+- Preview 実機確認のときだけ、**exe 隣** `Assets\config.json` の `baseUrl` を `https://develop--kouzakanri.netlify.app` にする
+- 通ったら教室配布の `baseUrl` は `https://kouzakanri.netlify.app` に戻す
+- 先に GitHub Secrets の `NETLIFY_AUTH_TOKEN` 更新が必要。更新しないと Preview は 404 のまま
 
 ---
 

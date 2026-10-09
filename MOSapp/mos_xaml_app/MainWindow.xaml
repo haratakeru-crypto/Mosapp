@@ -293,7 +293,7 @@
                 </ScrollViewer>
             </TabItem>
             <TabItem Header="採点ログ">
-                <mos:ScoringLogListControl Subject="Excel" EntryClicked="ScoringLog_EntryClicked"/>
+                <mos:ScoringLogListControl x:Name="ScoringLogList" Subject="Excel" EntryClicked="ScoringLog_EntryClicked"/>
             </TabItem>
         </TabControl>
 

@@ -231,7 +231,7 @@ namespace MosPracticeClient
         void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
             var confirm = MessageBox.Show(
-                "このPCに保存している大学名・氏名を削除します。よろしいですか？",
+                "このPCに保存している大学名・氏名・教室と、採点ログをすべて削除します。よろしいですか？",
                 "大学情報を削除",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -245,6 +245,9 @@ namespace MosPracticeClient
             _pendingClassroom = "";
             ClassroomCombo.ItemsSource = null;
             ClassroomCombo.SelectedItem = null;
+            ClassroomCombo.IsEnabled = false;
+            ClassroomHint.Text = "";
+            ClassroomPanel.Visibility = Visibility.Collapsed;
             _suppressSuggest = false;
             UniversitySuggestions.Visibility = Visibility.Collapsed;
             _locked = false;
