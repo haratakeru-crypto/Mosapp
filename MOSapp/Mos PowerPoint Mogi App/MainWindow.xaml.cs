@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Libraries;
 
 namespace MOS_PowerPoint_app
 {
@@ -22,7 +23,8 @@ namespace MOS_PowerPoint_app
     {
         private MainViewModel _viewModel;
         private Views.UiTestAppBarWindow _appBarWindow;
-        
+        private bool _isExiting;
+
         // タイマー無効化フラグ（静的プロパティ）。デフォルトは一時停止。
         public static bool IsTimerDisabled { get; private set; } = true;
 
@@ -31,10 +33,10 @@ namespace MOS_PowerPoint_app
             try
             {
                 InitializeComponent();
-                
+
                 _viewModel = new MainViewModel();
                 DataContext = _viewModel;
-                
+
                 // ViewModelのイベントを購読
                 _viewModel.ShowAppBarRequested += OnShowAppBarRequested;
                 _viewModel.HideMainWindowRequested += OnHideMainWindowRequested;
@@ -47,7 +49,7 @@ namespace MOS_PowerPoint_app
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"MainWindowの初期化中にエラーが発生しました:\n\n{ex.Message}\n\nスタックトレース:\n{ex.StackTrace}", 
+                MessageBox.Show($"MainWindowの初期化中にエラーが発生しました:\n\n{ex.Message}\n\nスタックトレース:\n{ex.StackTrace}",
                     "初期化エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 System.Diagnostics.Debug.WriteLine($"MainWindow初期化エラー: {ex}");
                 throw;
@@ -92,32 +94,75 @@ namespace MOS_PowerPoint_app
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (_isExiting)
+                return;
+
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
+            {
                 e.Cancel = true;
+                return;
+            }
+
+            _isExiting = true;
+            try
+            {
+                Cursor = Cursors.Wait;
+                CloseAppBarForExit();
+                PowerPointApplicationManager.ClosePowerPointApplicationForAppExit();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainWindow] Exit cleanup: " + ex.Message);
+            }
+            finally
+            {
+                Cursor = Cursors.Arrow;
+            }
+        }
+
+        /// <summary>終了時に AppBar を閉じる（Closed で MainWindow を再表示しない）。</summary>
+        private void CloseAppBarForExit()
+        {
+            var bar = _appBarWindow;
+            _appBarWindow = null;
+            if (bar == null)
+                return;
+
+            try { bar.Closed -= OnAppBarWindowClosed; } catch { /* ignore */ }
+            try { bar.Close(); } catch { /* ignore */ }
         }
 
         private void OnShowAppBarRequested(object sender, EventArgs e)
         {
+            if (_isExiting)
+                return;
+
             if (_appBarWindow == null || !_appBarWindow.IsLoaded)
             {
                 var project = _viewModel.CurrentProject;
                 if (project != null)
                 {
                     _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, true, false, () => _viewModel.ScoreCommand.Execute(null));
-                    _appBarWindow.Closed += (s, args) =>
-                    {
-                        // バーウィンドウが閉じられたらメインウィンドウを再表示
-                        this.Show();
-                        this.Activate();
-                        _appBarWindow = null;
-                    };
+                    _appBarWindow.Closed += OnAppBarWindowClosed;
                 }
             }
             if (_appBarWindow != null)
             {
                 _appBarWindow.Show();
             }
+        }
+
+        private void OnAppBarWindowClosed(object sender, EventArgs e)
+        {
+            if (!ReferenceEquals(sender, _appBarWindow))
+                return;
+            _appBarWindow = null;
+            if (_isExiting)
+                return;
+            _viewModel?.EnableProjectSelection();
+            this.Show();
+            this.Activate();
         }
 
         private void OnHideMainWindowRequested(object sender, EventArgs e)
@@ -146,6 +191,7 @@ namespace MOS_PowerPoint_app
             {
                 try
                 {
+                    _appBarWindow.CloseInstantScoringOverlay();
                     _appBarWindow.ApplyScoreResults(_viewModel.CurrentProject.ProjectId, results);
                 }
                 catch (Exception ex)
@@ -153,7 +199,10 @@ namespace MOS_PowerPoint_app
                     System.Diagnostics.Debug.WriteLine($"[OnScoreCompleted] ApplyScoreResults error: {ex.Message}");
                 }
             }
-            Views.ScoreResultWindow.ShowResults(_appBarWindow ?? (Window)this, results);
+            if (_appBarWindow != null)
+                _appBarWindow.ShowScoreResult(results);
+            else
+                Views.ScoreResultWindow.ShowResults(this, results);
         }
 
         protected override void OnClosed(EventArgs e)
@@ -167,10 +216,10 @@ namespace MOS_PowerPoint_app
                 _viewModel.ExamEnded -= OnExamEnded;
                 _viewModel.ScoreCompleted -= OnScoreCompleted;
             }
-            
-            // アプリバーウィンドウを閉じる
-            _appBarWindow?.Close();
-            
+
+            if (!_isExiting)
+                CloseAppBarForExit();
+
             base.OnClosed(e);
         }
     }

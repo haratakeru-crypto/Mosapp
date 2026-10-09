@@ -89,12 +89,12 @@ namespace MOS_PowerPoint_app
         /// 採点前にスナップショットをクリアし世代番号で新規取得を強制する（同一タスクの古い基準を再利用しない）。
         /// タイムアウトした場合は待機を諦め、採点は継続する（スナップショットチェックは ID Mismatch でスキップされる）。
         /// </summary>
-        public void StartTaskAndWaitForSnapshot(int projectId, int taskId, int timeoutMs = 2000, int pollIntervalMs = 50)
+        public bool StartTaskAndWaitForSnapshot(int projectId, int taskId, int timeoutMs = 2000, int pollIntervalMs = 50)
         {
-            StartTaskAndWaitForSnapshot(projectId, taskId, 1, timeoutMs, pollIntervalMs);
+            return StartTaskAndWaitForSnapshot(projectId, taskId, 1, timeoutMs, pollIntervalMs);
         }
 
-        public void StartTaskAndWaitForSnapshot(int projectId, int taskId, int attemptNo, int timeoutMs = 2000, int pollIntervalMs = 50)
+        public bool StartTaskAndWaitForSnapshot(int projectId, int taskId, int attemptNo, int timeoutMs = 2000, int pollIntervalMs = 50)
         {
             var swTotal = Stopwatch.StartNew();
             Libraries.PPLogReader.ClearSnapshot();
@@ -115,7 +115,7 @@ namespace MOS_PowerPoint_app
                     {
                         PPGradingPerf.Log("StartTaskAndWaitForSnapshot.wait", swWait.ElapsedMilliseconds, $"P{projectId}-T{taskId} gen={expectedGen}");
                         PPGradingPerf.Log("StartTaskAndWaitForSnapshot.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
-                        return;
+                        return true;
                     }
                 }
                 catch { }
@@ -123,6 +123,43 @@ namespace MOS_PowerPoint_app
             }
             PPGradingPerf.Log("StartTaskAndWaitForSnapshot.wait", swWait.ElapsedMilliseconds, $"P{projectId}-T{taskId} gen={expectedGen} timeout {timeoutMs}ms");
             PPGradingPerf.Log("StartTaskAndWaitForSnapshot.total", swTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
+            return false;
+        }
+
+        /// <summary>
+        /// その場採点の開始時に、いま開いているタスクだけ離脱時と同じ破壊的比較を1回行う。
+        /// 採点用の世代番号（0以外）や別タスクの基準は比べない。
+        /// </summary>
+        public bool LogOpenTaskBaselineDiffOnce(int projectId)
+        {
+            try
+            {
+                if (!Libraries.PPLogReader.TryReadCurrentTaskFile(out int curProjectId, out int curTaskId, out _, out int attemptNo, out int snapshotGen))
+                    return false;
+                if (curProjectId != projectId || curTaskId <= 0 || snapshotGen != 0)
+                    return false;
+
+                string snapshotPath = Libraries.PPLogReader.GetSnapshotPath();
+                if (!Libraries.PPLogReader.TryReadSnapshotMeta(snapshotPath, out int snapProjectId, out int snapTaskId, out int snapAttemptNo, out int snapGen))
+                    return false;
+                if (snapProjectId != curProjectId || snapTaskId != curTaskId || snapAttemptNo != attemptNo || snapGen != 0)
+                    return false;
+
+                var exempt = Libraries.PPTaskValidationConfig.GetExemptFlags(curProjectId, curTaskId);
+                List<string> errors;
+                lock (PowerPointCheckerCommon.PowerPointComInteropSync)
+                {
+                    errors = Libraries.PPSnapshotChecker.CompareAndGetErrors(curProjectId, curTaskId, attemptNo, exempt);
+                }
+                if (errors != null && errors.Count > 0)
+                    Libraries.PPLogReader.AppendDestructiveErrors(curProjectId, curTaskId, attemptNo, errors);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[LogOpenTaskBaselineDiffOnce] " + ex.Message);
+                return false;
+            }
         }
         /// <summary>
         /// 指定したプロジェクト・タスクの採点を行う。
@@ -136,7 +173,7 @@ namespace MOS_PowerPoint_app
             return GradeTask(projectId, taskId, 1);
         }
 
-        public bool GradeTask(int projectId, int taskId, int attemptNo)
+        public bool GradeTask(int projectId, int taskId, int attemptNo, bool batchScoring = false, bool skipFreshSnapshotCompare = false)
         {
             var swGradeTotal = Stopwatch.StartNew();
             if (_activePresentation == null)
@@ -172,36 +209,55 @@ namespace MOS_PowerPoint_app
             bool comResult = false;
             lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
-                var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, attemptNo, exemptFlags);
-                PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
-                if (projectId == 1 && taskId == 1)
+                bool snapshotMatched = skipFreshSnapshotCompare
+                    && Libraries.PPLogReader.TryReadSnapshotMeta(
+                        Libraries.PPLogReader.GetSnapshotPath(),
+                        out int snapProjectId,
+                        out int snapTaskId,
+                        out int snapAttemptNo,
+                        out int snapGen)
+                    && snapProjectId == projectId
+                    && snapTaskId == taskId
+                    && snapAttemptNo == attemptNo
+                    && snapGen > 0;
+                if (snapshotMatched)
                 {
-                    LogTask1_1SnapshotContext(destructiveErrors);
+                    PPGradingPerf.Log("GradeTask.PPSnapshotCompareSkipped", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}");
                 }
-                if (destructiveErrors.Count > 0)
+                else
                 {
-                    foreach (var err in destructiveErrors)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
-                    }
-                    PPLogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, destructiveErrors);
+                    string fallback = skipFreshSnapshotCompare ? " fallback" : string.Empty;
+                    var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, attemptNo, exemptFlags);
+                    PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}{fallback}");
                     if (projectId == 1 && taskId == 1)
                     {
-                        Debug.WriteLine($"[Task1-1] GradeTask: FAIL early exit (snapshot errors={destructiveErrors.Count}, COM not run)");
+                        LogTask1_1SnapshotContext(destructiveErrors);
                     }
-                    PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit snapshot errors");
-                    return false;
-                }
+                    if (destructiveErrors.Count > 0)
+                    {
+                        foreach (var err in destructiveErrors)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
+                        }
+                        PPLogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, destructiveErrors);
+                        if (projectId == 1 && taskId == 1)
+                        {
+                            Debug.WriteLine($"[Task1-1] GradeTask: FAIL early exit (snapshot errors={destructiveErrors.Count}, COM not run)");
+                        }
+                        PPGradingPerf.Log("GradeTask.total", swGradeTotal.ElapsedMilliseconds, $"P{projectId}-T{taskId} early exit snapshot errors");
+                        return false;
+                    }
 
-                if (projectId == 1 && taskId == 1)
-                {
-                    Debug.WriteLine("[Task1-1] GradeTask: snapshot OK, reaching COM checker");
+                    if (projectId == 1 && taskId == 1)
+                    {
+                        Debug.WriteLine("[Task1-1] GradeTask: snapshot OK, reaching COM checker");
+                    }
                 }
 
                 sw.Restart();
                 try
                 {
-                    PPLogReader.SetGradingContext(projectId, taskId, attemptNo);
+                    PPLogReader.SetGradingContext(projectId, taskId, attemptNo, batchScoring);
                     comResult = RunComChecker(projectId, taskId);
                 }
                 catch

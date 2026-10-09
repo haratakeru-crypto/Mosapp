@@ -64,6 +64,7 @@ namespace MOS_Word_app.Views
         private TimeSpan _remainingTime;
         private int _currentProjectId = 1;
         private int _currentTaskId = 1;
+        private bool _isMovingToNextProject;
         private int _groupId = 1; // グループIDを保存
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
@@ -314,6 +315,7 @@ namespace MOS_Word_app.Views
                 : MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
+            WordStartupInputGate.End();
             _timer?.Stop();
             SaveAndCloseAllWordDocuments();
             TryQuitWord();
@@ -338,6 +340,10 @@ namespace MOS_Word_app.Views
 
                 // 通常モード: レビューページを開く（編集内容をディスクに保存してから Word を閉じる）
                 LogReader.RequestCloseNavigationPaneIfOpen();
+                WriteCurrentTaskFile();
+                int reviewAttemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, reviewAttemptNo);
+                WordBatchScoring.PrepareBeforeClosingDocumentsForBatchScoring(_currentProjectId, _currentTaskId, reviewAttemptNo);
                 SaveAndCloseAllWordDocuments();
                 this.Hide();
 
@@ -1487,12 +1493,12 @@ namespace MOS_Word_app.Views
             }
         }
         
-        private void NextProject_Click(object sender, RoutedEventArgs e)
+        private async void NextProject_Click(object sender, RoutedEventArgs e)
         {
             ScoreResultWindow.TryBringOpenToFront();
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
-            MoveToNextProject();
+            await MoveToNextProjectAsync();
         }
 
         /// <summary>
@@ -1549,47 +1555,109 @@ namespace MOS_Word_app.Views
             }
         }
         
-        private void MoveToNextProject()
+        private async System.Threading.Tasks.Task MoveToNextProjectAsync()
         {
-            LogReader.RequestCloseNavigationPaneIfOpen();
-            SaveAndCloseAllWordDocuments();
+            if (_isMovingToNextProject)
+                return;
 
-            // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
-            
-            // 次のプロジェクトに移動
-            _currentProjectId++;
-            
-            if (_currentProjectId > maxProjectId)
+            if (_currentProjectId >= maxProjectId)
             {
-                // 最後のプロジェクトを超えた場合はレビューページに移動
                 System.Diagnostics.Debug.WriteLine($"プロジェクト{maxProjectId}を超えたため、レビューページに移動します");
                 ReviewPageButton_Click(null, null);
                 return;
             }
-            
-            // 新しいプロジェクトのWordドキュメントを開く
-            OpenProjectDocument(_currentProjectId, _groupId);
-            
-            // プロジェクト変更時は状態をリセットしない（Dictionaryで管理）
-            
-            // 新しいプロジェクトのタスクを読み込み
-            LoadCurrentProjectTasks();
-            UpdateTaskDisplay();
-            
-            // プロジェクトタイマーをリセット
-            ResetProjectTimer();
-            
-            // プロジェクトの初回閲覧時刻を記録
-            if (!_projectFirstViewTime.ContainsKey(_currentProjectId))
+
+            int previousProjectId = _currentProjectId;
+            int nextProjectId = _currentProjectId + 1;
+            bool opened = false;
+            _isMovingToNextProject = true;
+            try
             {
-                _projectFirstViewTime[_currentProjectId] = DateTime.Now;
+                await DelayedProjectOpenNotice.RunAsync(async () =>
+                {
+                    string nextPath = null;
+                    try
+                    {
+                        nextPath = await System.Threading.Tasks.Task.Run(
+                            () => WordDataPathHelper.EnsureWorkingFile(_groupId, nextProjectId));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] 作業ファイル準備エラー: {ex.Message}");
+                    }
+
+                    if (string.IsNullOrEmpty(nextPath) || !File.Exists(nextPath))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"プロジェクト{nextProjectId}の作業ファイルが見つかりません。");
+                        return;
+                    }
+
+                    opened = await WordApplicationManager.TrySwitchToDocumentInRunningWordAsync(nextPath);
+                    if (!opened)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[MoveToNextProject] fast-path failed; fallback to TryOpenExamDocument");
+                        opened = await WordApplicationManager.TryOpenExamDocumentOnStaAsync(nextPath, makeVisible: true);
+                    }
+
+                    if (!opened)
+                    {
+                        await TryRestoreProjectDocumentAsync(previousProjectId);
+                        return;
+                    }
+
+                    _currentProjectId = nextProjectId;
+                    ApplyExamWindowLayout();
+                    LoadCurrentProjectTasks();
+                    UpdateTaskDisplay();
+                    ResetProjectTimer();
+                    if (!_projectFirstViewTime.ContainsKey(_currentProjectId))
+                        _projectFirstViewTime[_currentProjectId] = DateTime.Now;
+
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
+                });
             }
-            
-            System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
+            finally
+            {
+                _isMovingToNextProject = false;
+            }
+
+            if (!opened)
+            {
+                MessageBox.Show(this,
+                    "次のプロジェクトを開けませんでした。現在のプロジェクトのままにしておきます。",
+                    "プロジェクト切り替え",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private async System.Threading.Tasks.Task TryRestoreProjectDocumentAsync(int projectId)
+        {
+            string currentPath = null;
+            try
+            {
+                currentPath = await System.Threading.Tasks.Task.Run(
+                    () => WordDataPathHelper.EnsureWorkingFile(_groupId, projectId));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] 元文書の準備エラー: {ex.Message}");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(currentPath) || !File.Exists(currentPath))
+                return;
+
+            bool restored = await WordApplicationManager.TryOpenExamDocumentOnStaAsync(currentPath, makeVisible: true);
+            System.Diagnostics.Debug.WriteLine(
+                $"[MoveToNextProject] restore project {projectId} {(restored ? "ok" : "fail")}");
+            if (restored)
+                ApplyExamWindowLayout();
         }
         
-        private void OpenProjectDocument(int projectId, int groupId)
+        private void OpenProjectDocument(int projectId, int groupId, bool showPreparingDialog = true)
         {
             string filePath = null;
             try
@@ -1601,56 +1669,27 @@ namespace MOS_Word_app.Views
                     PositionWordWindow();
                     return;
                 }
-                
-                WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
-                bool wordWasNotRunning = false;
-                
-                if (wordApp == null) return;
-                
-                // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、常にフォルダから開き直す
-                string pathLower = System.IO.Path.GetFullPath(filePath).ToLowerInvariant();
-                try
-                {
-                    for (int i = wordApp.Documents.Count; i >= 1; i--)
-                    {
-                        WordDoc doc = wordApp.Documents[i];
-                        try
-                        {
-                            string fullName = doc.FullName?.ToLowerInvariant() ?? "";
-                            string docFullPath = fullName;
-                            try { docFullPath = System.IO.Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
-                            if (fullName == pathLower || docFullPath == pathLower)
-                            {
-                                if (!doc.Saved)
-                                    doc.Save();
-                                doc.Close(SaveChanges: false);
-                                break;
-                            }
-                        }
-                        finally
-                        {
-                            if (doc != null) Marshal.ReleaseComObject(doc);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] 既存ドキュメント閉じる際のエラー: {ex.Message}");
-                }
 
-                try
+                // 同じパスが開いていれば一度閉じ、ハイブリッド Open（心拍即利用 / 拒否リトライ）
+                Action open = () =>
                 {
-                    wordApp.Documents.Open(filePath, ReadOnly: false, Visible: true); // 常にフォルダから開く
-                    if (wordWasNotRunning)
-                        System.Threading.Thread.Sleep(300);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Documents.Open エラー: {ex.Message}");
-                }
-                
-                ApplyExamWindowLayout();
-                System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
+                    WordApplicationManager.TryCloseOpenDocumentByPath(filePath);
+                    if (!WordApplicationManager.TryOpenExamDocument(filePath, out _, makeVisible: false))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] ドキュメントを開けませんでした: {filePath}");
+                        PositionWordWindow();
+                        return;
+                    }
+
+                    WordApplicationManager.SetWordVisible(true);
+                    ApplyExamWindowLayout();
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
+                };
+
+                if (showPreparingDialog)
+                    PreparingWindow.Run(this, open);
+                else
+                    open();
             }
             catch (Exception ex)
             {
@@ -1658,7 +1697,7 @@ namespace MOS_Word_app.Views
             }
         }
         
-        private void MoveToNextProjectWithMessage()
+        private async void MoveToNextProjectWithMessage()
         {
             MessageBox.Show(this, "5分経ったので次のプロジェクトに移動します", "時間切れ",
                           MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1666,7 +1705,7 @@ namespace MOS_Word_app.Views
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
 
-            MoveToNextProject();
+            await MoveToNextProjectAsync();
         }
         
         private void ResetProjectTimer()
@@ -1810,7 +1849,7 @@ namespace MOS_Word_app.Views
             return flaggedCount;
         }
         
-        private async void ResetButton_Click(object sender, RoutedEventArgs e)
+        private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -1823,73 +1862,24 @@ namespace MOS_Word_app.Views
                 if (result != MessageBoxResult.Yes)
                     return;
 
-                var waitWindow = new Window
+                try
                 {
-                    Title = "リセット中",
-                    Width = 300,
-                    Height = 120,
-                    WindowStyle = WindowStyle.None,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    ShowInTaskbar = false,
-                    ResizeMode = ResizeMode.NoResize,
-                    Topmost = true,
-                    Background = System.Windows.Media.Brushes.White,
-                    BorderBrush = System.Windows.Media.Brushes.SteelBlue,
-                    BorderThickness = new Thickness(2)
-                };
-                var stack = new StackPanel
-                {
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Thickness(16)
-                };
-                stack.Children.Add(new TextBlock
-                {
-                    Text = $"リセット中です...\nプロジェクト {_currentProjectId}",
-                    FontSize = 14,
-                    TextAlignment = TextAlignment.Center,
-                    Foreground = System.Windows.Media.Brushes.SteelBlue
-                });
-                waitWindow.Content = stack;
-                waitWindow.Show();
-
-                Exception resetError = null;
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        if (!CloseAllWordDocuments())
-                            TryQuitWord();
-                        Thread.Sleep(500);
-                        ResetProject(_groupId, _currentProjectId);
-                    }
-                    catch (Exception ex) { resetError = ex; }
-                }, DispatcherPriority.Background);
-
-                waitWindow.Close();
-
-                if (resetError != null)
+                    if (!CloseAllWordDocuments())
+                        TryQuitWord();
+                    Thread.Sleep(500);
+                    ResetProject(_groupId, _currentProjectId);
+                }
+                catch (Exception resetError)
                 {
                     MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
                         "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                OpenProjectDocument(_currentProjectId, _groupId);
+                MessageBox.Show("プロジェクトをリセットしました。", "リセット完了",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
 
-                bool originalTopmost = this.Topmost;
-                try
-                {
-                    this.Topmost = true;
-                    this.Activate();
-                    MessageBox.Show(this, "プロジェクトをリセットしました。", "リセット完了",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                finally
-                {
-                    this.Topmost = originalTopmost;
-                }
-
+                OpenProjectDocument(_currentProjectId, _groupId, showPreparingDialog: false);
                 ApplyExamWindowLayout();
 
                 int taskCount = _tasks != null ? _tasks.Count : 0;

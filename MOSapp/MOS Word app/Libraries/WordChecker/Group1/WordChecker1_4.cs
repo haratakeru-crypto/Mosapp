@@ -180,7 +180,7 @@ namespace Libraries.Group1
                 try
                 {
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
-                    string xml = document.WordOpenXML;
+                    string xml = WordOpenXmlSession.Get(document);
                     if (!string.IsNullOrEmpty(xml))
                     {
                         xmlContainsPhrase = xml.Contains("前田先生に最終確認");
@@ -333,14 +333,12 @@ namespace Libraries.Group1
                 }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_04] ロジック実行開始");
-                bool lineSimple = WordWatermarkInspection.IsDocumentStyleSetLineSimple(document);
-                bool lineStylish = WordWatermarkInspection.IsDocumentStyleSetLineStylish(document);
+                WordWatermarkInspection.StyleSetLineResult styleSet = WordWatermarkInspection.EvaluateStyleSetLine(document);
+                bool lineSimple = styleSet.IsSimple;
                 bool logSimple = LogReader.HasTaskEvidence(4, 4, "StyleSetLineSimple");
-                bool logStylish = LogReader.HasTaskEvidence(4, 4, "StyleSetLineStylish");
-                bool logOk = logSimple && !logStylish;
-
-                bool result = lineSimple && !lineStylish && logOk;
-                System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_04] 終了。結果={result}");
+                // 過去の StyleSetLineStylish は見ない。別セットのままなら lineSimple が false で ×。
+                bool result = lineSimple && logSimple;
+                System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_04] 終了。結果={result} (lineSimple={lineSimple}, logSimple={logSimple})");
                 return result;
             }
             catch (Exception ex)
@@ -402,7 +400,7 @@ namespace Libraries.Group1
                 string normalizedXml = "";
                 try
                 {
-                    string xml = document.WordOpenXML;
+                    string xml = WordOpenXmlSession.Get(document);
                     normalizedXml = WordWatermarkInspection.NormalizeXml(xml);
                 }
                 catch { }

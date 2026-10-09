@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text;
@@ -25,8 +26,17 @@ namespace MosPracticeSessionWatch
         static string KeyPath => Path.Combine(DataDirectory, "presence-key.txt");
 
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            // MOS 本体が COM で固まっても / 即終了しても Excel を落とすワンショット。
+            // 例: MosPracticeSessionWatch.exe kill-excel 12345 638000000000000000 3000
+            if (args != null && args.Length >= 1
+                && string.Equals(args[0], "kill-excel", StringComparison.OrdinalIgnoreCase))
+            {
+                RunExcelKillWatch(args);
+                return;
+            }
+
             bool created;
             var mutex = new Mutex(true, MutexName, out created);
             if (!created) return;
@@ -44,6 +54,106 @@ namespace MosPracticeSessionWatch
                 SystemEvents.SessionSwitch -= OnSessionSwitch;
                 mutex.ReleaseMutex();
                 mutex.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// kill-excel &lt;pid&gt; &lt;startTimeTicks|0&gt; &lt;delayMs&gt;
+        /// 待機後、同一 Excel PID（起動時刻一致）が残っていれば Kill して終了する。
+        /// 診断ログや COM は使わない。
+        /// </summary>
+        static void RunExcelKillWatch(string[] args)
+        {
+            try
+            {
+                if (args.Length < 4)
+                    return;
+
+                int pid;
+                long startTicks;
+                int delayMs;
+                if (!int.TryParse(args[1], out pid) || pid <= 0)
+                    return;
+                if (!long.TryParse(args[2], out startTicks))
+                    return;
+                if (!int.TryParse(args[3], out delayMs) || delayMs < 0)
+                    delayMs = 3000;
+                if (delayMs > 60000)
+                    delayMs = 60000;
+
+                Thread.Sleep(delayMs);
+
+                if (!IsMatchingExcelAlive(pid, startTicks))
+                    return;
+
+                try
+                {
+                    using (var p = Process.GetProcessById(pid))
+                    {
+                        if (p.HasExited)
+                            return;
+                        if (!string.Equals(p.ProcessName, "EXCEL", StringComparison.OrdinalIgnoreCase))
+                            return;
+                        p.Kill();
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    return;
+                }
+                catch
+                {
+                    return;
+                }
+
+                var sw = Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < 2000)
+                {
+                    if (!IsMatchingExcelAlive(pid, startTicks))
+                        return;
+                    Thread.Sleep(100);
+                }
+            }
+            catch
+            {
+                /* ワンショット。失敗しても本体には影響させない */
+            }
+        }
+
+        static bool IsMatchingExcelAlive(int pid, long startTicks)
+        {
+            try
+            {
+                using (var p = Process.GetProcessById(pid))
+                {
+                    if (p.HasExited)
+                        return false;
+                    if (!string.Equals(p.ProcessName, "EXCEL", StringComparison.OrdinalIgnoreCase))
+                        return false;
+                    if (startTicks > 0)
+                    {
+                        try
+                        {
+                            long actual = p.StartTime.ToUniversalTime().Ticks;
+                            // 2秒相当のずれを許容
+                            if (Math.Abs(actual - startTicks) > TimeSpan.FromSeconds(2).Ticks)
+                                return false;
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            catch
+            {
+                return false;
             }
         }
 

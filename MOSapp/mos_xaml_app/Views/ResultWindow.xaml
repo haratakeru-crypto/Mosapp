@@ -175,7 +175,7 @@
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="120"/>
+                                                    <ColumnDefinition Width="160"/>
                                                 </Grid.ColumnDefinitions>
                                                 
                                                 <TextBlock Grid.Column="0" Text="プロジェクト番号・タスク番号" 
@@ -208,7 +208,7 @@
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="120"/>
+                                                                <ColumnDefinition Width="160"/>
                                                             </Grid.ColumnDefinitions>
                                                             
                                                             <!-- タスク情報 -->
@@ -221,14 +221,31 @@
                                                                            TextWrapping="Wrap" LineHeight="21"/>
                                                             </StackPanel>
                                                             
-                                                            <!-- 結果列（〇×） -->
-                                                            <Grid Grid.Column="1" VerticalAlignment="Center">
+                                                            <!-- 結果列（〇×と詳細） -->
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                                        HorizontalAlignment="Center" VerticalAlignment="Center">
                                                                 <TextBlock Text="{Binding ResultMark}" 
                                                                            FontSize="24" 
                                                                            FontWeight="Bold"
                                                                            Foreground="{Binding ResultColor}"
-                                                                           HorizontalAlignment="Center"/>
-                                                            </Grid>
+                                                                           VerticalAlignment="Center"/>
+                                                                <TextBlock Text="詳細" Tag="FailReason" Margin="10,0,0,0"
+                                                                           FontSize="15" Foreground="#1E40AF"
+                                                                           TextDecorations="Underline" Cursor="Hand"
+                                                                           VerticalAlignment="Center"
+                                                                           PreviewMouseLeftButtonDown="FailReason_PreviewMouseLeftButtonDown">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding HasFailReason}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </StackPanel>
                                                         </Grid>
                                                     </Border>
                                                 </DataTemplate>

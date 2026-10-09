@@ -15,6 +15,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- 見出し: 採点結果 -->
@@ -32,14 +33,14 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding TaskNumber}" MinWidth="32" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding TaskNumber}" MinWidth="48" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
 
             <!-- Result 行（〇 / ✖）-->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,20">
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
                 <TextBlock Text="Result" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <ItemsControl x:Name="ResultPanel" ItemsSource="{Binding}">
                     <ItemsControl.ItemsPanel>
@@ -49,7 +50,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock MinWidth="32" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <TextBlock MinWidth="48" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,8,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="✖"/>
@@ -68,8 +69,41 @@
                 </ItemsControl>
             </StackPanel>
 
+            <!-- Reason 行（×のときだけ「詳細」） -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20">
+                <TextBlock Text="Reason" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <ItemsControl x:Name="ReasonsPanel" ItemsSource="{Binding}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="詳細" MinWidth="48" Margin="0,0,8,0"
+                                       HorizontalAlignment="Center" FontSize="12"
+                                       Foreground="#1E40AF" Cursor="Hand" TextDecorations="Underline"
+                                       TextAlignment="Center"
+                                       PreviewMouseLeftButtonDown="ReasonLink_MouseDown">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <!-- Collapsed だと幅が消えて列が左に詰まるため Hidden で枠を残す -->
+                                        <Setter Property="Visibility" Value="Hidden"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasFailReason}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
             <!-- 閉じる -->
-            <Button Grid.Row="3" Content="閉じる" Width="100" Height="32"
+            <Button Grid.Row="4" Content="閉じる" Width="100" Height="32"
                     HorizontalAlignment="Center"
                     Background="#9E9E9E" Foreground="White" BorderThickness="0"
                     Click="CloseButton_Click"

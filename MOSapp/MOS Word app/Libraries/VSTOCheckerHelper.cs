@@ -24,7 +24,8 @@ namespace Libraries
             "7-3",  // インテグラルヘッダー（IntegralHeader ポーリング補助）
             "7-4",  // テキスト保存 (FileSaveAsTxt)
             "7-5",  // マクロ有効保存 (FileSaveAsDocm)
-            "8-1"   // 目次の挿入 (TocAutomatic2)
+            "8-1",  // 目次の挿入 (TocAutomatic2)
+            "9-5",  // 変更履歴のすべてを承諾して追跡終了 (AcceptAllChangesInDocAndStopTracking)
         };
 
         /// <summary>

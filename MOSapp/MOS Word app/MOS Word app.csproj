@@ -25,7 +25,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>10</ApplicationRevision>
+    <ApplicationRevision>11</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -100,7 +100,12 @@
       <Name>MosPracticeSessionWatch</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <!-- VSTO は Rebuild-And-Install-WordVSTO.ps1 / RegisterReleaseWordVsto で別途 Release 登録（Debug ビルド参照で上書きしない） -->
+    <!-- Debug: VS が New_MOSWordVSTOAddIn (bin\Debug) を登録。製品 MSI は WordMosVsto。Release 再登録は RegisterReleaseWordVsto / Rebuild-And-Install-WordVSTO.ps1 -->
+    <ProjectReference Include="New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn.csproj">
+      <Project>{07F6198F-2781-45A3-B41A-F75F992D27CF}</Project>
+      <Name>New_MOSWordVSTOAddIn</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -155,7 +160,11 @@
     <Compile Include="Converters.cs" />
     <Compile Include="Libraries\LogReader.cs" />
     <Compile Include="Libraries\ScoreResultStore.cs" />
+    <Compile Include="Libraries\WordScoreExplanation.cs" />
     <Compile Include="Libraries\WordBatchScoring.cs" />
+    <Compile Include="Views\ScoreReasonWindow.cs" />
+    <Compile Include="Libraries\WordGradingPerf.cs" />
+    <Compile Include="Libraries\ResetPerfLog.cs" />
     <Compile Include="Libraries\WordChecker\Group1\WordWatermarkInspection.cs" />
     <Compile Include="Libraries\WordChecker\WordFindHelper.cs" />
     <Compile Include="Libraries\WordWindowLayoutHelper.cs" />
@@ -190,6 +199,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Views\PreparingWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Compile Include="Views\UiTestAppBarWindow.xaml.cs">
       <DependentUpon>UiTestAppBarWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -212,6 +225,12 @@
     </Compile>
     <Compile Include="Views\ObjectSelectedWarningWindow.xaml.cs">
       <DependentUpon>ObjectSelectedWarningWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\DelayedProjectOpenNotice.cs" />
+    <Compile Include="Views\WordStartupInputGate.cs" />
+    <Compile Include="Views\PreparingWindow.xaml.cs">
+      <DependentUpon>PreparingWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
@@ -353,8 +372,6 @@
       <_ReleaseVsto>$(ProjectDir)New_MOSWordVSTOAddIn\New_MOSWordVSTOAddIn\bin\Release\New_MOSWordVSTOAddIn.vsto</_ReleaseVsto>
       <_VstoInstaller>$(CommonProgramFiles)\Microsoft Shared\VSTO\10.0\VSTOInstaller.exe</_VstoInstaller>
     </PropertyGroup>
-    <Exec Condition="Exists('$(_ReleaseVsto)') And Exists('$(_VstoInstaller)')"
-          Command="&quot;$(_VstoInstaller)&quot; /Install &quot;$(_ReleaseVsto)&quot; /Silent"
-          ContinueOnError="true" />
+    <Exec Condition="Exists('$(_ReleaseVsto)') And Exists('$(_VstoInstaller)')" Command="&quot;$(_VstoInstaller)&quot; /Install &quot;$(_ReleaseVsto)&quot; /Silent" ContinueOnError="true" />
   </Target>
 </Project>

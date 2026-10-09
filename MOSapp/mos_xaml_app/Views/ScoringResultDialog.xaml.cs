@@ -17,7 +17,9 @@ namespace MOSExcelMogiApp.Views
         public string Text { get; set; }
         public Brush Color { get; set; }
         public int TaskId { get; set; }
+        public string ReasonText { get; set; }
         public bool IsClickable => Text == "X" || Text == "▲";
+        public bool HasReason => !string.IsNullOrEmpty(ReasonText);
     }
 
     public partial class ScoringResultDialog : Window
@@ -29,6 +31,9 @@ namespace MOSExcelMogiApp.Views
         private Dictionary<int, string> _answerStepsByTaskId = new Dictionary<int, string>();
         private DispatcherTimer _keepOnTopTimer;
         private static int _openCount;
+        private bool _closing;
+        private bool _foregroundHooksAttached;
+        private bool _foregroundArmed;
 
         /// <summary>▲ クリックで解答手順表示後、採点結果を再表示するか。</summary>
         public bool ReopenAfterAnswerSteps { get; private set; }
@@ -54,7 +59,7 @@ namespace MOSExcelMogiApp.Views
                 {
                     foreach (Window window in app.Windows)
                     {
-                        if (window is ScoringResultDialog score && score.IsVisible)
+                        if (window is ScoringResultDialog score && score.CanBringToForeground)
                             score.BringToForeground();
                     }
                 }
@@ -74,21 +79,21 @@ namespace MOSExcelMogiApp.Views
             HookForegroundBehavior();
         }
 
-        public ScoringResultDialog(int taskCount, List<bool> results, int groupId = 1, int projectId = 1)
+        public ScoringResultDialog(int taskCount, List<bool> results, int groupId = 1, int projectId = 1, IList<string> failReasons = null)
         {
             InitializeComponent();
             _groupId = groupId;
             _projectId = projectId;
-            DisplayResults(results);
+            DisplayResults(results, failReasons);
             HookForegroundBehavior();
         }
 
-        public ScoringResultDialog(List<bool> results, int groupId = 1, int projectId = 1)
+        public ScoringResultDialog(List<bool> results, int groupId = 1, int projectId = 1, IList<string> failReasons = null)
         {
             InitializeComponent();
             _groupId = groupId;
             _projectId = projectId;
-            DisplayResults(results);
+            DisplayResults(results, failReasons);
             HookForegroundBehavior();
         }
 
@@ -107,25 +112,31 @@ namespace MOSExcelMogiApp.Views
         /// <summary>
         /// 採点結果を最前面のモーダルで表示する（Excel が前面に出ても維持）。
         /// </summary>
-        public static void ShowResults(Window owner, int taskCount, List<bool> results, int groupId, int projectId)
+        public static void ShowResults(Window owner, int taskCount, List<bool> results, int groupId, int projectId, IList<string> failReasons = null)
         {
-            var w = new ScoringResultDialog(taskCount, results, groupId, projectId)
+            var w = new ScoringResultDialog(taskCount, results, groupId, projectId, failReasons)
             {
                 Owner = owner,
                 Topmost = true,
                 ShowInTaskbar = true
             };
 
+            bool ownerWasTopmost = false;
             if (owner != null)
             {
+                ownerWasTopmost = owner.Topmost;
                 owner.Topmost = true;
-                owner.Activate();
             }
 
-            w.ShowDialog();
-
-            if (owner != null)
-                owner.Topmost = true;
+            try
+            {
+                w.ShowDialog();
+            }
+            finally
+            {
+                if (owner != null)
+                    owner.Topmost = ownerWasTopmost;
+            }
         }
 
         /// <summary>
@@ -133,39 +144,45 @@ namespace MOSExcelMogiApp.Views
         /// </summary>
         public static void ShowVariantResults(Window owner, int taskCount, int groupId, int projectId, int variantSetNo)
         {
+            bool ownerWasTopmost = false;
             if (owner != null)
             {
+                ownerWasTopmost = owner.Topmost;
                 owner.Topmost = true;
-                owner.Activate();
             }
 
-            while (true)
+            try
             {
-                var w = new ScoringResultDialog(taskCount, groupId, projectId, variantSetNo)
+                while (true)
                 {
-                    Owner = owner,
-                    Topmost = true,
-                    ShowInTaskbar = true
-                };
+                    var w = new ScoringResultDialog(taskCount, groupId, projectId, variantSetNo)
+                    {
+                        Owner = owner,
+                        Topmost = true,
+                        ShowInTaskbar = true
+                    };
 
-                w.ShowDialog();
+                    w.ShowDialog();
 
-                if (!w.ReopenAfterAnswerSteps)
-                    break;
+                    if (!w.ReopenAfterAnswerSteps)
+                        break;
 
-                string steps = w.GetAnswerStepsForTask(w.AnswerStepsTaskId);
-                string title = $"類題{variantSetNo} プロジェクト {groupId}-{projectId} タスク {w.AnswerStepsTaskId} 解答手順";
-                var answerWindow = new AnswerStepsWindow(title, steps)
-                {
-                    Owner = owner,
-                    Topmost = true,
-                    ShowInTaskbar = true
-                };
-                answerWindow.ShowDialog();
+                    string steps = w.GetAnswerStepsForTask(w.AnswerStepsTaskId);
+                    string title = $"類題{variantSetNo} プロジェクト {groupId}-{projectId} タスク {w.AnswerStepsTaskId} 解答手順";
+                    var answerWindow = new AnswerStepsWindow(title, steps)
+                    {
+                        Owner = owner,
+                        Topmost = true,
+                        ShowInTaskbar = true
+                    };
+                    answerWindow.ShowDialog();
+                }
             }
-
-            if (owner != null)
-                owner.Topmost = true;
+            finally
+            {
+                if (owner != null)
+                    owner.Topmost = ownerWasTopmost;
+            }
         }
 
         private string GetAnswerStepsForTask(int taskId)
@@ -175,25 +192,45 @@ namespace MOSExcelMogiApp.Views
             return string.Empty;
         }
 
+        private bool CanBringToForeground => !_closing && IsLoaded && IsVisible;
+
         private void HookForegroundBehavior()
         {
             Loaded += ScoringResultDialog_Loaded;
+            Closing += ScoringResultDialog_Closing;
             Closed += ScoringResultDialog_Closed;
             Deactivated += ScoringResultDialog_Deactivated;
+            _foregroundHooksAttached = true;
         }
 
         private void ScoringResultDialog_Loaded(object sender, RoutedEventArgs e)
         {
+            if (!_foregroundArmed)
+            {
+                _foregroundArmed = true;
+                if (_openCount++ == 0 && Application.Current != null)
+                    Application.Current.Activated += Application_Activated;
+            }
+
             BringToForeground();
             _keepOnTopTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             _keepOnTopTimer.Tick += KeepOnTopTimer_Tick;
             _keepOnTopTimer.Start();
+        }
 
-            if (_openCount++ == 0 && Application.Current != null)
-                Application.Current.Activated += Application_Activated;
+        private void ScoringResultDialog_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _closing = true;
+            ReleaseForegroundHooks();
         }
 
         private void ScoringResultDialog_Closed(object sender, EventArgs e)
+        {
+            _closing = true;
+            ReleaseForegroundHooks();
+        }
+
+        private void ReleaseForegroundHooks()
         {
             if (_keepOnTopTimer != null)
             {
@@ -202,6 +239,16 @@ namespace MOSExcelMogiApp.Views
                 _keepOnTopTimer = null;
             }
 
+            if (!_foregroundHooksAttached)
+                return;
+
+            _foregroundHooksAttached = false;
+            Deactivated -= ScoringResultDialog_Deactivated;
+
+            if (!_foregroundArmed)
+                return;
+
+            _foregroundArmed = false;
             if (--_openCount <= 0)
             {
                 _openCount = 0;
@@ -212,6 +259,9 @@ namespace MOSExcelMogiApp.Views
 
         private void ScoringResultDialog_Deactivated(object sender, EventArgs e)
         {
+            if (!CanBringToForeground)
+                return;
+
             Dispatcher.BeginInvoke(new Action(BringToForeground), DispatcherPriority.ApplicationIdle);
         }
 
@@ -222,19 +272,18 @@ namespace MOSExcelMogiApp.Views
 
         private void KeepOnTopTimer_Tick(object sender, EventArgs e)
         {
-            if (!IsVisible)
+            if (_closing || !IsVisible || IsActive)
                 return;
 
-            if (!IsActive)
-            {
-                Topmost = false;
-                Topmost = true;
-                BringToForeground();
-            }
+            Topmost = false;
+            Topmost = true;
         }
 
         private void BringToForeground()
         {
+            if (!CanBringToForeground)
+                return;
+
             Topmost = true;
             Activate();
             try
@@ -304,6 +353,7 @@ namespace MOSExcelMogiApp.Views
                 .Select(i => new ResultItem { Text = "-", Color = Brushes.Gray, TaskId = i })
                 .ToList();
             ResultsControl.ItemsSource = resultItems;
+            ReasonsControl.ItemsSource = resultItems;
         }
 
         private void DisplayVariantResults(int taskCount)
@@ -323,9 +373,10 @@ namespace MOSExcelMogiApp.Views
                 })
                 .ToList();
             ResultsControl.ItemsSource = resultItems;
+            ReasonsControl.ItemsSource = resultItems;
         }
 
-        private void DisplayResults(List<bool> results)
+        private void DisplayResults(List<bool> results, IList<string> failReasons)
         {
             System.Diagnostics.Debug.WriteLine($"[DisplayResults] Called with {results.Count} results, groupId: {_groupId}, projectId: {_projectId}");
 
@@ -333,16 +384,28 @@ namespace MOSExcelMogiApp.Views
             TaskNumbersControl.ItemsSource = taskNumbers;
 
             var resultItems = results.Select((r, index) => {
+                string reason = null;
+                if (!r && failReasons != null && index < failReasons.Count)
+                    reason = failReasons[index];
                 var item = new ResultItem
                 {
                     Text = r ? "O" : "X",
                     Color = r ? Brushes.Green : Brushes.Red,
-                    TaskId = index + 1
+                    TaskId = index + 1,
+                    ReasonText = reason
                 };
                 System.Diagnostics.Debug.WriteLine($"[DisplayResults] Created ResultItem - TaskId: {item.TaskId}, Text: {item.Text}, IsClickable: {item.IsClickable}");
                 return item;
             }).ToList();
             ResultsControl.ItemsSource = resultItems;
+            ReasonsControl.ItemsSource = resultItems;
+        }
+
+        private void ReasonLink_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement element && element.DataContext is ResultItem resultItem && resultItem.HasReason)
+                ScoreReasonWindow.Show(this, resultItem.TaskId, resultItem.ReasonText);
         }
 
         private void ResultItem_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)

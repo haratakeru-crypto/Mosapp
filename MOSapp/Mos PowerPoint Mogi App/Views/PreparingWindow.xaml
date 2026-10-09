@@ -1,0 +1,52 @@
+<Window x:Class="MOS_PowerPoint_app.Views.PreparingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="準備中"
+        Height="180" Width="420"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="White"
+        BorderBrush="#1E3A5F"
+        BorderThickness="2"
+        Loaded="Window_Loaded">
+    <Grid Margin="28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0"
+                   Text="準備中です"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Foreground="#1E3A5F"
+                   HorizontalAlignment="Center"/>
+        <TextBlock Grid.Row="1"
+                   Text="操作しないでください。完了するまでお待ちください。"
+                   FontSize="14"
+                   Foreground="#333333"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   Margin="0,12,0,16"/>
+        <!-- UI スレッドが固まっても専用スレッド上で動く見た目用マーキー -->
+        <Border Grid.Row="2"
+                Height="18"
+                Background="#E5E7EB"
+                CornerRadius="3"
+                ClipToBounds="True">
+            <Rectangle x:Name="MarqueeBar"
+                       Width="110"
+                       Height="18"
+                       RadiusX="3"
+                       RadiusY="3"
+                       Fill="#1E3A5F">
+                <Rectangle.RenderTransform>
+                    <TranslateTransform x:Name="MarqueeTransform" X="-110"/>
+                </Rectangle.RenderTransform>
+            </Rectangle>
+        </Border>
+    </Grid>
+</Window>

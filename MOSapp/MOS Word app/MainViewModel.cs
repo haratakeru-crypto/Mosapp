@@ -49,7 +49,7 @@ namespace MOS_Word_app
         public MainViewModel()
         {
             LoadProjects();
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
+            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
             TabSearchCommand = new RelayCommand(ExecuteTabSearch);
             ResetAllInGroupCommand = new RelayCommand(ExecuteResetAllInGroup);
             TabTasks = new ObservableCollection<TabTaskInfo>();
@@ -158,6 +158,29 @@ namespace MOS_Word_app
             }
         }
 
+        private bool _isOpeningProject;
+
+        public void EnableProjectSelection()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(EnableProjectSelection));
+                return;
+            }
+
+            if (!_isOpeningProject)
+                return;
+            _isOpeningProject = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void DisableProjectSelection()
+        {
+            _isOpeningProject = true;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
         private void ExecuteOpenProject(object parameter)
         {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
@@ -168,9 +191,11 @@ namespace MOS_Word_app
                 return;
             }
             var project = (ProjectViewModel)parameter;
+            DisableProjectSelection();
             {
                 if (string.IsNullOrEmpty(project.FilePath))
                 {
+                    EnableProjectSelection();
                     ResultMessage = $"エラー: ファイルが見つかりません: {project.FilePath ?? "パスが設定されていません"}";
                     return;
                 }
@@ -184,6 +209,7 @@ namespace MOS_Word_app
                     }
                     catch (Exception exCopy)
                     {
+                        EnableProjectSelection();
                         ResultMessage = $"エラー: ファイルをコピーできませんでした: {exCopy.Message}";
                         return;
                     }
@@ -202,74 +228,64 @@ namespace MOS_Word_app
 
                     if (result == MessageBoxResult.No)
                     {
+                        EnableProjectSelection();
                         ResultMessage = "Wordの起動をキャンセルしました。";
                         return;
                     }
                 }
 
-                try
+                Views.WordStartupInputGate.Begin();
+
+                string targetPath = NormalizeDocumentPath(project.FilePath);
+                bool switchingProject = CurrentProject != null
+                    && !string.Equals(NormalizeDocumentPath(CurrentProject.FilePath), targetPath, StringComparison.OrdinalIgnoreCase);
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+
+                // アドイン待ちは画面スレッドの外で行い、準備中ダイアログを描けるようにする。
+                System.Threading.Tasks.Task.Run(() =>
                 {
-                    string targetPath = NormalizeDocumentPath(project.FilePath);
-                    bool switchingProject = CurrentProject != null
-                        && !string.Equals(NormalizeDocumentPath(CurrentProject.FilePath), targetPath, StringComparison.OrdinalIgnoreCase);
-
-                    // 別プロジェクトへ切り替えるときだけ全ドキュメントを保存・閉じる
-                    if (switchingProject)
-                        SaveAndCloseAllWordDocuments();
-
-                    WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
-
-                    if (!TryActivateOpenDocument(wordApp, targetPath))
+                    bool opened = false;
+                    string errorMessage = null;
+                    try
                     {
-                        // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、フォルダから開き直す
-                        try
-                        {
-                            for (int i = wordApp.Documents.Count; i >= 1; i--)
-                            {
-                                WordDoc openDoc = wordApp.Documents[i];
-                                try
-                                {
-                                    if (DocumentPathsEqual(openDoc.FullName, targetPath))
-                                    {
-                                        if (!openDoc.Saved)
-                                            openDoc.Save();
-                                        openDoc.Close(SaveChanges: false);
-                                        break;
-                                    }
-                                }
-                                finally
-                                {
-                                    if (openDoc != null) Marshal.ReleaseComObject(openDoc);
-                                }
-                            }
-                        }
-                        catch (Exception exClose)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] 既存ドキュメント閉じる際のエラー: {exClose.Message}");
-                        }
+                        if (switchingProject)
+                            SaveAndCloseAllWordDocuments();
 
-                        try
-                        {
-                            wordApp.Documents.Open(project.FilePath, ReadOnly: false, Visible: true);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"ドキュメントを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
-                        }
+                        WordApplicationManager.TryCloseOpenDocumentByPath(project.FilePath);
+                        opened = WordApplicationManager.TryOpenExamDocument(project.FilePath, out _, makeVisible: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        errorMessage = ex.Message;
+                        System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
                     }
 
-                    CurrentProject = project;
-                    HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
-                    ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
-                    ApplyExamWindowLayoutFromOpenProject();
-                    BringWordWindowToForeground();
-                    ResultMessage = $"Wordファイルを開きました: {Path.GetFileName(project.FilePath)}";
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
-                    System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
-                }
+                    if (dispatcher == null)
+                    {
+                        EnableProjectSelection();
+                        return;
+                    }
+
+                    dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!opened)
+                        {
+                            Views.WordStartupInputGate.End();
+                            EnableProjectSelection();
+                            ResultMessage = errorMessage != null
+                                ? $"エラー: ファイルを開けませんでした: {errorMessage}"
+                                : $"エラー: Wordファイルを開けませんでした: {Path.GetFileName(project.FilePath)}";
+                            return;
+                        }
+
+                        CurrentProject = project;
+                        HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
+                        ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
+                        ApplyExamWindowLayoutFromOpenProject();
+                        BringWordWindowToForeground();
+                        ResultMessage = $"Wordファイルを開きました: {Path.GetFileName(project.FilePath)}";
+                    }));
+                });
             }
         }
 
@@ -404,47 +420,6 @@ namespace MOS_Word_app
             {
                 return path.ToLowerInvariant();
             }
-        }
-
-        private static bool DocumentPathsEqual(string left, string rightNormalized)
-        {
-            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(rightNormalized))
-                return false;
-            return string.Equals(NormalizeDocumentPath(left), rightNormalized, StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>対象ファイルが既に開いていればアクティブ化して true を返す。</summary>
-        private static bool TryActivateOpenDocument(WordApp wordApp, string targetPathNormalized)
-        {
-            if (wordApp == null || string.IsNullOrEmpty(targetPathNormalized))
-                return false;
-
-            try
-            {
-                for (int i = wordApp.Documents.Count; i >= 1; i--)
-                {
-                    WordDoc doc = wordApp.Documents[i];
-                    try
-                    {
-                        if (!DocumentPathsEqual(doc.FullName, targetPathNormalized))
-                            continue;
-
-                        doc.Activate();
-                        try { doc.ActiveWindow?.Activate(); } catch { }
-                        return true;
-                    }
-                    finally
-                    {
-                        try { if (doc != null) Marshal.ReleaseComObject(doc); } catch { }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[TryActivateOpenDocument] {ex.Message}");
-            }
-
-            return false;
         }
 
         /// <summary>
@@ -712,6 +687,9 @@ namespace MOS_Word_app
         public int TaskNumber { get; set; }
         public bool IsPassed { get; set; }
         public string TaskName { get; set; }
+        /// <summary>×のときの学生向け理由。合格時は空。</summary>
+        public string FailReason { get; set; }
+        public bool HasFailReason => !IsPassed && !string.IsNullOrEmpty(FailReason);
     }
 }
 

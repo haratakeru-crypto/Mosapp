@@ -23,4 +23,24 @@ if (Test-Path $vstoinstaller) {
 
 # 4) インストール（/Silent で証明書未信頼の場合はダイアログが出る場合あり）
 & $vstoinstaller /Install $vstoPath /Silent
+
+# 5) 開発用キーのみ有効（MSI 用 PowerPointMosVsto との二重読み込み防止）
+$devKey = "HKCU:\Software\Microsoft\Office\PowerPoint\Addins\PowerPointAddIn1"
+$msiKey = "HKCU:\Software\Microsoft\Office\PowerPoint\Addins\PowerPointMosVsto"
+if (Test-Path $devKey) {
+    Set-ItemProperty -Path $devKey -Name "LoadBehavior" -Value 3 -Type DWord -ErrorAction SilentlyContinue
+}
+if (Test-Path $msiKey) {
+    Set-ItemProperty -Path $msiKey -Name "LoadBehavior" -Value 0 -Type DWord -ErrorAction SilentlyContinue
+    Write-Host "Disabled MSI add-in key PowerPointMosVsto (LoadBehavior=0) to avoid dual load"
+}
+
 Write-Host "Done. Start PowerPoint to load the add-in."
+foreach ($n in @("PowerPointAddIn1","PowerPointMosVsto")) {
+    $p = "HKCU:\Software\Microsoft\Office\PowerPoint\Addins\$n"
+    if (Test-Path $p) {
+        Write-Host "$n LoadBehavior=$((Get-ItemProperty $p).LoadBehavior)"
+    } else {
+        Write-Host "$n (missing)"
+    }
+}

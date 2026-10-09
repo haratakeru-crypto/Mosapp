@@ -68,7 +68,7 @@ namespace Libraries
     /// </summary>
     /// <remarks>
     /// <para>コード内は <c>#region</c> で免除 / 許可 / 禁止 / 許可範囲に分割。</para>
-    /// <para>実際の採点フローは <c>ReviewPageWindow.ApplyDestructiveValidation</c> と
+    /// <para>実際の採点フローは <c>ExcelScoreExplanation.Apply</c> と
     /// <see cref="ExcelLogReader"/>（<c>mos_excel_log.txt</c> の <c>[Op]</c> 解析）。</para>
     /// <para>PowerPoint にある図形数・文字数などのデルタ厳密判定は、Excel は操作ログベースのため未実装。</para>
     /// </remarks>
@@ -166,8 +166,10 @@ namespace Libraries
                             return ExcelValidationExemptFlags.None;
                         case 4: // 担当者別売上・H5:K19コピーA5貼付
                             return ExcelValidationExemptFlags.RangeEdit;
-                        case 7: // 参加者一覧・8-9行削除
-                            return ExcelValidationExemptFlags.SheetStructure | ExcelValidationExemptFlags.RangeEdit;
+                        case 7: // 参加者一覧・行削除。使用範囲の番地変化を EditCellFormat と誤記録するため書式も許可
+                            return ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.CellFormatOnly;
                         default:
                             return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
                     }
@@ -185,8 +187,8 @@ namespace Libraries
                             return ExcelValidationExemptFlags.PrintAndPage | ExcelValidationExemptFlags.WorkbookProperty;
                         case 6: // スキルアップ検定結果・セル内折り返し（書式のみ → CellFormatOnly）。許可範囲は A4:K4（TryGetFirstNonExemptViolation の範囲ゲート）
                             return ExcelValidationExemptFlags.CellFormatOnly;
-                        case 7: // 売上一覧・G4 メモ（範囲制限あり。RangeEdit 免除は付けない）
-                            return ExcelValidationExemptFlags.None;
+                        case 7: // 売上一覧・G4 メモ。Excel はメモを図形として追加するため InsertShapeOrImage を許可
+                            return ExcelValidationExemptFlags.ShapeOrImage;
                         default:
                             return ExcelValidationExemptFlags.PrintAndPage | ExcelValidationExemptFlags.WorkbookProperty;
                     }
@@ -254,8 +256,9 @@ namespace Libraries
                         case 4: // 試験結果・COUNTBLANK
                         case 5: // 試験結果・RANDBETWEEN/オートフィル
                         case 6: // 試験結果・LEFT/オートフィル
-                        case 7: // 申込一覧・UNIQUE
                             return ExcelValidationExemptFlags.RangeEdit;
+                        case 7: // 申込一覧・UNIQUE。スピルで名前定義の参照先が変わる
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.WorkbookProperty;
                         default:
                             return ExcelValidationExemptFlags.RangeEdit;
                     }

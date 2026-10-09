@@ -407,13 +407,55 @@ namespace MOS_Word_app.Views
             this.Close();
         }
         
-        private static Window CreateScoringOverlayWindow()
+        private sealed class ScoringProgressOverlay
         {
-            return new Window
+            public Window Window { get; }
+            private readonly TextBlock _message;
+            private readonly ProgressBar _progress;
+
+            public ScoringProgressOverlay(Window window, TextBlock message, ProgressBar progress)
+            {
+                Window = window;
+                _message = message;
+                _progress = progress;
+            }
+
+            public void Update(string message, int completed, int total)
+            {
+                if (_message != null)
+                    _message.Text = total > 0 ? $"{message}（{completed}/{total}）" : message;
+                if (_progress == null)
+                    return;
+                int safeTotal = Math.Max(total, 1);
+                _progress.Maximum = safeTotal;
+                _progress.Value = Math.Max(0, Math.Min(completed, safeTotal));
+            }
+        }
+
+        private static ScoringProgressOverlay CreateScoringProgressOverlay()
+        {
+            var message = new TextBlock
+            {
+                Text = "採点の準備をしています...",
+                FontSize = 14,
+                TextWrapping = TextWrapping.Wrap,
+                TextAlignment = TextAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            var progress = new ProgressBar
+            {
+                Height = 14,
+                IsIndeterminate = false,
+                Minimum = 0,
+                Maximum = 1,
+                Value = 0
+            };
+            var window = new Window
             {
                 Title = "採点中",
-                Width = 320,
-                Height = 140,
+                Width = 360,
+                Height = 150,
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
                 WindowStyle = WindowStyle.ToolWindow,
                 ResizeMode = ResizeMode.NoResize,
@@ -423,26 +465,10 @@ namespace MOS_Word_app.Views
                 {
                     Margin = new Thickness(16, 14, 16, 14),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Children =
-                    {
-                        new TextBlock
-                        {
-                            Text = "採点中です。しばらくお待ちください...",
-                            FontSize = 14,
-                            TextAlignment = TextAlignment.Center,
-                            HorizontalAlignment = HorizontalAlignment.Stretch,
-                            Margin = new Thickness(0, 0, 0, 12)
-                        },
-                        new ProgressBar
-                        {
-                            Height = 14,
-                            IsIndeterminate = true,
-                            Minimum = 0,
-                            Maximum = 100
-                        }
-                    }
+                    Children = { message, progress }
                 }
             };
+            return new ScoringProgressOverlay(window, message, progress);
         }
 
         private static DispatcherTimer StartScoringOverlayKeepOnTopTimer(Window overlay)
@@ -498,7 +524,7 @@ namespace MOS_Word_app.Views
             }
 
             _isScoring = true;
-            Window scoringOverlay = null;
+            ScoringProgressOverlay scoringOverlay = null;
             DispatcherTimer overlayKeepOnTopTimer = null;
             try
             {
@@ -530,14 +556,25 @@ namespace MOS_Word_app.Views
                 }, DispatcherPriority.Background);
                 
                 // 採点中オーバーレイ（PowerPoint版と同様・最前面維持）
-                scoringOverlay = CreateScoringOverlayWindow();
-                scoringOverlay.Show();
-                scoringOverlay.Activate();
-                overlayKeepOnTopTimer = StartScoringOverlayKeepOnTopTimer(scoringOverlay);
+                scoringOverlay = CreateScoringProgressOverlay();
+                scoringOverlay.Window.Show();
+                scoringOverlay.Window.Activate();
+                overlayKeepOnTopTimer = StartScoringOverlayKeepOnTopTimer(scoringOverlay.Window);
                 await System.Threading.Tasks.Task.Yield();
                 
                 // 全プロジェクト一括採点（結果画面の 〇/✖ 表示用）
-                await System.Threading.Tasks.Task.Run(() => WordBatchScoring.ScoreAllProjects(_groupId, scoringProjectIds));
+                await System.Threading.Tasks.Task.Run(() => WordBatchScoring.ScoreAllProjects(
+                    _groupId,
+                    scoringProjectIds,
+                    (message, completed, total) =>
+                    {
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            if (scoringOverlay?.Window == null || !scoringOverlay.Window.IsVisible)
+                                return;
+                            scoringOverlay.Update(message, completed, total);
+                        }));
+                    }));
                 ScoreResultStore.SnapshotGroup(_groupId);
                 try
                 {
@@ -565,7 +602,7 @@ namespace MOS_Word_app.Views
                 overlayKeepOnTopTimer = null;
                 if (scoringOverlay != null)
                 {
-                    try { scoringOverlay.Close(); } catch { }
+                    try { scoringOverlay.Window.Close(); } catch { }
                     scoringOverlay = null;
                 }
                 
@@ -614,7 +651,7 @@ namespace MOS_Word_app.Views
                 if (scoringOverlay != null)
                 {
                     overlayKeepOnTopTimer?.Stop();
-                    try { scoringOverlay.Close(); } catch { }
+                    try { scoringOverlay.Window.Close(); } catch { }
                 }
                 string logPath = Path.Combine(Path.GetTempPath(), "mos_word_scoring_errors.log");
                 try

@@ -27,6 +27,91 @@ namespace Libraries
         private const string LoadBehaviorValueName = "LoadBehavior";
         private const string UninstallBasePath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
 
+        /// <summary>
+        /// 開発ビルドは New_MOSWordVSTOAddIn、製品（Release + MSI 配置）は WordMosVsto を優先する。
+        /// 同時に両方 LoadBehavior=3 にしない（二重読み込みで P6/P9 等が極端に重くなる）。
+        /// </summary>
+        private static string ResolvePreferredAddInKeyName()
+        {
+#if DEBUG
+            return RegistryAddInKeyNameFromManifest;
+#else
+            if (KeyHasManifest(RegistryAddInKeyNameFromMsi) || MsiDeployedVstoExists())
+                return RegistryAddInKeyNameFromMsi;
+            return RegistryAddInKeyNameFromManifest;
+#endif
+        }
+
+        private static bool MsiDeployedVstoExists()
+        {
+            string vstoFileName = AddInName + ".vsto";
+            foreach (string path in EnumerateInstallerDeployedPaths(vstoFileName))
+            {
+                if (File.Exists(path))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool KeyHasManifest(string leafName)
+        {
+            try
+            {
+                string path = Path.Combine(RegistryAddInsBasePath, leafName).Replace('/', '\\');
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path))
+                {
+                    if (key == null)
+                        return false;
+                    object manifest = key.GetValue("Manifest");
+                    return manifest != null && !string.IsNullOrWhiteSpace(manifest.ToString());
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void SetLoadBehavior(string leafName, int loadBehavior)
+        {
+            try
+            {
+                string path = Path.Combine(RegistryAddInsBasePath, leafName).Replace('/', '\\');
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path, writable: true))
+                {
+                    if (key != null)
+                        key.SetValue(LoadBehaviorValueName, loadBehavior, RegistryValueKind.DWord);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[VSTOInstallerHelper] SetLoadBehavior " + leafName + ": " + ex.Message);
+            }
+        }
+
+        /// <summary>優先キーだけ 3、もう一方は 0。優先キーが無い場合は存在する方にフォールバック。</summary>
+        private static string ApplyExclusiveAddInLoadBehavior()
+        {
+            string active = ResolvePreferredAddInKeyName();
+            if (!KeyHasManifest(active))
+            {
+                string fallback = string.Equals(active, RegistryAddInKeyNameFromManifest, StringComparison.OrdinalIgnoreCase)
+                    ? RegistryAddInKeyNameFromMsi
+                    : RegistryAddInKeyNameFromManifest;
+                if (KeyHasManifest(fallback))
+                    active = fallback;
+            }
+
+            foreach (string leaf in RegistryAddInKeyNames)
+            {
+                int behavior = string.Equals(leaf, active, StringComparison.OrdinalIgnoreCase) ? 3 : 0;
+                SetLoadBehavior(leaf, behavior);
+            }
+
+            System.Diagnostics.Debug.WriteLine("[VSTOInstallerHelper] exclusive add-in active=" + active);
+            return active;
+        }
         private static string NormalizeFullPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -126,7 +211,8 @@ namespace Libraries
         }
 
         /// <summary>
-        /// 試験開始前に Release 版 VSTO を有効化する（Debug 登録の上書き、LoadBehavior=3）。
+        /// 試験開始前に VSTO を有効化する（排他 LoadBehavior、必要なら silent install）。
+        /// DEBUG では bin\Debug の New_MOSWordVSTOAddIn を許容し、Release への勝手な付け替えはしない。
         /// バックグラウンド準備が走っていれば完了を待つ。
         /// </summary>
         public static bool EnsureAddInReadyForExam(out string issue)
@@ -163,6 +249,18 @@ namespace Libraries
                     && !string.IsNullOrEmpty(releaseVsto)
                     && !PathsEqual(installed, releaseVsto);
 
+#if DEBUG
+                // 開発中は New_ キーが無ければ bin\Debug を登録。Release への勝手な再インストールはしない。
+                if (!KeyHasManifest(RegistryAddInKeyNameFromManifest))
+                {
+                    string dev = GetBuildOutputPath();
+                    if (!string.IsNullOrEmpty(dev) && File.Exists(dev))
+                    {
+                        if (!TrySilentInstall(dev, out issue))
+                            return false;
+                    }
+                }
+#else
                 if ((!IsInstalled() || pointsToDebug || pointsToWrongBuild)
                     && !string.IsNullOrEmpty(releaseVsto)
                     && File.Exists(releaseVsto))
@@ -170,14 +268,15 @@ namespace Libraries
                     if (!TrySilentInstall(releaseVsto, out issue))
                         return false;
                 }
+#endif
 
                 if (!IsInstalled())
                 {
-                    issue = "VSTO add-in is not registered. Run Rebuild-And-Install-WordVSTO.ps1.";
+                    issue = "VSTO add-in is not registered. Build New_MOSWordVSTOAddIn (Debug) or run Rebuild-And-Install-WordVSTO.ps1.";
                     return false;
                 }
 
-                SetLoadBehaviorForAllKeys(3);
+                ApplyExclusiveAddInLoadBehavior();
                 return true;
             }
             catch (Exception ex)
@@ -188,24 +287,17 @@ namespace Libraries
             }
         }
 
+        /// <summary>互換のため残す。内部では排他有効化に置き換え。</summary>
         private static void SetLoadBehaviorForAllKeys(int loadBehavior)
         {
-            foreach (string leaf in RegistryAddInKeyNames)
+            if (loadBehavior == 3)
             {
-                string path = Path.Combine(RegistryAddInsBasePath, leaf).Replace('/', '\\');
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path, writable: true))
-                {
-                    if (key != null)
-                        key.SetValue(LoadBehaviorValueName, loadBehavior, RegistryValueKind.DWord);
-                }
+                ApplyExclusiveAddInLoadBehavior();
+                return;
             }
 
-            string primary = Path.Combine(RegistryAddInsBasePath, RegistryAddInKeyNameFromManifest).Replace('/', '\\');
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(primary, writable: true))
-            {
-                if (key != null)
-                    key.SetValue(LoadBehaviorValueName, loadBehavior, RegistryValueKind.DWord);
-            }
+            foreach (string leaf in RegistryAddInKeyNames)
+                SetLoadBehavior(leaf, loadBehavior);
         }
 
         private static bool TrySilentInstall(string vstoPath, out string issue)
@@ -232,7 +324,7 @@ namespace Libraries
                 if (!RunVstoInstaller(installer, "/Install \"" + vstoPath + "\" /Silent", out issue))
                     return false;
 
-                SetLoadBehaviorForAllKeys(3);
+                ApplyExclusiveAddInLoadBehavior();
                 return true;
             }
             catch (Exception ex)
@@ -377,14 +469,11 @@ namespace Libraries
         {
             try
             {
+                // LoadBehavior=0 でも Manifest があれば登録済み（排他オフ側）
                 foreach (string leaf in RegistryAddInKeyNames)
                 {
-                    string path = Path.Combine(RegistryAddInsBasePath, leaf).Replace('/', '\\');
-                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path))
-                    {
-                        if (IsAddInKeyEnabled(key))
-                            return true;
-                    }
+                    if (KeyHasManifest(leaf))
+                        return true;
                 }
 
                 return false;
@@ -404,7 +493,13 @@ namespace Libraries
         {
             try
             {
-                foreach (string leaf in RegistryAddInKeyNames)
+                // 有効化予定キーを優先して読む
+                string preferred = ResolvePreferredAddInKeyName();
+                string[] order = preferred == RegistryAddInKeyNameFromMsi
+                    ? new[] { RegistryAddInKeyNameFromMsi, RegistryAddInKeyNameFromManifest }
+                    : new[] { RegistryAddInKeyNameFromManifest, RegistryAddInKeyNameFromMsi };
+
+                foreach (string leaf in order)
                 {
                     string path = Path.Combine(RegistryAddInsBasePath, leaf).Replace('/', '\\');
                     using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path))
@@ -438,10 +533,21 @@ namespace Libraries
         private const string InstallerManufacturer = "Rabbit";
         private const string InstallerProductName = "wordvstosetup";
 
-        /// <summary>試験用の Release 版 .vsto のみを返す（Debug は登録対象外）。</summary>
+        /// <summary>Release 版 .vsto のパスを返す（製品 / Release 試験用）。</summary>
         public static string GetReleaseBuildOutputPath()
         {
             string vstoFileName = AddInName + ".vsto";
+
+            // 開発中はソースの bin\Release を優先（Program Files の MSI 配置より新しい診断ビルドを使う）
+#if DEBUG
+            string devRelease = FindBuildOutputPath(new[]
+            {
+                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Release", vstoFileName)
+            });
+            if (!string.IsNullOrEmpty(devRelease) && File.Exists(devRelease))
+                return devRelease;
+#endif
+
             foreach (string installedPath in EnumerateInstallerDeployedPaths(vstoFileName))
             {
                 if (File.Exists(installedPath))
@@ -456,9 +562,18 @@ namespace Libraries
 
         /// <summary>
         /// VSTOアドインのビルド出力パス（または配布配置パス）を取得する。
+        /// DEBUG では bin\Debug を優先（VS Debug 登録と同じ成果物）。
         /// </summary>
         public static string GetBuildOutputPath()
         {
+#if DEBUG
+            string debugPath = FindBuildOutputPath(new[]
+            {
+                Path.Combine("New_MOSWordVSTOAddIn", "New_MOSWordVSTOAddIn", "bin", "Debug", AddInName + ".vsto"),
+            });
+            if (!string.IsNullOrEmpty(debugPath) && File.Exists(debugPath))
+                return debugPath;
+#endif
             return GetReleaseBuildOutputPath()
                 ?? FindBuildOutputPath(new[]
                 {

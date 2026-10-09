@@ -36,7 +36,7 @@ namespace MOS_PowerPoint_app
         public MainViewModel()
         {
             LoadProjects();
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject);
+            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllProjectsCommand = new RelayCommand(ExecuteResetAllProjects);
             TaskResults = new ObservableCollection<TaskResult>();
@@ -203,6 +203,33 @@ namespace MOS_PowerPoint_app
             }
         }
 
+        private const int ExistingPptHeartbeatWaitMs = 400;
+        private const int VstoHeartbeatWaitAfterLaunchMs = 8000;
+        private const int ActiveVstoHeartbeatMaxAgeSeconds = 15;
+
+        private bool _isOpeningProject;
+
+        public void EnableProjectSelection()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(new Action(EnableProjectSelection));
+                return;
+            }
+
+            if (!_isOpeningProject)
+                return;
+            _isOpeningProject = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void DisableProjectSelection()
+        {
+            _isOpeningProject = true;
+            CommandManager.InvalidateRequerySuggested();
+        }
+
         private void ExecuteOpenProject(object parameter)
         {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
@@ -216,43 +243,107 @@ namespace MOS_PowerPoint_app
                     return;
                 }
 
-                try
+                DisableProjectSelection();
+                Views.PowerPointStartupInputGate.Begin();
+
+                string filePath = project.FilePath;
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+
+                // 開く処理とアドイン待ちは画面スレッドの外で行い、準備中ダイアログを残す。
+                System.Threading.Tasks.Task.Run(() =>
                 {
-                    // プロジェクト起動前にタスク情報をクリアし、アドイン側の古いスナップショットとの比較を防止
-                    Libraries.PPLogReader.ClearCurrentTaskFile();
-
-                    // PowerPointアプリケーションを取得または作成
-                    PowerPointApp pptApp = null;
+                    string errorMessage = null;
+                    bool vstoFailed = false;
+                    bool opened = false;
                     try
                     {
-                        pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
-                    }
-                    catch
-                    {
-                        pptApp = new PowerPointApp();
-                        pptApp.Visible = MsoTriState.msoTrue;
-                    }
+                        string vstoIssue;
+                        if (!Libraries.VSTOInstallerHelper.EnsureAddInReadyForExam(out vstoIssue))
+                        {
+                            errorMessage = "エラー: PowerPoint 用 VSTO アドインを準備できません。"
+                                + (string.IsNullOrEmpty(vstoIssue) ? "" : ("\n" + vstoIssue));
+                            vstoFailed = true;
+                        }
+                        else
+                        {
+                            Libraries.PPLogReader.ClearCurrentTaskFile();
 
-                    try
-                    {
-                        pptApp.Presentations.Open(project.FilePath, WithWindow: MsoTriState.msoTrue);
-                        Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
+                            PowerPointApp pptApp = null;
+                            bool launchedNew = false;
+                            try
+                            {
+                                pptApp = (PowerPointApp)Marshal.GetActiveObject("PowerPoint.Application");
+                            }
+                            catch
+                            {
+                                Libraries.PPLogReader.ClearVstoHeartbeat();
+                                pptApp = new PowerPointApp();
+                                pptApp.Visible = MsoTriState.msoTrue;
+                                launchedNew = true;
+                            }
+
+                            try
+                            {
+                                pptApp.Presentations.Open(filePath, WithWindow: MsoTriState.msoTrue);
+                                Libraries.PowerPointViewHelper.HideNotesPane(pptApp);
+                                Views.PowerPointStartupInputGate.DisablePowerPointWindows();
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                            }
+
+                            int waitMs = launchedNew ? VstoHeartbeatWaitAfterLaunchMs : ExistingPptHeartbeatWaitMs;
+                            if (!Libraries.PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds)
+                                && !Libraries.PPLogReader.WaitForVstoHeartbeat(waitMs, ActiveVstoHeartbeatMaxAgeSeconds)
+                                && (launchedNew
+                                    || !Libraries.PPLogReader.WaitForVstoHeartbeat(VstoHeartbeatWaitAfterLaunchMs, ActiveVstoHeartbeatMaxAgeSeconds)))
+                            {
+                                errorMessage = "エラー: PowerPoint 用 VSTO アドインが応答していません。アドインを有効にしてから再度開いてください。";
+                                vstoFailed = true;
+                            }
+                            else
+                            {
+                                opened = true;
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"プレゼンテーションを開く際のエラー（既に開いている可能性があります）: {ex.Message}");
+                        errorMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
+                        System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
                     }
 
-                    CurrentProject = project;
-                    HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
-                    ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
-                    ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(project.FilePath)}";
-                }
-                catch (Exception ex)
-                {
-                    ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
-                    System.Diagnostics.Debug.WriteLine($"エラー詳細: {ex.StackTrace}");
-                }
+                    if (dispatcher == null)
+                    {
+                        EnableProjectSelection();
+                        return;
+                    }
+
+                    dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!opened)
+                        {
+                            Views.PowerPointStartupInputGate.End();
+                            EnableProjectSelection();
+                            ResultMessage = errorMessage ?? "エラー: PowerPointファイルを開けませんでした。";
+                            if (vstoFailed)
+                            {
+                                MessageBox.Show(
+                                    ResultMessage,
+                                    "VSTO 未準備",
+                                    MessageBoxButton.OK,
+                                    MessageBoxImage.Warning);
+                            }
+                            return;
+                        }
+
+                        CurrentProject = project;
+                        HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
+                        ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
+                        ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(filePath)}";
+                    }));
+                });
             }
         }
 
@@ -265,18 +356,32 @@ namespace MOS_PowerPoint_app
         {
             if (CurrentProject == null)
             {
-                ResultMessage = "プロジェクトを開いてから実行してください。";
+                RunOnUi(() => ResultMessage = "プロジェクトを開いてから実行してください。");
                 return;
             }
 
-            TaskResults.Clear();
-            ResultMessage = "採点中...";
+            if (!Libraries.PPLogReader.IsVstoHeartbeatFresh(ActiveVstoHeartbeatMaxAgeSeconds)
+                && !Libraries.PPLogReader.WaitForVstoHeartbeat(VstoHeartbeatWaitAfterLaunchMs, ActiveVstoHeartbeatMaxAgeSeconds))
+            {
+                RunOnUi(() =>
+                {
+                    ResultMessage = "PowerPoint 用 VSTO アドインが応答していないため採点できません。アドインを有効にしてから再度実行してください。";
+                    MessageBox.Show(ResultMessage, "VSTO 未準備", MessageBoxButton.OK, MessageBoxImage.Warning);
+                });
+                return;
+            }
+
+            RunOnUi(() =>
+            {
+                TaskResults.Clear();
+                ResultMessage = "採点中...";
+            });
 
             string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
                 "MOS模擬アプリ問題文一覧_PowerPoint.json");
             if (!File.Exists(jsonPath))
             {
-                ResultMessage = "該当プロジェクトのタスクが見つかりません（問題文JSONがありません）。";
+                RunOnUi(() => ResultMessage = "該当プロジェクトのタスクが見つかりません（問題文JSONがありません）。");
                 return;
             }
 
@@ -288,14 +393,14 @@ namespace MOS_PowerPoint_app
             }
             catch (Exception ex)
             {
-                ResultMessage = $"問題文の読み込みに失敗しました: {ex.Message}";
+                RunOnUi(() => ResultMessage = $"問題文の読み込みに失敗しました: {ex.Message}");
                 return;
             }
 
             var project = projectData?.Projects?.FirstOrDefault(p => p.ProjectId == CurrentProject.ProjectId);
             if (project?.Tasks == null || project.Tasks.Count == 0)
             {
-                ResultMessage = "該当プロジェクトのタスクが見つかりません。";
+                RunOnUi(() => ResultMessage = "該当プロジェクトのタスクが見つかりません。");
                 return;
             }
 
@@ -305,9 +410,12 @@ namespace MOS_PowerPoint_app
                 grader = new PowerPointGrader();
                 if (!grader.Connect())
                 {
-                    ResultMessage = "PowerPoint を起動し、対象のファイルを開いた状態で実行してください。";
+                    RunOnUi(() => ResultMessage = "PowerPoint を起動し、対象のファイルを開いた状態で実行してください。");
                     return;
                 }
+
+                grader.LogOpenTaskBaselineDiffOnce(CurrentProject.ProjectId);
+                Libraries.PPLogReader.ClearSnapshot();
 
                 int passedCount = 0;
                 foreach (var task in project.Tasks.OrderBy(t => t.TaskId))
@@ -315,9 +423,7 @@ namespace MOS_PowerPoint_app
                     bool passed = false;
                     try
                     {
-                        // 1タスクごとに current_task を更新し、VSTO 側の snapshot が追いつくのを短時間待つ。
                         int attemptNo = Libraries.PPTaskAttemptRegistry.GetAttempt(CurrentProject.ProjectId, task.TaskId);
-                        grader.StartTaskAndWaitForSnapshot(CurrentProject.ProjectId, task.TaskId, attemptNo, 2000, 50);
                         passed = grader.GradeTask(CurrentProject.ProjectId, task.TaskId, attemptNo);
                     }
                     catch
@@ -325,24 +431,38 @@ namespace MOS_PowerPoint_app
                         passed = false;
                     }
                     if (passed) passedCount++;
-                    TaskResults.Add(new TaskResult
+                    var taskResult = new TaskResult
                     {
                         TaskNumber = task.TaskId,
                         IsPassed = passed,
                         TaskName = string.IsNullOrEmpty(task.Description) ? $"タスク{task.TaskId}" : task.Description
-                    });
+                    };
+                    RunOnUi(() => TaskResults.Add(taskResult));
                 }
-                ResultMessage = $"採点: {passedCount}/{project.Tasks.Count} タスク合格";
-                ScoreCompleted?.Invoke(this, EventArgs.Empty);
+                int taskCount = project.Tasks.Count;
+                RunOnUi(() =>
+                {
+                    ResultMessage = $"採点: {passedCount}/{taskCount} タスク合格";
+                    ScoreCompleted?.Invoke(this, EventArgs.Empty);
+                });
             }
             catch (Exception ex)
             {
-                ResultMessage = $"採点中にエラーが発生しました: {ex.Message}";
+                RunOnUi(() => ResultMessage = $"採点中にエラーが発生しました: {ex.Message}");
             }
             finally
             {
                 grader?.Dispose();
             }
+        }
+
+        private static void RunOnUi(Action action)
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.CheckAccess())
+                action();
+            else
+                dispatcher.Invoke(action);
         }
 
         private void ExecuteResetAllProjects(object parameter)

@@ -20,7 +20,17 @@ namespace Libraries
     /// </summary>
     public static class WordBatchScoring
     {
-        private const int BatchPostOpenDelayMs = 350;
+        private const int ReadyPollIntervalMs = 30;
+        private const int DocumentReadyTimeoutMs = 3000;
+        private const int DocumentsClosedTimeoutMs = 2000;
+        private const int WordStartupTimeoutMs = 3000;
+        private const string LastTaskFlushAttemptedKey = "MOS.Word.LastTaskEvidenceFlush.Attempted";
+        private const string LastTaskFlushCompletedKey = "MOS.Word.LastTaskEvidenceFlush.Completed";
+        private const string LastTaskFlushElapsedKey = "MOS.Word.LastTaskEvidenceFlush.ElapsedMs";
+        private const string LastTaskFlushProjectKey = "MOS.Word.LastTaskEvidenceFlush.ProjectId";
+        private const string LastTaskFlushTaskKey = "MOS.Word.LastTaskEvidenceFlush.TaskId";
+        private const string LastTaskFlushAttemptKey = "MOS.Word.LastTaskEvidenceFlush.AttemptNo";
+        private static int _batchVstoFlushFallbackCount;
 
         private class BatchProjectData
         {
@@ -44,8 +54,9 @@ namespace Libraries
 
         /// <summary>
         /// 問題文 JSON を読み込み、指定プロジェクト（未指定時は全件）を採点して ScoreResultStore に保存する。
+        /// progress は (メッセージ, 完了プロジェクト数, 対象プロジェクト数)。
         /// </summary>
-        public static void ScoreAllProjects(int groupId, ISet<int> projectIds = null)
+        public static void ScoreAllProjects(int groupId, ISet<int> projectIds = null, Action<string, int, int> progress = null)
         {
             var projectData = LoadProjectData();
             if (projectData?.Projects == null || projectData.Projects.Count == 0)
@@ -54,11 +65,25 @@ namespace Libraries
                 return;
             }
 
+            var projectsToScore = projectData.Projects
+                .Where(project => project != null)
+                .Where(project => projectIds == null || projectIds.Count == 0 || projectIds.Contains(project.ProjectId))
+                .Where(project => (project.Tasks?.Count ?? 0) > 0)
+                .OrderBy(project => project.ProjectId)
+                .ToList();
+
+            WordGradingPerf.BeginSession("Word batch scoring");
+            var totalSw = Stopwatch.StartNew();
+            _batchVstoFlushFallbackCount = 0;
+            LogLastTaskEvidenceFlush();
+            LogReader.BeginBatchScoringLogCache();
             ScoreResultStore.ClearGroup(groupId);
+            ReportProgress(progress, "採点の準備をしています...", 0, projectsToScore.Count);
 
             WordApp wordApp = null;
             try
             {
+                var connectSw = Stopwatch.StartNew();
                 try
                 {
                     wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
@@ -66,9 +91,15 @@ namespace Libraries
                 catch
                 {
                     wordApp = new WordApp();
-                    Thread.Sleep(500);
                     try { wordApp.Visible = true; } catch { }
+                    if (!WaitUntilWordApplicationReady(wordApp))
+                    {
+                        AppendScoringErrorLog(
+                            $"ScoreAllProjects group={groupId} Word startup",
+                            new TimeoutException("Word application was not ready"));
+                    }
                 }
+                WordGradingPerf.Log("ScoreAllProjects.Connect", connectSw.ElapsedMilliseconds);
 
                 if (wordApp != null)
                 {
@@ -78,35 +109,53 @@ namespace Libraries
                     SaveAllOpenDocuments(wordApp);
                 }
 
-                foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
+                int completedProjects = 0;
+                foreach (var project in projectsToScore)
                 {
-                    if (projectIds != null && projectIds.Count > 0 && !projectIds.Contains(project.ProjectId))
-                        continue;
-
                     int taskCount = project.Tasks?.Count ?? 0;
-                    if (taskCount == 0)
-                        continue;
-
                     System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Scoring project {project.ProjectId} ({taskCount} tasks)");
+                    ReportProgress(progress, $"プロジェクト {project.ProjectId} を採点中", completedProjects, projectsToScore.Count);
+                    var projectSw = Stopwatch.StartNew();
 
                     try
                     {
+                        var closeSw = Stopwatch.StartNew();
                         CloseAllOpenDocumentsForBatch(wordApp);
-
-                        if (!OpenProjectDocument(wordApp, project.ProjectId, groupId))
+                        bool closed = WaitUntilDocumentsClosed(wordApp);
+                        WordGradingPerf.Log(
+                            "OpenProjectDocument.CloseDocuments",
+                            closeSw.ElapsedMilliseconds,
+                            $"P{project.ProjectId} closed={closed}");
+                        if (!closed)
                         {
-                            for (int t = 1; t <= taskCount; t++)
-                                ScoreResultStore.RecordResult(groupId, project.ProjectId, t, false);
-                            continue;
+                            AppendScoringErrorLog(
+                                $"ScoreAllProjects group={groupId} project={project.ProjectId} close",
+                                new TimeoutException("Word documents were not closed"));
                         }
 
-                        Thread.Sleep(BatchPostOpenDelayMs);
+                        var openSw = Stopwatch.StartNew();
+                        bool opened = OpenProjectDocument(wordApp, project.ProjectId, groupId);
+                        WordGradingPerf.Log(
+                            "OpenProjectDocument.Open",
+                            openSw.ElapsedMilliseconds,
+                            $"P{project.ProjectId} opened={opened}");
+                        if (!opened)
+                        {
+                            for (int t = 1; t <= taskCount; t++)
+                            {
+                                ScoreResultStore.RecordResult(
+                                    groupId, project.ProjectId, t, false,
+                                    WordScoreExplanation.UnavailableText);
+                            }
+                            continue;
+                        }
 
                         var results = ScoreProject(groupId, project.ProjectId, taskCount, batchMode: true);
                         for (int i = 0; i < taskCount; i++)
                         {
-                            bool passed = i < results.Count && results[i];
-                            ScoreResultStore.RecordResult(groupId, project.ProjectId, i + 1, passed);
+                            bool passed = i < results.Count && results[i].Passed;
+                            string failReason = i < results.Count ? results[i].FailReason : WordScoreExplanation.UnavailableText;
+                            ScoreResultStore.RecordResult(groupId, project.ProjectId, i + 1, passed, failReason);
                         }
                     }
                     catch (Exception ex)
@@ -116,16 +165,44 @@ namespace Libraries
                         AppendScoringErrorLog(
                             $"ScoreAllProjects group={groupId} project={project.ProjectId}", ex);
                         for (int t = 1; t <= taskCount; t++)
-                            ScoreResultStore.RecordResult(groupId, project.ProjectId, t, false);
+                        {
+                            ScoreResultStore.RecordResult(
+                                groupId, project.ProjectId, t, false,
+                                WordScoreExplanation.UnavailableText);
+                        }
                     }
                     finally
                     {
+                        var closeSw = Stopwatch.StartNew();
                         CloseAllOpenDocumentsForBatch(wordApp);
+                        WaitUntilDocumentsClosed(wordApp);
+                        WordGradingPerf.Log(
+                            "OpenProjectDocument.CloseDocuments",
+                            closeSw.ElapsedMilliseconds,
+                            $"P{project.ProjectId} after-score");
+                        completedProjects++;
+                        WordGradingPerf.Log(
+                            "ScoreAllProjects.Project",
+                            projectSw.ElapsedMilliseconds,
+                            $"P{project.ProjectId}");
+                        ReportProgress(
+                            progress,
+                            $"プロジェクト {project.ProjectId} の採点が完了しました",
+                            completedProjects,
+                            projectsToScore.Count);
                     }
                 }
             }
             finally
             {
+                WordGradingPerf.Log("ScoreAllProjects.Total", totalSw.ElapsedMilliseconds, $"group={groupId}");
+                WordGradingPerf.Log(
+                    "ScoreAllProjects.VstoFlushFallback",
+                    _batchVstoFlushFallbackCount,
+                    _batchVstoFlushFallbackCount > 0 ? "fallback=True" : "fallback=False");
+                WordGradingPerf.EndSession();
+                LogReader.EndBatchScoringLogCache();
+                ClearLastTaskEvidenceFlush();
                 if (wordApp != null)
                 {
                     try { Marshal.ReleaseComObject(wordApp); } catch { }
@@ -133,6 +210,20 @@ namespace Libraries
             }
 
             System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Done scoring group {groupId}");
+        }
+
+        private static void ReportProgress(Action<string, int, int> progress, string message, int completed, int total)
+        {
+            if (progress == null)
+                return;
+            try
+            {
+                progress(message, completed, total);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Progress callback: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -150,8 +241,14 @@ namespace Libraries
                 catch
                 {
                     wordApp = new WordApp();
-                    Thread.Sleep(500);
                     try { wordApp.Visible = true; } catch { }
+                    if (!WaitUntilWordApplicationReady(wordApp))
+                    {
+                        AppendScoringErrorLog(
+                            $"ScoreSingleTask group={groupId} project={projectId} task={taskId} Word startup",
+                            new TimeoutException("Word application was not ready"));
+                        return null;
+                    }
                 }
 
                 if (wordApp == null)
@@ -169,13 +266,28 @@ namespace Libraries
                     return null;
                 }
 
-                Thread.Sleep(300);
+                if (!WaitUntilDocumentReady(wordApp, ResolveProjectFilePath(projectId, groupId)))
+                {
+                    AppendScoringErrorLog(
+                        $"ScoreSingleTask group={groupId} project={projectId} task={taskId} ready",
+                        new TimeoutException("Word document was not ready"));
+                    return null;
+                }
                 int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
-                if (!WordGradingGate.TryPass(groupId, projectId, taskId, attemptNo, out _))
+                WordScoreExplanation.ClearCheckerReason();
+                if (!WordGradingGate.TryPass(groupId, projectId, taskId, attemptNo, out string gateReason))
+                {
+                    string failReason = WordScoreExplanation.ResolveFailReason(
+                        passed: false, gateFailed: true, gateInternalReason: gateReason);
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, false, failReason);
                     return false;
+                }
                 bool? result = InvokeCheckTask(groupId, projectId, taskId);
                 if (result.HasValue)
-                    ScoreResultStore.RecordResult(groupId, projectId, taskId, result.Value);
+                {
+                    string failReason = WordScoreExplanation.ResolveFailReason(result.Value);
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, result.Value, failReason);
+                }
                 return result;
             }
             catch (Exception ex)
@@ -249,15 +361,106 @@ namespace Libraries
             }
         }
 
-        private static void RequestVstoEvidenceFlushIfNeeded(int groupId, int projectId, int taskNum, bool batchMode)
+        /// <summary>
+        /// レビュー遷移で Word 文書を閉じる直前に、表示中タスクの VSTO 証跡を1回確定する。
+        /// ack が指定タスクと一致したセッションだけ、一括採点中のタスク別フラッシュを省略する。
+        /// </summary>
+        public static void PrepareBeforeClosingDocumentsForBatchScoring(int projectId, int taskId, int attemptNo)
         {
-            if (!batchMode || VSTOCheckerHelper.RequiresVstoEvidenceFlush(groupId, projectId, taskNum))
-                LogReader.RequestVstoEvidenceFlush();
+            var sw = Stopwatch.StartNew();
+            VstoEvidenceFlushAck ack = null;
+            try
+            {
+                ack = LogReader.TryRequestVstoEvidenceFlush(projectId, taskId, attemptNo);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[WordBatchScoring] Last-task evidence flush: " + ex.Message);
+            }
+
+            bool completed = ack != null
+                && ack.Completed
+                && ack.ProjectId == projectId
+                && ack.TaskId == taskId
+                && ack.AttemptNo == attemptNo
+                && projectId > 0
+                && taskId > 0;
+            AppDomain.CurrentDomain.SetData(LastTaskFlushAttemptedKey, true);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushCompletedKey, completed);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushElapsedKey, sw.ElapsedMilliseconds);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushProjectKey, projectId);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushTaskKey, taskId);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushAttemptKey, attemptNo);
         }
 
-        private static List<bool> ScoreProject(int groupId, int projectId, int taskCount, bool batchMode = false)
+        private static void RequestVstoEvidenceFlushIfNeeded(int groupId, int projectId, int taskNum, bool batchMode)
         {
-            var results = new List<bool>();
+            if (batchMode && IsLastTaskEvidenceFlushCompleted())
+                return;
+            if (!batchMode || VSTOCheckerHelper.RequiresVstoEvidenceFlush(groupId, projectId, taskNum))
+            {
+                if (batchMode)
+                    _batchVstoFlushFallbackCount++;
+                var flushSw = Stopwatch.StartNew();
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskNum);
+                LogReader.TryRequestVstoEvidenceFlush(projectId, taskNum, attemptNo);
+                WordGradingPerf.Log(
+                    "VstoEvidenceFlush",
+                    flushSw.ElapsedMilliseconds,
+                    $"P{projectId}-{taskNum} fallback={batchMode}");
+            }
+        }
+
+        private static void LogLastTaskEvidenceFlush()
+        {
+            bool attempted = AppDomain.CurrentDomain.GetData(LastTaskFlushAttemptedKey) as bool? == true;
+            bool completed = AppDomain.CurrentDomain.GetData(LastTaskFlushCompletedKey) as bool? == true;
+            int projectId = ReadAppDomainInt(LastTaskFlushProjectKey);
+            int taskId = ReadAppDomainInt(LastTaskFlushTaskKey);
+            int attemptNo = ReadAppDomainInt(LastTaskFlushAttemptKey);
+            long elapsedMs = 0;
+            object elapsed = AppDomain.CurrentDomain.GetData(LastTaskFlushElapsedKey);
+            if (elapsed is long value)
+                elapsedMs = value;
+            WordGradingPerf.Log(
+                "ScoreAllProjects.LastTaskEvidenceFlush",
+                elapsedMs,
+                $"attempted={attempted} completed={completed} task={projectId}-{taskId} attempt={attemptNo} ack={completed}");
+        }
+
+        private static bool IsLastTaskEvidenceFlushCompleted()
+        {
+            return AppDomain.CurrentDomain.GetData(LastTaskFlushCompletedKey) as bool? == true
+                && ReadAppDomainInt(LastTaskFlushProjectKey) > 0
+                && ReadAppDomainInt(LastTaskFlushTaskKey) > 0;
+        }
+
+        private static int ReadAppDomainInt(string key)
+        {
+            object value = AppDomain.CurrentDomain.GetData(key);
+            return value is int number ? number : 0;
+        }
+
+        private static void ClearLastTaskEvidenceFlush()
+        {
+            AppDomain.CurrentDomain.SetData(LastTaskFlushAttemptedKey, null);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushCompletedKey, null);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushElapsedKey, null);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushProjectKey, null);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushTaskKey, null);
+            AppDomain.CurrentDomain.SetData(LastTaskFlushAttemptKey, null);
+            _batchVstoFlushFallbackCount = 0;
+        }
+
+        private struct TaskScoreResult
+        {
+            public bool Passed;
+            public string FailReason;
+        }
+
+        private static List<TaskScoreResult> ScoreProject(int groupId, int projectId, int taskCount, bool batchMode = false)
+        {
+            var results = new List<TaskScoreResult>();
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string dllPath = Path.Combine(baseDir, "Dlls", $"WordChecker{groupId}_{projectId}.dll");
 
@@ -265,7 +468,7 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] DLL not found: {dllPath}");
                 for (int i = 0; i < taskCount; i++)
-                    results.Add(false);
+                    results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
                 return results;
             }
 
@@ -278,7 +481,7 @@ namespace Libraries
                 if (checkerType == null)
                 {
                     for (int i = 0; i < taskCount; i++)
-                        results.Add(false);
+                        results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
                     return results;
                 }
 
@@ -292,28 +495,52 @@ namespace Libraries
                     if (method == null)
                     {
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: method not found ({methodName})");
-                        results.Add(false);
+                        results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
                         continue;
                     }
 
+                    var taskSw = Stopwatch.StartNew();
                     try
                     {
-                        int attemptNo = 0;
-                        if (!WordGradingGate.TryPass(groupId, projectId, taskNum, attemptNo, out _))
+                        WordScoreExplanation.ClearCheckerReason();
+                        int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskNum);
+                        var gateSw = Stopwatch.StartNew();
+                        bool gatePassed = WordGradingGate.TryPass(groupId, projectId, taskNum, attemptNo, out string gateReason);
+                        WordGradingPerf.Log(
+                            "GradeTask.WordGradingGate",
+                            gateSw.ElapsedMilliseconds,
+                            $"P{projectId}-{taskNum} passed={gatePassed}");
+                        if (!gatePassed)
                         {
-                            results.Add(false);
+                            string failReason = WordScoreExplanation.ResolveFailReason(
+                                passed: false, gateFailed: true, gateInternalReason: gateReason);
+                            results.Add(new TaskScoreResult { Passed = false, FailReason = failReason });
                             System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: fail (grading gate)");
+                            WordGradingPerf.Log("GradeTask.total", taskSw.ElapsedMilliseconds, $"P{projectId}-{taskNum} gate");
                             continue;
                         }
                         RequestVstoEvidenceFlushIfNeeded(groupId, projectId, taskNum, batchMode);
+                        var checkerSw = Stopwatch.StartNew();
                         bool taskResult = (bool)method.Invoke(checkerInstance, null);
-                        results.Add(taskResult);
+                        WordGradingPerf.Log(
+                            "GradeTask.CheckerInvoke",
+                            checkerSw.ElapsedMilliseconds,
+                            $"P{projectId}-{taskNum} passed={taskResult}");
+                        string reason = WordScoreExplanation.ResolveFailReason(taskResult);
+                        results.Add(new TaskScoreResult { Passed = taskResult, FailReason = reason });
+                        WordGradingPerf.Log("GradeTask.total", taskSw.ElapsedMilliseconds, $"P{projectId}-{taskNum}");
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: {(taskResult ? "pass" : "fail")}");
                     }
                     catch (Exception exTask)
                     {
                         System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum} error: {exTask.Message}");
-                        results.Add(false);
+                        WordScoreExplanation.ClearCheckerReason();
+                        results.Add(new TaskScoreResult
+                        {
+                            Passed = false,
+                            FailReason = WordScoreExplanation.ResolveFailReason(passed: false, unavailable: true)
+                        });
+                        WordGradingPerf.Log("GradeTask.total", taskSw.ElapsedMilliseconds, $"P{projectId}-{taskNum} error");
                     }
                 }
             }
@@ -321,7 +548,7 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] ScoreProject error: {ex.Message}");
                 while (results.Count < taskCount)
-                    results.Add(false);
+                    results.Add(new TaskScoreResult { Passed = false, FailReason = WordScoreExplanation.UnavailableText });
             }
 
             return results;
@@ -385,6 +612,21 @@ namespace Libraries
             }
 
             return wordApp.Documents.Count < countBefore;
+        }
+
+        /// <summary>起動時に前回までの採点例外ログを消す。試験のリセットでは消さない。</summary>
+        public static void ClearScoringErrorLog()
+        {
+            try
+            {
+                string logPath = Path.Combine(Path.GetTempPath(), "mos_word_scoring_errors.log");
+                if (File.Exists(logPath))
+                    File.Delete(logPath);
+            }
+            catch
+            {
+                // ignore log failure
+            }
         }
 
         private static void AppendScoringErrorLog(string context, Exception ex)
@@ -543,10 +785,8 @@ namespace Libraries
                                 doc.Activate();
                             }
                             catch { }
-                            Thread.Sleep(200);
                             WordWindowLayoutHelper.PositionWordForBatchScoring(wordApp);
-                            Thread.Sleep(100);
-                            return true;
+                            return WaitUntilOpenedDocumentReady(wordApp, filePath, groupId, projectId);
                         }
                     }
                     catch { }
@@ -566,10 +806,8 @@ namespace Libraries
                 {
                     if (opened != null) Marshal.ReleaseComObject(opened);
                 }
-                Thread.Sleep(300);
                 WordWindowLayoutHelper.PositionWordForBatchScoring(wordApp);
-                Thread.Sleep(200);
-                return true;
+                return WaitUntilOpenedDocumentReady(wordApp, filePath, groupId, projectId);
             }
             catch (Exception ex)
             {
@@ -589,6 +827,183 @@ namespace Libraries
                 System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] Resolve project file failed: {ex.Message}");
                 return null;
             }
+        }
+
+        private static bool WaitUntilWordApplicationReady(WordApp wordApp)
+        {
+            var wait = Stopwatch.StartNew();
+            while (wait.ElapsedMilliseconds < WordStartupTimeoutMs)
+            {
+                if (IsWordApplicationReady(wordApp))
+                    return true;
+                Thread.Sleep(ReadyPollIntervalMs);
+            }
+            return IsWordApplicationReady(wordApp);
+        }
+
+        private static bool IsWordApplicationReady(WordApp wordApp)
+        {
+            if (wordApp == null)
+                return false;
+            try
+            {
+                bool visible = wordApp.Visible;
+                int count = wordApp.Documents.Count;
+                return visible && count >= 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool WaitUntilDocumentsClosed(WordApp wordApp)
+        {
+            var wait = Stopwatch.StartNew();
+            while (wait.ElapsedMilliseconds < DocumentsClosedTimeoutMs)
+            {
+                if (AreDocumentsClosed(wordApp))
+                    return true;
+                Thread.Sleep(ReadyPollIntervalMs);
+            }
+            return AreDocumentsClosed(wordApp);
+        }
+
+        private static bool AreDocumentsClosed(WordApp wordApp)
+        {
+            if (wordApp == null)
+                return true;
+            try
+            {
+                return wordApp.Documents.Count == 0;
+            }
+            catch (COMException)
+            {
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool WaitUntilOpenedDocumentReady(WordApp wordApp, string filePath, int groupId, int projectId)
+        {
+            var readySw = Stopwatch.StartNew();
+            bool ready = WaitUntilDocumentReady(wordApp, filePath);
+            WordGradingPerf.Log(
+                "OpenProjectDocument.DocumentReady",
+                readySw.ElapsedMilliseconds,
+                $"P{projectId} ready={ready}");
+            if (!ready)
+            {
+                AppendScoringErrorLog(
+                    $"OpenProjectDocument timeout group={groupId} project={projectId} path={filePath}",
+                    new TimeoutException("Word document was not ready"));
+            }
+            return ready;
+        }
+
+        private static bool WaitUntilDocumentReady(WordApp wordApp, string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return false;
+
+            var wait = Stopwatch.StartNew();
+            while (wait.ElapsedMilliseconds < DocumentReadyTimeoutMs)
+            {
+                if (IsDocumentReady(wordApp, filePath))
+                    return true;
+                Thread.Sleep(ReadyPollIntervalMs);
+            }
+            return IsDocumentReady(wordApp, filePath);
+        }
+
+        private static bool IsDocumentReady(WordApp wordApp, string filePath)
+        {
+            WordDoc active = null;
+            Microsoft.Office.Interop.Word.Window window = null;
+            Microsoft.Office.Interop.Word.Range content = null;
+            try
+            {
+                if (wordApp == null || string.IsNullOrEmpty(filePath))
+                    return false;
+                if (!ContainsDocument(wordApp, filePath))
+                    return false;
+
+                active = wordApp.ActiveDocument;
+                if (active == null || !DocumentPathsEqual(active.FullName, filePath))
+                    return false;
+
+                window = active.ActiveWindow;
+                if (window == null || !window.Visible || !wordApp.Visible)
+                    return false;
+
+                content = active.Content;
+                if (content == null)
+                    return false;
+                int start = content.Start;
+                return start >= 0;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (content != null)
+                {
+                    try { Marshal.ReleaseComObject(content); } catch { }
+                }
+                if (window != null)
+                {
+                    try { Marshal.ReleaseComObject(window); } catch { }
+                }
+                if (active != null)
+                {
+                    try { Marshal.ReleaseComObject(active); } catch { }
+                }
+            }
+        }
+
+        private static bool ContainsDocument(WordApp wordApp, string filePath)
+        {
+            int count;
+            try { count = wordApp.Documents.Count; }
+            catch { return false; }
+
+            for (int i = 1; i <= count; i++)
+            {
+                WordDoc doc = null;
+                try
+                {
+                    doc = wordApp.Documents[i];
+                    if (DocumentPathsEqual(doc.FullName, filePath))
+                        return true;
+                }
+                catch { }
+                finally
+                {
+                    if (doc != null)
+                    {
+                        try { Marshal.ReleaseComObject(doc); } catch { }
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool DocumentPathsEqual(string left, string right)
+        {
+            return string.Equals(NormalizeDocumentPath(left), NormalizeDocumentPath(right), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeDocumentPath(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return string.Empty;
+            try { return Path.GetFullPath(filePath); }
+            catch { return filePath; }
         }
     }
 
@@ -744,8 +1159,17 @@ namespace Libraries
                     // 9-2: 表の解除（コンマ区切り）で表数・本文長が変わる
                     flags |= WordValidationExemptFlags.TablesCount | WordValidationExemptFlags.BodyTextLength;
                 if (taskId == 5)
-                    // 9-5: すべての変更履歴を反映で本文長が変わり得る
-                    flags |= WordValidationExemptFlags.BodyTextLength;
+                    // 9-5: 変更履歴の承認で表・図形・ヘッダー等が確定し得る。破壊判定は可視本文長に限る。
+                    flags |= WordValidationExemptFlags.SectionsCount
+                        | WordValidationExemptFlags.BodyTextLength
+                        | WordValidationExemptFlags.InlineShapesCount
+                        | WordValidationExemptFlags.FloatingShapesCount
+                        | WordValidationExemptFlags.TablesCount
+                        | WordValidationExemptFlags.CommentsCount
+                        | WordValidationExemptFlags.HeaderFooterFingerprint
+                        | WordValidationExemptFlags.PageBorder
+                        | WordValidationExemptFlags.Watermark
+                        | WordValidationExemptFlags.CompatibilityMode;
             }
 
             // P10
@@ -856,9 +1280,26 @@ namespace Libraries
             public string WatermarkFingerprint { get; set; } = "None";
             public string PageBorderFingerprint { get; set; } = "";
             public int FootnoteReferenceCount { get; set; }
+            public int VisibleBodyTextLength { get; set; } = -1;
         }
 
         public static List<string> CompareAndGetErrors(int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return CompareAndGetErrorsCore(groupId, projectId, taskId, attemptNo, exemptFlags);
+            }
+            finally
+            {
+                WordGradingPerf.Log(
+                    "WordSnapshotChecker.CompareAndGetErrors",
+                    sw.ElapsedMilliseconds,
+                    $"P{projectId} T{taskId}");
+            }
+        }
+
+        private static List<string> CompareAndGetErrorsCore(int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags)
         {
             var errors = new List<string>();
             var snapshot = LoadSnapshot();
@@ -866,6 +1307,15 @@ namespace Libraries
                 return errors;
             if (snapshot.ProjectId != projectId || snapshot.TaskId != taskId || snapshot.AttemptNo != attemptNo)
                 return errors;
+            string expectedPath = ResolveSnapshotProjectPath(projectId, groupId);
+            if (!SnapshotPathMatches(snapshot.FullName, expectedPath))
+            {
+                WordGradingPerf.Log(
+                    "WordSnapshotChecker.SkippedPathMismatch",
+                    0,
+                    $"P{projectId} T{taskId} snapshot={snapshot.FullName} expected={expectedPath}");
+                return errors;
+            }
 
             SnapshotData current = CaptureProjectDocument(projectId, groupId);
             if (current == null)
@@ -900,7 +1350,46 @@ namespace Libraries
             if (projectId == 8 && taskId == 3
                 && current.FootnoteReferenceCount != snapshot.FootnoteReferenceCount)
                 errors.Add($"FootnoteReferenceCount changed {snapshot.FootnoteReferenceCount}->{current.FootnoteReferenceCount}");
+            if (projectId == 9 && (taskId == 3 || taskId == 4 || taskId == 5)
+                && snapshot.VisibleBodyTextLength >= 0 && current.VisibleBodyTextLength >= 0
+                && current.VisibleBodyTextLength != snapshot.VisibleBodyTextLength)
+                errors.Add($"VisibleBodyTextLength changed {snapshot.VisibleBodyTextLength}->{current.VisibleBodyTextLength}");
             return errors;
+        }
+
+        /// <summary>
+        /// その場採点の開始時、スナップショットが一致するタスクだけ開始時との差分を一度記録する。
+        /// 一致しないときは文書を読み直さない。
+        /// </summary>
+        [ThreadStatic] static bool _reuseActive;
+        [ThreadStatic] static bool _reuseCaptured;
+        [ThreadStatic] static int _reuseGroupId;
+        [ThreadStatic] static int _reuseProjectId;
+        [ThreadStatic] static SnapshotData _reuseCurrent;
+
+        /// <summary>その場採点中は、今の文書の現在状態を1回だけ読む。</summary>
+        public static void BeginReuseCurrentDocument(int groupId, int projectId)
+        {
+            _reuseActive = true;
+            _reuseCaptured = false;
+            _reuseGroupId = groupId;
+            _reuseProjectId = projectId;
+            _reuseCurrent = null;
+        }
+
+        public static void EndReuseCurrentDocument()
+        {
+            _reuseActive = false;
+            _reuseCaptured = false;
+            _reuseCurrent = null;
+        }
+
+        public static void LogMatchingBaselineDiffOnce(int groupId, int projectId, int taskId, int attemptNo)
+        {
+            var exempt = WordTaskValidationConfig.GetExemptFlags(projectId, taskId);
+            var errors = CompareAndGetErrors(groupId, projectId, taskId, attemptNo, exempt);
+            if (errors != null && errors.Count > 0)
+                LogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, errors);
         }
 
         private static SnapshotData CaptureProjectDocument(int projectId, int groupId)
@@ -913,13 +1402,16 @@ namespace Libraries
                 if (app == null) return null;
                 string path = ResolveSnapshotProjectPath(projectId, groupId);
                 if (string.IsNullOrEmpty(path)) return null;
+                if (_reuseActive && _reuseCaptured && groupId == _reuseGroupId && projectId == _reuseProjectId)
+                    return _reuseCurrent;
+
                 WordDoc doc = FindOpenDocumentForSnapshot(app, path);
                 if (doc == null)
                 {
                     try { doc = app.Documents.Open(path, ReadOnly: true, Visible: false); }
-                    catch { return null; }
+                    catch { return RememberReuse(groupId, projectId, null); }
                 }
-                try { return BuildSnapshotFromDocument(doc); }
+                try { return RememberReuse(groupId, projectId, BuildSnapshotFromDocument(doc)); }
                 finally
                 {
                     if (doc != null)
@@ -935,6 +1427,16 @@ namespace Libraries
             }
         }
 
+        static SnapshotData RememberReuse(int groupId, int projectId, SnapshotData data)
+        {
+            if (_reuseActive && groupId == _reuseGroupId && projectId == _reuseProjectId)
+            {
+                _reuseCaptured = true;
+                _reuseCurrent = data;
+            }
+            return data;
+        }
+
         private static SnapshotData BuildSnapshotFromDocument(WordDoc doc)
         {
             var data = new SnapshotData { FullName = doc.FullName ?? "" };
@@ -946,11 +1448,14 @@ namespace Libraries
             try { data.Tables = doc.Tables.Count; } catch { }
             try { data.CompatibilityMode = (int)doc.CompatibilityMode; } catch { data.CompatibilityMode = -1; }
             data.HeaderPrimaryFp = GetHeaderFingerprint(doc);
-            data.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprintFromDocument(doc);
             data.PageBorderFingerprint = WordWatermarkInspection.GetPageBorderFingerprint(doc);
             try
             {
-                data.FootnoteReferenceCount = WordFindHelper.CountFootnoteReferencesInXml(doc.WordOpenXML);
+                string openXml = doc.WordOpenXML;
+                data.WatermarkFingerprint = WordWatermarkInspection.GetWatermarkFingerprint(
+                    WordWatermarkInspection.NormalizeXml(openXml));
+                data.FootnoteReferenceCount = WordFindHelper.CountFootnoteReferencesInXml(openXml);
+                data.VisibleBodyTextLength = WordFindHelper.CountVisibleBodyTextLength(openXml);
             }
             catch
             {
@@ -1004,6 +1509,23 @@ namespace Libraries
             return MOS_Word_app.WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
         }
 
+        private static bool SnapshotPathMatches(string snapshotPath, string expectedPath)
+        {
+            if (string.IsNullOrWhiteSpace(snapshotPath) || string.IsNullOrWhiteSpace(expectedPath))
+                return false;
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(snapshotPath),
+                    Path.GetFullPath(expectedPath),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(snapshotPath.Trim(), expectedPath.Trim(), StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
         private static SnapshotData LoadSnapshot()
         {
             string path = LogReader.GetSnapshotFilePath();
@@ -1025,6 +1547,7 @@ namespace Libraries
                         case "ProjectId": int.TryParse(val, out int p); data.ProjectId = p; break;
                         case "TaskId": int.TryParse(val, out int t); data.TaskId = t; break;
                         case "AttemptNo": int.TryParse(val, out int a); data.AttemptNo = a; break;
+                        case "FullName": data.FullName = val; break;
                         case "Sections": int.TryParse(val, out int s); data.Sections = s; break;
                         case "BodyTextLength": int.TryParse(val, out int bl); data.BodyTextLength = bl; break;
                         case "InlineShapes": int.TryParse(val, out int ins); data.InlineShapes = ins; break;
@@ -1036,6 +1559,7 @@ namespace Libraries
                         case "WatermarkFingerprint": data.WatermarkFingerprint = val; break;
                         case "PageBorderFingerprint": data.PageBorderFingerprint = val; break;
                         case "FootnoteReferenceCount": int.TryParse(val, out int fn); data.FootnoteReferenceCount = fn; break;
+                        case "VisibleBodyTextLength": int.TryParse(val, out int visible); data.VisibleBodyTextLength = visible; break;
                     }
                 }
                 if (string.IsNullOrEmpty(data.WatermarkFingerprint))

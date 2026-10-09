@@ -105,6 +105,17 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>現在の試験タスク文脈（未設定なら false）。</summary>
+        public static bool TryGetCurrentTaskContext(out int projectId, out int taskId)
+        {
+            lock (_lockObject)
+            {
+                projectId = _currentProjectId;
+                taskId = _currentTaskId;
+                return projectId > 0 && taskId > 0;
+            }
+        }
+
         /// <summary>
         /// 汎用操作ログ。[Task P-T-A] [Op] Type Detail（TaskStart は試験アプリが記録）。
         /// </summary>

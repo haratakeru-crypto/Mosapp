@@ -27,7 +27,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>10</ApplicationRevision>
+    <ApplicationRevision>11</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -169,10 +169,13 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Libraries\PowerPointViewHelper.cs" />
+    <Compile Include="Libraries\PowerPointApplicationManager.cs" />
+    <Compile Include="Libraries\VSTOInstallerHelper.cs" />
     <Compile Include="Libraries\PPTaskAttemptRegistry.cs" />
     <Compile Include="Libraries\PPTaskValidationConfig.cs" />
     <Compile Include="Libraries\PPSnapshotChecker.cs" />
     <Compile Include="Libraries\PPGradingPerf.cs" />
+    <Compile Include="Libraries\ResetPerfLog.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -181,6 +184,15 @@
     <Compile Include="PowerPointDataPathHelper.cs" />
     <Compile Include="PowerPointProjectResetHelper.cs" />
     <Compile Include="PowerPointGrader.cs" />
+    <Page Include="Views\PreparingWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="Views\PowerPointStartupInputGate.cs" />
+    <Compile Include="Views\PreparingWindow.xaml.cs">
+      <DependentUpon>PreparingWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Page Include="Views\UiTestAppBarWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

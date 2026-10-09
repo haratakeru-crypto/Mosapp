@@ -22,6 +22,12 @@ namespace New_MOSWordVSTOAddIn
         public string GetCustomUI(string ribbonID)
         {
             System.Diagnostics.Debug.WriteLine($"[Ribbon] GetCustomUI called, ribbonID={ribbonID}");
+            if (!DiagMode.EnableRibbonCommands())
+            {
+                DiagMode.Write("GetCustomUI: ribbon shell only (no idMso commands)");
+                // IRibbonExtensibility は載せるがコマンドフックは無し（stage 8）
+                return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><customUI xmlns=\"http://schemas.microsoft.com/office/2009/07/customui\" onLoad=\"Ribbon_Load\"><ribbon/></customUI>";
+            }
             string xml = GetResourceText("New_MOSWordVSTOAddIn.Ribbon.xml");
             System.Diagnostics.Debug.WriteLine($"[Ribbon] GetCustomUI returning {xml?.Length ?? 0} chars");
             return xml;
@@ -63,14 +69,6 @@ namespace New_MOSWordVSTOAddIn
                 {
                     loggedCommandId = "ColumnsLeft";
                 }
-                else if (string.Equals(commandId, "PageBorders", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(commandId, "PageBorderOptionsDialog", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(commandId, "PageBorderAndShadingDialog", StringComparison.OrdinalIgnoreCase))
-                {
-                    // 4-6: ページ罫線系。Word の Ribbon.xml では PageBorderAndShadingDialog のみ有効（PageBorders は不明 ID）
-                    loggedCommandId = "PageBorders";
-                    Globals.ThisAddIn?.RegisterRibbonLoggedPageBorders();
-                }
                 else if (string.Equals(commandId, "PageOrientationPortraitLandscape", StringComparison.OrdinalIgnoreCase))
                 {
                     Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();
@@ -79,10 +77,28 @@ namespace New_MOSWordVSTOAddIn
                 {
                     Globals.ThisAddIn?.RegisterRibbonLoggedReviewDeleteComment();
                 }
+                else if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase))
+                {
+                    Globals.ThisAddIn?.RegisterRibbonLoggedTableConvertTextToTable();
+                }
+                else if (IsTableColumnsDistributeCommand(commandId))
+                {
+                    // 6-5: 「幅を揃える」ボタン。列幅が同じになっただけでは記録しない。
+                    loggedCommandId = "TableColumnsDistribute";
+                    Globals.ThisAddIn?.RegisterRibbonLoggedTableColumnsDistribute();
+                }
 
                 bool cutSkipped = false;
                 if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))
+                {
                     cutSkipped = WordEvidenceHelper.TryLogInvalidParagraphCut();
+                    if (!cutSkipped)
+                        Globals.ThisAddIn?.RegisterRibbonLoggedCut();
+                }
+                else if (string.Equals(commandId, "Paste", StringComparison.OrdinalIgnoreCase))
+                {
+                    Globals.ThisAddIn?.RegisterRibbonLoggedPaste();
+                }
 
                 if (!cutSkipped)
                     WordEvidenceHelper.LogCommandWithEvidence(loggedCommandId);
@@ -97,6 +113,12 @@ namespace New_MOSWordVSTOAddIn
                 // エラー時も既定動作はブロックしない
                 cancelDefault = false;
             }
+        }
+
+        /// <summary>「列の幅を揃える」ボタンの idMso。列幅ダイアログは含めない。</summary>
+        private static bool IsTableColumnsDistributeCommand(string commandId)
+        {
+            return string.Equals(commandId, "TableColumnsDistribute", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void LogRibbonOperation(string commandId, string loggedCommandId)
@@ -115,9 +137,6 @@ namespace New_MOSWordVSTOAddIn
             else if (string.Equals(commandId, "ConvertTextToTable", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(loggedCommandId, "TableConvertTextToTable", StringComparison.OrdinalIgnoreCase))
                 Logger.LogOperation("InsertTable", loggedCommandId ?? "");
-            else if (string.Equals(loggedCommandId, "PageBorders", StringComparison.OrdinalIgnoreCase))
-                // 4-6: ページ罫線 — 採点ゲート②で PageBorders 種別として判定（RibbonCommand 汎用にしない）
-                Logger.LogOperation("PageBorders", commandId ?? "");
             else
                 Logger.LogOperation("RibbonCommand", loggedCommandId ?? commandId ?? "");
         }

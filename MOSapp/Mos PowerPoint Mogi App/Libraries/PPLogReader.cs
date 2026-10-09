@@ -16,12 +16,19 @@ namespace Libraries
         private static readonly AsyncLocal<int?> _gradingProjectId = new AsyncLocal<int?>();
         private static readonly AsyncLocal<int?> _gradingTaskId = new AsyncLocal<int?>();
         private static readonly AsyncLocal<int?> _gradingAttemptNo = new AsyncLocal<int?>();
+        private static readonly AsyncLocal<bool> _gradingBatchScoring = new AsyncLocal<bool>();
 
-        public static void SetGradingContext(int projectId, int taskId, int attemptNo)
+        public static void SetGradingContext(int projectId, int taskId, int attemptNo, bool batchScoring = false)
         {
             _gradingProjectId.Value = projectId;
             _gradingTaskId.Value = taskId;
             _gradingAttemptNo.Value = attemptNo;
+            _gradingBatchScoring.Value = batchScoring;
+        }
+
+        public static bool IsBatchScoring()
+        {
+            return _gradingBatchScoring.Value;
         }
 
         public static void ClearGradingContext()
@@ -29,6 +36,7 @@ namespace Libraries
             _gradingProjectId.Value = null;
             _gradingTaskId.Value = null;
             _gradingAttemptNo.Value = null;
+            _gradingBatchScoring.Value = false;
         }
 
         /// <summary>
@@ -37,6 +45,110 @@ namespace Libraries
         public static string GetLogFilePath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_ppt_log.txt");
+        }
+
+        /// <summary>VSTO アドインが PowerPoint 内で動作中であることを示すハートビートファイル。</summary>
+        public static string GetVstoHeartbeatPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_vsto_heartbeat.txt");
+        }
+
+        /// <summary>一括採点中だけ、VSTOのcurrent_task監視を高速化するための一時フラグ。</summary>
+        public static string GetBatchScoringFastPollFlagPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_batch_scoring_fast_poll.txt");
+        }
+
+        public static bool IsBatchScoringFastPollEnabled()
+        {
+            try
+            {
+                return File.Exists(GetBatchScoringFastPollFlagPath());
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static void BeginBatchScoringFastPoll()
+        {
+            try
+            {
+                File.WriteAllText(GetBatchScoringFastPollFlagPath(), DateTime.UtcNow.ToString("o"), new UTF8Encoding(false));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] BeginBatchScoringFastPoll: " + ex.Message);
+            }
+        }
+
+        public static void EndBatchScoringFastPoll()
+        {
+            try
+            {
+                string path = GetBatchScoringFastPollFlagPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] EndBatchScoringFastPoll: " + ex.Message);
+            }
+        }
+
+        /// <summary>直近で VSTO がハートビートを更新していれば true（既定 5 分以内）。</summary>
+        public static bool IsVstoHeartbeatFresh(int maxAgeSeconds = 300)
+        {
+            try
+            {
+                string path = GetVstoHeartbeatPath();
+                if (!File.Exists(path))
+                    return false;
+
+                string text = File.ReadAllText(path, Encoding.UTF8).Trim();
+                if (!long.TryParse(text, out long unixMs))
+                    return false;
+
+                double ageSec = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - unixMs) / 1000.0;
+                return ageSec >= 0 && ageSec <= maxAgeSeconds;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PPLogReader] IsVstoHeartbeatFresh: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>PowerPoint 再起動前に古い心拍を消し、前セッションの誤検知を防ぐ。</summary>
+        public static void ClearVstoHeartbeat()
+        {
+            try
+            {
+                string path = GetVstoHeartbeatPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PPLogReader] ClearVstoHeartbeat: {ex.Message}");
+            }
+        }
+
+        /// <summary>指定時間内に新鮮な心拍が来るまで待つ。成功で true。</summary>
+        public static bool WaitForVstoHeartbeat(int timeoutMs, int maxAgeSeconds = 15, int pollIntervalMs = 100)
+        {
+            if (IsVstoHeartbeatFresh(maxAgeSeconds))
+                return true;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                if (IsVstoHeartbeatFresh(maxAgeSeconds))
+                    return true;
+                Thread.Sleep(pollIntervalMs);
+            }
+            return IsVstoHeartbeatFresh(maxAgeSeconds);
         }
 
         /// <summary>

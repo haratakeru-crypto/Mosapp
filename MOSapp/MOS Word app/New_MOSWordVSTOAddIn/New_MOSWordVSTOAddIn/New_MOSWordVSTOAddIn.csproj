@@ -94,8 +94,8 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
     <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
     <WarningLevel>4</WarningLevel>
-    <!-- Debug ビルドで .vsto 登録すると Release インストールを上書きするため無効化 -->
-    <Install>false</Install>
+    <!-- Debug ビルドで bin\Debug の New_MOSWordVSTOAddIn をレジストリ登録（製品用 WordMosVsto とはキー分離） -->
+    <Install>true</Install>
   </PropertyGroup>
   <!--
     This section defines properties that are set when the "Release" configuration is selected.
@@ -234,6 +234,7 @@
     <Compile Include="ThisAddIn.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DiagMode.cs" />
     <Compile Include="Logger.cs">
       <SubType>Code</SubType>
     </Compile>

@@ -46,15 +46,28 @@ namespace MOSExcelMogiApp
         private DispatcherTimer _excelPositionRetryTimer;
         private DateTime _excelPositionRetryDeadline;
         private bool _isNavigatingToTask = false; // 連続クリックで多重起動しないためのガード
+        private bool _isOpeningReviewPage;
+        private bool _pendingResultRetry;
+        private int _resultRetryProjectId;
+        private int _resultRetryTaskId;
+        private bool _resultRetryIsWrong;
 
         // Win32 API
         [DllImport("user32.dll", SetLastError = true)]
         static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
         [DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         private const int SW_RESTORE = 9;
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_SHOWWINDOW = 0x0040;
 
         [DllImport("user32.dll")]
         static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
@@ -154,6 +167,8 @@ namespace MOSExcelMogiApp
 
             // シェル起動後の共有 Excel 接続完了時に Excel ウィンドウを再配置（起動直後のずれを解消）
             _viewModel.SharedExcelApplicationAttached += OnSharedExcelApplicationAttached;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            ApplyScoreResultActionState();
 
             this.Activated += (s, e) =>
             {
@@ -169,14 +184,18 @@ namespace MOSExcelMogiApp
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] Constructor completed");
         }
 
-        private void SetWindowPosition()
+        /// <param name="bringExcelToForeground">
+        /// true のときだけ Excel を前面化する。自動リトライ・初期配置では false にし、
+        /// リセット完了ダイアログや入力中のフォーカスを奪わない。□ボタンなど明示操作時のみ true。
+        /// </param>
+        private void SetWindowPosition(bool bringExcelToForeground = false)
         {
             // Excel の共有参照が確立した後のみ配置を行う（初期化中の新規起動・競合を避ける）
             try
             {
                 var sharedExcel = _viewModel?.TryGetSharedExcelApplication();
                 if (sharedExcel != null)
-                    PositionExcelWindow();
+                    PositionExcelWindow(bringExcelToForeground);
                 ScoringResultDialog.TryBringOpenToFront();
             }
             catch
@@ -216,7 +235,32 @@ namespace MOSExcelMogiApp
             int h = barH   + borderHeight;
 
             MoveWindow(hWnd, x, y, w, h, true);
+            EnsureAppBarTopmost(hWnd);
+        }
+
+        /// <summary>
+        /// アプリバーをタスクバーより上の Z 順に保つ。フォーカスは奪わない。
+        /// </summary>
+        private void EnsureAppBarTopmost(IntPtr hWnd)
+        {
             this.Topmost = true;
+            if (hWnd == IntPtr.Zero)
+                return;
+            try
+            {
+                SetWindowPos(
+                    hWnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            }
+            catch
+            {
+                // ignore
+            }
         }
 
         /// <summary>
@@ -230,14 +274,15 @@ namespace MOSExcelMogiApp
             delayTimer.Tick += (s, args) =>
             {
                 delayTimer.Stop();
-                SetWindowPosition();
+                // ユーザー明示操作なので Excel も前面へ戻す
+                SetWindowPosition(bringExcelToForeground: true);
             };
             delayTimer.Start();
         }
 
-        /// <param name="bringToForeground">true のときのみ Excel を前面に出す。タイマーから呼ぶ場合は false にし、ダイアログ入力中のフォーカスを奪わない。</param>
+        /// <param name="bringToForeground">true のときのみ Excel を前面に出す。自動配置・リトライでは false。□ボタンなど明示操作時のみ true。</param>
         /// <returns>XLMAIN ウィンドウを検出して MoveWindow できた場合 true。</returns>
-        private bool PositionExcelWindow(bool bringToForeground = true)
+        private bool PositionExcelWindow(bool bringToForeground = false)
         {
             try
             {
@@ -367,7 +412,8 @@ namespace MOSExcelMogiApp
                 return;
             }
 
-            SetWindowPosition();
+            // 自動リトライでは Excel を前面化しない（リセット完了 MessageBox の裏隠れ防止）
+            SetWindowPosition(bringExcelToForeground: false);
 
             if (_viewModel?.TryGetSharedExcelApplication() != null &&
                 PositionExcelWindow(bringToForeground: false))
@@ -475,6 +521,11 @@ namespace MOSExcelMogiApp
             {
                 _timer.Stop();
                 UpdateTimerDisplay();
+                if (_viewModel != null && _viewModel.IsScoreResultOpen)
+                {
+                    _viewModel.RequestEndExamAfterScoreResult();
+                    return;
+                }
                 // 試験終了処理
                 _viewModel.EndExamCommand.Execute(null);
             }
@@ -1256,6 +1307,7 @@ namespace MOSExcelMogiApp
                         : $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）";
 
                     var result = MessageBox.Show(
+                        this,
                         confirmMessage,
                         "確認",
                         MessageBoxButton.YesNo,
@@ -1278,6 +1330,7 @@ namespace MOSExcelMogiApp
                         ShowInTaskbar = false,
                         ResizeMode = ResizeMode.NoResize,
                         Topmost = true,
+                        Owner = this,
                         Background = System.Windows.Media.Brushes.White,
                         BorderBrush = System.Windows.Media.Brushes.SteelBlue,
                         BorderThickness = new Thickness(2)
@@ -1311,9 +1364,9 @@ namespace MOSExcelMogiApp
                             try
                             {
                                 if (isVariantMode)
-                                    mainWindow.ResetVariantProject(groupId, projectId, variantSetNo, showMessage: false);
+                                    mainWindow.ResetVariantProject(groupId, projectId, variantSetNo, showMessage: false, logResetPerf: true);
                                 else
-                                    mainWindow.ResetProject(groupId, projectId, showMessage: false);
+                                    mainWindow.ResetProject(groupId, projectId, showMessage: false, logResetPerf: true);
                             }
                             catch (Exception ex) { resetError = ex; }
                         }, System.Windows.Threading.DispatcherPriority.Background);
@@ -1323,7 +1376,7 @@ namespace MOSExcelMogiApp
                         if (resetError != null)
                         {
                             System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Reset error: {resetError.Message}");
-                            MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
+                            MessageBox.Show(this, $"リセット中にエラーが発生しました: {resetError.Message}",
                                 "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                         else
@@ -1335,7 +1388,7 @@ namespace MOSExcelMogiApp
                             string doneMessage = isVariantMode
                                 ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。"
                                 : $"プロジェクト {groupId}-{projectId} をリセットしました。";
-                            MessageBox.Show(doneMessage,
+                            MessageBox.Show(this, doneMessage,
                                 "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
                     }
@@ -1343,48 +1396,40 @@ namespace MOSExcelMogiApp
                     {
                         waitWindow.Close();
                         System.Diagnostics.Debug.WriteLine($"[AppBarWindow] MainWindow not found");
-                        MessageBox.Show("メインウィンドウが見つかりませんでした。", "エラー",
+                        MessageBox.Show(this, "メインウィンドウが見つかりませんでした。", "エラー",
                             MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
                 else
                 {
                     System.Diagnostics.Debug.WriteLine("[AppBarWindow] CurrentProject is null");
-                    MessageBox.Show("リセットするプロジェクトが選択されていません。",
+                    MessageBox.Show(this, "リセットするプロジェクトが選択されていません。",
                         "情報", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error in ProjectResetButton_Click: {ex.Message}\n{ex.StackTrace}");
-                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
+                MessageBox.Show(this, $"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
                     "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         
         private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel != null && _viewModel.IsScoreResultOpen)
+                return;
+            if (_isOpeningReviewPage)
+                return;
+
+            _isOpeningReviewPage = true;
             try
             {
-                // レビューページを開く前に現在のExcelプロジェクトを自動保存
-                // closeWorkbook: false にして、ワークブックは開いたままにする
                 if (_viewModel != null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Saving and closing current project before opening review page");
-                    _viewModel.SaveCurrentExcelProject(closeWorkbook: true);
-                    
-                    // Excelの終了プロセス（QuitとKill待機）はUIスレッドをブロックするため、非同期で実行する
-                    ReviewPageWindow.PendingExcelCloseTask = Task.Run(() => 
-                    {
-                        try
-                        {
-                            _viewModel.CloseExcelApplication();
-                        }
-                        catch (Exception innerEx)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error closing Excel async: {innerEx.Message}");
-                        }
-                    });
+                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Requesting STA Excel shutdown before review page");
+                    _viewModel.FlushCurrentTaskBoundaryBeforeReview();
+                    ReviewPageWindow.SetPendingExcelCloseTask(_viewModel.BeginExcelShutdownForReview());
                 }
 
                 // メインのバーウィンドウを非表示にする
@@ -1405,6 +1450,7 @@ namespace MOSExcelMogiApp
                 reviewWindow.OnNavigateToTask = (g, p, t) => NavigateToTask(p, t, g);
                 reviewWindow.Closed += (s, args) => 
                 {
+                    _isOpeningReviewPage = false;
                     // レビューページが閉じられたらメインウィンドウを再表示
                     this.Show();
                 };
@@ -1414,6 +1460,7 @@ namespace MOSExcelMogiApp
             }
             catch (Exception ex)
             {
+                _isOpeningReviewPage = false;
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 // エラーが発生した場合はメインウィンドウを再表示
@@ -1439,6 +1486,7 @@ namespace MOSExcelMogiApp
             {
                 _isNavigatingToTask = false;
                 _pendingTaskId = null;
+                ClearPendingResultRetry();
                 return;
             }
             
@@ -1471,6 +1519,7 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Error showing window (may be closing): {ex.Message}");
                 _isNavigatingToTask = false;
                 _pendingTaskId = null;
+                ClearPendingResultRetry();
                 return; // NavigateToTaskを中断
             }
             
@@ -1502,23 +1551,12 @@ namespace MOSExcelMogiApp
                 {
                     System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Opening Excel file: {filePath}");
 
-                    // Excel を COM で取得（起動中ならそれを使う／無ければ新規起動→最後にシェル起動＋ROT 接続）
-                    try
-                    {
-                        excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                        // ROT に残った古いプロキシが無効でないか生存確認（0x800706BE 等が出れば死んでいる）
-                        try { var _ = excelApp.Hwnd; }
-                        catch
-                        {
-                            Marshal.ReleaseComObject(excelApp);
-                            excelApp = null;
-                            throw new COMException("Stale Excel proxy detected");
-                        }
-                    }
-                    catch (COMException)
+                    // 起動中の正常な Excel だけ使う。終了直後の古い ROT は例外にせず、既存の復旧経路へ進む。
+                    excelApp = ExcelApplicationManager.TryGetHealthyExcelApplication();
+                    if (excelApp == null)
                     {
                         if (_viewModel == null)
-                            throw;
+                            throw new InvalidOperationException("Excel に接続できませんでした。");
 
                         // 先に対象ブックをシェルで開き短時間で ROT 接続（スタート画面の空 Excel 起動より優先）
                         excelApp = _viewModel.TryOpenWorkbookByShellAndAttachRunningExcel(
@@ -1689,6 +1727,7 @@ namespace MOSExcelMogiApp
                 }
                 
                 // タスク表示を更新（問題文とボタンの選択状態を含む）
+                ConsumeResultRetry(projectId, taskId);
                 UpdateTaskDisplay();
                 
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Task display updated: Project={_currentProjectId}, Task={_currentTaskId}");
@@ -1696,6 +1735,7 @@ namespace MOSExcelMogiApp
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"タスクナビゲーションエラー: {ex.Message}");
+                ClearPendingResultRetry();
                 MessageBox.Show($"エラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -1824,6 +1864,8 @@ namespace MOSExcelMogiApp
 
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel != null && _viewModel.IsScoreResultOpen)
+                return;
             // モーダル確認中も DispatcherTimer は進むため、先に止めないと Timer_Tick から試験終了が走り Excel が先に閉じることがある
             bool timerWasEnabled = _timer != null && _timer.IsEnabled;
             if (timerWasEnabled)
@@ -1940,8 +1982,22 @@ namespace MOSExcelMogiApp
                 _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
                 _viewModel.OpenReviewPageRequested -= OnOpenReviewPageRequested;
                 _viewModel.SharedExcelApplicationAttached -= OnSharedExcelApplicationAttached;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             }
             base.OnClosed(e);
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsScoreResultOpen))
+                ApplyScoreResultActionState();
+        }
+
+        private void ApplyScoreResultActionState()
+        {
+            bool enabled = _viewModel == null || !_viewModel.IsScoreResultOpen;
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = enabled;
         }
 
         private void WriteCurrentTaskFile()
@@ -1949,13 +2005,41 @@ namespace MOSExcelMogiApp
             try
             {
                 if (_currentProjectId <= 0 || _currentTaskId <= 0) return;
-                string content = $"{_currentProjectId},{_currentTaskId},1";
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                string content = $"{_currentProjectId},{_currentTaskId},{attemptNo}";
                 File.WriteAllText(ExcelLogReader.GetCurrentTaskFilePath(), content, Encoding.UTF8);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[AppBarWindow] WriteCurrentTaskFile: " + ex.Message);
             }
+        }
+
+        /// <summary>結果画面で選んだタスクが×なら、作業画面に入ったとき番号を1つ上げる。</summary>
+        public void PrepareResultRetry(int projectId, int taskId, bool isWrong)
+        {
+            _resultRetryProjectId = projectId;
+            _resultRetryTaskId = taskId;
+            _resultRetryIsWrong = isWrong;
+            _pendingResultRetry = true;
+        }
+
+        private void ConsumeResultRetry(int projectId, int taskId)
+        {
+            if (!_pendingResultRetry)
+                return;
+            if (_resultRetryProjectId != projectId || _resultRetryTaskId != taskId)
+                return;
+            _pendingResultRetry = false;
+            if (!_resultRetryIsWrong)
+                return;
+            int attemptNo = ExcelTaskAttemptRegistry.Increment(projectId, taskId);
+            System.Diagnostics.Debug.WriteLine($"[ResultRetry] P{projectId} T{taskId} attempt={attemptNo}");
+        }
+
+        private void ClearPendingResultRetry()
+        {
+            _pendingResultRetry = false;
         }
 
         private void ClearCurrentTaskFile()
@@ -2046,6 +2130,10 @@ namespace MOSExcelMogiApp
             ExcelApp excelApp = null;
             int excelPid = -1;
 
+            ExcelVstoReadiness.RecordHostEvent(
+                "return-to-result close begin excelCount="
+                + ExcelApplicationManager.CountExcelProcesses());
+
             try
             {
                 try
@@ -2055,10 +2143,12 @@ namespace MOSExcelMogiApp
                 catch (COMException)
                 {
                     System.Diagnostics.Debug.WriteLine("[ReturnToResult] No Excel application");
+                    ExcelVstoReadiness.RecordHostEvent("return-to-result no-rot");
                     return;
                 }
 
                 excelPid = ExcelApplicationManager.TryGetExcelProcessId(excelApp);
+                ExcelVstoReadiness.RecordHostEvent("return-to-result rot pid=" + excelPid);
 
                 bool originalDisplayAlerts = true;
                 try
@@ -2113,21 +2203,18 @@ namespace MOSExcelMogiApp
                 try
                 {
                     excelApp.Quit();
+                    ExcelVstoReadiness.RecordHostEvent("return-to-result Quit requested pid=" + excelPid);
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ReturnToResult] Quit: {ex.Message}");
+                    ExcelVstoReadiness.RecordHostEvent(
+                        "return-to-result Quit failed pid=" + excelPid
+                        + " error=" + ex.GetType().Name + ":" + ex.Message);
                 }
 
-                try
-                {
-                    Marshal.ReleaseComObject(excelApp);
-                }
-                catch
-                {
-                    /* ignore */
-                }
-
+                // Quit 後の同期 ReleaseComObject はブロックし得るため破棄のみ。
+                ExcelApplicationManager.AbandonComObjectAfterQuit(excelApp, "[ReturnToResult]");
                 excelApp = null;
 
                 const int quitWaitMs = 10000;
@@ -2143,10 +2230,22 @@ namespace MOSExcelMogiApp
                 {
                     ExcelApplicationManager.WaitForAllExcelProcessesGone(quitWaitMs);
                 }
+
+                ExcelVstoReadiness.RecordHostEvent(
+                    "return-to-result close end pid=" + excelPid
+                    + " alive=" + (ExcelApplicationManager.IsProcessAlive(excelPid) ? "1" : "0")
+                    + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ReturnToResult] {ex.Message}");
+                ExcelVstoReadiness.RecordHostEvent(
+                    "return-to-result exception error=" + ex.GetType().Name + ":" + ex.Message);
+                if (excelApp != null)
+                {
+                    ExcelApplicationManager.AbandonComObjectAfterQuit(excelApp, "[ReturnToResult]");
+                    excelApp = null;
+                }
                 if (excelPid > 0)
                 {
                     ExcelApplicationManager.EnsureExcelProcessExited(

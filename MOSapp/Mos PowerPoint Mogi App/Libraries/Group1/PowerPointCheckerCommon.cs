@@ -560,38 +560,55 @@ namespace Libraries.Group1
         /// </summary>
         /// <param name="slide">スライド。</param>
         /// <returns>該当図形。見つからない場合は null。呼び出し元で Marshal.ReleaseComObject すること。</returns>
-        public static PptShape FindFirstVideoShape(Slide slide)
+        public enum MediaScanStatus
         {
-            if (slide == null) return null;
+            Found,
+            NotFound,
+            TransientComFailure
+        }
+
+        public static MediaScanStatus TryFindFirstVideoShape(Slide slide, out PptShape videoShape)
+        {
+            videoShape = null;
+            if (slide == null)
+                return MediaScanStatus.TransientComFailure;
+
             PptShapes shapes = null;
+            bool sawIndexFailure = false;
             try
             {
-                shapes = slide.Shapes;
-                if (shapes == null) return null;
-                int count = shapes.Count;
+                try { shapes = slide.Shapes; }
+                catch { return MediaScanStatus.TransientComFailure; }
+                if (shapes == null)
+                    return MediaScanStatus.TransientComFailure;
+
+                int count;
+                try { count = shapes.Count; }
+                catch { return MediaScanStatus.TransientComFailure; }
+
                 for (int i = 1; i <= count; i++)
                 {
                     PptShape sh = null;
                     try
                     {
-                        sh = shapes[i];
-                        // 可能なら MediaType を使う（取得が例外になる環境がある）
+                        try { sh = shapes[i]; }
+                        catch
+                        {
+                            sawIndexFailure = true;
+                            continue;
+                        }
+
                         try
                         {
                             if (sh.MediaType == PpMediaType.ppMediaTypeMovie)
                             {
-                                PptShape r = sh;
+                                videoShape = sh;
                                 sh = null;
-                                return r;
+                                return MediaScanStatus.Found;
                             }
                         }
-                        catch
-                        {
-                            // ignore
-                        }
+                        catch { }
 
-                        // MediaType が取得できない/不安定な環境向けのフォールバック:
-                        // msoMedia で MediaFormat が取得できるものを動画候補として扱う（8-1～8-3 は動画タスク）。
                         try
                         {
                             if (sh.Type == MsoShapeType.msoMedia)
@@ -600,29 +617,32 @@ namespace Libraries.Group1
                                 if (mf != null)
                                 {
                                     try { Marshal.ReleaseComObject(mf); } catch { }
-                                    PptShape r = sh;
+                                    videoShape = sh;
                                     sh = null;
-                                    return r;
+                                    return MediaScanStatus.Found;
                                 }
                             }
                         }
-                        catch
-                        {
-                            // ignore
-                        }
+                        catch { }
                     }
                     finally
                     {
                         if (sh != null) { try { Marshal.ReleaseComObject(sh); } catch { } }
                     }
                 }
-                return null;
+
+                return sawIndexFailure ? MediaScanStatus.TransientComFailure : MediaScanStatus.NotFound;
             }
-            catch { return null; }
             finally
             {
                 if (shapes != null) { try { Marshal.ReleaseComObject(shapes); } catch { } }
             }
+        }
+
+        public static PptShape FindFirstVideoShape(Slide slide)
+        {
+            TryFindFirstVideoShape(slide, out PptShape videoShape);
+            return videoShape;
         }
 
         /// <summary>
@@ -917,3 +937,4 @@ namespace Libraries.Group1
         }
     }
 }
+

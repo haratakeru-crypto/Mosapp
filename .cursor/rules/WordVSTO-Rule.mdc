@@ -2,4 +2,14 @@
 alwaysApply: true
 ---
 
+# Word VSTO 開発
+
+- **通常の Debug**: Visual Studio で `New_MOSWordVSTOAddIn`（または `MOS Word app`）を Debug ビルドすると `bin\Debug` がレジストリ登録される。毎回アンインストール不要。
+- **開発用キー**: `New_MOSWordVSTOAddIn` / **製品 MSI キー**: `WordMosVsto`（排他 LoadBehavior）。
+- **登録が壊れたとき / Release 確認用**:
+
+```powershell
 powershell -ExecutionPolicy Bypass -File ".\Rebuild-And-Install-WordVSTO.ps1"
+```
+
+（作業ディレクトリ: `MOSapp\MOS Word app`）

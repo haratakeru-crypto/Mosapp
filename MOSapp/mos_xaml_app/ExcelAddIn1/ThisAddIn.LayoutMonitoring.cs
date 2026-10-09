@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using Excel = Microsoft.Office.Interop.Excel;
 
@@ -12,36 +13,83 @@ namespace ExcelAddIn1
     {
         private readonly Dictionary<string, SheetLayoutSnapshot> _layoutSnapshots =
             new Dictionary<string, SheetLayoutSnapshot>(StringComparer.Ordinal);
+        private string _freshBaselineSheetKey;
+        private int _freshBaselineStamp;
+        private const int FreshBaselineReuseMs = 2000;
 
-        private void InitializeLayoutSnapshotsForAllOpenWorkbooks()
+        private void RememberFreshBaseline(string sheetKey)
+        {
+            _freshBaselineSheetKey = sheetKey;
+            _freshBaselineStamp = Environment.TickCount;
+        }
+
+        private void InvalidateFreshBaseline()
+        {
+            _freshBaselineSheetKey = null;
+        }
+
+        private bool HasFreshBaseline(string sheetKey, out int ageMs)
+        {
+            ageMs = 0;
+            if (string.IsNullOrEmpty(sheetKey) || sheetKey != _freshBaselineSheetKey)
+                return false;
+            ageMs = unchecked(Environment.TickCount - _freshBaselineStamp);
+            return ageMs >= 0 && ageMs < FreshBaselineReuseMs;
+        }
+
+        private void InitializeLayoutSnapshotsForAllOpenWorkbooks(string reason)
         {
             if (Application == null) return;
             try
             {
                 foreach (Excel.Workbook wb in Application.Workbooks)
                 {
-                    InitializeLayoutSnapshotsForWorkbook(wb, readFreeze: false);
+                    InitializeLayoutSnapshotsForWorkbook(wb, readFreeze: false, reason);
                 }
             }
             catch (Exception ex)
             {
-                WriteDiagnostic("InitializeLayoutSnapshotsForAllOpenWorkbooks: " + ex.Message);
+                WriteDiagnostic($"InitializeLayoutSnapshotsForAllOpenWorkbooks reason={reason}: {ex.Message}");
             }
         }
 
-        private void InitializeLayoutSnapshotsForWorkbook(Excel.Workbook workbook, bool readFreeze)
+        /// <summary>
+        /// 表示中のワークシートだけを基準にする。未表示シートは初回表示時に遅延初期化する。
+        /// 同じシートを起動・WorkbookOpen・TaskStart が短時間に連続しても、変更がなければ再取得しない。
+        /// </summary>
+        private void InitializeLayoutSnapshotsForWorkbook(Excel.Workbook workbook, bool readFreeze, string reason)
         {
             if (workbook == null) return;
             try
             {
-                foreach (Excel.Worksheet ws in workbook.Worksheets)
+                var ws = workbook.ActiveSheet as Excel.Worksheet;
+                if (ws == null)
                 {
-                    TryStoreSnapshot(ws, readFreeze, logChanges: false);
+                    WriteDiagnostic($"LayoutSnapshot active skipped reason={reason} (no worksheet)");
+                    return;
                 }
+
+                string key = GetSheetKey(ws);
+                if (HasFreshBaseline(key, out int ageMs) && _layoutSnapshots.ContainsKey(key))
+                {
+                    WriteDiagnostic(
+                        $"LayoutSnapshot skipped reason={reason} sheet={SafeWorksheetName(ws)} freshBaselineAge={ageMs}ms");
+                    WriteDiagnostic(WithOpenToken("Baseline completed reason=" + reason + " sheet=" + SafeWorksheetName(ws)));
+                    return;
+                }
+
+                var sw = Stopwatch.StartNew();
+                TryStoreSnapshot(ws, readFreeze, logChanges: false);
+                if (_layoutSnapshots.ContainsKey(key))
+                    RememberFreshBaseline(key);
+                WriteDiagnostic(
+                    $"LayoutSnapshot active reason={reason} sheet={SafeWorksheetName(ws)} elapsed={sw.ElapsedMilliseconds}ms");
+                if (_layoutSnapshots.ContainsKey(key))
+                    WriteDiagnostic(WithOpenToken("Baseline completed reason=" + reason + " sheet=" + SafeWorksheetName(ws)));
             }
             catch (Exception ex)
             {
-                WriteDiagnostic("InitializeLayoutSnapshotsForWorkbook: " + ex.Message);
+                WriteDiagnostic($"InitializeLayoutSnapshotsForWorkbook reason={reason}: {ex.Message}");
             }
         }
 
@@ -85,7 +133,7 @@ namespace ExcelAddIn1
                     }
                 } 
                 catch { }
-                TryStoreSnapshot(ws, readFreeze: true, logChanges: true, trigger: LayoutChangeTrigger.SheetActivate);
+                TryStoreSnapshot(ws, readFreeze: true, logChanges: true, trigger: LayoutChangeTrigger.SheetActivate, reportFirstStore: true);
             }
             catch (Exception ex)
             {
@@ -101,7 +149,7 @@ namespace ExcelAddIn1
                 if (ws == null) return;
 
                 // シートが裏に隠れる直前に、現在の状態を保存し差分があればログに記録する。
-                TryStoreSnapshot(ws, readFreeze: true, logChanges: true);
+                TryStoreSnapshot(ws, readFreeze: true, logChanges: true, reportFirstStore: true);
             }
             catch (Exception ex)
             {
@@ -130,7 +178,7 @@ namespace ExcelAddIn1
                 } 
                 catch { }
                 // WindowActivate は実運用で発火頻度が低いため、主ログ経路としては使わず保険的にスナップショットだけ更新する。
-                TryStoreSnapshot(ws, readFreeze: true, logChanges: false, trigger: LayoutChangeTrigger.WindowActivate);
+                TryStoreSnapshot(ws, readFreeze: true, logChanges: false, trigger: LayoutChangeTrigger.WindowActivate, reportFirstStore: true);
             }
             catch (Exception ex)
             {
@@ -142,7 +190,7 @@ namespace ExcelAddIn1
         {
             try
             {
-                InitializeLayoutSnapshotsForWorkbook(wb, readFreeze: false);
+                InitializeLayoutSnapshotsForWorkbook(wb, readFreeze: false, "NewWorkbook");
             }
             catch (Exception ex)
             {
@@ -183,8 +231,21 @@ namespace ExcelAddIn1
             return wbKey + "\x1E" + sn;
         }
 
-        private void TryStoreSnapshot(Excel.Worksheet ws, bool readFreeze, bool logChanges, LayoutChangeTrigger trigger = LayoutChangeTrigger.Other)
+        private static string SafeWorksheetName(Excel.Worksheet ws)
         {
+            try
+            {
+                return ws?.Name ?? "?";
+            }
+            catch
+            {
+                return "?";
+            }
+        }
+
+        private void TryStoreSnapshot(Excel.Worksheet ws, bool readFreeze, bool logChanges, LayoutChangeTrigger trigger = LayoutChangeTrigger.Other, bool reportFirstStore = false)
+        {
+            var sw = Stopwatch.StartNew();
             SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze);
             if (snap == null) return;
 
@@ -193,6 +254,11 @@ namespace ExcelAddIn1
             if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
             {
                 _layoutSnapshots[key] = snap.Value;
+                if (reportFirstStore)
+                {
+                    WriteDiagnostic(
+                        $"LayoutSnapshot deferred sheet={SafeWorksheetName(ws)} elapsed={sw.ElapsedMilliseconds}ms trigger={trigger}");
+                }
                 return;
             }
 
@@ -211,51 +277,126 @@ namespace ExcelAddIn1
             }
         }
 
-        private static SheetLayoutSnapshot? BuildSnapshot(Excel.Worksheet ws, bool readFreeze)
+        private sealed class SnapshotReadCache
         {
+            public readonly Dictionary<string, List<string>> WorkbookNameParts =
+                new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 未取得の項目はビットを立てない。初期値と実値を差分ログにしないため。
+        /// PageSetup と改ページは、非印刷タスクでも無断変更が違反になるので起動基準に含める。
+        /// </summary>
+        [Flags]
+        private enum SnapshotFields
+        {
+            None = 0,
+            PageSetup = 1,
+            PageBreaks = 2,
+            Tables = 4,
+            SortFilter = 8,
+            Shapes = 16,
+            NamedRanges = 32,
+            ExternalData = 64,
+            ConditionalFormats = 128,
+            UsedRange = 256,
+            CellFormat = 512,
+            Hyperlinks = 1024,
+            Freeze = 2048
+        }
+
+        private const SnapshotFields TrackedSnapshotFields =
+            SnapshotFields.PageSetup
+            | SnapshotFields.PageBreaks
+            | SnapshotFields.Tables
+            | SnapshotFields.SortFilter
+            | SnapshotFields.Shapes
+            | SnapshotFields.NamedRanges
+            | SnapshotFields.ExternalData
+            | SnapshotFields.ConditionalFormats
+            | SnapshotFields.UsedRange
+            | SnapshotFields.CellFormat
+            | SnapshotFields.Hyperlinks;
+
+        private static long MarkTiming(Stopwatch sw, long mark, string name, List<string> steps)
+        {
+            long now = sw.ElapsedMilliseconds;
+            steps.Add(name + "=" + (now - mark).ToString(CultureInfo.InvariantCulture));
+            return now;
+        }
+
+        private static SheetLayoutSnapshot? BuildSnapshot(Excel.Worksheet ws, bool readFreeze, SnapshotReadCache cache = null)
+        {
+            var steps = new List<string>(12);
+            var sw = Stopwatch.StartNew();
+            long mark = 0;
             try
             {
+                var s = new SheetLayoutSnapshot();
+                s.Present = TrackedSnapshotFields;
+
                 Excel.PageSetup ps = ws.PageSetup;
-                var s = new SheetLayoutSnapshot
-                {
-                    PrintArea = SafeGet(() => ps.PrintArea),
-                    PrintTitleRows = SafeGet(() => ps.PrintTitleRows),
-                    PrintTitleColumns = SafeGet(() => ps.PrintTitleColumns),
-                    Orientation = SafeGetInt(() => (int)ps.Orientation),
-                    LeftMargin = SafeGetDouble(() => ps.LeftMargin),
-                    RightMargin = SafeGetDouble(() => ps.RightMargin),
-                    TopMargin = SafeGetDouble(() => ps.TopMargin),
-                    BottomMargin = SafeGetDouble(() => ps.BottomMargin),
-                    LeftHeader = SafeGet(() => ps.LeftHeader),
-                    CenterHeader = SafeGet(() => ps.CenterHeader),
-                    RightHeader = SafeGet(() => ps.RightHeader),
-                    LeftFooter = SafeGet(() => ps.LeftFooter),
-                    CenterFooter = SafeGet(() => ps.CenterFooter),
-                    RightFooter = SafeGet(() => ps.RightFooter),
-                    Zoom = SafeGetZoom(ps),
-                    PaperSize = SafeGetInt(() => (int)ps.PaperSize),
-                    FitToPagesWide = SafeGetInt(() => ps.FitToPagesWide),
-                    FitToPagesTall = SafeGetInt(() => ps.FitToPagesTall),
-                    BlackAndWhite = SafeGetBool(() => ps.BlackAndWhite),
-                    Draft = SafeGetBool(() => ps.Draft),
-                    HPageBreakCount = SafeGetHBreakCount(ws),
-                    VPageBreakCount = SafeGetVBreakCount(ws),
-                    TableStyleSignature = BuildTableStyleSignature(ws),
-                    TableRangeSignature = BuildTableRangeSignature(ws),
-                    SortFilterSignature = BuildSortFilterSignature(ws),
-                    ShapeCount = SafeGetShapeCount(ws),
-                    ShapeGeometrySignature = BuildShapeGeometrySignature(ws),
-                    NamedRangeSignature = BuildNamedRangeSignature(ws),
-                    ExternalDataSignature = BuildExternalDataSignature(ws),
-                    ConditionalFormatSignature = BuildConditionalFormatSignature(ws),
-                    UsedRowCount = SafeGetUsedRangeRowCount(ws),
-                    UsedColumnCount = SafeGetUsedRangeColumnCount(ws),
-                    CellFormatSignature = BuildCellFormatSignature(ws),
-                    HyperlinkSignature = BuildHyperlinkSignature(ws)
-                };
+                s.PrintArea = SafeGet(() => ps.PrintArea);
+                s.PrintTitleRows = SafeGet(() => ps.PrintTitleRows);
+                s.PrintTitleColumns = SafeGet(() => ps.PrintTitleColumns);
+                s.Orientation = SafeGetInt(() => (int)ps.Orientation);
+                s.LeftMargin = SafeGetDouble(() => ps.LeftMargin);
+                s.RightMargin = SafeGetDouble(() => ps.RightMargin);
+                s.TopMargin = SafeGetDouble(() => ps.TopMargin);
+                s.BottomMargin = SafeGetDouble(() => ps.BottomMargin);
+                s.LeftHeader = SafeGet(() => ps.LeftHeader);
+                s.CenterHeader = SafeGet(() => ps.CenterHeader);
+                s.RightHeader = SafeGet(() => ps.RightHeader);
+                s.LeftFooter = SafeGet(() => ps.LeftFooter);
+                s.CenterFooter = SafeGet(() => ps.CenterFooter);
+                s.RightFooter = SafeGet(() => ps.RightFooter);
+                s.Zoom = SafeGetZoom(ps);
+                s.PaperSize = SafeGetInt(() => (int)ps.PaperSize);
+                s.FitToPagesWide = SafeGetInt(() => ps.FitToPagesWide);
+                s.FitToPagesTall = SafeGetInt(() => ps.FitToPagesTall);
+                s.BlackAndWhite = SafeGetBool(() => ps.BlackAndWhite);
+                s.Draft = SafeGetBool(() => ps.Draft);
+                mark = MarkTiming(sw, mark, "PageSetup", steps);
+
+                s.HPageBreakCount = SafeGetHBreakCount(ws);
+                s.VPageBreakCount = SafeGetVBreakCount(ws);
+                mark = MarkTiming(sw, mark, "PageBreaks", steps);
+
+                s.TableStyleSignature = BuildTableStyleSignature(ws);
+                s.TableRangeSignature = BuildTableRangeSignature(ws);
+                mark = MarkTiming(sw, mark, "Tables", steps);
+
+                s.SortFilterSignature = BuildSortFilterSignature(ws);
+                mark = MarkTiming(sw, mark, "SortFilter", steps);
+
+                s.ShapeCount = SafeGetShapeCount(ws);
+                s.ShapeGeometrySignature = BuildShapeGeometrySignature(ws);
+                mark = MarkTiming(sw, mark, "Shapes", steps);
+
+                s.NamedRangeSignature = BuildNamedRangeSignature(ws, cache);
+                mark = MarkTiming(sw, mark, "NamedRanges", steps);
+
+                s.ExternalDataSignature = BuildExternalDataSignature(ws);
+                mark = MarkTiming(sw, mark, "ExternalData", steps);
+
+                Excel.Range used = null;
+                try { used = ws.UsedRange; } catch { }
+                s.UsedRowCount = SafeGetUsedRangeRowCount(used);
+                s.UsedColumnCount = SafeGetUsedRangeColumnCount(used);
+                mark = MarkTiming(sw, mark, "UsedRange", steps);
+
+                s.CellFormatSignature = BuildCellFormatSignature(used);
+                mark = MarkTiming(sw, mark, "CellFormat", steps);
+
+                s.ConditionalFormatSignature = BuildConditionalFormatSignature(used);
+                mark = MarkTiming(sw, mark, "ConditionalFormats", steps);
+
+                s.HyperlinkSignature = BuildHyperlinkSignature(ws);
+                mark = MarkTiming(sw, mark, "Hyperlinks", steps);
 
                 if (readFreeze && TryGetFreezeForActiveSheet(ws, out bool freeze, out int splitRow, out int splitCol))
                 {
+                    s.Present |= SnapshotFields.Freeze;
                     s.FreezePanes = freeze;
                     s.SplitRow = splitRow;
                     s.SplitColumn = splitCol;
@@ -266,12 +407,29 @@ namespace ExcelAddIn1
                     s.SplitRow = null;
                     s.SplitColumn = null;
                 }
+                MarkTiming(sw, mark, "Freeze", steps);
+
+                if (sw.ElapsedMilliseconds >= 30)
+                {
+                    WriteDiagnostic(
+                        "BuildSnapshot sheet=" + SafeWorksheetName(ws)
+                        + " total=" + sw.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture)
+                        + "ms " + string.Join(" ", steps));
+                }
 
                 return s;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[LayoutMonitoring] BuildSnapshot: " + ex.Message);
+                if (sw.ElapsedMilliseconds >= 30)
+                {
+                    WriteDiagnostic(
+                        "BuildSnapshot failed sheet=" + SafeWorksheetName(ws)
+                        + " total=" + sw.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture)
+                        + "ms " + string.Join(" ", steps)
+                        + " error=" + ex.Message);
+                }
                 return null;
             }
         }
@@ -601,7 +759,7 @@ namespace ExcelAddIn1
             return string.Join("|", parts);
         }
 
-        private static string BuildNamedRangeSignature(Excel.Worksheet ws)
+        private static string BuildNamedRangeSignature(Excel.Worksheet ws, SnapshotReadCache cache)
         {
             var parts = new List<string>();
             try
@@ -609,16 +767,28 @@ namespace ExcelAddIn1
                 var wb = ws.Parent as Excel.Workbook;
                 if (wb != null)
                 {
-                    foreach (Excel.Name n in wb.Names)
+                    string wbKey = GetWorkbookKey(wb);
+                    List<string> workbookParts = null;
+                    if (cache == null || !cache.WorkbookNameParts.TryGetValue(wbKey, out workbookParts))
                     {
-                        try
+                        workbookParts = new List<string>();
+                        foreach (Excel.Name n in wb.Names)
                         {
-                            string name = SafeGet(() => n.Name);
-                            string refersTo = SafeGet(() => n.RefersTo);
-                            parts.Add($"WB:{name}:{refersTo}");
+                            try
+                            {
+                                string name = SafeGet(() => n.Name);
+                                string refersTo = SafeGet(() => n.RefersTo);
+                                workbookParts.Add("WB:" + name + ":" + refersTo);
+                            }
+                            catch { }
                         }
-                        catch { }
+
+                        if (cache != null)
+                            cache.WorkbookNameParts[wbKey] = workbookParts;
                     }
+
+                    if (workbookParts != null)
+                        parts.AddRange(workbookParts);
                 }
 
                 foreach (Excel.Name n in ws.Names)
@@ -627,7 +797,7 @@ namespace ExcelAddIn1
                     {
                         string name = SafeGet(() => n.Name);
                         string refersTo = SafeGet(() => n.RefersTo);
-                        parts.Add($"WS:{name}:{refersTo}");
+                        parts.Add("WS:" + name + ":" + refersTo);
                     }
                     catch { }
                 }
@@ -636,6 +806,52 @@ namespace ExcelAddIn1
 
             parts.Sort(StringComparer.Ordinal);
             return string.Join("|", parts);
+        }
+
+        /// <summary>
+        /// 名前定義シグネチャから定義名の集合だけを取り出し、追加・削除があるか判定する。
+        /// RefersTo だけの変化（SORT/スピル等の自動更新）は破壊的操作にしない。
+        /// 署名要素形式: "WB:名前:参照先" / "WS:名前:参照先"
+        /// </summary>
+        private static bool HasNamedRangeNameSetChanged(string oldSignature, string newSignature)
+        {
+            var oldNames = ExtractNamedRangeNameKeys(oldSignature);
+            var newNames = ExtractNamedRangeNameKeys(newSignature);
+            if (oldNames.Count != newNames.Count)
+                return true;
+            foreach (string name in oldNames)
+            {
+                if (!newNames.Contains(name))
+                    return true;
+            }
+            return false;
+        }
+
+        private static HashSet<string> ExtractNamedRangeNameKeys(string signature)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(signature))
+                return keys;
+
+            foreach (string part in signature.Split('|'))
+            {
+                if (string.IsNullOrEmpty(part))
+                    continue;
+
+                // "WB:氏名:=Sheet!$A$1" → scope=WB, name=氏名
+                int first = part.IndexOf(':');
+                if (first < 0 || first >= part.Length - 1)
+                    continue;
+                int second = part.IndexOf(':', first + 1);
+                string scope = part.Substring(0, first);
+                string name = second > first
+                    ? part.Substring(first + 1, second - first - 1)
+                    : part.Substring(first + 1);
+                if (string.IsNullOrEmpty(name))
+                    continue;
+                keys.Add(scope + ":" + name);
+            }
+            return keys;
         }
 
         private static string BuildExternalDataSignature(Excel.Worksheet ws)
@@ -679,13 +895,11 @@ namespace ExcelAddIn1
             return string.Join("|", parts);
         }
 
-        private static string BuildConditionalFormatSignature(Excel.Worksheet ws)
+        private static string BuildConditionalFormatSignature(Excel.Range used)
         {
             var parts = new List<string>();
             try
             {
-                Excel.Range used = null;
-                try { used = ws.UsedRange; } catch { }
                 if (used == null) return "";
 
                 Excel.FormatConditions fcs = null;
@@ -719,11 +933,10 @@ namespace ExcelAddIn1
             return string.Join("|", parts);
         }
 
-        private static int SafeGetUsedRangeRowCount(Excel.Worksheet ws)
+        private static int SafeGetUsedRangeRowCount(Excel.Range used)
         {
             try
             {
-                Excel.Range used = ws.UsedRange;
                 if (used == null) return 0;
                 return used.Rows?.Count ?? 0;
             }
@@ -733,11 +946,10 @@ namespace ExcelAddIn1
             }
         }
 
-        private static int SafeGetUsedRangeColumnCount(Excel.Worksheet ws)
+        private static int SafeGetUsedRangeColumnCount(Excel.Range used)
         {
             try
             {
-                Excel.Range used = ws.UsedRange;
                 if (used == null) return 0;
                 return used.Columns?.Count ?? 0;
             }
@@ -747,11 +959,10 @@ namespace ExcelAddIn1
             }
         }
 
-        private static string BuildCellFormatSignature(Excel.Worksheet ws)
+        private static string BuildCellFormatSignature(Excel.Range used)
         {
             try
             {
-                Excel.Range used = ws.UsedRange;
                 if (used == null) return "";
 
                 string addr = "";
@@ -860,15 +1071,22 @@ namespace ExcelAddIn1
         private void FlushPendingBoundaryDiffsForTask(int projectId, int taskId, int attemptNo)
         {
             if (projectId <= 0 || taskId <= 0) return;
-            FlushPendingSelectedSheetsLayoutDiffsForTask(projectId, taskId, attemptNo);
-            FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(projectId, taskId, attemptNo);
+            var capturedSheetKeys = new HashSet<string>(StringComparer.Ordinal);
+            var cache = new SnapshotReadCache();
+            FlushPendingSelectedSheetsLayoutDiffsForTask(projectId, taskId, attemptNo, capturedSheetKeys, cache);
+            FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(projectId, taskId, attemptNo, capturedSheetKeys, cache);
         }
 
         /// <summary>
         /// 全ブック各シートについて、旧スナップショットと現在状態を1回の <c>BuildSnapshot</c> で比較し、
         /// 差分カテゴリをまとめてログしてからスナップショットを更新する。
         /// </summary>
-        private void FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(int projectId, int taskId, int attemptNo)
+        private void FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(
+            int projectId,
+            int taskId,
+            int attemptNo,
+            HashSet<string> alreadyCapturedSheetKeys,
+            SnapshotReadCache cache)
         {
             if (projectId <= 0 || taskId <= 0 || Application == null) return;
             try
@@ -882,7 +1100,10 @@ namespace ExcelAddIn1
                             try
                             {
                                 string key = GetSheetKey(ws);
-                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false);
+                                if (alreadyCapturedSheetKeys != null && alreadyCapturedSheetKeys.Contains(key))
+                                    continue;
+
+                                SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: false, cache);
                                 if (snap == null) continue;
 
                                 if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
@@ -892,13 +1113,13 @@ namespace ExcelAddIn1
                                 }
 
                                 SheetLayoutSnapshot now = snap.Value;
-                                bool rowChanged = old.UsedRowCount != now.UsedRowCount;
-                                bool colChanged = old.UsedColumnCount != now.UsedColumnCount;
-                                bool sortFilterChanged = old.SortFilterSignature != now.SortFilterSignature;
-                                bool tableStyleChanged = old.TableStyleSignature != now.TableStyleSignature;
-                                bool shapeCountChanged = old.ShapeCount != now.ShapeCount;
-                                bool shapeGeomChanged = old.ShapeGeometrySignature != now.ShapeGeometrySignature;
-                                bool hyperlinkChanged = old.HyperlinkSignature != now.HyperlinkSignature;
+                                bool rowChanged = CanCompare(old, now, SnapshotFields.UsedRange) && old.UsedRowCount != now.UsedRowCount;
+                                bool colChanged = CanCompare(old, now, SnapshotFields.UsedRange) && old.UsedColumnCount != now.UsedColumnCount;
+                                bool sortFilterChanged = CanCompare(old, now, SnapshotFields.SortFilter) && old.SortFilterSignature != now.SortFilterSignature;
+                                bool tableStyleChanged = CanCompare(old, now, SnapshotFields.Tables) && old.TableStyleSignature != now.TableStyleSignature;
+                                bool shapeCountChanged = CanCompare(old, now, SnapshotFields.Shapes) && old.ShapeCount != now.ShapeCount;
+                                bool shapeGeomChanged = CanCompare(old, now, SnapshotFields.Shapes) && old.ShapeGeometrySignature != now.ShapeGeometrySignature;
+                                bool hyperlinkChanged = CanCompare(old, now, SnapshotFields.Hyperlinks) && old.HyperlinkSignature != now.HyperlinkSignature;
 
                                 if (!rowChanged && !colChanged && !sortFilterChanged && !tableStyleChanged
                                     && !shapeCountChanged && !shapeGeomChanged && !hyperlinkChanged)
@@ -979,7 +1200,12 @@ namespace ExcelAddIn1
         /// タスク切替直前に、現在選択されているすべてのシート（ActiveSheet含む）のレイアウト差分を旧タスク文脈で確定する。
         /// 印刷設定や書式などは全シート回すと重いため、ユーザーが直前まで触っていた可能性が高い選択シートのみに限定してチェックする。
         /// </summary>
-        private void FlushPendingSelectedSheetsLayoutDiffsForTask(int projectId, int taskId, int attemptNo)
+        private void FlushPendingSelectedSheetsLayoutDiffsForTask(
+            int projectId,
+            int taskId,
+            int attemptNo,
+            HashSet<string> capturedSheetKeys,
+            SnapshotReadCache cache)
         {
             if (projectId <= 0 || taskId <= 0 || Application == null) return;
             try
@@ -998,12 +1224,14 @@ namespace ExcelAddIn1
                         if (ws == null) continue;
 
                         string key = GetSheetKey(ws);
-                        SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: true);
+                        SheetLayoutSnapshot? snap = BuildSnapshot(ws, readFreeze: true, cache);
                         if (snap == null) continue;
 
                         if (!_layoutSnapshots.TryGetValue(key, out SheetLayoutSnapshot old))
                         {
                             _layoutSnapshots[key] = snap.Value;
+                            if (capturedSheetKeys != null)
+                                capturedSheetKeys.Add(key);
                             continue;
                         }
 
@@ -1016,6 +1244,8 @@ namespace ExcelAddIn1
                             });
                             _layoutSnapshots[key] = now;
                         }
+                        if (capturedSheetKeys != null)
+                            capturedSheetKeys.Add(key);
                     }
                     catch (Exception exSheet)
                     {
@@ -1046,19 +1276,19 @@ namespace ExcelAddIn1
                 WriteDiagnostic($"Layout diff ignored once (trigger={trigger}, sheet={sheetName})");
             }
 
-            if (!suppressLayoutLog && oldS.PrintArea != newS.PrintArea)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.PageSetup) && oldS.PrintArea != newS.PrintArea)
                 Logger.LogOperation("SetPrintArea", $"{sheetName}!{newS.PrintArea}");
 
-            if (!suppressLayoutLog && (oldS.PrintTitleRows != newS.PrintTitleRows || oldS.PrintTitleColumns != newS.PrintTitleColumns))
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.PageSetup) && (oldS.PrintTitleRows != newS.PrintTitleRows || oldS.PrintTitleColumns != newS.PrintTitleColumns))
                 Logger.LogOperation("SetPrintTitle", $"{sheetName}!Rows:{newS.PrintTitleRows};Cols:{newS.PrintTitleColumns}");
 
             bool headerChanged =
                 oldS.LeftHeader != newS.LeftHeader || oldS.CenterHeader != newS.CenterHeader || oldS.RightHeader != newS.RightHeader ||
                 oldS.LeftFooter != newS.LeftFooter || oldS.CenterFooter != newS.CenterFooter || oldS.RightFooter != newS.RightFooter;
-            if (!suppressLayoutLog && headerChanged)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.PageSetup) && headerChanged)
                 Logger.LogOperation("SetHeaderFooter", $"{sheetName}!HF");
 
-            if (!suppressLayoutLog && oldS.Orientation != newS.Orientation)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.PageSetup) && oldS.Orientation != newS.Orientation)
                 Logger.LogOperation("SetPageOrientation", $"{sheetName}!Orientation={newS.Orientation}");
 
             bool marginChanged =
@@ -1066,7 +1296,7 @@ namespace ExcelAddIn1
                 !MarginEquals(oldS.RightMargin, newS.RightMargin) ||
                 !MarginEquals(oldS.TopMargin, newS.TopMargin) ||
                 !MarginEquals(oldS.BottomMargin, newS.BottomMargin);
-            if (!suppressLayoutLog && marginChanged)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.PageSetup) && marginChanged)
                 Logger.LogOperation("SetPageMargins", $"{sheetName}!L:{newS.LeftMargin};R:{newS.RightMargin};T:{newS.TopMargin};B:{newS.BottomMargin}");
 
             bool scalingChanged =
@@ -1076,46 +1306,48 @@ namespace ExcelAddIn1
                 oldS.FitToPagesTall != newS.FitToPagesTall ||
                 oldS.BlackAndWhite != newS.BlackAndWhite ||
                 oldS.Draft != newS.Draft;
-            if (!suppressLayoutLog && scalingChanged)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.PageSetup) && scalingChanged)
                 Logger.LogOperation("SetPageScaling", $"{sheetName}!Zoom={newS.Zoom};Paper={newS.PaperSize};FitW={newS.FitToPagesWide};FitT={newS.FitToPagesTall};BW={newS.BlackAndWhite};Draft={newS.Draft}");
 
-            if (!suppressLayoutLog && (oldS.HPageBreakCount != newS.HPageBreakCount || oldS.VPageBreakCount != newS.VPageBreakCount))
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.PageBreaks) && (oldS.HPageBreakCount != newS.HPageBreakCount || oldS.VPageBreakCount != newS.VPageBreakCount))
                 Logger.LogOperation("SetPageBreak", $"{sheetName}!H={newS.HPageBreakCount};V={newS.VPageBreakCount}");
 
-            if (!suppressLayoutLog && oldS.TableStyleSignature != newS.TableStyleSignature)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.Tables) && oldS.TableStyleSignature != newS.TableStyleSignature)
                 Logger.LogOperation("SetTableStyle", $"{sheetName}!{newS.TableStyleSignature}");
 
-            if (!suppressLayoutLog && oldS.TableRangeSignature != newS.TableRangeSignature)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.Tables) && oldS.TableRangeSignature != newS.TableRangeSignature)
                 Logger.LogOperation("ResizeTable", $"{sheetName}!{newS.TableRangeSignature}");
 
-            if (!suppressLayoutLog && oldS.SortFilterSignature != newS.SortFilterSignature)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.SortFilter) && oldS.SortFilterSignature != newS.SortFilterSignature)
                 Logger.LogOperation("SortOrFilter", $"{sheetName}!{newS.SortFilterSignature}");
 
-            if (!suppressLayoutLog && oldS.HyperlinkSignature != newS.HyperlinkSignature)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.Hyperlinks) && oldS.HyperlinkSignature != newS.HyperlinkSignature)
                 Logger.LogOperation("InsertHyperlink", $"{sheetName}!HyperlinkChanged");
 
-            if (!suppressLayoutLog && oldS.ShapeCount != newS.ShapeCount)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.Shapes) && oldS.ShapeCount != newS.ShapeCount)
             {
                 if (newS.ShapeCount > oldS.ShapeCount)
                     Logger.LogOperation("InsertShapeOrImage", $"{sheetName}!Count:{oldS.ShapeCount}->{newS.ShapeCount}");
                 else
                     Logger.LogOperation("DeleteShapeOrImage", $"{sheetName}!Count:{oldS.ShapeCount}->{newS.ShapeCount}");
             }
-            else if (!suppressLayoutLog && oldS.ShapeGeometrySignature != newS.ShapeGeometrySignature)
+            else if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.Shapes) && oldS.ShapeGeometrySignature != newS.ShapeGeometrySignature)
             {
                 Logger.LogOperation("MoveOrResizeShape", $"{sheetName}!Count={newS.ShapeCount}");
             }
 
-            if (!suppressLayoutLog && oldS.NamedRangeSignature != newS.NamedRangeSignature)
+            // 参照先(RefersTo)だけの自動更新は無視し、定義名の追加・削除があるときだけ記録する
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.NamedRanges)
+                && HasNamedRangeNameSetChanged(oldS.NamedRangeSignature, newS.NamedRangeSignature))
                 Logger.LogOperation("ManageNamedRange", $"{sheetName}!NamedRangeChanged");
 
-            if (!suppressLayoutLog && oldS.ExternalDataSignature != newS.ExternalDataSignature)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.ExternalData) && oldS.ExternalDataSignature != newS.ExternalDataSignature)
                 Logger.LogOperation("ImportExternalData", $"{sheetName}!ExternalDataChanged");
 
-            if (!suppressLayoutLog && oldS.ConditionalFormatSignature != newS.ConditionalFormatSignature)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.ConditionalFormats) && oldS.ConditionalFormatSignature != newS.ConditionalFormatSignature)
                 Logger.LogOperation("AddConditionalFormat", $"{sheetName}!ConditionalFormatChanged");
 
-            if (!suppressLayoutLog && oldS.UsedRowCount != newS.UsedRowCount)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.UsedRange) && oldS.UsedRowCount != newS.UsedRowCount)
             {
                 if (!IsLikelyFormatOnlyUsedRangeDrift(oldS, newS))
                 {
@@ -1126,7 +1358,7 @@ namespace ExcelAddIn1
                 }
             }
 
-            if (!suppressLayoutLog && oldS.UsedColumnCount != newS.UsedColumnCount)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.UsedRange) && oldS.UsedColumnCount != newS.UsedColumnCount)
             {
                 if (!IsLikelyFormatOnlyUsedRangeDrift(oldS, newS))
                 {
@@ -1137,11 +1369,11 @@ namespace ExcelAddIn1
                 }
             }
 
-            if (!suppressLayoutLog && oldS.CellFormatSignature != newS.CellFormatSignature)
+            if (!suppressLayoutLog && CanCompare(oldS, newS, SnapshotFields.CellFormat) && oldS.CellFormatSignature != newS.CellFormatSignature)
                 Logger.LogOperation("EditCellFormat", $"{sheetName}!UsedRangeFormatChanged");
 
-            bool freezeOldKnown = oldS.FreezePanes.HasValue;
-            bool freezeNewKnown = newS.FreezePanes.HasValue;
+            bool freezeOldKnown = CanCompare(oldS, newS, SnapshotFields.Freeze) && oldS.FreezePanes.HasValue;
+            bool freezeNewKnown = CanCompare(oldS, newS, SnapshotFields.Freeze) && newS.FreezePanes.HasValue;
             if (freezeOldKnown && freezeNewKnown)
             {
                 if (!suppressLayoutLog && (oldS.FreezePanes != newS.FreezePanes ||
@@ -1151,6 +1383,11 @@ namespace ExcelAddIn1
                     Logger.LogOperation("SetFreezePanes", $"{sheetName}!Freeze={newS.FreezePanes};SplitRow={newS.SplitRow};SplitCol={newS.SplitColumn}");
                 }
             }
+        }
+
+        private static bool CanCompare(SheetLayoutSnapshot oldS, SheetLayoutSnapshot newS, SnapshotFields field)
+        {
+            return (oldS.Present & field) == field && (newS.Present & field) == field;
         }
 
         private static bool MarginEquals(double a, double b)
@@ -1165,6 +1402,8 @@ namespace ExcelAddIn1
         /// </summary>
         private static bool IsLikelyFormatOnlyUsedRangeDrift(SheetLayoutSnapshot oldS, SheetLayoutSnapshot newS)
         {
+            if (!CanCompare(oldS, newS, SnapshotFields.CellFormat) || !CanCompare(oldS, newS, SnapshotFields.UsedRange))
+                return false;
             if (oldS.CellFormatSignature == newS.CellFormatSignature)
                 return false;
 
@@ -1217,12 +1456,15 @@ namespace ExcelAddIn1
             public int UsedColumnCount;
             public string CellFormatSignature;
             public string HyperlinkSignature;
+            public SnapshotFields Present;
             public bool? FreezePanes;
             public int? SplitRow;
             public int? SplitColumn;
 
             public bool Equals(SheetLayoutSnapshot other)
             {
+                if (Present != other.Present)
+                    return false;
                 return PrintArea == other.PrintArea
                     && PrintTitleRows == other.PrintTitleRows
                     && PrintTitleColumns == other.PrintTitleColumns

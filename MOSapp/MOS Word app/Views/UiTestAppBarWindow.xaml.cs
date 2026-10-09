@@ -35,6 +35,28 @@ namespace MOS_Word_app.Views
 
         [DllImport("user32.dll")]
         static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool EnableWindow(IntPtr hWnd, bool bEnable);
+
+        [DllImport("kernel32.dll")]
+        static extern uint GetCurrentThreadId();
+
+        const int SW_RESTORE = 9;
         
         [DllImport("user32.dll")]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -65,6 +87,7 @@ namespace MOS_Word_app.Views
         private TimeSpan _remainingTime;
         private int _currentProjectId = 1;
         private int _currentTaskId = 1;
+        private bool _isMovingToNextProject;
         private int _groupId = 1; // グループIDを保存
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
@@ -74,6 +97,8 @@ namespace MOS_Word_app.Views
         private DateTime _projectStartTime; // プロジェクト開始時刻
         private DispatcherTimer _projectTimer; // プロジェクト用タイマー（5分制限）
         private Dictionary<int, Dictionary<int, string>> _clipboardTargets = new Dictionary<int, Dictionary<int, string>>(); // クリップボード対象（プロジェクトID → タスクID → 問題文）
+        private bool _isScoreResultOpen;
+        private bool _nextProjectPendingAfterScoreResult;
         private bool _isPaused = false; // 一時停止状態
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
@@ -238,6 +263,11 @@ namespace MOS_Word_app.Views
             if (elapsed.TotalMinutes >= 5.0)
             {
                 _projectTimer.Stop();
+                if (_isScoreResultOpen)
+                {
+                    _nextProjectPendingAfterScoreResult = true;
+                    return;
+                }
                 MoveToNextProjectWithMessage();
             }
         }
@@ -320,11 +350,13 @@ namespace MOS_Word_app.Views
                 scoreButton.IsEnabled = false;
             }
 
+            Window scoringOverlay = null;
+            Timer scoringNoticeTimer = null;
+            bool scoringCompleted = false;
+            bool scoringNoticeShown = false;
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId}");
-
-                LogReader.RequestVstoEvidenceFlush();
 
                 // 現在のプロジェクトのタスク数を取得
                 int taskCount = _tasks != null ? _tasks.Count : 0;
@@ -345,8 +377,20 @@ namespace MOS_Word_app.Views
                     return;
                 }
 
+                const int scoringNoticeDelayMs = 300;
+                scoringNoticeTimer = new Timer(_ => Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (scoringCompleted || scoringOverlay != null)
+                        return;
+                    scoringOverlay = CreateInstantScoringOverlay();
+                    scoringOverlay.Show();
+                    scoringNoticeShown = true;
+                })), null, scoringNoticeDelayMs, Timeout.Infinite);
+
                 var result = await System.Threading.Tasks.Task.Run(() =>
                 {
+                    LogReader.RequestVstoEvidenceFlush();
+
                     // DLLを読み込む
                     Assembly assembly = Assembly.LoadFrom(dllPath);
                     string className = $"Libraries.Group{_groupId}.WordChecker{_groupId}_{_currentProjectId}";
@@ -359,11 +403,22 @@ namespace MOS_Word_app.Views
 
                     // WordCheckerインスタンスを作成
                     object checkerInstance = Activator.CreateInstance(checkerType);
+                    MethodInfo beginOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("Begin");
+                    MethodInfo endOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("End");
 
+                    int openAttempt = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                    WordSnapshotChecker.BeginReuseCurrentDocument(_groupId, _currentProjectId);
+                    beginOpenXml?.Invoke(null, null);
+                    try
+                    {
+                    WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, openAttempt);
+
+                    try
+                    {
                     // 各タスクをチェック
                     int passedCount = 0;
                     int totalTasks = 0;
-                    var taskResults = new List<(int taskId, bool result, string error)>();
+                    var taskResults = new List<(int taskId, bool result, string failReason)>();
 
                     for (int taskNum = 1; taskNum <= taskCount; taskNum++)
                     {
@@ -375,17 +430,20 @@ namespace MOS_Word_app.Views
                             totalTasks++;
                             try
                             {
+                                WordScoreExplanation.ClearCheckerReason();
                                 int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, taskNum);
                                 if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out string gateReason))
                                 {
-                                    taskResults.Add((taskNum, false, gateReason));
-                                    ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false);
+                                    string failReason = WordScoreExplanation.ResolveFailReason(
+                                        passed: false, gateFailed: true, gateInternalReason: gateReason);
+                                    taskResults.Add((taskNum, false, failReason));
+                                    ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
                                     continue;
                                 }
                                 bool taskResult = (bool)method.Invoke(checkerInstance, null);
-                                taskResults.Add((taskNum, taskResult, null));
-                                // 採点結果を共有ストアに記録
-                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, taskResult);
+                                string reason = WordScoreExplanation.ResolveFailReason(taskResult);
+                                taskResults.Add((taskNum, taskResult, reason));
+                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, taskResult, reason);
 
                                 if (taskResult)
                                 {
@@ -396,7 +454,11 @@ namespace MOS_Word_app.Views
                             }
                             catch (Exception exTask)
                             {
-                                taskResults.Add((taskNum, false, exTask.Message));
+                                WordScoreExplanation.ClearCheckerReason();
+                                string failReason = WordScoreExplanation.ResolveFailReason(
+                                    passed: false, unavailable: true);
+                                taskResults.Add((taskNum, false, failReason));
+                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
                                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] タスク{taskNum} エラー: {exTask.Message}");
                             }
                         }
@@ -407,25 +469,60 @@ namespace MOS_Word_app.Views
                         {
                             TaskNumber = t.taskId,
                             IsPassed = t.result,
-                            TaskName = $"タスク{t.taskId}"
+                            TaskName = $"タスク{t.taskId}",
+                            FailReason = t.failReason ?? ""
                         })
                         .ToList();
 
                     return (scoreList, passedCount, totalTasks);
+                    }
+                    finally
+                    {
+                        LogReader.ClearSnapshot();
+                    }
+                    }
+                    finally
+                    {
+                        try { endOpenXml?.Invoke(null, null); } catch { }
+                        WordSnapshotChecker.EndReuseCurrentDocument();
+                    }
                 });
 
+                scoringCompleted = true;
+                scoringNoticeTimer.Dispose();
+                scoringNoticeTimer = null;
+                CloseInstantScoringOverlay(scoringOverlay);
+                scoringOverlay = null;
+                if (scoringNoticeShown)
+                    await System.Threading.Tasks.Task.Delay(80);
+
                 // 採点結果ウィンドウを表示（Task / Result 〇✖）
-                ScoreResultWindow.ShowResults(this, result.scoreList);
+                ShowScoreResult(result.scoreList);
 
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点完了: {result.passedCount}/{result.totalTasks}");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] Error: {ex.Message}");
+                scoringCompleted = true;
+                if (scoringNoticeTimer != null)
+                {
+                    scoringNoticeTimer.Dispose();
+                    scoringNoticeTimer = null;
+                }
+                CloseInstantScoringOverlay(scoringOverlay);
+                scoringOverlay = null;
                 MessageBox.Show($"採点中にエラーが発生しました:\n{ex.Message}", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
+                scoringCompleted = true;
+                if (scoringNoticeTimer != null)
+                {
+                    scoringNoticeTimer.Dispose();
+                    scoringNoticeTimer = null;
+                }
+                CloseInstantScoringOverlay(scoringOverlay);
                 _isScoring = false;
                 if (scoreButton != null)
                 {
@@ -433,15 +530,194 @@ namespace MOS_Word_app.Views
                 }
             }
         }
+
+        private static Window CreateInstantScoringOverlay()
+        {
+            var overlay = new Window
+            {
+                Title = "採点中",
+                Width = 320,
+                Height = 140,
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
+                BorderThickness = new Thickness(2)
+            };
+            var stack = new StackPanel
+            {
+                Margin = new Thickness(24),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "採点中です",
+                FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 12),
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
+            });
+            stack.Children.Add(new ProgressBar
+            {
+                IsIndeterminate = true,
+                Height = 20,
+                Width = 260
+            });
+            overlay.Content = stack;
+            return overlay;
+        }
+
+        private static void CloseInstantScoringOverlay(Window overlay)
+        {
+            if (overlay == null)
+                return;
+            try { overlay.Close(); } catch { }
+        }
+
+        private void ShowScoreResult(IEnumerable<MOS_Word_app.TaskResult> scoreList)
+        {
+            bool reviewEnabled = ReviewPageButton == null || ReviewPageButton.IsEnabled;
+            bool scoreEnabled = ScoreButton == null || ScoreButton.IsEnabled;
+            bool nextEnabled = NextProjectButton == null || NextProjectButton.IsEnabled;
+            bool closeEnabled = CloseExamButton == null || CloseExamButton.IsEnabled;
+            SetScoreResultActionsEnabled(false);
+            _isScoreResultOpen = true;
+            try
+            {
+                ScoreResultWindow.ShowResults(this, scoreList);
+            }
+            finally
+            {
+                _isScoreResultOpen = false;
+                if (!_nextProjectPendingAfterScoreResult)
+                    RestoreWordInputAfterScoreResult();
+                if (ReviewPageButton != null)
+                    ReviewPageButton.IsEnabled = reviewEnabled;
+                if (ScoreButton != null)
+                    ScoreButton.IsEnabled = scoreEnabled;
+                if (NextProjectButton != null)
+                    NextProjectButton.IsEnabled = nextEnabled;
+                if (CloseExamButton != null)
+                    CloseExamButton.IsEnabled = closeEnabled;
+                if (_nextProjectPendingAfterScoreResult)
+                {
+                    _nextProjectPendingAfterScoreResult = false;
+                    MoveToNextProjectWithMessage();
+                }
+            }
+        }
+
+        private void SetScoreResultActionsEnabled(bool enabled)
+        {
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = enabled;
+            if (ScoreButton != null)
+                ScoreButton.IsEnabled = enabled;
+            if (NextProjectButton != null)
+                NextProjectButton.IsEnabled = enabled;
+            if (CloseExamButton != null)
+                CloseExamButton.IsEnabled = enabled;
+        }
+
+        /// <summary>
+        /// 結果ダイアログが前面を取ったあと、Word が無効なら戻して一度だけ前面へ出す。
+        /// </summary>
+        private void RestoreWordInputAfterScoreResult()
+        {
+            try
+            {
+                WordStartupInputGate.EnsureWordInputEnabled();
+                IntPtr hwnd = TryGetWordMainWindowHandle();
+                if (hwnd == IntPtr.Zero)
+                    return;
+                TryForceForeground(hwnd);
+            }
+            catch
+            {
+                /* ignore */
+            }
+        }
+
+        private static IntPtr TryGetWordMainWindowHandle()
+        {
+            Process[] wordProcesses = Process.GetProcessesByName("WINWORD");
+            try
+            {
+                if (wordProcesses.Length == 0)
+                    return IntPtr.Zero;
+
+                uint processId = (uint)wordProcesses[0].Id;
+                IntPtr found = IntPtr.Zero;
+                EnumWindows((windowHandle, lParam) =>
+                {
+                    GetWindowThreadProcessId(windowHandle, out uint windowProcessId);
+                    if (windowProcessId != processId)
+                        return true;
+
+                    var className = new StringBuilder(256);
+                    GetClassName(windowHandle, className, className.Capacity);
+                    if (!className.ToString().Contains("OpusApp"))
+                        return true;
+
+                    found = windowHandle;
+                    return false;
+                }, IntPtr.Zero);
+                return found;
+            }
+            finally
+            {
+                foreach (Process process in wordProcesses)
+                    process.Dispose();
+            }
+        }
+
+        private static void TryForceForeground(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero)
+                return;
+
+            uint currentTid = 0;
+            uint targetTid = 0;
+            bool attached = false;
+            try
+            {
+                currentTid = GetCurrentThreadId();
+                targetTid = GetWindowThreadProcessId(hWnd, out _);
+                if (currentTid != 0 && targetTid != 0 && currentTid != targetTid)
+                    attached = AttachThreadInput(currentTid, targetTid, true);
+
+                ShowWindow(hWnd, SW_RESTORE);
+                BringWindowToTop(hWnd);
+                SetForegroundWindow(hWnd);
+            }
+            catch
+            {
+                /* ignore */
+            }
+            finally
+            {
+                if (attached && currentTid != 0 && targetTid != 0)
+                {
+                    try { AttachThreadInput(currentTid, targetTid, false); } catch { }
+                }
+            }
+        }
         
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             var owner = Application.Current.MainWindow;
             var result = owner != null
                 ? MessageBox.Show(owner, "アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question)
                 : MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
+            MOS_Word_app.Views.WordStartupInputGate.End();
             _timer?.Stop();
             SaveAllWordDocumentsAndQuitWord();
             this.Close();
@@ -449,6 +725,8 @@ namespace MOS_Word_app.Views
         
         private async void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             try
             {
                 // 「結果に戻る」モードの場合は、隠れている ResultWindow を再表示する
@@ -465,6 +743,10 @@ namespace MOS_Word_app.Views
 
                 // 通常モード: レビューページを開く（編集内容をディスクに保存してから Word を閉じる）
                 LogReader.RequestCloseNavigationPaneIfOpen();
+                WriteCurrentTaskFile();
+                int reviewAttemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, reviewAttemptNo);
+                WordBatchScoring.PrepareBeforeClosingDocumentsForBatchScoring(_currentProjectId, _currentTaskId, reviewAttemptNo);
                 SaveAndCloseAllWordDocuments();
                 this.Hide();
 
@@ -1689,12 +1971,14 @@ namespace MOS_Word_app.Views
             }
         }
         
-        private void NextProject_Click(object sender, RoutedEventArgs e)
+        private async void NextProject_Click(object sender, RoutedEventArgs e)
         {
+            if (_isScoreResultOpen)
+                return;
             ScoreResultWindow.TryBringOpenToFront();
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
-            MoveToNextProject();
+            await MoveToNextProjectAsync();
         }
 
         private bool TryShowObjectSelectedWarningIfWordObjectSelected()
@@ -1748,42 +2032,106 @@ namespace MOS_Word_app.Views
             }
         }
         
-        private void MoveToNextProject()
+        private async System.Threading.Tasks.Task MoveToNextProjectAsync()
         {
-            LogReader.RequestCloseNavigationPaneIfOpen();
-            SaveAndCloseAllWordDocuments();
+            if (_isMovingToNextProject)
+                return;
 
-            // プロジェクトの最大数をチェック（JSONファイルの最大プロジェクトID）
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
-            
-            // 次のプロジェクトに移動
-            _currentProjectId++;
-            
-            if (_currentProjectId > maxProjectId)
+            if (_currentProjectId >= maxProjectId)
             {
-                // 最後のプロジェクトを超えた場合はレビューページに移動（再利用時の誤判定防止）
-                _currentProjectId = maxProjectId;
                 System.Diagnostics.Debug.WriteLine($"プロジェクト{maxProjectId}を超えたため、レビューページに移動します");
                 ReviewPageButton_Click(null, null);
                 return;
             }
-            
-            // 新しいプロジェクトのWordドキュメントを開く
-            OpenProjectDocument(_currentProjectId, _groupId);
-            
-            // プロジェクト変更時は状態をリセットしない（Dictionaryで管理）
-            
-            // 新しいプロジェクトのタスクを読み込み
-            LoadCurrentProjectTasks();
-            UpdateTaskDisplay();
-            
-            // プロジェクトタイマーをリセット
-            ResetProjectTimer();
-            
-            System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
+
+            int previousProjectId = _currentProjectId;
+            int nextProjectId = _currentProjectId + 1;
+            bool opened = false;
+            _isMovingToNextProject = true;
+            try
+            {
+                await DelayedProjectOpenNotice.RunAsync(async () =>
+                {
+                    string nextPath = null;
+                    try
+                    {
+                        nextPath = await System.Threading.Tasks.Task.Run(
+                            () => WordDataPathHelper.EnsureWorkingFile(_groupId, nextProjectId));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] 作業ファイル準備エラー: {ex.Message}");
+                    }
+
+                    if (string.IsNullOrEmpty(nextPath) || !File.Exists(nextPath))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"プロジェクト{nextProjectId}の作業ファイルが見つかりません。");
+                        return;
+                    }
+
+                    opened = await WordApplicationManager.TrySwitchToDocumentInRunningWordAsync(nextPath);
+                    if (!opened)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[MoveToNextProject] fast-path failed; fallback to TryOpenExamDocument");
+                        opened = await WordApplicationManager.TryOpenExamDocumentOnStaAsync(nextPath, makeVisible: true);
+                    }
+
+                    if (!opened)
+                    {
+                        await TryRestoreProjectDocumentAsync(previousProjectId);
+                        return;
+                    }
+
+                    _currentProjectId = nextProjectId;
+                    ApplyExamWindowLayout();
+                    LoadCurrentProjectTasks();
+                    UpdateTaskDisplay();
+                    ResetProjectTimer();
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
+                });
+            }
+            finally
+            {
+                _isMovingToNextProject = false;
+            }
+
+            if (!opened)
+            {
+                MessageBox.Show(this,
+                    "次のプロジェクトを開けませんでした。現在のプロジェクトのままにしておきます。",
+                    "プロジェクト切り替え",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
-        
-        private void OpenProjectDocument(int projectId, int groupId)
+
+        private async System.Threading.Tasks.Task TryRestoreProjectDocumentAsync(int projectId)
+        {
+            string currentPath = null;
+            try
+            {
+                currentPath = await System.Threading.Tasks.Task.Run(
+                    () => WordDataPathHelper.EnsureWorkingFile(_groupId, projectId));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] 元文書の準備エラー: {ex.Message}");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(currentPath) || !File.Exists(currentPath))
+                return;
+
+            bool restored = await WordApplicationManager.TryOpenExamDocumentOnStaAsync(currentPath, makeVisible: true);
+            System.Diagnostics.Debug.WriteLine(
+                $"[MoveToNextProject] restore project {projectId} {(restored ? "ok" : "fail")}");
+            if (restored)
+                ApplyExamWindowLayout();
+        }
+
+        private void OpenProjectDocument(int projectId, int groupId, bool showPreparingDialog = true)
         {
             string filePath = null;
             try
@@ -1794,54 +2142,25 @@ namespace MOS_Word_app.Views
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}の作業ファイルが見つかりません。");
                     return;
                 }
-                
-                WordApp wordApp = WordApplicationManager.AcquireWordApplicationForExam(true);
-                bool wordWasNotRunning = false;
-                
-                // 同じパスで既に開いているドキュメントがあれば保存してから閉じ、常にフォルダから開き直す
-                string pathLower = System.IO.Path.GetFullPath(filePath).ToLowerInvariant();
-                try
-                {
-                    for (int i = wordApp.Documents.Count; i >= 1; i--)
-                    {
-                        WordDoc doc = wordApp.Documents[i];
-                        try
-                        {
-                            string fullName = doc.FullName?.ToLowerInvariant() ?? "";
-                            string docFullPath = fullName;
-                            try { docFullPath = System.IO.Path.GetFullPath(fullName).ToLowerInvariant(); } catch { }
-                            if (fullName == pathLower || docFullPath == pathLower)
-                            {
-                                if (!doc.Saved)
-                                    doc.Save();
-                                doc.Close(SaveChanges: false);
-                                break;
-                            }
-                        }
-                        finally
-                        {
-                            if (doc != null) Marshal.ReleaseComObject(doc);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] 既存ドキュメント閉じる際のエラー: {ex.Message}");
-                }
 
-                try
+                Action open = () =>
                 {
-                    wordApp.Documents.Open(filePath, ReadOnly: false, Visible: true); // 常にフォルダから開く
-                    if (wordWasNotRunning)
-                        System.Threading.Thread.Sleep(300);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Documents.Open エラー: {ex.Message}");
-                }
-                
-                ApplyExamWindowLayout();
-                System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
+                    WordApplicationManager.TryCloseOpenDocumentByPath(filePath);
+                    if (!WordApplicationManager.TryOpenExamDocument(filePath, out _, makeVisible: false))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[OpenProjectDocument] ドキュメントを開けませんでした: {filePath}");
+                        return;
+                    }
+
+                    WordApplicationManager.SetWordVisible(true);
+                    ApplyExamWindowLayout();
+                    System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のドキュメントを開きました: {filePath}");
+                };
+
+                if (showPreparingDialog)
+                    PreparingWindow.Run(this, open);
+                else
+                    open();
             }
             catch (Exception ex)
             {
@@ -1849,7 +2168,7 @@ namespace MOS_Word_app.Views
             }
         }
         
-        private void MoveToNextProjectWithMessage()
+        private async void MoveToNextProjectWithMessage()
         {
             MessageBox.Show(this, "5分経ったので次のプロジェクトに移動します", "時間切れ",
                           MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1857,7 +2176,7 @@ namespace MOS_Word_app.Views
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
 
-            MoveToNextProject();
+            await MoveToNextProjectAsync();
         }
         
         private void ResetProjectTimer()
@@ -1942,7 +2261,7 @@ namespace MOS_Word_app.Views
         }
         
         
-        private async void ResetButton_Click(object sender, RoutedEventArgs e)
+        private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -1955,71 +2274,30 @@ namespace MOS_Word_app.Views
                 if (result != MessageBoxResult.Yes)
                     return;
 
-                var waitWindow = new Window
+                if (!ResetProject(_groupId, _currentProjectId))
                 {
-                    Title = "リセット中",
-                    Width = 300,
-                    Height = 120,
-                    WindowStyle = WindowStyle.None,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                    ShowInTaskbar = false,
-                    ResizeMode = ResizeMode.NoResize,
-                    Topmost = true,
-                    Background = System.Windows.Media.Brushes.White,
-                    BorderBrush = System.Windows.Media.Brushes.SteelBlue,
-                    BorderThickness = new Thickness(2)
-                };
-                var stack = new StackPanel
-                {
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Thickness(16)
-                };
-                stack.Children.Add(new TextBlock
-                {
-                    Text = $"リセット中です...\nプロジェクト {_currentProjectId}",
-                    FontSize = 14,
-                    TextAlignment = TextAlignment.Center,
-                    Foreground = System.Windows.Media.Brushes.SteelBlue
-                });
-                waitWindow.Content = stack;
-                waitWindow.Show();
-
-                Exception resetError = null;
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        if (!ResetProject(_groupId, _currentProjectId))
-                            resetError = new InvalidOperationException("リセットを完了できませんでした。");
-                    }
-                    catch (Exception ex) { resetError = ex; }
-                }, DispatcherPriority.Background);
-
-                waitWindow.Close();
-
-                if (resetError != null)
-                {
-                    MessageBox.Show($"リセット中にエラーが発生しました: {resetError.Message}",
+                    MessageBox.Show("リセットを完了できませんでした。",
                         "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                OpenProjectDocument(_currentProjectId, _groupId);
+                MessageBox.Show("プロジェクトをリセットしました。", "リセット完了",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
 
-                bool originalTopmost = this.Topmost;
+                string resetFilePath = null;
                 try
                 {
-                    this.Topmost = true;
-                    this.Activate();
-                    MessageBox.Show(this, "プロジェクトをリセットしました。", "リセット完了",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    resetFilePath = WordDataPathHelper.FindExistingWorkingFile(_groupId, _currentProjectId);
                 }
-                finally
+                catch (Exception pathEx)
                 {
-                    this.Topmost = originalTopmost;
+                    System.Diagnostics.Debug.WriteLine("[ResetButton_Click] path: " + pathEx.Message);
                 }
 
+                var reopenSw = Stopwatch.StartNew();
+                OpenProjectDocument(_currentProjectId, _groupId, showPreparingDialog: false);
+                ResetPerfLog.Write("word", _currentProjectId, "reopen", reopenSw.ElapsedMilliseconds, "main");
+                LogWordResetReady(_currentProjectId, resetFilePath);
                 ApplyExamWindowLayout();
 
                 int taskCount = _tasks != null ? _tasks.Count : 0;
@@ -2038,12 +2316,128 @@ namespace MOS_Word_app.Views
         /// <returns>リセットを実行した場合は true。</returns>
         private bool ResetProject(int groupId, int projectId)
         {
-            if (!CloseAllWordDocuments())
-                TryQuitWord();
+            ResetPerfLog.Begin("word", projectId);
+            var closeSw = Stopwatch.StartNew();
+            bool closed = CloseAllWordDocuments();
+            string closePath = "main";
+            string closeDetail = null;
+            if (!closed)
+            {
+                string workingPath = null;
+                try
+                {
+                    workingPath = WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
+                }
+                catch (Exception pathEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ResetProject] working path: " + pathEx.Message);
+                }
+
+                if (IsWorkingFileLocked(workingPath))
+                {
+                    TryQuitWord();
+                    closePath = "fallback";
+                    closeDetail = "quit";
+                }
+                else
+                {
+                    closeDetail = "file-free";
+                }
+            }
             Thread.Sleep(500); // Word がファイルハンドルを解放するまで待つ
-            MOS_Word_app.WordProjectResetHelper.ResetProject(groupId, projectId);
+            ResetPerfLog.Write(
+                "word",
+                projectId,
+                "close",
+                closeSw.ElapsedMilliseconds,
+                closePath,
+                closeDetail);
+
+            var copySw = Stopwatch.StartNew();
+            try
+            {
+                MOS_Word_app.WordProjectResetHelper.ResetProject(groupId, projectId);
+                ResetPerfLog.Write("word", projectId, "copy", copySw.ElapsedMilliseconds, "main");
+            }
+            catch
+            {
+                ResetPerfLog.Write("word", projectId, "copy", copySw.ElapsedMilliseconds, "main", "result=fail");
+                throw;
+            }
             _lastTaskStartKey = null;
             return true;
+        }
+
+        void LogWordResetReady(int projectId, string filePath)
+        {
+            var readySw = Stopwatch.StartNew();
+            if (IsWordResetReady(filePath))
+            {
+                ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "signal=vsto-heartbeat result=ok");
+                return;
+            }
+
+            var thread = new Thread(() => WatchWordResetReady(projectId, filePath, readySw));
+            thread.IsBackground = true;
+            thread.Name = "WordResetReady";
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+        }
+
+        static void WatchWordResetReady(int projectId, string filePath, Stopwatch readySw)
+        {
+            const int timeoutMs = 15000;
+            try
+            {
+                while (readySw.ElapsedMilliseconds < timeoutMs)
+                {
+                    if (IsWordResetReady(filePath))
+                    {
+                        ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "signal=vsto-heartbeat result=ok");
+                        return;
+                    }
+                    Thread.Sleep(200);
+                }
+
+                ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "signal=vsto-heartbeat result=timeout");
+            }
+            catch (Exception ex)
+            {
+                ResetPerfLog.Write("word", projectId, "ready", readySw.ElapsedMilliseconds, "main", "result=fail " + ex.Message);
+            }
+        }
+
+        static bool IsWordResetReady(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !LogReader.IsVstoHeartbeatFresh(15))
+                return false;
+
+            WordApp wordApp = null;
+            WordDoc document = null;
+            try
+            {
+                wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                document = wordApp.ActiveDocument;
+                string fullName = document == null ? null : document.FullName;
+                if (string.IsNullOrWhiteSpace(fullName))
+                    return false;
+                return string.Equals(Path.GetFullPath(fullName), Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (document != null)
+                {
+                    try { Marshal.ReleaseComObject(document); } catch { }
+                }
+                if (wordApp != null)
+                {
+                    try { Marshal.ReleaseComObject(wordApp); } catch { }
+                }
+            }
         }
         
         /// <summary>
@@ -2257,7 +2651,7 @@ namespace MOS_Word_app.Views
                     catch (COMException comEx) when (comEx.HResult == unchecked((int)0x80010108)) // RPC_E_DISCONNECTED
                     {
                         System.Diagnostics.Debug.WriteLine($"[CloseAllWordDocuments] ドキュメントは既に切断されています: {comEx.Message}");
-                        return false;
+                        return !WordStillHasDocuments();
                     }
                     catch (Exception closeEx)
                     {
@@ -2291,7 +2685,51 @@ namespace MOS_Word_app.Views
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[CloseAllWordDocuments] Error: {ex.Message}");
+                return !WordStillHasDocuments();
+            }
+        }
+
+        /// <summary>COM が切れても、文書が残っていなければ閉じ切れたとみなす。</summary>
+        private static bool WordStillHasDocuments()
+        {
+            WordApp wordApp = null;
+            try
+            {
+                wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                return wordApp.Documents.Count > 0;
+            }
+            catch
+            {
                 return false;
+            }
+            finally
+            {
+                if (wordApp != null)
+                {
+                    try { Marshal.ReleaseComObject(wordApp); } catch { }
+                }
+            }
+        }
+
+        static bool IsWorkingFileLocked(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                return false;
+
+            try
+            {
+                using (new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                }
+                return false;
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return true;
             }
         }
 

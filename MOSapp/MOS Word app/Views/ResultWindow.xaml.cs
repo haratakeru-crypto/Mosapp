@@ -300,6 +300,7 @@ namespace MOS_Word_app.Views
                         bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                         string resultMark = ComputeResultMark(project.ProjectId, task.TaskId, isFlagged, isUnread,
                             firstProjectId, firstTaskId, out _);
+                        string failReason = ResolveDisplayedFailReason(project.ProjectId, task.TaskId, resultMark);
                         return new ResultTaskInfo
                         {
                             TaskTitle = $"タスク {task.TaskId}",
@@ -307,7 +308,8 @@ namespace MOS_Word_app.Views
                             ProjectId = project.ProjectId,
                             TaskId = task.TaskId,
                             ResultMark = resultMark,
-                            ResultColor = null
+                            ResultColor = null,
+                            FailReason = failReason
                         };
                     }).ToList() ?? new List<ResultTaskInfo>()
                 };
@@ -393,8 +395,45 @@ namespace MOS_Word_app.Views
             }
         }
 
+        private string ResolveDisplayedFailReason(int projectId, int taskId, string resultMark)
+        {
+            if (resultMark != "✖")
+                return "";
+            if (_fromScoringLog)
+                return "";
+            string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId);
+            if (!string.IsNullOrEmpty(reason))
+                return reason;
+            return ScoreResultStore.GetInitialFailReason(_groupId, projectId, taskId);
+        }
+
+        private void FailReason_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement element
+                && element.DataContext is ResultTaskInfo taskInfo
+                && taskInfo.HasFailReason)
+            {
+                ScoreReasonWindow.Show(this, taskInfo.TaskId, taskInfo.FailReason);
+            }
+        }
+
+        private static bool IsFailReasonClick(RoutedEventArgs e)
+        {
+            DependencyObject current = e.OriginalSource as DependencyObject;
+            while (current != null)
+            {
+                if (current is FrameworkElement element && Equals(element.Tag, "FailReason"))
+                    return true;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return false;
+        }
+
         private async void TaskRow_MouseDown(object sender, RoutedEventArgs e)
         {
+            if (IsFailReasonClick(e))
+                return;
             var element = sender as FrameworkElement;
             var taskInfo = element?.DataContext as ResultTaskInfo;
             if (taskInfo == null || OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0) return;
@@ -441,6 +480,7 @@ namespace MOS_Word_app.Views
             var mainWindow = System.Windows.Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
             if (mainWindow != null)
             {
+                (mainWindow.DataContext as MOS_Word_app.MainViewModel)?.EnableProjectSelection();
                 mainWindow.Show();
                 mainWindow.Activate();
             }
@@ -462,5 +502,8 @@ namespace MOS_Word_app.Views
         public int TaskId { get; set; }
         public string ResultMark { get; set; }
         public Brush ResultColor { get; set; }
+        /// <summary>×のときの学生向け理由。〇・時間切れは空。</summary>
+        public string FailReason { get; set; }
+        public bool HasFailReason => ResultMark == "✖" && !string.IsNullOrEmpty(FailReason);
     }
 }

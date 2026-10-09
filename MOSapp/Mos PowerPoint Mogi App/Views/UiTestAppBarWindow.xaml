@@ -171,7 +171,7 @@
                             </Button.Style>
                         </Button>
                         
-                        <Button Content="次のプロジェクト" 
+                        <Button Name="NextProjectButton" Content="次のプロジェクト" 
                                 Background="White" 
                                 Foreground="#1E40AF" 
                                 Padding="24,10" 
@@ -238,7 +238,7 @@
                             <TextBlock Text="←" FontSize="16" Foreground="White" FontWeight="Bold"/>
                         </Button>
                         
-                        <!-- タスク番号ボタン（1-7） -->
+                        <!-- タスク番号ボタン（1-8） -->
                         <Button Name="TaskButton1" Width="120" Height="32" 
                                 Background="White" 
                                 BorderBrush="#9CA3AF" 
@@ -365,6 +365,25 @@
                                            Visibility="Collapsed"/>
                             </Grid>
                         </Button>
+
+                        <Button Name="TaskButton8" Width="120" Height="32" 
+                                Background="#D1D5DB" 
+                                BorderThickness="0"
+                                Click="TaskButton_Click"
+                                Tag="8"
+                                Margin="0,0,5,0"
+                                Visibility="Collapsed">
+                            <Grid Width="120" Height="32">
+                                <TextBlock Name="TaskText8" Text="8" FontSize="16" Foreground="Black" FontWeight="Bold" 
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Name="Check8" Text="✓" FontSize="16" Foreground="Green" FontWeight="Bold" 
+                                           HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,15,0"
+                                           Visibility="Collapsed"/>
+                                <TextBlock Name="Flag8" Text="🚩" FontSize="16" 
+                                           HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0"
+                                           Visibility="Collapsed"/>
+                            </Grid>
+                        </Button>
                         
                         <Button Width="96" Height="32" 
                                 Background="#D1D5DB" 
@@ -459,7 +478,7 @@
                                 </Button>
 
                                 <!-- 右側: 閉じるボタン（ここに配置） -->
-                                <Button Content="閉じる" 
+                                <Button Name="CloseExamButton" Content="閉じる" 
                                         Background="#EF4444" 
                                         Foreground="White" 
                                         Padding="15,8" 

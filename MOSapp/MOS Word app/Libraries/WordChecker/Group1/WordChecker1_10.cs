@@ -138,20 +138,9 @@ namespace Libraries.Group1
                 }
                 if (document == null) return false;
 
-                bool isState02 = IsTask02StateCorrect(document);
-                bool isState03 = IsTask03StateCorrect(document);
-
-                int requiredCount = 0;
-                if (isState02) requiredCount++;
-                if (isState03) requiredCount++;
-
-                // 教材としての品質担保（手抜き防止）：状態が正しい場合、その回数分「新しい行頭文字の定義」のログが必要
-                if (requiredCount > 0 && !LogReader.HasTaskEvidenceForProjectAtLeast(10, "BulletDefineNew", requiredCount))
-                {
+                if (!IsTask02StateCorrect(document))
                     return false;
-                }
-
-                return isState02;
+                return LogReader.HasTaskEvidence(10, 2, "BulletDefineNew");
             }
             catch { return false; }
             finally
@@ -182,20 +171,9 @@ namespace Libraries.Group1
                 }
                 if (document == null) return false;
 
-                bool isState02 = IsTask02StateCorrect(document);
-                bool isState03 = IsTask03StateCorrect(document);
-
-                int requiredCount = 0;
-                if (isState02) requiredCount++;
-                if (isState03) requiredCount++;
-
-                // 教材としての品質担保（手抜き防止）：状態が正しい場合、その回数分「新しい行頭文字の定義」のログが必要
-                if (requiredCount > 0 && !LogReader.HasTaskEvidenceForProjectAtLeast(10, "BulletDefineNew", requiredCount))
-                {
+                if (!IsTask03StateCorrect(document))
                     return false;
-                }
-
-                return isState03;
+                return LogReader.HasTaskEvidence(10, 3, "BulletDefineNew");
             }
             catch { return false; }
             finally

@@ -16,6 +16,8 @@ namespace MOSExcelMogiApp.Models
 
         // プロジェクトID -> タスクの採点結果（true=正解、false=不正解）
         private static Dictionary<int, List<bool>> _projectResults = new Dictionary<int, List<bool>>();
+        // プロジェクトID -> タスクごとの×理由（合格は空文字）
+        private static Dictionary<int, List<string>> _projectFailReasons = new Dictionary<int, List<string>>();
         // 「採点直後」のスナップショット（復習前の正答率計算用）
         private static Dictionary<int, List<bool>> _initialProjectResults = new Dictionary<int, List<bool>>();
 
@@ -24,12 +26,28 @@ namespace MOSExcelMogiApp.Models
         /// </summary>
         public static void SaveProjectResult(int projectId, List<bool> results)
         {
+            SaveProjectResult(projectId, results, null);
+        }
+
+        /// <summary>
+        /// プロジェクトの採点結果と、×の理由を保存する。理由はタスクと同じ順。
+        /// </summary>
+        public static void SaveProjectResult(int projectId, List<bool> results, IList<string> failReasons)
+        {
             if (_projectResults == null)
             {
                 _projectResults = new Dictionary<int, List<bool>>();
             }
+            if (_projectFailReasons == null)
+            {
+                _projectFailReasons = new Dictionary<int, List<string>>();
+            }
             
             _projectResults[projectId] = new List<bool>(results);
+            if (failReasons == null)
+                _projectFailReasons.Remove(projectId);
+            else
+                _projectFailReasons[projectId] = new List<string>(failReasons);
             try
             {
                 ResultsChanged?.Invoke(projectId);
@@ -38,6 +56,19 @@ namespace MOSExcelMogiApp.Models
             {
                 // UI更新イベントなので例外は握りつぶす
             }
+        }
+
+        /// <summary>タスク番号（1始まり）の×理由。無いときは空文字。</summary>
+        public static string GetFailReason(int projectId, int taskId)
+        {
+            if (_projectFailReasons == null || taskId <= 0)
+                return "";
+            if (!_projectFailReasons.TryGetValue(projectId, out List<string> reasons) || reasons == null)
+                return "";
+            int index = taskId - 1;
+            if (index < 0 || index >= reasons.Count || reasons[index] == null)
+                return "";
+            return reasons[index];
         }
 
         /// <summary>
@@ -86,6 +117,7 @@ namespace MOSExcelMogiApp.Models
         public static void Clear()
         {
             _projectResults?.Clear();
+            _projectFailReasons?.Clear();
             _initialProjectResults?.Clear();
         }
     }

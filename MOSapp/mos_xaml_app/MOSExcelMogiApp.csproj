@@ -27,7 +27,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>12</ApplicationRevision>
+    <ApplicationRevision>13</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -153,6 +153,7 @@
       <DependentUpon>ScoringResultDialog.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Views\ScoreReasonWindow.cs" />
     <Compile Include="Views\UiTestAppBarWindow.xaml.cs">
       <DependentUpon>UiTestAppBarWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -173,6 +174,8 @@
       <DependentUpon>ResultWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Ui\ExcelDelayedProjectOpenNotice.cs" />
+    <Compile Include="Ui\ExcelStartupInputGate.cs" />
     <Compile Include="Views\ObjectSelectedWarningWindow.xaml.cs">
       <DependentUpon>ObjectSelectedWarningWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -216,7 +219,14 @@
     <Compile Include="Libraries\Group3\ExcelChecker3_9.cs" />
     <Compile Include="Libraries\Group3\ExcelChecker3_10.cs" />
     <Compile Include="Libraries\ExcelLogReader.cs" />
+    <Compile Include="Libraries\ExcelScoreExplanation.cs" />
+    <Compile Include="Libraries\ExcelGradingPerf.cs" />
+    <Compile Include="Libraries\ResetPerfLog.cs" />
+    <Compile Include="Libraries\ExcelResetReadyWatch.cs" />
     <Compile Include="Libraries\ExcelApplicationManager.cs" />
+    <Compile Include="Libraries\ExcelExternalKillWatch.cs" />
+    <Compile Include="Libraries\ExcelVstoInstallerHelper.cs" />
+    <Compile Include="Libraries\ExcelVstoReadiness.cs" />
     <Compile Include="Libraries\ExcelTaskValidationConfig.cs" />
     <Compile Include="Vocabulary\VocabularyCatalog.cs" />
     <Compile Include="Vocabulary\VocabularyEventWatcher.cs" />

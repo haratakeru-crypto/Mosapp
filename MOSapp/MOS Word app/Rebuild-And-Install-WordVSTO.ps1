@@ -1,5 +1,7 @@
 # Rebuild-And-Install-WordVSTO.ps1
-# Uninstall -> Release build -> install Word VSTO add-in
+# Recovery / Release reinstall: Uninstall -> Release build -> install New_MOSWordVSTOAddIn.
+# Normal Debug workflow: build New_MOSWordVSTOAddIn (or MOS Word app) in VS Debug; Install=true registers bin\Debug.
+# Product MSI uses registry key WordMosVsto (separate from New_MOSWordVSTOAddIn).
 
 $ErrorActionPreference = "Stop"
 $AddInName = "New_MOSWordVSTOAddIn"
@@ -159,6 +161,12 @@ else {
 Start-Sleep -Seconds 2
 Enable-WordAddInLoadBehavior -Name $AddInName
 Set-ItemProperty -Path "HKCU:\Software\Microsoft\Office\Word\Addins\$AddInName" -Name "LoadBehavior" -Value 3 -Type DWord -ErrorAction SilentlyContinue
+# 製品用キー WordMosVsto が残っていると二重読み込みになるため開発インストール時は必ず切る
+$msiKey = "HKCU:\Software\Microsoft\Office\Word\Addins\WordMosVsto"
+if (Test-Path $msiKey) {
+    Set-ItemProperty -Path $msiKey -Name "LoadBehavior" -Value 0 -Type DWord -ErrorAction SilentlyContinue
+    Write-Step "Disabled MSI add-in key WordMosVsto (LoadBehavior=0) to avoid dual load"
+}
 if (Test-WordAddInRegistered -Name $AddInName) {
     Write-Step "=== Done: Word add-in registered ==="
 }

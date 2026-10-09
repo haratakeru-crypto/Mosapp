@@ -38,7 +38,7 @@ namespace ExcelAddIn1
             System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Add-in started. Log file: " + Logger.GetLogFilePath());
             WriteDiagnostic("Startup begin");
             RegisterApplicationEventHooks();
-            InitializeLayoutSnapshotsForAllOpenWorkbooks();
+            InitializeLayoutSnapshotsForAllOpenWorkbooks("Startup");
             StartTaskFilePolling();
             WriteDiagnostic("Startup completed");
         }
@@ -103,7 +103,7 @@ namespace ExcelAddIn1
         {
             string name = SafeWorkbookName(workbook);
             WriteDiagnostic("WorkbookOpen: " + name);
-            InitializeLayoutSnapshotsForWorkbook(workbook, readFreeze: false);
+            InitializeLayoutSnapshotsForWorkbook(workbook, readFreeze: false, "WorkbookOpen");
         }
 
         private void Application_WorkbookBeforeClose(Excel.Workbook workbook, ref bool cancel)
@@ -139,6 +139,7 @@ namespace ExcelAddIn1
                 {
                     Logger.LogOperation(operationType, $"{sheetName}!{NormalizeAddress(address)}");
                     WriteDiagnostic($"SheetChange: {operationType} {sheetName}!{NormalizeAddress(address)}");
+                    InvalidateFreshBaseline();
                     if (string.Equals(operationType, "EditCellFormula", StringComparison.Ordinal))
                     {
                         try { VocabLogger.LogFormulaIfAny(SafeRangeFormulaText(target)); }
@@ -470,7 +471,7 @@ namespace ExcelAddIn1
                 // TaskStart 直後の自動イベント（SheetActivate/WindowActivate）で出る
                 // 最初のレイアウト差分だけ無視する。
                 _ignoreNextAutoLayoutChangeAfterTaskStart = true;
-                InitializeLayoutSnapshotsForAllOpenWorkbooks();
+                InitializeLayoutSnapshotsForAllOpenWorkbooks("Startup");
                 WriteDiagnostic($"Task context updated: {projectId}-{taskId}-{attemptNo} (ignore next auto layout change)");
             }
             catch (Exception ex)
@@ -479,6 +480,42 @@ namespace ExcelAddIn1
                 WriteDiagnostic("TaskFilePollTimer_Tick error: " + ex.Message);
             }
         }
+
+        private static string WithOpenToken(string message)
+        {
+            string token = ReadOpenToken();
+            if (string.IsNullOrEmpty(token))
+                return message;
+            return message + " token=" + token;
+        }
+
+
+
+        private static string ReadOpenToken()
+        {
+            try
+            {
+                string path = Path.Combine(Path.GetTempPath(), "mos_excel_open_token.txt");
+                if (!File.Exists(path))
+                    return "";
+                string token = File.ReadAllText(path).Trim();
+                if (token.Length == 0 || token.Length > 64)
+                    return "";
+                foreach (char c in token)
+                {
+                    bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+                    if (!hex)
+                        return "";
+                }
+                return token;
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+
 
         private static void WriteDiagnostic(string message)
         {

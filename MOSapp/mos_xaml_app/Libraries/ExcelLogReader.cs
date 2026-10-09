@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Libraries
 {
@@ -34,6 +37,101 @@ namespace Libraries
         public static string GetCurrentTaskFilePath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_excel_current_task.txt");
+        }
+
+        public static string GetBoundaryFlushRequestPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_excel_flush_boundary.txt");
+        }
+
+        /// <summary>
+        /// その場採点の開始時、いま開いているタスクの未記録差分だけをアドインへ書き出させる。
+        /// 採点対象プロジェクトと現在タスクが違うときは何もしない。
+        /// </summary>
+        public static void RequestOpenTaskBoundaryFlush(int scoringProjectId, int timeoutMs = 1500)
+        {
+            if (!TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo))
+                return;
+            if (projectId != scoringProjectId || taskId <= 0)
+                return;
+
+            TryRequestBoundaryFlush(projectId, taskId, attemptNo, timeoutMs, out _);
+        }
+
+        /// <summary>
+        /// レビュー遷移前に、現在タスクの未記録差分をVSTOへ確定させる。
+        /// 要求ファイルが削除されたときだけ成功とする。現在タスクが無い、または時間内に消えないときは false。
+        /// </summary>
+        public static bool TryRequestCurrentTaskBoundaryFlush(int timeoutMs, out string detail)
+        {
+            if (!TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo) || taskId <= 0)
+            {
+                detail = "no-current-task";
+                return false;
+            }
+
+            return TryRequestBoundaryFlush(projectId, taskId, attemptNo, timeoutMs, out detail);
+        }
+
+        private static bool TryRequestBoundaryFlush(int projectId, int taskId, int attemptNo, int timeoutMs, out string detail)
+        {
+            detail = $"P{projectId}-T{taskId}-A{attemptNo}";
+            string path = GetBoundaryFlushRequestPath();
+            try
+            {
+                File.WriteAllText(path, $"{projectId},{taskId},{attemptNo}", Encoding.UTF8);
+                var sw = Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < timeoutMs)
+                {
+                    if (!File.Exists(path))
+                    {
+                        detail += " flushed";
+                        return true;
+                    }
+                    Thread.Sleep(50);
+                }
+
+                detail += " timeout";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                detail += " error";
+                Debug.WriteLine("[ExcelLogReader] TryRequestBoundaryFlush: " + ex.Message);
+                return false;
+            }
+        }
+
+        private static bool TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo)
+        {
+            projectId = taskId = 0;
+            attemptNo = 1;
+            try
+            {
+                string path = GetCurrentTaskFilePath();
+                if (!File.Exists(path))
+                    return false;
+                string line = File.ReadAllText(path).Trim();
+                if (string.IsNullOrEmpty(line))
+                    return false;
+                string[] parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2)
+                    return false;
+                if (!int.TryParse(parts[0].Trim(), out projectId))
+                    return false;
+                if (!int.TryParse(parts[1].Trim(), out taskId))
+                    return false;
+                if (parts.Length >= 3)
+                {
+                    int.TryParse(parts[2].Trim(), out attemptNo);
+                    if (attemptNo < 1) attemptNo = 1;
+                }
+                return projectId > 0 && taskId > 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static void ClearCurrentTaskFile()
@@ -161,6 +259,7 @@ namespace Libraries
                 if (File.Exists(path)) File.Delete(path);
             }
             catch { }
+            ExcelVstoReadiness.ResetAfterDiagnosticLogCleared();
         }
 
 
@@ -175,7 +274,29 @@ namespace Libraries
             ExcelValidationExemptFlags exemptFlags,
             out string message)
         {
-            message = null;
+            if (!TryCollectNonExemptViolations(projectId, taskId, attemptNo, exemptFlags, out string firstLogMessage, out _))
+            {
+                message = null;
+                return false;
+            }
+
+            message = firstLogMessage;
+            return true;
+        }
+
+        /// <summary>
+        /// 免除外の操作を、学生向けの理由文として種類ごとに集める。正誤は先頭の1件と同じです。
+        /// </summary>
+        public static bool TryCollectNonExemptViolations(
+            int projectId,
+            int taskId,
+            int attemptNo,
+            ExcelValidationExemptFlags exemptFlags,
+            out string firstLogMessage,
+            out List<string> studentReasons)
+        {
+            firstLogMessage = null;
+            studentReasons = new List<string>();
             // 破壊的操作の判定は、同一タスク内の全試行（セッション）の操作を合算して判定する。
             // 以前は latestOnly: true だったが、タスクを切り替えて戻るだけで違反が消えてしまうのを防ぐため false に変更。
             var ops = GetOperationsForTask(projectId, taskId, attemptNo, latestOnly: false);
@@ -183,13 +304,20 @@ namespace Libraries
             List<string> allowedRanges = useRangeGate
                 ? ExcelTaskValidationConfig.GetAllowedRanges(projectId, taskId)
                 : null;
+            var seenKinds = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var op in ops)
             {
                 if (!Enum.TryParse(op.Type, out ExcelOperationType opType))
                 {
-                    message = $"未対応の操作種別: {op.Type} (detail: {op.Detail})";
-                    return true;
+                    RememberViolation(
+                        ref firstLogMessage,
+                        studentReasons,
+                        seenKinds,
+                        $"未対応の操作種別: {op.Type} (detail: {op.Detail})",
+                        ExcelScoreExplanation.UnknownKind,
+                        ExcelScoreExplanation.UnknownStudentAction);
+                    continue;
                 }
 
                 // タスク切替などで別シートに付いたレイアウト系ログは、対象シート外なら違反にしない
@@ -206,22 +334,56 @@ namespace Libraries
                 {
                     if (!TryParseSheetAndAddress(op.Detail, out string sheetName, out string address))
                     {
-                        message = $"許可範囲外の編集: {op.Type}（アドレス解釈不可: {op.Detail}）";
-                        return true;
+                        RememberViolation(
+                            ref firstLogMessage,
+                            studentReasons,
+                            seenKinds,
+                            $"許可範囲外の編集: {op.Type}（アドレス解釈不可: {op.Detail}）",
+                            ExcelScoreExplanation.OutsideRangeKind,
+                            ExcelScoreExplanation.OutsideRangeStudentAction);
+                        continue;
                     }
 
                     if (IsAddressWithinAllowedRanges(sheetName, address, allowedRanges))
                         continue;
 
-                    message = $"許可範囲外の編集: {op.Type} {op.Detail}";
-                    return true;
+                    RememberViolation(
+                        ref firstLogMessage,
+                        studentReasons,
+                        seenKinds,
+                        $"許可範囲外の編集: {op.Type} {op.Detail}",
+                        ExcelScoreExplanation.OutsideRangeKind,
+                        ExcelScoreExplanation.OutsideRangeStudentAction);
+                    continue;
                 }
 
-                message = $"免除外の操作: {opType} (detail: {op.Detail})";
-                return true;
+                ExcelScoreExplanation.DescribeOperation(opType, out string kind, out string studentText);
+                RememberViolation(
+                    ref firstLogMessage,
+                    studentReasons,
+                    seenKinds,
+                    $"免除外の操作: {opType} (detail: {op.Detail})",
+                    kind,
+                    studentText);
             }
 
-            return false;
+            return firstLogMessage != null;
+        }
+
+        private static void RememberViolation(
+            ref string firstLogMessage,
+            List<string> studentReasons,
+            HashSet<string> seenKinds,
+            string logMessage,
+            string kind,
+            string studentText)
+        {
+            if (firstLogMessage == null)
+                firstLogMessage = logMessage;
+            if (string.IsNullOrEmpty(kind) || !seenKinds.Add(kind))
+                return;
+            if (!string.IsNullOrEmpty(studentText))
+                studentReasons.Add(studentText);
         }
 
 
@@ -534,6 +696,66 @@ namespace Libraries
             {
                 int.TryParse(tokens[2].Trim(), out attemptNo);
                 if (attemptNo < 1) attemptNo = 1;
+            }
+        }
+    }
+
+    /// <summary>
+    /// タスク単位の再挑戦番号。未登録は 1。結果画面から×のタスクに戻ったときだけ増やす。
+    /// </summary>
+    public static class ExcelTaskAttemptRegistry
+    {
+        private static readonly object Sync = new object();
+        private static readonly Dictionary<string, int> Attempts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        private static string Key(int projectId, int taskId) => $"{projectId}-{taskId}";
+
+        public static int GetAttempt(int projectId, int taskId)
+        {
+            lock (Sync)
+            {
+                if (Attempts.TryGetValue(Key(projectId, taskId), out int v) && v >= 1)
+                    return v;
+                return 1;
+            }
+        }
+
+        public static void SetAttempt(int projectId, int taskId, int attemptNo)
+        {
+            if (attemptNo < 1) attemptNo = 1;
+            lock (Sync)
+            {
+                Attempts[Key(projectId, taskId)] = attemptNo;
+            }
+        }
+
+        public static int Increment(int projectId, int taskId)
+        {
+            lock (Sync)
+            {
+                string key = Key(projectId, taskId);
+                int current = 1;
+                if (Attempts.TryGetValue(key, out int v) && v >= 1)
+                    current = v;
+                int next = current + 1;
+                Attempts[key] = next;
+                return next;
+            }
+        }
+
+        public static void ClearProject(int projectId)
+        {
+            string prefix = projectId + "-";
+            lock (Sync)
+            {
+                var keys = new List<string>();
+                foreach (var key in Attempts.Keys)
+                {
+                    if (key.StartsWith(prefix, StringComparison.Ordinal))
+                        keys.Add(key);
+                }
+                foreach (var key in keys)
+                    Attempts.Remove(key);
             }
         }
     }

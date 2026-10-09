@@ -16,6 +16,10 @@ namespace New_MOSWordVSTOAddIn
         private static readonly (int ProjectId, int TaskId, string CommandId)[] EvidenceTargets =
         {
             (1, 1, "ShowAll"),
+            // 1-1: 離脱時・トグル実績ありかつ最終表示ONのときだけ付く（初期ON放置の偽○防止）
+            (1, 1, "ShowAllFinalOn"),
+            // 1-1: 最終がOFFのとき（FinalOn の sticky を last-wins で無効化）
+            (1, 1, "ShowAllFinalOff"),
             // 1-1-5: 環境により FontClearFormatting 等の idMso が無効のため、Ribbon では ClearFormatting のみフック
             (1, 5, "ClearFormatting"),
             (2, 1, "Cut"),
@@ -41,12 +45,29 @@ namespace New_MOSWordVSTOAddIn
             (7, 4, "FileSaveAsTxt"),
             (7, 5, "FileSaveAsDocm"),
             (9, 5, "AcceptAllChangesInDocAndStopTracking"),
-            (10, 2, "BulletDefineNew"),
-            (10, 3, "BulletDefineNew"),
+        };
+
+        static readonly string[] Task10_2BulletTexts =
+        {
+            "推測できる簡単なパスワード",
+            "身に覚えのないリンク",
+            "サポート切れソフトウェア"
+        };
+
+        static readonly string[] Task10_3BulletTexts =
+        {
+            "セキュリティ対策ソフト",
+            "使わなくなった機器"
         };
 
         public static void LogCommandWithEvidence(string commandId)
         {
+            if (string.Equals(commandId, "BulletDefineNew", StringComparison.OrdinalIgnoreCase))
+            {
+                LogBulletDefineNewForSelection();
+                return;
+            }
+
             int activeProjectId = TryGetActiveProjectId();
 
             foreach (var entry in EvidenceTargets)
@@ -66,13 +87,89 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>
+        /// 10-2 / 10-3: 選択中の段落だけに新しい行頭文字の定義を付ける。履歴からの適用は別コマンドなので記録しない。
+        /// </summary>
+        static void LogBulletDefineNewForSelection()
+        {
+            if (TryGetActiveProjectId() != 10)
+                return;
+
+            bool task02 = false;
+            bool task03 = false;
+            Paragraphs paragraphs = null;
+            try
+            {
+                Selection sel = Globals.ThisAddIn?.Application?.Selection;
+                if (sel == null)
+                    return;
+                paragraphs = sel.Paragraphs;
+                int count = paragraphs == null ? 0 : paragraphs.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Paragraph para = null;
+                    Range range = null;
+                    try
+                    {
+                        para = paragraphs[i];
+                        range = para?.Range;
+                        string text = range?.Text ?? "";
+                        if (ContainsAny(text, Task10_2BulletTexts))
+                            task02 = true;
+                        if (ContainsAny(text, Task10_3BulletTexts))
+                            task03 = true;
+                    }
+                    finally
+                    {
+                        if (range != null)
+                        {
+                            try { Marshal.ReleaseComObject(range); } catch { }
+                        }
+                        if (para != null)
+                        {
+                            try { Marshal.ReleaseComObject(para); } catch { }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                return;
+            }
+            finally
+            {
+                if (paragraphs != null)
+                {
+                    try { Marshal.ReleaseComObject(paragraphs); } catch { }
+                }
+            }
+
+            if (task02)
+                Logger.LogTaskEvidence(10, 2, "BulletDefineNew");
+            if (task03)
+                Logger.LogTaskEvidence(10, 3, "BulletDefineNew");
+        }
+
+        static bool ContainsAny(string text, string[] needles)
+        {
+            if (string.IsNullOrEmpty(text))
+                return false;
+            foreach (string needle in needles)
+            {
+                if (text.IndexOf(needle, StringComparison.Ordinal) >= 0)
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>2-1: 切り取り選択を記録し、段落単位なら CutParagraphSelection 証跡を付ける。記録した場合 true（通常 Cut は付けない）。</summary>
         public static bool TryLogInvalidParagraphCut()
         {
             try
             {
                 int activeProjectId = TryGetActiveProjectId();
-                if (activeProjectId > 0 && activeProjectId != 2)
+                bool task21 = Globals.ThisAddIn != null && ThisAddIn.IsCurrentExamTask(2, 1);
+                if (!task21 && activeProjectId > 0 && activeProjectId != 2)
                     return false;
 
                 var app = Globals.ThisAddIn?.Application;
@@ -231,6 +328,8 @@ namespace New_MOSWordVSTOAddIn
         private static bool UsesFixedProjectWhenActiveUnknown(string commandId)
         {
             return string.Equals(commandId, "ShowAll", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandId, "ShowAllFinalOn", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandId, "ShowAllFinalOff", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "FileSaveAsTxt", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(commandId, "FileSaveAsDocm", StringComparison.OrdinalIgnoreCase);
         }
