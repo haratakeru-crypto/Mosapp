@@ -856,6 +856,14 @@ namespace MOS_PowerPoint_app.Views
                     MessageBoxImage.Warning);
                 return results;
             }
+
+            // 再オープン前に、表示中タスクの証跡を Word/Excel 型で1回確定する。
+            var flushTimer = Stopwatch.StartNew();
+            bool flushOk = Libraries.PPLogReader.TryRequestCurrentTaskEvidenceFlush(2000, out string flushDetail);
+            PPGradingPerf.Log(
+                "ScoreAllProjects.EvidenceFlush",
+                flushTimer.ElapsedMilliseconds,
+                $"ok={flushOk} {flushDetail}");
             
             PowerPointGrader grader = null;
             Libraries.PPLogReader.BeginBatchScoringFastPoll();
@@ -2542,15 +2550,17 @@ namespace MOS_PowerPoint_app.Views
             // 破壊的操作の記録は VSTO タスク境界と Grader ゲートに一本化（Word 方式）。
             // プロジェクト遷移時は destructive_errors.log へ追記しない。
 
-            // current_task を消す前に、印刷系タスク（5-1/11-7）は同期再評価して証跡を確定する。
-            // 最終タスク 11-7 での高速遷移時の取りこぼしを防ぐため、アプリ側でも境界補完する。
+            // current_task を消す前に、表示中タスクの証跡を VSTO へ確定させる（Word/Excel 型 flush）。
+            // 印刷系は従来どおりアプリ側の同期補完も残す。
             try
             {
+                bool flushOk = Libraries.PPLogReader.TryRequestCurrentTaskEvidenceFlush(2000, out string flushDetail);
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] EvidenceFlush ok={flushOk} {flushDetail}");
                 TryFinalizePrintEvidenceBeforeProjectTransition();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Print evidence finalize error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Evidence finalize error: {ex.Message}");
             }
 
             await Dispatcher.Yield(DispatcherPriority.Background);

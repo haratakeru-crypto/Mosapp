@@ -9,6 +9,7 @@ namespace ExcelAddIn1
     public partial class ThisAddIn
     {
         private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_excel_current_task.txt");
+        private static readonly string BoundaryFlushRequestPath = Path.Combine(Path.GetTempPath(), "mos_excel_flush_boundary.txt");
         private static readonly string DiagnosticLogFilePath = Path.Combine(Path.GetTempPath(), "mos_excel_addin_diag.txt");
         private bool _eventHooksRegistered;
         private Timer _taskFilePollTimer;
@@ -17,6 +18,8 @@ namespace ExcelAddIn1
         private int _currentTaskAttemptNo = 1;
         private bool _ignoreNextAutoLayoutChangeAfterTaskStart;
         private string _lastRangeSelectionAddress;
+        /// <summary>複数セル／複数領域の最終選択。グラフ挿入直後の1セル縮小では AddChart に使わない。</summary>
+        private string _lastMultiCellRangeSelectionAddress;
 
         // 単語帳: 選択種別の重複ログ防止
         private string _lastVocabSelectionKey;
@@ -168,11 +171,127 @@ namespace ExcelAddIn1
                     _lastRangeSelectionAddress = _lastRangeSelectionAddress.Substring(_lastRangeSelectionAddress.IndexOf("]") + 1);
                 }
 
+                if (IsMultiCellRange(target) && !string.IsNullOrEmpty(_lastRangeSelectionAddress))
+                    _lastMultiCellRangeSelectionAddress = _lastRangeSelectionAddress;
+
                 // 選択変更のたびにハイパーリンク集合を照合（ダイアログ挿入後に別セルを選ぶまで SheetChange が無いケースの補足）
                 TryDetectHyperlinkChangeAfterSheetChange(sheet);
                 TryEmitVocabSelectionFromRange(target);
             }
             catch { }
+        }
+
+        private static bool IsMultiCellRange(Excel.Range target)
+        {
+            if (target == null) return false;
+            try
+            {
+                if (target.CountLarge > 1) return true;
+            }
+            catch { }
+            try
+            {
+                if (target.Areas != null && target.Areas.Count > 1) return true;
+            }
+            catch { }
+            return false;
+        }
+
+        private static bool IsSingleCellRange(Excel.Range target)
+        {
+            if (target == null) return true;
+            try
+            {
+                if (target.Areas != null && target.Areas.Count > 1) return false;
+            }
+            catch { }
+            try
+            {
+                return target.CountLarge <= 1;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string GetSheetNameFromExternalAddress(string address)
+        {
+            if (string.IsNullOrEmpty(address)) return "";
+            int bang = address.IndexOf('!');
+            if (bang <= 0) return "";
+            string sheet = address.Substring(0, bang).Trim();
+            if (sheet.StartsWith("'") && sheet.EndsWith("'") && sheet.Length >= 2)
+                sheet = sheet.Substring(1, sheet.Length - 2).Replace("''", "'");
+            return sheet;
+        }
+
+        /// <summary>
+        /// AddChart 用の選択範囲。挿入直後に Selection が1セルや Chart になっても、直前の複数セル選択を優先する。
+        /// 期待範囲の捏造はしない（ユーザーが実際に選んだ範囲だけ）。
+        /// </summary>
+        private string ResolveChartCreationSelectionAddress(Excel.Chart chart)
+        {
+            string selectionAddress = "";
+            Excel.Range selection = null;
+            try { selection = Application.Selection as Excel.Range; } catch { }
+
+            if (selection != null)
+            {
+                try
+                {
+                    selectionAddress = selection.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing) ?? "";
+                }
+                catch { selectionAddress = ""; }
+            }
+
+            if (selectionAddress.Contains("]"))
+                selectionAddress = selectionAddress.Substring(selectionAddress.IndexOf("]") + 1);
+
+            string multi = _lastMultiCellRangeSelectionAddress;
+            if (!string.IsNullOrEmpty(multi) && multi.Contains("]"))
+                multi = multi.Substring(multi.IndexOf("]") + 1);
+
+            bool preferMulti = !string.IsNullOrEmpty(multi)
+                && (selection == null || IsSingleCellRange(selection) || string.IsNullOrEmpty(selectionAddress));
+
+            if (preferMulti)
+            {
+                string multiSheet = GetSheetNameFromExternalAddress(multi);
+                string currentSheet = GetSheetNameFromExternalAddress(selectionAddress);
+                if (string.IsNullOrEmpty(currentSheet))
+                {
+                    try
+                    {
+                        if (selection?.Worksheet != null)
+                            currentSheet = selection.Worksheet.Name ?? "";
+                    }
+                    catch { }
+                }
+                if (string.IsNullOrEmpty(currentSheet))
+                {
+                    try
+                    {
+                        var parent = chart?.Parent as Excel.ChartObject;
+                        var ws = parent?.Parent as Excel.Worksheet;
+                        if (ws != null) currentSheet = ws.Name ?? "";
+                    }
+                    catch { }
+                }
+
+                if (string.IsNullOrEmpty(multiSheet)
+                    || string.IsNullOrEmpty(currentSheet)
+                    || string.Equals(multiSheet, currentSheet, StringComparison.OrdinalIgnoreCase))
+                {
+                    return multi;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(selectionAddress))
+                return selectionAddress;
+            if (!string.IsNullOrEmpty(_lastRangeSelectionAddress))
+                return _lastRangeSelectionAddress;
+            return "NoSelection";
         }
 
         void TryEmitVocabSelectionFromRange(Excel.Range target)
@@ -351,21 +470,9 @@ namespace ExcelAddIn1
         {
             try
             {
-                string selectionAddress = "";
-                Excel.Range selection = Application.Selection as Excel.Range;
-                if (selection != null)
-                {
-                    selectionAddress = selection.get_Address(true, true, Excel.XlReferenceStyle.xlA1, true, Type.Missing);
-                }
-                else
-                {
-                    selectionAddress = _lastRangeSelectionAddress;
-                }
-
+                string selectionAddress = ResolveChartCreationSelectionAddress(Ch);
                 if (string.IsNullOrEmpty(selectionAddress))
-                {
                     selectionAddress = "NoSelection";
-                }
 
                 // Remove workbook name from address if present (e.g. [book.xlsx]Sheet1!$A$1 -> Sheet1!$A$1)
                 if (selectionAddress.Contains("]"))
@@ -380,6 +487,56 @@ namespace ExcelAddIn1
             {
                 System.Diagnostics.Debug.WriteLine("[ExcelAddIn1] Application_WorkbookNewChart: " + ex.Message);
                 WriteDiagnostic("Application_WorkbookNewChart error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// ホストが mos_excel_flush_boundary.txt に P,T,A を置いたとき、未記録レイアウト差分を確定して削除する。
+        /// ExcelLogReader はファイル消滅を成功とみなす（タイムアウト防止のため失敗時も削除）。
+        /// </summary>
+        private void ProcessBoundaryFlushRequest()
+        {
+            if (!File.Exists(BoundaryFlushRequestPath))
+                return;
+
+            int projectId = 0;
+            int taskId = 0;
+            int attemptNo = 1;
+            try
+            {
+                string text = File.ReadAllText(BoundaryFlushRequestPath).Trim();
+                if (!string.IsNullOrEmpty(text))
+                {
+                    string[] parts = text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2)
+                    {
+                        int.TryParse(parts[0].Trim(), out projectId);
+                        int.TryParse(parts[1].Trim(), out taskId);
+                        if (parts.Length >= 3)
+                        {
+                            int.TryParse(parts[2].Trim(), out attemptNo);
+                            if (attemptNo < 1) attemptNo = 1;
+                        }
+                    }
+                }
+
+                if (projectId > 0 && taskId > 0)
+                {
+                    FlushPendingBoundaryDiffsForTask(projectId, taskId, attemptNo);
+                    WriteDiagnostic($"BoundaryFlush done: {projectId}-{taskId}-{attemptNo}");
+                }
+                else
+                {
+                    WriteDiagnostic("BoundaryFlush skipped: invalid request");
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("BoundaryFlush error: " + ex.Message);
+            }
+            finally
+            {
+                try { File.Delete(BoundaryFlushRequestPath); } catch { }
             }
         }
 
@@ -405,6 +562,9 @@ namespace ExcelAddIn1
         {
             try
             {
+                // 採点アプリからの境界フラッシュ要求（その場採点開始／レビュー前）。削除で完了を伝える。
+                ProcessBoundaryFlushRequest();
+
                 // 単語帳: チャート選択など Range 以外の選択を補足検知。
                 // モードがオンになった瞬間の選択はユーザー操作ではないので送らない。
                 bool vocabOn = VocabLogger.IsVocabModeEnabled();
@@ -465,6 +625,7 @@ namespace ExcelAddIn1
                 _currentTaskProjectId = projectId;
                 _currentTaskTaskId = taskId;
                 _currentTaskAttemptNo = attemptNo;
+                _lastMultiCellRangeSelectionAddress = null;
 
                 Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
                 Logger.LogTaskStart(projectId, taskId, attemptNo);

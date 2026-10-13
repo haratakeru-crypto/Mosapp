@@ -417,6 +417,9 @@ namespace MOS_PowerPoint_app
                 grader.LogOpenTaskBaselineDiffOnce(CurrentProject.ProjectId);
                 Libraries.PPLogReader.ClearSnapshot();
 
+                // 開いたまま採点するとき、離脱境界を通っていない現在タスクの証跡を先に確定する。
+                Libraries.PPLogReader.RequestOpenTaskEvidenceFlush(CurrentProject.ProjectId);
+
                 int passedCount = 0;
                 foreach (var task in project.Tasks.OrderBy(t => t.TaskId))
                 {

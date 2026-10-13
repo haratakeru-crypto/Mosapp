@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -168,6 +169,77 @@ namespace Libraries
         public static string GetCurrentTaskFilePath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
+        }
+
+        /// <summary>
+        /// 採点／レビュー直前の証跡確定要求（%TEMP%\mos_ppt_flush_evidence.txt）。
+        /// 形式: ProjectId,TaskId,AttemptNo。VSTO が処理後に削除する（Excel 境界 flush と同型）。
+        /// </summary>
+        public static string GetEvidenceFlushRequestPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_flush_evidence.txt");
+        }
+
+        /// <summary>
+        /// その場採点の開始時、いま開いているタスクの証跡を VSTO へ確定させる。
+        /// 採点対象プロジェクトと現在タスクが違うときは何もしない。
+        /// </summary>
+        public static void RequestOpenTaskEvidenceFlush(int scoringProjectId, int timeoutMs = 1500)
+        {
+            if (!TryReadCurrentTaskFile(out int projectId, out int taskId, out _, out int attemptNo, out _))
+                return;
+            if (projectId != scoringProjectId || taskId <= 0)
+                return;
+
+            TryRequestEvidenceFlush(projectId, taskId, attemptNo, timeoutMs, out _);
+        }
+
+        /// <summary>
+        /// レビュー／一括採点の前に、現在タスクの証跡を VSTO へ確定させる。
+        /// 要求ファイルが削除されたときだけ成功とする。
+        /// </summary>
+        public static bool TryRequestCurrentTaskEvidenceFlush(int timeoutMs, out string detail)
+        {
+            if (!TryReadCurrentTaskFile(out int projectId, out int taskId, out _, out int attemptNo, out _) || taskId <= 0)
+            {
+                detail = "no-current-task";
+                return false;
+            }
+
+            return TryRequestEvidenceFlush(projectId, taskId, attemptNo, timeoutMs, out detail);
+        }
+
+        /// <summary>
+        /// 指定タスクの証跡確定を VSTO に依頼する。ファイル消滅で完了とみなす。
+        /// </summary>
+        public static bool TryRequestEvidenceFlush(int projectId, int taskId, int attemptNo, int timeoutMs, out string detail)
+        {
+            if (attemptNo < 1) attemptNo = 1;
+            detail = $"P{projectId}-T{taskId}-A{attemptNo}";
+            string path = GetEvidenceFlushRequestPath();
+            try
+            {
+                File.WriteAllText(path, $"{projectId},{taskId},{attemptNo}", new UTF8Encoding(false));
+                var sw = Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < timeoutMs)
+                {
+                    if (!File.Exists(path))
+                    {
+                        detail += " flushed";
+                        return true;
+                    }
+                    Thread.Sleep(50);
+                }
+
+                detail += " timeout";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                detail += " error";
+                Debug.WriteLine("[PPLogReader] TryRequestEvidenceFlush: " + ex.Message);
+                return false;
+            }
         }
 
         /// <summary>current_task ファイルの固定フィールド数（ProjectId,TaskId,ExemptFlags,AttemptNo,SnapshotGen）。</summary>
