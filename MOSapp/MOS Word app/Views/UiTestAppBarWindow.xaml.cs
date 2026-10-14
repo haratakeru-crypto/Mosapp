@@ -432,10 +432,10 @@ namespace MOS_Word_app.Views
                             {
                                 WordScoreExplanation.ClearCheckerReason();
                                 int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, taskNum);
-                                if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out string gateReason))
+                                if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out List<string> gateActions))
                                 {
                                     string failReason = WordScoreExplanation.ResolveFailReason(
-                                        passed: false, gateFailed: true, gateInternalReason: gateReason);
+                                        passed: false, gateFailed: true, gateStudentActions: gateActions);
                                     taskResults.Add((taskNum, false, failReason));
                                     ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
                                     continue;

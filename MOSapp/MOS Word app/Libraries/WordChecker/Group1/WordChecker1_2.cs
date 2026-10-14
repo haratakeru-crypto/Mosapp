@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,143 +11,58 @@ namespace Libraries.Group1
 {
     public class WordChecker1_2
     {
-        /// <summary>
-        /// タスク2-1: 「青空文庫のURLはコチラ↓」の文字列を切り取って、見出し「朗読を楽しみましょう！」の下の段落に貼り付けます。
-        /// </summary>
-        public bool CheckTask_1_2_01()
+        public bool CheckTask_1_2_01() => RunCheck(CheckTask_1_2_01_Impl);
+        public bool CheckTask_1_2_02() => RunCheck(CheckTask_1_2_02_Impl);
+        public bool CheckTask_1_2_03() => RunCheck(CheckTask_1_2_03_Impl);
+        public bool CheckTask_1_2_04() => RunCheck(CheckTask_1_2_04_Impl);
+        public bool CheckTask_1_2_05() => RunCheck(CheckTask_1_2_05_Impl);
+
+        private bool RunCheck(Func<string, bool> task)
         {
             try
             {
                 string filePath = GetCurrentWordFilePath();
                 if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
-                return CheckTask_1_2_01(filePath);
+                    return Miss(WordScoreExplanation.UnavailableText);
+                return task(filePath);
             }
-            catch (Exception)
+            catch
             {
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
         }
 
         /// <summary>
-        /// タスク2-2: 見出し「方法」の下にある箇条書きのレベルを「3」に変更します。
+        /// タスク2-1: 「青空文庫のURLはコチラ↓」を切り取って、「朗読を楽しみましょう！」の下の段落に貼り付け。
         /// </summary>
-        public bool CheckTask_1_2_02()
-        {
-            try
-            {
-                string filePath = GetCurrentWordFilePath();
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
-                return CheckTask_1_2_02(filePath);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// タスク2-3: 文書内の「朗読を楽しみましょう！」の文字の色を「青、アクセント1、黒+基本色25％」に変更します。
-        /// </summary>
-        public bool CheckTask_1_2_03()
-        {
-            try
-            {
-                string filePath = GetCurrentWordFilePath();
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
-                return CheckTask_1_2_03(filePath);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// タスク2-4: 文書の一番下の図形に、「ご参加お待ちしております」と入力します。
-        /// </summary>
-        public bool CheckTask_1_2_04()
-        {
-            try
-            {
-                string filePath = GetCurrentWordFilePath();
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
-                return CheckTask_1_2_04(filePath);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// タスク2-5: テキストボックス内の文字列を15ptの斜体にします。
-        /// </summary>
-        public bool CheckTask_1_2_05()
-        {
-            try
-            {
-                string filePath = GetCurrentWordFilePath();
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    return false;
-                }
-                return CheckTask_1_2_05(filePath);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        private bool CheckTask_1_2_01(string filePath)
+        private bool CheckTask_1_2_01_Impl(string filePath)
         {
             Application wordApp = null;
             Document document = null;
             try
             {
-                try
-                {
-                    wordApp = (Application)Marshal.GetActiveObject("Word.Application");
-                }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
                 catch
                 {
                     wordApp = new Application();
                     wordApp.Visible = true;
                 }
 
-                document = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
+                document = GetDocument(wordApp, filePath);
+                if (document == null)
+                    return Miss(WordScoreExplanation.UnavailableText);
 
-                foreach (Document doc in wordApp.Documents)
-                {
-                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        document = doc;
-                        break;
-                    }
-                }
-
-                if (document == null) return false;
-
-                // 0. Cut / Paste が操作ログまたは証跡で記録されていること
                 bool cutParagraph = LogReader.HasTaskEvidence(2, 1, "CutParagraphSelection");
                 bool cutExecuted = LogReader.HasTaskEvidence(2, 1, "Cut");
                 bool pasteExecuted = LogReader.HasTaskEvidence(2, 1, "Paste");
-                if (cutParagraph) return false;
-                if (!cutExecuted || !pasteExecuted) return false;
+                if (cutParagraph)
+                    return Miss("段落ごと切り取った記録があるため、×になりました。");
+                if (!cutExecuted && !pasteExecuted)
+                    return Miss("切り取りまたは貼り付けの操作の記録がありません。");
+                if (!cutExecuted)
+                    return Miss("切り取りの操作の記録がありません。");
+                if (!pasteExecuted)
+                    return Miss("貼り付けの操作の記録がありません。");
 
                 int count = WordFindHelper.CountTextOccurrences(document, wordApp, "青空文庫のURLはコチラ↓");
 
@@ -155,17 +71,20 @@ namespace Libraries.Group1
                 Range linkRange = WordFindHelper.FindFirstRange(document, wordApp, "https://www.aozora.gr.jp/index.html");
                 if (urlRange == null || headingRange == null || linkRange == null)
                 {
+                    string missReason = urlRange == null
+                        ? "「青空文庫のURLはコチラ↓」が文書内にありません。"
+                        : headingRange == null
+                            ? "「朗読を楽しみましょう！」が文書内にありません。"
+                            : "貼り付け位置の確認に必要な文字列が見つかりません。";
                     if (urlRange != null) Marshal.ReleaseComObject(urlRange);
                     if (headingRange != null) Marshal.ReleaseComObject(headingRange);
                     if (linkRange != null) Marshal.ReleaseComObject(linkRange);
-                    return false;
+                    return Miss(missReason);
                 }
 
-                // 「青空文庫のURLはコチラ↓」が見出しより後ろにあるか
                 int headingStart = headingRange.Start;
                 bool isAfterHeading = urlRange.Start > headingStart;
 
-                // リンク段落の1つ上の段落に「青空文庫のURLはコチラ↓」が含まれるか（Paragraph.Range は段落記号を含むため「含まれる」で判定）
                 Paragraph linkPara = linkRange.Paragraphs[1];
                 Paragraph abovePara = null;
                 try
@@ -189,12 +108,19 @@ namespace Libraries.Group1
                 if (abovePara != null) Marshal.ReleaseComObject(abovePara);
                 Marshal.ReleaseComObject(linkPara);
 
+                if (count != 1)
+                    WordScoreExplanation.Note($"「青空文庫のURLはコチラ↓」が文書内に「{count}」か所あります。");
+                if (!isAfterHeading || !isJustAboveLink)
+                    WordScoreExplanation.Note("「青空文庫のURLはコチラ↓」が「朗読を楽しみましょう！」の下の段落になっていません。");
+
                 bool isCorrectPosition = isAfterHeading && isJustAboveLink;
-                return isCorrectPosition && (count == 1);
-            }
-            catch (Exception)
-            {
+                if (isCorrectPosition && count == 1)
+                    return true;
                 return false;
+            }
+            catch
+            {
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -202,42 +128,29 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_2_02(string filePath)
+        /// <summary>
+        /// タスク2-2: 見出し「方法」の下にある箇条書きのレベルを「3」に変更。
+        /// </summary>
+        private bool CheckTask_1_2_02_Impl(string filePath)
         {
             Application wordApp = null;
             Document document = null;
             try
             {
-                try
-                {
-                    wordApp = (Application)Marshal.GetActiveObject("Word.Application");
-                }
-                catch
-                {
-                    wordApp = new Application();
-                    wordApp.Visible = true;
-                }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
-                document = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-
-                foreach (Document doc in wordApp.Documents)
-                {
-                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        document = doc;
-                        break;
-                    }
-                }
-
-                if (document == null) return false;
+                document = GetDocument(wordApp, filePath);
+                if (document == null)
+                    return Miss(WordScoreExplanation.UnavailableText);
 
                 Range headingRange = FindExactText(document, "方法");
-                if (headingRange == null) return false;
+                if (headingRange == null)
+                    return Miss("見出し「方法」がありません。");
 
                 int level3Count = 0;
                 int listCount = 0;
+                var levels = new System.Collections.Generic.List<int>();
                 try
                 {
                     foreach (Paragraph p in document.Paragraphs)
@@ -249,8 +162,10 @@ namespace Libraries.Group1
                             {
                                 if (p.Range.ListFormat.ListType != WdListType.wdListNoNumbering)
                                 {
+                                    int level = p.Range.ListFormat.ListLevelNumber;
                                     listCount++;
-                                    if (p.Range.ListFormat.ListLevelNumber == 3) level3Count++;
+                                    levels.Add(level);
+                                    if (level == 3) level3Count++;
                                 }
                                 if (listCount >= 3) break;
                             }
@@ -261,11 +176,27 @@ namespace Libraries.Group1
                 {
                     Marshal.ReleaseComObject(headingRange);
                 }
-                return listCount == 3 && level3Count == 3;
-            }
-            catch (Exception)
-            {
+
+                if (listCount == 3 && level3Count == 3)
+                    return true;
+
+                if (listCount == 0)
+                    return Miss("見出し「方法」の下に箇条書きがありません。");
+                if (listCount != 3)
+                    WordScoreExplanation.Note($"見出し「方法」の下の箇条書きの数が「{listCount}」になっています。");
+                if (level3Count != 3 && levels.Count > 0)
+                {
+                    bool allSame = levels.TrueForAll(l => l == levels[0]);
+                    if (allSame)
+                        WordScoreExplanation.Note($"見出し「方法」の下の箇条書きがレベル「{levels[0]}」になっています。");
+                    else
+                        WordScoreExplanation.Note($"見出し「方法」の下の箇条書きのレベルが「{string.Join("」「", levels)}」になっています。");
+                }
                 return false;
+            }
+            catch
+            {
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -273,44 +204,25 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_2_03(string filePath)
+        /// <summary>
+        /// タスク2-3: 「朗読を楽しみましょう！」の文字色を「青、アクセント1、黒+基本色25％」に変更。
+        /// </summary>
+        private bool CheckTask_1_2_03_Impl(string filePath)
         {
             Application wordApp = null;
             Document document = null;
             try
             {
-                try
-                {
-                    wordApp = (Application)Marshal.GetActiveObject("Word.Application");
-                }
-                catch
-                {
-                    wordApp = new Application();
-                    wordApp.Visible = true;
-                }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
-                document = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
+                document = GetDocument(wordApp, filePath);
+                if (document == null)
+                    return Miss(WordScoreExplanation.UnavailableText);
 
-                foreach (Document doc in wordApp.Documents)
-                {
-                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        document = doc;
-                        break;
-                    }
-                }
-
-                if (document == null) return false;
-
-                // 採点対象「朗読を楽しみましょう！」の色を直接チェック（見本テキストは使わない）
                 Range targetRange = FindExactText(document, "朗読を楽しみましょう！");
-
                 if (targetRange == null)
-                {
-                    return false;
-                }
+                    return Miss("「朗読を楽しみましょう！」が文書内にありません。");
 
                 try
                 {
@@ -323,7 +235,7 @@ namespace Libraries.Group1
                         {
                             isAccent1 = font.TextColor.ObjectThemeColor == WdThemeColorIndex.wdThemeColorAccent1;
                         }
-                        catch { /* ObjectThemeColor が未実装の環境あり */ }
+                        catch { }
                         try
                         {
                             object tintVal = font.TextColor.TintAndShade;
@@ -339,7 +251,11 @@ namespace Libraries.Group1
                         bool isBlue = false;
                         try { isBlue = IsResolvedColorBlue(font.TextColor); } catch { }
                         bool colorStateOk = isAccent1 && isDarker25 && isBlue;
-                        return colorStateOk;
+                        if (colorStateOk)
+                            return true;
+
+                        WordScoreExplanation.Note("「朗読を楽しみましょう！」の文字の色が「青、アクセント1、黒+基本色25％」になっていません。");
+                        return false;
                     }
                     finally
                     {
@@ -348,7 +264,7 @@ namespace Libraries.Group1
                 }
                 catch
                 {
-                    return false;
+                    return Miss(WordScoreExplanation.UnavailableText);
                 }
                 finally
                 {
@@ -357,7 +273,7 @@ namespace Libraries.Group1
             }
             catch
             {
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -498,12 +414,6 @@ namespace Libraries.Group1
             }
         }
 
-        /// <summary>WordOpenXML の w:color に accent1 と themeShade（または lumMod による暗化）があるか。COM の TintAndShade が 0 でもここで判別できる。</summary>
-        private static bool TryIsAccent1DarkerFromWordOpenXml(Range range, out string snippet)
-        {
-            return TryIsAccent1BlackBasic25PercentFromOpenXml(range, out snippet);
-        }
-
         /// <summary>文書テーマのアクセント1（ギャラリー最上段）の RGB。Office の型を直接参照しないため dynamic で取得する。</summary>
         private static bool TryGetDocumentThemeAccent1Rgb(Document document, out int r, out int g, out int b)
         {
@@ -567,126 +477,202 @@ namespace Libraries.Group1
             catch { return false; }
         }
 
-        private bool CheckTask_1_2_04(string filePath)
+        private const string Task24ExpectedText = "ご参加お待ちしております";
+
+        /// <summary>
+        /// タスク2-4: 文書の一番下の図形に「ご参加お待ちしております」と入力。
+        /// </summary>
+        private bool CheckTask_1_2_04_Impl(string filePath)
         {
             Application wordApp = null;
             Document document = null;
+            Shape bottomShape = null;
             try
             {
-                try
-                {
-                    wordApp = (Application)Marshal.GetActiveObject("Word.Application");
-                }
-                catch
-                {
-                    wordApp = new Application();
-                    wordApp.Visible = true;
-                }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
-                document = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
+                document = GetDocument(wordApp, filePath);
+                if (document == null)
+                    return Miss(WordScoreExplanation.UnavailableText);
 
-                foreach (Document doc in wordApp.Documents)
-                {
-                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
-                        doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        document = doc;
-                        break;
-                    }
-                }
+                bottomShape = FindBottomTextShape(document);
+                if (bottomShape == null)
+                    return Miss("文書の一番下の図形がありません。");
 
-                if (document == null) return false;
-
-                foreach (Shape shape in document.Shapes)
-                {
-                    if (shape.TextFrame != null && shape.TextFrame.TextRange != null)
-                    {
-                        string text = shape.TextFrame.TextRange.Text ?? "";
-                        if (text.Contains("ご参加お待ちしております"))
-                        {
-                            Marshal.ReleaseComObject(shape);
-                            return true;
-                        }
-                    }
-                    Marshal.ReleaseComObject(shape);
-                }
-                return false;
+                string raw = "";
+                try { raw = bottomShape.TextFrame.TextRange.Text ?? ""; } catch { }
+                string display = NormalizeShapeText(raw);
+                if (display.Contains(Task24ExpectedText))
+                    return true;
+                if (string.IsNullOrEmpty(display))
+                    return Miss($"文書の一番下の図形に「{Task24ExpectedText}」がありません。");
+                return Miss($"文書の一番下の図形の文字列が「{Quote(display)}」になっています。");
             }
-            catch (Exception)
+            catch
             {
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
+                if (bottomShape != null) Marshal.ReleaseComObject(bottomShape);
                 if (document != null) Marshal.ReleaseComObject(document);
             }
         }
 
-        private bool CheckTask_1_2_05(string filePath)
+        /// <summary>
+        /// タスク2-5: テキストボックス内の文字列を15ptの斜体に。
+        /// 文言正誤に依存せず、一番下のテキスト付図形の書式を見る。
+        /// </summary>
+        private bool CheckTask_1_2_05_Impl(string filePath)
         {
             Application wordApp = null;
             Document document = null;
+            Shape targetShape = null;
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
-                document = null;
-                string fileName = System.IO.Path.GetFileName(filePath);
-                foreach (Document doc in wordApp.Documents)
-                {
-                    if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
-                    { document = doc; break; }
-                }
+                document = GetDocument(wordApp, filePath);
+                if (document == null)
+                    return Miss(WordScoreExplanation.UnavailableText);
 
-                if (document == null) return false;
+                targetShape = FindBottomTextShape(document);
+                if (targetShape == null)
+                    return Miss("テキスト付図形がありません。");
 
-                Shape targetShape = null;
-                foreach (Shape shape in document.Shapes)
-                {
-                    if (shape.TextFrame != null && shape.TextFrame.TextRange != null)
-                    {
-                        if ((shape.TextFrame.TextRange.Text ?? "").Contains("ご参加お待ちしております"))
-                        { targetShape = shape; break; }
-                    }
-                    Marshal.ReleaseComObject(shape);
-                }
+                Font font = targetShape.TextFrame.TextRange.Characters[1].Font;
+                float size = 0f;
+                try { size = font.Size; } catch { }
+                bool is15pt = Math.Abs(size - 15.0f) < 0.5f;
+                int italicVal = 0;
+                int boldVal = 0;
+                int underlineVal = 0;
+                try { italicVal = font.Italic; } catch { }
+                try { boldVal = font.Bold; } catch { }
+                try { underlineVal = (int)font.Underline; } catch { }
+                bool isItalic = (italicVal != 0 && italicVal != 9999999);
+                bool noBold = (boldVal == 0);
+                bool noUnderline = (underlineVal == (int)WdUnderline.wdUnderlineNone);
+                Marshal.ReleaseComObject(font);
 
-                if (targetShape == null) return false;
+                if (is15pt && isItalic && noBold && noUnderline)
+                    return true;
 
+                if (!is15pt)
+                    WordScoreExplanation.Note($"テキストボックス内の文字サイズが「{Quote(size.ToString("0.#"))}」ptになっています。");
+                if (!isItalic)
+                    WordScoreExplanation.Note("テキストボックス内の文字が斜体になっていません。");
+                if (!noBold)
+                    WordScoreExplanation.Note("テキストボックス内の文字に太字が残っています。");
+                if (!noUnderline)
+                    WordScoreExplanation.Note("テキストボックス内の文字に下線が残っています。");
+                return false;
+            }
+            catch
+            {
+                return Miss(WordScoreExplanation.UnavailableText);
+            }
+            finally
+            {
+                if (targetShape != null) Marshal.ReleaseComObject(targetShape);
+                if (document != null) Marshal.ReleaseComObject(document);
+            }
+        }
+
+        /// <summary>TextFrame を持つ図形のうち、ページ上で最も下（Top 最大）のものを返す。呼び出し側で Release すること。</summary>
+        private static Shape FindBottomTextShape(Document document)
+        {
+            Shape best = null;
+            float bestTop = float.MinValue;
+            foreach (Shape shape in document.Shapes)
+            {
+                bool keep = false;
                 try
                 {
-                    Font font = targetShape.TextFrame.TextRange.Characters[1].Font;
-                    float size = 0f;
-                    try { size = font.Size; } catch { }
-                    bool is15pt = Math.Abs(size - 15.0f) < 0.5f;
-                    int italicVal = 0;
-                    int boldVal = 0;
-                    int underlineVal = 0;
-                    try { italicVal = font.Italic; } catch { }
-                    try { boldVal = font.Bold; } catch { }
-                    try { underlineVal = (int)font.Underline; } catch { }
-                    bool isItalic = (italicVal != 0 && italicVal != 9999999);
-                    bool noBold = (boldVal == 0);
-                    bool noUnderline = (underlineVal == (int)WdUnderline.wdUnderlineNone);
-                    Marshal.ReleaseComObject(font);
-                    bool result = is15pt && isItalic && noBold && noUnderline;
-                    return result;
+                    if (!HasUsableTextFrame(shape))
+                        continue;
+                    float top = shape.Top;
+                    if (best == null || top >= bestTop)
+                    {
+                        if (best != null) Marshal.ReleaseComObject(best);
+                        best = shape;
+                        bestTop = top;
+                        keep = true;
+                    }
                 }
+                catch { }
                 finally
                 {
-                    Marshal.ReleaseComObject(targetShape);
+                    if (!keep)
+                        Marshal.ReleaseComObject(shape);
+                }
+            }
+            return best;
+        }
+
+        private static bool HasUsableTextFrame(Shape shape)
+        {
+            try
+            {
+                TextFrame tf = shape.TextFrame;
+                if (tf == null) return false;
+                try
+                {
+                    // HasText: msoTrue(-1) / msoFalse(0)。未対応図形は例外になり得る。
+                    int hasText = tf.HasText;
+                    if (hasText == 0)
+                        return tf.TextRange != null;
+                    return true;
+                }
+                catch
+                {
+                    return tf.TextRange != null;
                 }
             }
             catch
             {
                 return false;
             }
-            finally
+        }
+
+        private static string NormalizeShapeText(string raw)
+        {
+            if (string.IsNullOrEmpty(raw))
+                return "";
+            return raw.Trim('\r', '\n', '\a', ' ', '　');
+        }
+
+        private static bool Miss(string reason)
+        {
+            WordScoreExplanation.Note(reason);
+            return false;
+        }
+
+        private static string Quote(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        private Document GetDocument(Application wordApp, string filePath)
+        {
+            string fileName = Path.GetFileName(filePath);
+            foreach (Document doc in wordApp.Documents)
             {
-                if (document != null) Marshal.ReleaseComObject(document);
+                if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) ||
+                    doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return doc;
+                }
             }
+            return null;
         }
 
         private Range FindExactText(Document doc, string searchText)
@@ -735,4 +721,3 @@ namespace Libraries.Group1
         }
     }
 }
-

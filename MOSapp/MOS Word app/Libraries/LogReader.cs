@@ -790,21 +790,32 @@ namespace Libraries
 
         public static bool HasDisallowedOperations(int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes)
         {
+            return CollectDisallowedOperationTypes(projectId, taskId, attemptNo, allowedOperationTypes).Count > 0;
+        }
+
+        /// <summary>許可外 [Op] 種別を出現順・重複なしで返す。</summary>
+        public static List<string> CollectDisallowedOperationTypes(
+            int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes)
+        {
+            var result = new List<string>();
             if (allowedOperationTypes == null)
-                return false;
+                return result;
             var ops = GetOperationsForTask(projectId, taskId, attemptNo);
             if (ops.Count == 0)
-                return false;
+                return result;
 
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string opLine in ops)
             {
                 string type = GetOperationType(opLine);
                 if (string.IsNullOrEmpty(type))
                     continue;
-                if (!allowedOperationTypes.Contains(type))
-                    return true;
+                if (allowedOperationTypes.Contains(type))
+                    continue;
+                if (seen.Add(type))
+                    result.Add(type);
             }
-            return false;
+            return result;
         }
 
         public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
@@ -826,6 +837,43 @@ namespace Libraries
                 System.Diagnostics.Debug.WriteLine($"[LogReader] HasLoggedDestructiveError: {ex.Message}");
             }
             return false;
+        }
+
+        /// <summary>
+        /// mos_word_destructive_errors.log の当該行から差分トークンを取り出す（" | " 区切り、重複なし）。
+        /// </summary>
+        public static List<string> GetLoggedDestructiveErrorTokens(int projectId, int taskId, int attemptNo)
+        {
+            var result = new List<string>();
+            try
+            {
+                string path = GetDestructiveErrorLogPath();
+                if (!File.Exists(path))
+                    return result;
+                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string line in ReadCachedLines(path))
+                {
+                    if (line == null || !line.StartsWith(prefix, StringComparison.Ordinal))
+                        continue;
+                    string body = line.Substring(prefix.Length).Trim();
+                    if (string.IsNullOrEmpty(body))
+                        continue;
+                    foreach (string part in body.Split(new[] { " | " }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        string token = part.Trim();
+                        if (token.Length == 0)
+                            continue;
+                        if (seen.Add(token))
+                            result.Add(token);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] GetLoggedDestructiveErrorTokens: {ex.Message}");
+            }
+            return result;
         }
 
         public static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, IList<string> errors)
