@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［スキルアップ検定結果］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［A4:K4］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［折り返して全体を表示する］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：1行目の文字がセル内で折り返して表示されている"
+    }
+  ]
+}
