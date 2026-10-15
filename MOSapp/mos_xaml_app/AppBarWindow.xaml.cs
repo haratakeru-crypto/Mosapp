@@ -53,7 +53,6 @@ namespace MOSExcelMogiApp
         private int _resultRetryTaskId;
         private bool _resultRetryIsWrong;
         private AnswerGuideWindow _answerGuideWindow;
-        private bool _isSyncingAnswerGuideTask;
 
         // Win32 API
         [DllImport("user32.dll", SetLastError = true)]
@@ -1223,39 +1222,20 @@ namespace MOSExcelMogiApp
         }
 
         /// <summary>
-        /// AppBar の現在タスクを更新する。番号が変わったときだけガイドへ通知する。
+        /// AppBar の現在タスクを更新する。
+        /// notifyGuide は互換のため残すが、手順ガイドへの追従確認は行わない
+        /// （手順側でタスク一覧選択時に不一致を案内する）。
         /// </summary>
         private void SetCurrentTask(int taskId, bool notifyGuide, bool writeCurrentTaskFile = true)
         {
             if (taskId <= 0)
                 return;
 
-            bool changed = _currentTaskId != taskId;
             _currentTaskId = taskId;
             UpdateTaskDisplay();
             if (writeCurrentTaskFile)
                 WriteCurrentTaskFile();
-
-            if (changed && notifyGuide && !_isSyncingAnswerGuideTask)
-                NotifyAnswerGuideTaskChanged(taskId);
-        }
-
-        private void NotifyAnswerGuideTaskChanged(int taskId)
-        {
-            if (_answerGuideWindow == null || !_answerGuideWindow.IsVisible)
-                return;
-            if (_isSyncingAnswerGuideTask)
-                return;
-
-            _isSyncingAnswerGuideTask = true;
-            try
-            {
-                _answerGuideWindow.OnAppBarTaskChanged(taskId);
-            }
-            finally
-            {
-                _isSyncingAnswerGuideTask = false;
-            }
+            _ = notifyGuide;
         }
 
         private void PauseButton_Click(object sender, RoutedEventArgs e)
@@ -1959,13 +1939,14 @@ namespace MOSExcelMogiApp
             var tasks = GuideStepsRepository.LoadProjectTasks(groupId, projectId);
             CloseAnswerGuide();
 
-            _answerGuideWindow = new AnswerGuideWindow(groupId, projectId, tasks)
+            _answerGuideWindow = new AnswerGuideWindow(groupId, projectId, tasks, () => _currentTaskId)
             {
                 Owner = this
             };
             _answerGuideWindow.Closed += AnswerGuideWindow_Closed;
             _answerGuideWindow.ApplyInitialPlacement(GetAnswerGuidePreferredBoundsDip());
             _answerGuideWindow.Show();
+            _answerGuideWindow.OpenForAppBarTask(_currentTaskId);
             _viewModel?.SetAnswerGuideOpen(true);
             ApplyNavigationLockState();
         }
@@ -2011,8 +1992,8 @@ namespace MOSExcelMogiApp
 
         private Rect GetAnswerGuidePreferredBoundsDip()
         {
-            double width = 480;
-            double height = 560;
+            double width = 720;
+            double height = 640;
             double left = SystemParameters.WorkArea.Right - width - 24;
             double top = SystemParameters.WorkArea.Top + 24;
 

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MOSExcelMogiApp.Guide;
@@ -14,12 +16,19 @@ namespace MOSExcelMogiApp.Views
     /// </summary>
     public partial class AnswerGuideWindow : Window
     {
+        private const int MinZoomPercent = 25;
+        private const int MaxZoomPercent = 400;
+
+        private static readonly int[] ZoomPresets = { 50, 75, 100, 125, 150, 200 };
+
         private readonly int _groupId;
         private readonly int _projectId;
         private readonly List<AnswerGuideTask> _tasks;
+        private readonly Func<int> _getAppBarTaskId;
         private AnswerGuideTask _currentTask;
         private int _stepIndex;
-        private bool _fitToWidth = true;
+        private int _zoomPercent = 100;
+        private bool _updatingZoomUi;
         private bool _hasStoredBounds;
         private double _storedLeft;
         private double _storedTop;
@@ -30,18 +39,36 @@ namespace MOSExcelMogiApp.Views
 
         public bool IsShowingSteps => StepPanel.Visibility == Visibility.Visible && _currentTask != null;
 
-        public AnswerGuideWindow(int groupId, int projectId, IEnumerable<AnswerGuideTask> tasks)
+        public AnswerGuideWindow(
+            int groupId,
+            int projectId,
+            IEnumerable<AnswerGuideTask> tasks,
+            Func<int> getAppBarTaskId = null)
         {
             InitializeComponent();
             _groupId = groupId;
             _projectId = projectId;
             _tasks = (tasks ?? Enumerable.Empty<AnswerGuideTask>()).ToList();
+            _getAppBarTaskId = getAppBarTaskId ?? (() => 0);
 
             Closed += AnswerGuideWindow_Closed;
             LocationChanged += AnswerGuideWindow_BoundsChanged;
             SizeChanged += AnswerGuideWindow_BoundsChanged;
 
+            InitZoomComboBox();
             ShowTaskList();
+        }
+
+        /// <summary>
+        /// 開いた直後に AppBar の現在タスク手順へ合わせる（一致時は確認なし）。
+        /// </summary>
+        public void OpenForAppBarTask(int appBarTaskId)
+        {
+            AnswerGuideTask match = _tasks.FirstOrDefault(t => t.TaskId == appBarTaskId);
+            if (match != null)
+                ShowTaskSteps(match, 0, confirmIfMismatch: false);
+            else
+                ShowTaskList();
         }
 
         public void ApplyInitialPlacement(Rect preferredBoundsDip)
@@ -58,8 +85,8 @@ namespace MOSExcelMogiApp.Views
 
             if (preferredBoundsDip.Width > 0 && preferredBoundsDip.Height > 0)
             {
-                Width = Math.Max(MinWidth, Math.Min(preferredBoundsDip.Width, 520));
-                Height = Math.Max(MinHeight, Math.Min(preferredBoundsDip.Height, 620));
+                Width = Math.Max(MinWidth, Math.Min(preferredBoundsDip.Width, 800));
+                Height = Math.Max(MinHeight, Math.Min(preferredBoundsDip.Height, 720));
                 Left = preferredBoundsDip.Left;
                 Top = preferredBoundsDip.Top;
             }
@@ -101,40 +128,54 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
-        /// <summary>
-        /// AppBar のタスクが変わったときの同期。戻り値はガイド側が切り替わったか。
-        /// </summary>
-        public void OnAppBarTaskChanged(int appBarTaskId)
+        private int GetAppBarTaskId()
         {
-            if (!IsVisible || !IsShowingSteps)
-                return;
+            try
+            {
+                return _getAppBarTaskId?.Invoke() ?? 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
 
-            if (appBarTaskId == GuideTaskId)
-                return;
+        private int IndexOfCurrentTask()
+        {
+            if (_currentTask == null)
+                return -1;
+            return _tasks.FindIndex(t => t.TaskId == _currentTask.TaskId);
+        }
+
+        private bool HasPreviousTask()
+        {
+            int index = IndexOfCurrentTask();
+            return index > 0;
+        }
+
+        private bool HasNextTask()
+        {
+            int index = IndexOfCurrentTask();
+            return index >= 0 && index < _tasks.Count - 1;
+        }
+
+        /// <summary>
+        /// タスク一覧からの選択時など、AppBar と異なる手順を開く前の確認。
+        /// </summary>
+        private bool ConfirmOpenIfMismatched(int guideTaskId)
+        {
+            int appBarTaskId = GetAppBarTaskId();
+            if (appBarTaskId <= 0 || guideTaskId <= 0 || appBarTaskId == guideTaskId)
+                return true;
 
             var result = MessageBox.Show(
                 this,
-                $"アプリバーはタスク{appBarTaskId}です。手順もタスク{appBarTaskId}に切り替えますか？",
+                $"アプリバーはタスク{appBarTaskId}です。タスク{guideTaskId}の手順を表示しますか？",
                 "解答手順",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (result != MessageBoxResult.Yes)
-                return;
-
-            AnswerGuideTask target = _tasks.FirstOrDefault(t => t.TaskId == appBarTaskId);
-            if (target == null)
-            {
-                MessageBox.Show(
-                    this,
-                    "このタスクの解答手順はまだありません",
-                    "解答手順",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            ShowTaskSteps(target);
+            return result == MessageBoxResult.Yes;
         }
 
         private void ShowTaskList()
@@ -180,13 +221,22 @@ namespace MOSExcelMogiApp.Views
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is AnswerGuideTask task)
-                ShowTaskSteps(task);
+                ShowTaskSteps(task, 0, confirmIfMismatch: true);
         }
 
-        private void ShowTaskSteps(AnswerGuideTask task)
+        private void ShowTaskSteps(AnswerGuideTask task, int stepIndex, bool confirmIfMismatch)
         {
+            if (task == null || task.Steps.Count == 0)
+            {
+                ShowTaskList();
+                return;
+            }
+
+            if (confirmIfMismatch && !ConfirmOpenIfMismatched(task.TaskId))
+                return;
+
             _currentTask = task;
-            _stepIndex = 0;
+            _stepIndex = Math.Max(0, Math.Min(stepIndex, task.Steps.Count - 1));
             TaskListScroll.Visibility = Visibility.Collapsed;
             EmptyMessageTextBlock.Visibility = Visibility.Collapsed;
             StepPanel.Visibility = Visibility.Visible;
@@ -213,8 +263,12 @@ namespace MOSExcelMogiApp.Views
                 ? "（説明なし）"
                 : step.Caption;
             ProgressTextBlock.Text = $"{_stepIndex + 1} / {_currentTask.Steps.Count}";
-            PrevButton.IsEnabled = _stepIndex > 0;
-            NextButton.IsEnabled = _stepIndex < _currentTask.Steps.Count - 1;
+
+            bool atFirstStep = _stepIndex <= 0;
+            bool atLastStep = _stepIndex >= _currentTask.Steps.Count - 1;
+            PrevButton.IsEnabled = !atFirstStep || HasPreviousTask();
+            NextButton.IsEnabled = !atLastStep || HasNextTask();
+
             LoadStepImage(step.ImagePath);
         }
 
@@ -229,7 +283,7 @@ namespace MOSExcelMogiApp.Views
                 bitmap.EndInit();
                 bitmap.Freeze();
                 StepImage.Source = bitmap;
-                ApplyStretchMode();
+                ApplyZoom();
             }
             catch (Exception ex)
             {
@@ -239,55 +293,178 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
-        private void ApplyStretchMode()
+        private void InitZoomComboBox()
         {
-            if (_fitToWidth)
+            _updatingZoomUi = true;
+            try
             {
-                StepImage.Stretch = Stretch.Uniform;
-                StepImage.Width = double.NaN;
-                StepImage.Height = double.NaN;
-                StepImage.MaxWidth = Math.Max(120, ActualWidth - 48);
+                ZoomComboBox.Items.Clear();
+                foreach (int preset in ZoomPresets)
+                    ZoomComboBox.Items.Add(FormatZoomPercent(preset));
+                SyncZoomComboText();
             }
-            else if (StepImage.Source is BitmapSource bmp)
+            finally
             {
-                StepImage.Stretch = Stretch.None;
-                StepImage.Width = bmp.PixelWidth;
-                StepImage.Height = bmp.PixelHeight;
-                StepImage.MaxWidth = double.PositiveInfinity;
+                _updatingZoomUi = false;
             }
+        }
+
+        private void ApplyZoom()
+        {
+            if (!(StepImage.Source is BitmapSource bmp))
+                return;
+
+            double dpiX = bmp.DpiX > 1 ? bmp.DpiX : 96.0;
+            double dpiY = bmp.DpiY > 1 ? bmp.DpiY : 96.0;
+            double dipWidth = bmp.PixelWidth * 96.0 / dpiX;
+            double dipHeight = bmp.PixelHeight * 96.0 / dpiY;
+            double factor = _zoomPercent / 100.0;
+
+            StepImage.Stretch = Stretch.Fill;
+            StepImage.MaxWidth = double.PositiveInfinity;
+            StepImage.MaxHeight = double.PositiveInfinity;
+            StepImage.Width = dipWidth * factor;
+            StepImage.Height = dipHeight * factor;
+            SyncZoomComboText();
+        }
+
+        private void SetZoomPercent(int percent)
+        {
+            _zoomPercent = ClampZoomPercent(percent);
+            ApplyZoom();
+        }
+
+        private static int ClampZoomPercent(int percent)
+        {
+            if (percent < MinZoomPercent)
+                return MinZoomPercent;
+            if (percent > MaxZoomPercent)
+                return MaxZoomPercent;
+            return percent;
+        }
+
+        private static string FormatZoomPercent(int percent) => $"{percent}%";
+
+        private void SyncZoomComboText()
+        {
+            if (ZoomComboBox == null)
+                return;
+
+            _updatingZoomUi = true;
+            try
+            {
+                string text = FormatZoomPercent(_zoomPercent);
+                if (ZoomComboBox.Text != text)
+                    ZoomComboBox.Text = text;
+            }
+            finally
+            {
+                _updatingZoomUi = false;
+            }
+        }
+
+        private bool TryParseZoomInput(string raw, out int percent)
+        {
+            percent = _zoomPercent;
+            if (string.IsNullOrWhiteSpace(raw))
+                return false;
+
+            string text = raw.Trim();
+            if (text.EndsWith("%", StringComparison.Ordinal))
+                text = text.Substring(0, text.Length - 1).Trim();
+
+            if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) &&
+                !int.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out value))
+            {
+                return false;
+            }
+
+            percent = ClampZoomPercent(value);
+            return true;
+        }
+
+        private void CommitZoomInput()
+        {
+            if (_updatingZoomUi)
+                return;
+
+            if (!TryParseZoomInput(ZoomComboBox.Text, out int percent))
+            {
+                SyncZoomComboText();
+                return;
+            }
+
+            SetZoomPercent(percent);
+        }
+
+        private void ZoomComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_updatingZoomUi || ZoomComboBox.SelectedItem == null)
+                return;
+
+            if (!TryParseZoomInput(ZoomComboBox.SelectedItem.ToString(), out int percent))
+                return;
+
+            SetZoomPercent(percent);
+        }
+
+        private void ZoomComboBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter)
+                return;
+            CommitZoomInput();
+            e.Handled = true;
+        }
+
+        private void ZoomComboBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            CommitZoomInput();
         }
 
         private void PrevButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentTask == null || _stepIndex <= 0)
+            if (_currentTask == null)
                 return;
-            _stepIndex--;
-            UpdateStepView();
+
+            if (_stepIndex > 0)
+            {
+                _stepIndex--;
+                UpdateStepView();
+                return;
+            }
+
+            int index = IndexOfCurrentTask();
+            if (index <= 0)
+                return;
+
+            AnswerGuideTask prev = _tasks[index - 1];
+            // タスク跨ぎ: AppBar と違う手順へ戻るときは確認（一致なら確認なし）
+            ShowTaskSteps(prev, prev.Steps.Count - 1, confirmIfMismatch: true);
         }
 
         private void NextButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentTask == null || _stepIndex >= _currentTask.Steps.Count - 1)
+            if (_currentTask == null)
                 return;
-            _stepIndex++;
-            UpdateStepView();
+
+            if (_stepIndex < _currentTask.Steps.Count - 1)
+            {
+                _stepIndex++;
+                UpdateStepView();
+                return;
+            }
+
+            int index = IndexOfCurrentTask();
+            if (index < 0 || index >= _tasks.Count - 1)
+                return;
+
+            // タスク跨ぎ: AppBar と違う手順へ進むときは確認（一致なら確認なし）
+            ShowTaskSteps(_tasks[index + 1], 0, confirmIfMismatch: true);
         }
 
         private void TaskListButton_Click(object sender, RoutedEventArgs e)
         {
             ShowTaskList();
-        }
-
-        private void FitWidthButton_Click(object sender, RoutedEventArgs e)
-        {
-            _fitToWidth = true;
-            ApplyStretchMode();
-        }
-
-        private void ActualSizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            _fitToWidth = false;
-            ApplyStretchMode();
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
@@ -315,13 +492,6 @@ namespace MOSExcelMogiApp.Views
         private void AnswerGuideWindow_Closed(object sender, EventArgs e)
         {
             RememberBounds();
-        }
-
-        protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
-        {
-            base.OnRenderSizeChanged(sizeInfo);
-            if (_fitToWidth && StepPanel.Visibility == Visibility.Visible)
-                ApplyStretchMode();
         }
     }
 }
