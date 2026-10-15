@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［担当者リスト］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［学科］のフィルターボタンをクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［すべて選択］をオフ → ［法学科］をオン → ［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：学科が「法学科」の行だけ表示されている"
+    }
+  ]
+}

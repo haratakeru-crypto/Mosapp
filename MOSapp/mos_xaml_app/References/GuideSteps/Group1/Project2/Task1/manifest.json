@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［下半期売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［A11:G11］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［セルのスタイル］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［集計］を選択する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成イメージを確認する"
+    }
+  ]
+}

@@ -96,6 +96,8 @@ namespace Ui.ViewModels
         private bool _isShutdownWaitOverlayVisible;
         private bool _showScoreButton;
         private bool _showVariantButton;
+        private bool _showAnswerGuide;
+        private bool _isAnswerGuideOpen;
         private int _variantSetNo = 1;
         private bool _isVariantMode;
         private bool _isInstantScoring;
@@ -242,6 +244,9 @@ namespace Ui.ViewModels
         /// <summary>教材↔類題の切替完了時に発火。AppBar が問題文を再読込する。</summary>
         public event EventHandler VariantModeChanged;
 
+        /// <summary>解答手順ガイドを閉じる要求（採点開始・タイマー満了・モード切替など）。</summary>
+        public event EventHandler CloseAnswerGuideRequested;
+
         private DispatcherTimer _attachRetryTimer;
         private DispatcherTimer _examExcelWindowWatchTimer;
         private int _examExcelPid;
@@ -259,12 +264,12 @@ namespace Ui.ViewModels
             CheckCommand = new RelayCommand(ExecuteCheck);
             OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
             ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring && !_isScoreResultOpen);
-            EndExamCommand = new RelayCommand(ExecuteEndExam, _ => !_isScoreResultOpen);
+            EndExamCommand = new RelayCommand(ExecuteEndExam, _ => !IsNavigationLocked);
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
-            ResetExamCommand = new RelayCommand(ExecuteResetExam);
-            NextProjectCommand = new RelayCommand(ExecuteNextProject, _ => !_isScoreResultOpen);
-            GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode);
-            GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant);
+            ResetExamCommand = new RelayCommand(ExecuteResetExam, _ => !IsNavigationLocked);
+            NextProjectCommand = new RelayCommand(ExecuteNextProject, _ => !IsNavigationLocked);
+            GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode && !IsNavigationLocked);
+            GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant && !IsNavigationLocked);
     }
 
         public bool IsVocabularyMode
@@ -279,6 +284,9 @@ namespace Ui.ViewModels
                 OnPropertyChanged(nameof(NextProjectButtonLabel));
                 OnPropertyChanged(nameof(ShowScoreButtonEffective));
                 OnPropertyChanged(nameof(ShowVocabularyChrome));
+                NotifyAnswerGuideStateChanged();
+                if (value)
+                    RequestCloseAnswerGuide();
             }
         }
 
@@ -323,6 +331,19 @@ namespace Ui.ViewModels
 
         /// <summary>単語帳中は採点ボタンを出さない。</summary>
         public bool ShowScoreButtonEffective => ShowScoreButton && !IsVocabularyMode;
+
+        /// <summary>Group1 通常教材かつオプション ON のときだけ手順ボタンを出す。</summary>
+        public bool ShowAnswerGuideEffective
+        {
+            get
+            {
+                if (!ShowAnswerGuide || IsVocabularyMode || IsVariantMode)
+                    return false;
+                if (!TryGetCurrentGroupProjectId(out int groupId, out _))
+                    return false;
+                return groupId == 1;
+            }
+        }
 
         private VocabularyCategory _pendingVocabularyCategory;
         private bool _pendingVocabularySettings;
@@ -939,13 +960,27 @@ namespace Ui.ViewModels
             get => _currentProject;
             set
             {
+                bool projectIdentityChanged = !IsSameProjectIdentity(_currentProject, value);
                 _currentProject = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CurrentProjectName));
                 OnPropertyChanged(nameof(IsNextProjectVisible));
                 NotifyVariantButtonStateChanged();
+                NotifyAnswerGuideStateChanged();
+                if (projectIdentityChanged)
+                    RequestCloseAnswerGuide();
                 CurrentProjectChanged?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        private static bool IsSameProjectIdentity(ProjectInfo left, ProjectInfo right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            if (left == null || right == null)
+                return false;
+            return string.Equals(left.Group, right.Group, StringComparison.Ordinal)
+                   && left.ProjectNumber == right.ProjectNumber;
         }
         
         public string CurrentProjectName => CurrentProject?.Name ?? "プロジェクトが選択されていません";
@@ -967,6 +1002,21 @@ namespace Ui.ViewModels
                 _showVariantButton = value;
                 OnPropertyChanged(nameof(ShowVariantButton));
                 NotifyVariantButtonStateChanged();
+            }
+        }
+
+        /// <summary>解答手順ガイドの表示。デフォルトは非表示。</summary>
+        public bool ShowAnswerGuide
+        {
+            get => _showAnswerGuide;
+            set
+            {
+                if (_showAnswerGuide == value) return;
+                _showAnswerGuide = value;
+                OnPropertyChanged(nameof(ShowAnswerGuide));
+                NotifyAnswerGuideStateChanged();
+                if (!value)
+                    RequestCloseAnswerGuide();
             }
         }
 
@@ -1003,6 +1053,9 @@ namespace Ui.ViewModels
                 OnPropertyChanged(nameof(IsVariantMode));
                 OnPropertyChanged(nameof(CanSelectVariantSet));
                 NotifyVariantButtonStateChanged();
+                NotifyAnswerGuideStateChanged();
+                if (value)
+                    RequestCloseAnswerGuide();
             }
         }
 
@@ -1109,6 +1162,18 @@ namespace Ui.ViewModels
             OnPropertyChanged(nameof(CanGoToVariant));
             CommandManager.InvalidateRequerySuggested();
         }
+
+        private void NotifyAnswerGuideStateChanged()
+        {
+            OnPropertyChanged(nameof(ShowAnswerGuideEffective));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        public void RequestCloseAnswerGuide()
+        {
+            CloseAnswerGuideRequested?.Invoke(this, EventArgs.Empty);
+        }
         
         public bool IsNextProjectVisible => CurrentProject != null && CurrentProject.ProjectNumber <= 10;
 
@@ -1146,12 +1211,33 @@ namespace Ui.ViewModels
 
         public bool IsScoreResultOpen => _isScoreResultOpen;
 
+        /// <summary>採点処理中（結果ダイアログ表示前を含む）。</summary>
+        public bool IsScoring => _isInstantScoring;
+
+        /// <summary>解答手順ガイド表示中。</summary>
+        public bool IsAnswerGuideOpen => _isAnswerGuideOpen;
+
+        /// <summary>終了・リセット・レビュー・次プロ・教材類題切替を抑止する統合ロック。</summary>
+        public bool IsNavigationLocked =>
+            _isAnswerGuideOpen || _isInstantScoring || _isScoreResultOpen;
+
+        public void SetAnswerGuideOpen(bool open)
+        {
+            if (_isAnswerGuideOpen == open)
+                return;
+            _isAnswerGuideOpen = open;
+            OnPropertyChanged(nameof(IsAnswerGuideOpen));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
         public void SetScoreResultOpen(bool open)
         {
             if (_isScoreResultOpen == open)
                 return;
             _isScoreResultOpen = open;
             OnPropertyChanged(nameof(IsScoreResultOpen));
+            OnPropertyChanged(nameof(IsNavigationLocked));
             CommandManager.InvalidateRequerySuggested();
             if (!open && _endExamPendingAfterScoreResult)
             {
@@ -2088,11 +2174,15 @@ namespace Ui.ViewModels
 
         private void ExecuteGoToTextbook(object parameter)
         {
+            if (IsNavigationLocked)
+                return;
             SwitchToVariantOrTextbook(targetVariantMode: false, targetSetNo: VariantSetNo);
         }
 
         private void ExecuteGoToVariant(object parameter)
         {
+            if (IsNavigationLocked)
+                return;
             if (!TryGetCurrentGroupProjectId(out int groupId, out int projectId))
                 return;
 
@@ -2182,7 +2272,10 @@ namespace Ui.ViewModels
             if (_isInstantScoring)
                 return;
             _isInstantScoring = true;
+            OnPropertyChanged(nameof(IsScoring));
+            OnPropertyChanged(nameof(IsNavigationLocked));
             CommandManager.InvalidateRequerySuggested();
+            RequestCloseAnswerGuide();
             try
             {
             if (CurrentProject == null)
@@ -2337,6 +2430,8 @@ namespace Ui.ViewModels
             finally
             {
                 _isInstantScoring = false;
+                OnPropertyChanged(nameof(IsScoring));
+                OnPropertyChanged(nameof(IsNavigationLocked));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -3443,6 +3538,9 @@ namespace Ui.ViewModels
 
         private async void ExecuteNextProject(object parameter)
         {
+            if (IsNavigationLocked)
+                return;
+
             if (IsVocabularyMode)
             {
                 _vocabularySession?.GoNext();

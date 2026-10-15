@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［試験結果］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "テーブル内の任意のセルを選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［テーブルデザイン］で縞模様（行）をオフ、縞模様（列）をオンにする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：列の縞模様が付いている"
+    }
+  ]
+}

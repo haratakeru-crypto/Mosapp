@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［参加者一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［B2］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［セルを結合して中央揃え］をクリックして解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成イメージを確認する"
+    }
+  ]
+}

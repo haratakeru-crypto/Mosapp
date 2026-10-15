@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［参加者一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "行番号［8:9］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "行番号上で右クリックし［削除］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "8行目と9行目が削除されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成イメージを確認する"
+    }
+  ]
+}
