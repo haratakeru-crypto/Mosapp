@@ -37,7 +37,9 @@ namespace MOS_Word_app.Views
         private bool _isWindowClosed;
         private bool _isScoring;
         
-        public ReviewPageWindow(TimeSpan remainingTime, Dictionary<int, bool[]> completedStates, Dictionary<int, bool[]> flaggedStates, Dictionary<int, bool[]> viewedStates = null, AppBarWindow appBarWindow = null, int groupId = 1)
+        private readonly bool _isVariantMode;
+
+        public ReviewPageWindow(TimeSpan remainingTime, Dictionary<int, bool[]> completedStates, Dictionary<int, bool[]> flaggedStates, Dictionary<int, bool[]> viewedStates = null, AppBarWindow appBarWindow = null, int groupId = 1, bool isVariantMode = false)
         {
             System.Diagnostics.Debug.WriteLine($"ReviewPageWindow constructor called with remainingTime: {remainingTime}");
             
@@ -49,6 +51,9 @@ namespace MOS_Word_app.Views
             _projectTaskViewedStates = viewedStates ?? new Dictionary<int, bool[]>();
             _appBarWindow = appBarWindow;
             _groupId = groupId;
+            _isVariantMode = isVariantMode;
+            if (_isVariantMode && EndExamButton != null)
+                EndExamButton.Visibility = Visibility.Collapsed;
             NavigateToTaskCommand = new RelayCommand<ReviewTaskInfo>(NavigateToTask);
             LoadAllProjects();
             InitializeTimer();
@@ -96,6 +101,28 @@ namespace MOS_Word_app.Views
         {
             try
             {
+                if (_isVariantMode)
+                {
+                    var reviewProjects = VariantProblemWorkbook.GetProjectIds()
+                        .Select(projectId => new ReviewProjectInfo
+                        {
+                            ProjectTitle = $"プロジェクト {projectId}",
+                            Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                                .Select(task => new ReviewTaskInfo
+                                {
+                                    TaskTitle = $"タスク {task.TaskId}",
+                                    Description = task.Description,
+                                    ProjectId = projectId,
+                                    TaskId = task.TaskId
+                                })
+                                .ToList()
+                        })
+                        .ToList();
+                    ProjectsItemsControl.ItemsSource = reviewProjects;
+                    this.Dispatcher.BeginInvoke(new Action(UpdateTaskStates), DispatcherPriority.Loaded);
+                    return;
+                }
+
                 // レビュー画面の問題文は Word 用 JSON（PowerPoint と独立）
                 string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
                 

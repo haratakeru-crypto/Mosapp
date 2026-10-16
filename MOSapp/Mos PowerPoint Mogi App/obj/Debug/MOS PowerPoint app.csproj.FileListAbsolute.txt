@@ -152,3 +152,8 @@ C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\ob
 C:\Users\kouza\source\repos\Mosapp_integration\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Mos PowerPoint Mogi App.pdb
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.baml
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\PreparingWindow.g.cs
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\References\PowerPoint類題.xlsx
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\DocumentFormat.OpenXml.dll
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\DocumentFormat.OpenXml.Framework.dll
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\DocumentFormat.OpenXml.xml
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\DocumentFormat.OpenXml.Framework.xml

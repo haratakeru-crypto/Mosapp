@@ -138,14 +138,23 @@ namespace MOS_PowerPoint_app
             if (_isExiting)
                 return;
 
-            if (_appBarWindow == null || !_appBarWindow.IsLoaded)
+            var project = _viewModel.CurrentProject;
+            if (project == null)
+                return;
+
+            bool needRecreate =
+                _appBarWindow == null ||
+                !_appBarWindow.IsLoaded ||
+                _appBarWindow.CurrentProjectId != project.ProjectId ||
+                _appBarWindow.CurrentGroupId != project.GroupId ||
+                _appBarWindow.IsVariantMode != _viewModel.IsVariantMode;
+
+            if (needRecreate)
             {
-                var project = _viewModel.CurrentProject;
-                if (project != null)
-                {
-                    _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, true, false, () => _viewModel.ScoreCommand.Execute(null));
-                    _appBarWindow.Closed += OnAppBarWindowClosed;
-                }
+                var oldAppBar = _appBarWindow;
+                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, true, false, () => _viewModel.ScoreCommand.Execute(null), _viewModel.IsVariantMode);
+                _appBarWindow.Closed += OnAppBarWindowClosed;
+                oldAppBar?.Close();
             }
             if (_appBarWindow != null)
             {

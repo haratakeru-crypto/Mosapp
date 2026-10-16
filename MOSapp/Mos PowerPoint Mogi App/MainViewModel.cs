@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -36,7 +37,9 @@ namespace MOS_PowerPoint_app
         public MainViewModel()
         {
             LoadProjects();
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
+            LoadVariantLaunchProjects();
+            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: false), _ => !_isOpeningProject);
+            OpenVariantProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: true), CanOpenVariantProject);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
             ResetAllProjectsCommand = new RelayCommand(ExecuteResetAllProjects);
             TaskResults = new ObservableCollection<TaskResult>();
@@ -44,7 +47,11 @@ namespace MOS_PowerPoint_app
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
 
-        public string[] VariantPlaceholderSets { get; } = { "類題1", "類題2", "類題3", "類題4", "類題5" };
+        public IReadOnlyList<ProjectViewModel> VariantLaunchProjects { get; private set; } = Array.Empty<ProjectViewModel>();
+
+        public ICommand OpenVariantProjectCommand { get; }
+
+        public bool IsVariantMode { get; private set; }
 
         public int SelectedTabIndex
         {
@@ -203,6 +210,40 @@ namespace MOS_PowerPoint_app
             }
         }
 
+        private void LoadVariantLaunchProjects()
+        {
+            var projects = new List<ProjectViewModel>();
+            var ids = VariantProblemWorkbook.GetProjectIds().ToList();
+            if (ids.Count == 0)
+            {
+                for (int projectId = 1; projectId <= 6; projectId++)
+                    ids.Add(projectId);
+            }
+
+            foreach (int projectId in ids)
+            {
+                string filePath = PowerPointDataPathHelper.FindVariantWorkingFile(1, projectId, 1);
+                projects.Add(new ProjectViewModel
+                {
+                    GroupId = 1,
+                    ProjectId = projectId,
+                    Name = $"プロジェクト1-{projectId}",
+                    FilePath = filePath
+                });
+            }
+
+            VariantLaunchProjects = projects;
+        }
+
+        private bool CanOpenVariantProject(object parameter)
+        {
+            if (_isOpeningProject)
+                return false;
+            if (!(parameter is ProjectViewModel project))
+                return true;
+            return PowerPointDataPathHelper.IsVariantFileAvailable(project.GroupId, project.ProjectId, 1);
+        }
+
         private const int ExistingPptHeartbeatWaitMs = 400;
         private const int VstoHeartbeatWaitAfterLaunchMs = 8000;
         private const int ActiveVstoHeartbeatMaxAgeSeconds = 15;
@@ -232,12 +273,27 @@ namespace MOS_PowerPoint_app
 
         private void ExecuteOpenProject(object parameter)
         {
+            ExecuteOpenProject(parameter, openAsVariant: false);
+        }
+
+        private void ExecuteOpenProject(object parameter, bool openAsVariant)
+        {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
 
             if (parameter is ProjectViewModel project)
             {
-                if (string.IsNullOrEmpty(project.FilePath) || !File.Exists(project.FilePath))
+                if (openAsVariant)
+                {
+                    string variantPath = PowerPointDataPathHelper.FindVariantWorkingFile(project.GroupId, project.ProjectId, 1);
+                    if (string.IsNullOrEmpty(variantPath) || !File.Exists(variantPath))
+                    {
+                        ResultMessage = $"エラー: 類題ファイルが見つかりません: {variantPath ?? "パスが設定されていません"}";
+                        return;
+                    }
+                    project.FilePath = variantPath;
+                }
+                else if (string.IsNullOrEmpty(project.FilePath) || !File.Exists(project.FilePath))
                 {
                     ResultMessage = $"エラー: ファイルが見つかりません: {project.FilePath ?? "パスが設定されていません"}";
                     return;
@@ -338,6 +394,7 @@ namespace MOS_PowerPoint_app
                             return;
                         }
 
+                        IsVariantMode = openAsVariant;
                         CurrentProject = project;
                         HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                         ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
@@ -345,6 +402,46 @@ namespace MOS_PowerPoint_app
                     }));
                 });
             }
+        }
+
+        internal static void ShowVariantAnswerSteps(int projectId)
+        {
+            var tasks = VariantProblemWorkbook.GetTasks(projectId);
+            var text = new StringBuilder();
+            if (tasks.Count == 0)
+            {
+                text.Append("解答手順が登録されていません。");
+            }
+            else
+            {
+                foreach (var task in tasks)
+                {
+                    text.AppendLine($"タスク {task.TaskId}");
+                    text.AppendLine(string.IsNullOrWhiteSpace(task.AnswerSteps)
+                        ? "解答手順が登録されていません。"
+                        : task.AnswerSteps);
+                    text.AppendLine();
+                }
+            }
+
+            var window = new Window
+            {
+                Title = $"類題 プロジェクト {projectId} 解答手順",
+                Width = 640,
+                Height = 480,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Content = new System.Windows.Controls.ScrollViewer
+                {
+                    Padding = new Thickness(16),
+                    Content = new System.Windows.Controls.TextBlock
+                    {
+                        Text = text.ToString(),
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 14
+                    }
+                }
+            };
+            window.ShowDialog();
         }
 
         private bool CanExecuteScore(object parameter)
@@ -357,6 +454,12 @@ namespace MOS_PowerPoint_app
             if (CurrentProject == null)
             {
                 RunOnUi(() => ResultMessage = "プロジェクトを開いてから実行してください。");
+                return;
+            }
+
+            if (IsVariantMode)
+            {
+                RunOnUi(() => ShowVariantAnswerSteps(CurrentProject.ProjectId));
                 return;
             }
 

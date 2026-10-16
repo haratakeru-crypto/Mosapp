@@ -19,6 +19,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Windows.Interop;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Libraries;
 using MOSExcelMogiApp.Infrastructure;
@@ -177,7 +178,14 @@ namespace MOSExcelMogiApp
             };
             this.PreviewMouseDown += (s, e) =>
             {
-                try { ScoringResultDialog.TryBringOpenToFront(); }
+                try
+                {
+                    // ボタンクリック中に結果画面を前面化すると MouseUp が吸われ Click が消える
+                    if (FindVisualAncestor<System.Windows.Controls.Primitives.ButtonBase>(
+                            e.OriginalSource as DependencyObject) != null)
+                        return;
+                    ScoringResultDialog.TryBringOpenToFront();
+                }
                 catch { }
             };
 
@@ -887,8 +895,9 @@ namespace MOSExcelMogiApp
                     System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] Description: {currentTask.Description}");
                     System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] Contains '\"': {currentTask.Description.Contains("\"")}");
                     
-                    // "で囲まれた部分に下線を付けて表示
-                    SetTextWithUnderline(taskDescriptionTextBlock, currentTask.Description);
+                    // コピーできる部分を""で囲んでから表示（「…」と入力 の 「」内をコピー対象に）
+                    string descriptionForDisplay = WrapCopyablePartInQuotes(currentTask.Description);
+                    SetTextWithUnderline(taskDescriptionTextBlock, descriptionForDisplay);
                 }
             }
             else if (taskDescriptionTextBlock != null)
@@ -1030,6 +1039,21 @@ namespace MOSExcelMogiApp
                     row.Visibility = Visibility.Collapsed;
             }
             catch { }
+        }
+
+        /// <summary>
+        /// 問題文からコピーすべき部分（「…」と入力 の 「」内など）を抽出し、半角ダブルクォートで囲んだ文字列を返します。
+        /// 既に"が含まれる問題文はそのまま返します。
+        /// 「と入力」に連なる一連の「…」をすべて対象にします。
+        /// </summary>
+        private static string WrapCopyablePartInQuotes(string description)
+        {
+            if (string.IsNullOrEmpty(description)) return description;
+            if (description.IndexOf('"') >= 0) return description;
+            return Regex.Replace(
+                description,
+                @"(?:「([^」]*)」(?:、[^「]*?)?)+と入力",
+                m => Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\""));
         }
 
         /// <summary>
@@ -1204,6 +1228,8 @@ namespace MOSExcelMogiApp
                     }
                 }
             }
+
+            UpdateTaskArrowButtons();
         }
 
         private void UpdateButtonTexts()
@@ -1247,27 +1273,72 @@ namespace MOSExcelMogiApp
 
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
-            ScoringResultDialog.TryBringOpenToFront();
-            if (_currentTaskId > 1)
-            {
-                _currentTaskId--;
+            if (TryMoveToAdjacentTask(-1))
                 UpdateTaskDisplay();
-            }
+            ScoringResultDialog.TryBringOpenToFront();
         }
 
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
-            ScoringResultDialog.TryBringOpenToFront();
-            if (_tasks != null && _currentTaskId < _tasks.Count)
-            {
-                _currentTaskId++;
+            if (TryMoveToAdjacentTask(1))
                 UpdateTaskDisplay();
+            ScoringResultDialog.TryBringOpenToFront();
+        }
+
+        /// <summary>現在タスクの前後へ移動。direction は -1（前）または +1（次）。</summary>
+        private bool TryMoveToAdjacentTask(int direction)
+        {
+            if (_tasks == null || _tasks.Count == 0)
+                return false;
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            if (orderedIds.Count == 0)
+                return false;
+
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (index < 0)
+                index = direction < 0 ? 0 : orderedIds.Count - 1;
+
+            int nextIndex = index + direction;
+            if (nextIndex < 0 || nextIndex >= orderedIds.Count)
+                return false;
+
+            _currentTaskId = orderedIds[nextIndex];
+            return true;
+        }
+
+        private void UpdateTaskArrowButtons()
+        {
+            var prev = FindName("PreviousTaskButton") as Button;
+            var next = FindName("NextTaskButton") as Button;
+            if (_tasks == null || _tasks.Count == 0)
+            {
+                if (prev != null) prev.IsEnabled = false;
+                if (next != null) next.IsEnabled = false;
+                return;
             }
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (prev != null)
+                prev.IsEnabled = index > 0;
+            if (next != null)
+                next.IsEnabled = index >= 0 && index < orderedIds.Count - 1;
+        }
+
+        private static T FindVisualAncestor<T>(DependencyObject current) where T : class
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                    return match;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
         }
 
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
-            ScoringResultDialog.TryBringOpenToFront();
             if (sender is Button button && button.Tag != null)
             {
                 int taskId = int.Parse(button.Tag.ToString());
@@ -1277,6 +1348,7 @@ namespace MOSExcelMogiApp
                     UpdateTaskDisplay();
                 }
             }
+            ScoringResultDialog.TryBringOpenToFront();
         }
 
         private void PauseButton_Click(object sender, RoutedEventArgs e)

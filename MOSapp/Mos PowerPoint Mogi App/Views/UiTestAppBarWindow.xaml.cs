@@ -133,6 +133,11 @@ namespace MOS_PowerPoint_app.Views
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（9番目以降）
         private readonly Action _onScoreClick; // 採点ボタン押下時（プロジェクト一覧の採点と同じ処理を実行）
+        private readonly bool _isVariantMode;
+
+        public int CurrentProjectId => _currentProjectId;
+        public int CurrentGroupId => _groupId;
+        public bool IsVariantMode => _isVariantMode;
         private bool _fromResultWindow = false; // 結果画面からタスクに飛んできたかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
         private readonly HashSet<string> _initialWrongTaskKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -146,12 +151,13 @@ namespace MOS_PowerPoint_app.Views
         private Timer _instantScoringNoticeTimer;
         private bool _instantScoringFinished;
 
-        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null)
+        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null, bool isVariantMode = false)
         {
             InitializeComponent();
             _currentProjectId = projectId;
             _groupId = groupId; // グループIDを保存
             _onScoreClick = onScoreClick;
+            _isVariantMode = isVariantMode;
             var scoreBtn = FindName("ScoreButton") as System.Windows.Controls.Button;
             if (scoreBtn != null)
                 scoreBtn.Visibility = showScoreButton ? Visibility.Visible : Visibility.Collapsed;
@@ -175,7 +181,14 @@ namespace MOS_PowerPoint_app.Views
             };
             this.PreviewMouseDown += (s, e) =>
             {
-                try { ScoreResultWindow.TryBringOpenToFront(); }
+                try
+                {
+                    // ボタンクリック中に結果画面を前面化すると MouseUp が吸われ Click が消える
+                    if (FindVisualAncestor<System.Windows.Controls.Primitives.ButtonBase>(
+                            e.OriginalSource as DependencyObject) != null)
+                        return;
+                    ScoreResultWindow.TryBringOpenToFront();
+                }
                 catch { }
             };
         }
@@ -452,7 +465,8 @@ namespace MOS_PowerPoint_app.Views
                     _projectTaskCompletedStates,
                     _projectTaskFlaggedStates,
                     _projectTaskViewedStates,
-                    _groupId);
+                    _groupId,
+                    _isVariantMode);
 
                 reviewWindow.OnNavigateToTask = (projectId, taskId) =>
                 {
@@ -1147,6 +1161,12 @@ namespace MOS_PowerPoint_app.Views
 
             try
             {
+                if (_isVariantMode)
+                {
+                    MainViewModel.ShowVariantAnswerSteps(_currentProjectId);
+                    return;
+                }
+
                 SyncProjectToMainViewModel();
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint)");
 
@@ -1519,6 +1539,13 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
+                if (_isVariantMode)
+                {
+                    LoadTasksFromVariantWorkbook();
+                    LoadCurrentProjectTasks();
+                    return;
+                }
+
                 // References\JSON を正規配置とし、実行ファイル直下を互換フォールバックにする。
                 string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
                     "MOS模擬アプリ問題文一覧_PowerPoint.json");
@@ -1544,6 +1571,26 @@ namespace MOS_PowerPoint_app.Views
             }
         }
         
+        private void LoadTasksFromVariantWorkbook()
+        {
+            _projectData = new ProjectData
+            {
+                Projects = VariantProblemWorkbook.GetProjectIds()
+                    .Select(projectId => new ProjectInfo
+                    {
+                        ProjectId = projectId,
+                        Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                            .Select(task => new TaskInfo
+                            {
+                                TaskId = task.TaskId,
+                                Description = task.Description ?? string.Empty
+                            })
+                            .ToList()
+                    })
+                    .ToList()
+            };
+        }
+
         private void LoadTasksFromJson(string jsonPath)
         {
             try
@@ -2048,13 +2095,16 @@ namespace MOS_PowerPoint_app.Views
         /// <summary>
         /// 問題文からコピーすべき部分（「…」と入力 の 「」内など）を抽出し、半角ダブルクォートで囲んだ文字列を返します。
         /// 既に"が含まれる問題文はそのまま返します。
+        /// 「と入力」に連なる一連の「…」をすべて対象にします。
         /// </summary>
         private static string WrapCopyablePartInQuotes(string description)
         {
             if (string.IsNullOrEmpty(description)) return description;
             if (description.IndexOf('"') >= 0) return description;
-            // 「…」と入力 の 「」内を "…" に変換（コピーできる部分として表示）
-            return Regex.Replace(description, @"「([^」]*)」と入力", "\"$1\"と入力");
+            return Regex.Replace(
+                description,
+                @"(?:「([^」]*)」(?:、[^「]*?)?)+と入力",
+                m => Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\""));
         }
 
         /// <summary>
@@ -2172,7 +2222,11 @@ namespace MOS_PowerPoint_app.Views
         
         private void UpdateTaskButtons()
         {
-            if (_tasks == null) return;
+            if (_tasks == null)
+            {
+                UpdateTaskArrowButtons();
+                return;
+            }
             
             // 現在のプロジェクトの状態を取得
             int maxTaskCount = _tasks != null ? _tasks.Count : 0;
@@ -2244,6 +2298,8 @@ namespace MOS_PowerPoint_app.Views
                     UpdateTaskButtonState(button, taskId, completedStates, flaggedStates);
                 }
             }
+
+            UpdateTaskArrowButtons();
         }
         
         private void UpdateTaskButtonState(System.Windows.Controls.Button button, int taskId, bool[] completedStates, bool[] flaggedStates)
@@ -2439,29 +2495,80 @@ namespace MOS_PowerPoint_app.Views
         
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
-            ScoreResultWindow.TryBringOpenToFront();
-            if (_currentTaskId > 1)
+            if (_isScoring)
+                return;
+            if (TryMoveToAdjacentTask(-1))
             {
-                _currentTaskId--;
                 UpdateTaskDisplay();
                 WriteCurrentTaskFile();
             }
+            ScoreResultWindow.TryBringOpenToFront();
         }
         
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
-            ScoreResultWindow.TryBringOpenToFront();
-            if (_tasks != null && _currentTaskId < _tasks.Count)
+            if (_isScoring)
+                return;
+            if (TryMoveToAdjacentTask(1))
             {
-                _currentTaskId++;
                 UpdateTaskDisplay();
                 WriteCurrentTaskFile();
             }
+            ScoreResultWindow.TryBringOpenToFront();
+        }
+
+        /// <summary>現在タスクの前後へ移動。direction は -1（前）または +1（次）。</summary>
+        private bool TryMoveToAdjacentTask(int direction)
+        {
+            if (_tasks == null || _tasks.Count == 0)
+                return false;
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            if (orderedIds.Count == 0)
+                return false;
+
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (index < 0)
+                index = direction < 0 ? 0 : orderedIds.Count - 1;
+
+            int nextIndex = index + direction;
+            if (nextIndex < 0 || nextIndex >= orderedIds.Count)
+                return false;
+
+            _currentTaskId = orderedIds[nextIndex];
+            return true;
+        }
+
+        private void UpdateTaskArrowButtons()
+        {
+            if (_tasks == null || _tasks.Count == 0)
+            {
+                if (PreviousTaskButton != null) PreviousTaskButton.IsEnabled = false;
+                if (NextTaskButton != null) NextTaskButton.IsEnabled = false;
+                return;
+            }
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (PreviousTaskButton != null)
+                PreviousTaskButton.IsEnabled = index > 0;
+            if (NextTaskButton != null)
+                NextTaskButton.IsEnabled = index >= 0 && index < orderedIds.Count - 1;
+        }
+
+        private static T FindVisualAncestor<T>(DependencyObject current) where T : class
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                    return match;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
         }
         
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
-            ScoreResultWindow.TryBringOpenToFront();
             if (_isScoring)
             {
                 System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Task button ignored while scoring.");
@@ -2478,6 +2585,7 @@ namespace MOS_PowerPoint_app.Views
                     WriteCurrentTaskFile();
                 }
             }
+            ScoreResultWindow.TryBringOpenToFront();
         }
         
         /// <summary>
@@ -2749,11 +2857,19 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 string tabFolder = PowerPointDataPathHelper.GetTabFolder(groupId);
-                string filePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
-                if (!File.Exists(filePath))
+                string filePath;
+                if (_isVariantMode)
                 {
-                    string legacyPptPath = Path.Combine(tabFolder, $"Project{projectId}.ppt");
-                    filePath = File.Exists(legacyPptPath) ? legacyPptPath : null;
+                    filePath = PowerPointDataPathHelper.FindVariantWorkingFile(groupId, projectId, 1);
+                }
+                else
+                {
+                    filePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
+                    if (!File.Exists(filePath))
+                    {
+                        string legacyPptPath = Path.Combine(tabFolder, $"Project{projectId}.ppt");
+                        filePath = File.Exists(legacyPptPath) ? legacyPptPath : null;
+                    }
                 }
                 
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
@@ -3495,9 +3611,11 @@ namespace MOS_PowerPoint_app.Views
                 if (mainWin != null && mainWin.DataContext is MainViewModel vm)
                 {
                     // 現在の GroupId と ProjectId に一致するプロジェクトを検索
-                    var project = vm.ProjectGroups
-                        .FirstOrDefault(g => g.GroupId == _groupId)?
-                        .Projects.FirstOrDefault(p => p.ProjectId == _currentProjectId);
+                    var project = _isVariantMode
+                        ? vm.VariantLaunchProjects?.FirstOrDefault(p => p.GroupId == _groupId && p.ProjectId == _currentProjectId)
+                        : vm.ProjectGroups
+                            .FirstOrDefault(g => g.GroupId == _groupId)?
+                            .Projects.FirstOrDefault(p => p.ProjectId == _currentProjectId);
 
                     if (project != null)
                     {

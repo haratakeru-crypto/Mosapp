@@ -215,16 +215,17 @@
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">
                     <Grid Margin="20">
-                        <ItemsControl ItemsSource="{Binding VariantPlaceholderSets}">
+                        <ItemsControl ItemsSource="{Binding VariantLaunchProjects}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Rows="3" Columns="2"/>
+                                    <UniformGrid Rows="3" Columns="3"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Content="{Binding}"
-                                            Click="VariantPlaceholderButton_Click"
+                                    <Button Content="{Binding Name}"
+                                            Command="{Binding DataContext.OpenVariantProjectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
                                             Margin="12" Padding="20,15" MinWidth="140" MinHeight="60">
                                         <Button.Style>
                                             <Style TargetType="Button">

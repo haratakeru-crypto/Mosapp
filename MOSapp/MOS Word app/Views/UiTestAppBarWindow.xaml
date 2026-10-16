@@ -203,12 +203,14 @@
                     
                     <!-- ナビゲーション -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,6" Name="TaskButtonsContainer">
-                        <Button Width="96" Height="32" 
+                        <Button Name="PreviousTaskButton" Width="96" Height="32" 
                                 Background="#D1D5DB" 
                                 BorderThickness="0"
                                 Margin="0,0,10,0"
+                                Cursor="Hand"
                                 Click="PreviousTask_Click">
-                            <TextBlock Text="←" FontSize="16" Foreground="White" FontWeight="Bold"/>
+                            <TextBlock Text="←" FontSize="18" Foreground="#374151" FontWeight="Bold"
+                                       IsHitTestVisible="False"/>
                         </Button>
                         
                         <!-- タスク番号ボタン（1-7） -->
@@ -339,11 +341,13 @@
                             </Grid>
                         </Button>
                         
-                        <Button Width="96" Height="32" 
+                        <Button Name="NextTaskButton" Width="96" Height="32" 
                                 Background="#D1D5DB" 
                                 BorderThickness="0"
+                                Cursor="Hand"
                                 Click="NextTask_Click">
-                            <TextBlock Text="→" FontSize="16" Foreground="White" FontWeight="Bold"/>
+                            <TextBlock Text="→" FontSize="18" Foreground="#374151" FontWeight="Bold"
+                                       IsHitTestVisible="False"/>
                         </Button>
                     </StackPanel>
                     
