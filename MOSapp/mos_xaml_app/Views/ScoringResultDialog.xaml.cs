@@ -7,7 +7,6 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Newtonsoft.Json.Linq;
 using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp.Views
@@ -104,7 +103,7 @@ namespace MOSExcelMogiApp.Views
             _projectId = projectId;
             _variantSetNo = variantSetNo;
             _isVariantDialog = true;
-            LoadVariantAnswerStepsFromJson();
+            LoadVariantAnswerSteps();
             DisplayVariantResults(taskCount);
             HookForegroundBehavior();
         }
@@ -140,7 +139,7 @@ namespace MOSExcelMogiApp.Views
         }
 
         /// <summary>
-        /// 類題モード用: 全タスク ▲ 表示（Checker 採点なし）。▲ クリックで JSON の解答手順を表示。
+        /// 類題モード用: 全タスク ▲ 表示（Checker 採点なし）。▲ クリックで xlsx の解答手順を表示。
         /// </summary>
         public static void ShowVariantResults(Window owner, int taskCount, int groupId, int projectId, int variantSetNo)
         {
@@ -295,52 +294,25 @@ namespace MOSExcelMogiApp.Views
             catch { }
         }
 
-        private void LoadVariantAnswerStepsFromJson()
+        /// <summary>類題1だけ xlsx の解答手順を読む。類題2〜5は空。</summary>
+        private void LoadVariantAnswerSteps()
         {
             _answerStepsByTaskId.Clear();
-
-            string jsonPath = DataPathHelper.ResolveJsonPath(
-                $"MOS演習問題文一覧_PracticeVariant{_variantSetNo}.json");
-
-            if (!File.Exists(jsonPath))
-            {
-                System.Diagnostics.Debug.WriteLine($"[ScoringResultDialog] Variant JSON not found: {jsonPath}");
+            if (_variantSetNo != 1)
                 return;
-            }
 
             try
             {
-                string json = File.ReadAllText(jsonPath);
-                var root = JObject.Parse(json);
-                var projects = root["projects"] as JArray;
-                if (projects == null)
-                    return;
-
-                foreach (var projectToken in projects)
+                foreach (VariantTaskText task in VariantProblemWorkbook.GetTasks(_projectId))
                 {
-                    if (projectToken["projectId"]?.Value<int>() != _projectId)
+                    if (task.TaskId <= 0)
                         continue;
-
-                    var tasks = projectToken["tasks"] as JArray;
-                    if (tasks == null)
-                        return;
-
-                    foreach (var taskToken in tasks)
-                    {
-                        int taskId = taskToken["taskId"]?.Value<int>() ?? 0;
-                        if (taskId <= 0)
-                            continue;
-
-                        string steps = taskToken["answerSteps"]?.ToString() ?? string.Empty;
-                        _answerStepsByTaskId[taskId] = steps;
-                    }
-
-                    return;
+                    _answerStepsByTaskId[task.TaskId] = task.AnswerSteps ?? string.Empty;
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ScoringResultDialog] Failed to load variant JSON: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[ScoringResultDialog] Failed to load variant xlsx: {ex.Message}");
             }
         }
 

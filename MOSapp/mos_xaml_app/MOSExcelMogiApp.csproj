@@ -186,6 +186,7 @@
     <Compile Include="Core\Models\ProjectInfo.cs" />
     <Compile Include="Infrastructure\DataPathHelper.cs" />
     <Compile Include="Infrastructure\ExcelCheckerRepository.cs" />
+    <Compile Include="Infrastructure\VariantProblemWorkbook.cs" />
     <Compile Include="Models\ExamResultStorage.cs" />
     <Compile Include="Ui\ViewModels\MainViewModel.cs" />
     <Compile Include="Libraries\Group1\ExcelChecker1_1.cs" />
@@ -330,6 +331,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\CSV\MOS演習類題_問題解答一覧.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\Excel類題_問題文と解答手順.xlsx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

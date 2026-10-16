@@ -241,7 +241,7 @@
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">
                     <Grid Margin="20">
-                        <ItemsControl ItemsSource="{Binding VariantPlaceholderSets}">
+                        <ItemsControl ItemsSource="{Binding VariantLaunchProjects}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <UniformGrid Rows="3" Columns="2"/>
@@ -249,8 +249,9 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Content="{Binding}"
-                                            Click="VariantPlaceholderButton_Click"
+                                    <Button Content="{Binding Name}"
+                                            Command="{Binding DataContext.OpenVariantProjectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
                                             Margin="12" Padding="20,15" MinWidth="140" MinHeight="60">
                                         <Button.Style>
                                             <Style TargetType="Button">
@@ -269,7 +270,9 @@
                                                 <Setter Property="Template">
                                                     <Setter.Value>
                                                         <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}" CornerRadius="20" Margin="4">
+                                                            <Border Background="{TemplateBinding Background}"
+                                                                    CornerRadius="20"
+                                                                    Margin="4">
                                                                 <Border.Effect>
                                                                     <DropShadowEffect Color="#014030" Direction="135" ShadowDepth="8" Opacity="0.4" BlurRadius="15"/>
                                                                 </Border.Effect>
@@ -283,6 +286,52 @@
                                                         </ControlTemplate>
                                                     </Setter.Value>
                                                 </Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                                        <Setter Property="Opacity" Value="0.45"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background">
+                                                            <Setter.Value>
+                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                                    <GradientStop Color="#0A9B70" Offset="0"/>
+                                                                    <GradientStop Color="#5CC390" Offset="0.5"/>
+                                                                    <GradientStop Color="#8FEBB0" Offset="1"/>
+                                                                </LinearGradientBrush>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter Property="Background">
+                                                            <Setter.Value>
+                                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                                    <GradientStop Color="#016B50" Offset="0"/>
+                                                                    <GradientStop Color="#3A9B70" Offset="0.5"/>
+                                                                    <GradientStop Color="#6FC390" Offset="1"/>
+                                                                </LinearGradientBrush>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border Background="{TemplateBinding Background}"
+                                                                            CornerRadius="20"
+                                                                            Margin="4">
+                                                                        <Border.Effect>
+                                                                            <DropShadowEffect Color="#012820" Direction="135" ShadowDepth="4" Opacity="0.5" BlurRadius="8"/>
+                                                                        </Border.Effect>
+                                                                        <Border CornerRadius="20" Margin="2">
+                                                                            <Border.Effect>
+                                                                                <DropShadowEffect Color="#A3D9C1" Direction="315" ShadowDepth="2" Opacity="0.6" BlurRadius="6"/>
+                                                                            </Border.Effect>
+                                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                        </Border>
+                                                                    </Border>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Trigger>
+                                                </Style.Triggers>
                                             </Style>
                                         </Button.Style>
                                     </Button>

@@ -65,16 +65,29 @@ namespace MOSExcelMogiApp.Views
 
         private Dictionary<int, bool[]> _projectTaskCompletedStates;
         private Dictionary<int, bool[]> _projectTaskFlaggedStates;
+        private readonly bool _isVariantMode;
+        private readonly int _variantSetNo;
         
-        public ReviewPageWindow(TimeSpan remainingTime, Dictionary<int, bool[]> completedStates, Dictionary<int, bool[]> flaggedStates, int groupId = 1)
+        public ReviewPageWindow(
+            TimeSpan remainingTime,
+            Dictionary<int, bool[]> completedStates,
+            Dictionary<int, bool[]> flaggedStates,
+            int groupId = 1,
+            bool isVariantMode = false,
+            int variantSetNo = 1)
         {
-            System.Diagnostics.Debug.WriteLine($"ReviewPageWindow constructor called with remainingTime: {remainingTime}, groupId: {groupId}");
+            System.Diagnostics.Debug.WriteLine(
+                $"ReviewPageWindow constructor called with remainingTime: {remainingTime}, groupId: {groupId}, variant={isVariantMode}");
             
             InitializeComponent();
             _remainingTime = remainingTime;
             _projectTaskCompletedStates = completedStates;
             _projectTaskFlaggedStates = flaggedStates;
             _groupId = groupId;
+            _isVariantMode = isVariantMode;
+            _variantSetNo = variantSetNo;
+            if (_isVariantMode && EndExamButton != null)
+                EndExamButton.Visibility = Visibility.Collapsed;
             NavigateToTaskCommand = new RelayCommand<ReviewTaskInfo>(NavigateToTask);
             LoadAllProjects();
             InitializeTimer();
@@ -124,9 +137,13 @@ namespace MOSExcelMogiApp.Views
             {
                 ProjectData projectData = null;
                 
-                // 模試①（GroupId=2）の場合はCSVファイルから読み込む
-                if (_groupId == 2)
+                if (_isVariantMode)
                 {
+                    projectData = LoadProjectsFromVariantWorkbook();
+                }
+                else if (_groupId == 2)
+                {
+                    // 模試①（GroupId=2）の場合はCSVファイルから読み込む
                     projectData = LoadProjectsFromCsv(_groupId);
                 }
                 else
@@ -240,6 +257,30 @@ namespace MOSExcelMogiApp.Views
                 System.Diagnostics.Debug.WriteLine($"CSV読み込みエラー: {ex.Message}\n{ex.StackTrace}");
                 return new ProjectData { Projects = new List<ProjectInfo>() };
             }
+        }
+
+        private ProjectData LoadProjectsFromVariantWorkbook()
+        {
+            if (_variantSetNo != 1)
+                return new ProjectData { Projects = new List<ProjectInfo>() };
+
+            var projects = VariantProblemWorkbook.GetProjectIds()
+                .Select(projectId => new ProjectInfo
+                {
+                    ProjectId = projectId,
+                    Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                        .Select(task => new TaskInfo
+                        {
+                            TaskId = task.TaskId,
+                            Description = task.Description ?? string.Empty
+                        })
+                        .ToList()
+                })
+                .ToList();
+
+            System.Diagnostics.Debug.WriteLine(
+                $"[ReviewPageWindow] Loaded variant set {_variantSetNo}: {projects.Count} projects");
+            return new ProjectData { Projects = projects };
         }
 
         private ProjectData LoadProjectsFromJson(int groupId)

@@ -2,10 +2,12 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MOSExcelMogiApp.Infrastructure;
 
 namespace MOSExcelMogiApp
 {
@@ -64,10 +66,11 @@ namespace MOSExcelMogiApp
 
             CloseStartupSplash();
 
-            // MainWindow 表示後に VSTO 準備（UI スレッドをブロックしない）
+            // MainWindow 表示後に VSTO 準備と類題 xlsx 先読み（UI スレッドをブロックしない）
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 Libraries.ExcelVstoInstallerHelper.StartBackgroundPrepForExam();
+                Task.Run(() => VariantProblemWorkbook.Preload());
             }), DispatcherPriority.ApplicationIdle);
         }
 

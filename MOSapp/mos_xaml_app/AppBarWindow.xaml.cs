@@ -553,9 +553,13 @@ namespace MOSExcelMogiApp
                     int.TryParse(groupStr, out groupId);
                 }
                 
-                // 模試①（GroupId=2）の場合はCSVファイルから読み込む
-                if (groupId == 2)
+                if (_viewModel != null && _viewModel.IsVariantMode)
                 {
+                    LoadTasksFromVariantWorkbook();
+                }
+                else if (groupId == 2)
+                {
+                    // 模試①（GroupId=2）の場合はCSVファイルから読み込む
                     LoadTasksFromCsv(groupId);
                 }
                 else
@@ -705,6 +709,51 @@ namespace MOSExcelMogiApp
             }
         }
 
+        /// <summary>類題1は xlsx の問題文。類題2〜5と表に無いプロジェクトは空。</summary>
+        private void LoadTasksFromVariantWorkbook()
+        {
+            try
+            {
+                int variantSetNo = _viewModel?.VariantSetNo ?? 1;
+                IReadOnlyList<VariantTaskText> sheetTasks = variantSetNo == 1
+                    ? VariantProblemWorkbook.GetTasks(_currentProjectId)
+                    : Array.Empty<VariantTaskText>();
+
+                _tasks = sheetTasks
+                    .Select(task => new TaskInfo
+                    {
+                        TaskId = task.TaskId,
+                        Description = task.Description ?? string.Empty
+                    })
+                    .ToList();
+
+                _projectData = new ProjectData
+                {
+                    Projects = VariantProblemWorkbook.GetProjectIds()
+                        .Select(projectId => new ProjectInfo
+                        {
+                            ProjectId = projectId,
+                            Tasks = projectId == _currentProjectId ? _tasks : new List<TaskInfo>()
+                        })
+                        .ToList()
+                };
+
+                int maxTaskCount = Math.Max(_tasks.Count, 8);
+                if (!_projectTaskCompletedStates.ContainsKey(_currentProjectId))
+                    _projectTaskCompletedStates[_currentProjectId] = new bool[maxTaskCount];
+                if (!_projectTaskFlaggedStates.ContainsKey(_currentProjectId))
+                    _projectTaskFlaggedStates[_currentProjectId] = new bool[maxTaskCount];
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"[LoadTasksFromVariantWorkbook] set={variantSetNo} project={_currentProjectId} tasks={_tasks.Count}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"類題xlsx読み込みエラー: {ex.Message}\n{ex.StackTrace}");
+                _tasks = new List<TaskInfo>();
+            }
+        }
+
         private void LoadTasksFromJson(int groupId)
         {
             try
@@ -841,6 +890,11 @@ namespace MOSExcelMogiApp
                     // "で囲まれた部分に下線を付けて表示
                     SetTextWithUnderline(taskDescriptionTextBlock, currentTask.Description);
                 }
+            }
+            else if (taskDescriptionTextBlock != null)
+            {
+                taskDescriptionTextBlock.Inlines.Clear();
+                taskDescriptionTextBlock.Text = string.Empty;
             }
 
             // タスクボタンの状態を更新
@@ -1443,10 +1497,19 @@ namespace MOSExcelMogiApp
                     int.TryParse(groupStr, out groupId);
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Opening ReviewPage with GroupId: {groupId}");
+                bool isVariantMode = _viewModel?.IsVariantMode == true;
+                int variantSetNo = _viewModel?.VariantSetNo ?? 1;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[AppBarWindow] Opening ReviewPage with GroupId: {groupId}, variant={isVariantMode}, set={variantSetNo}");
                 
                 // 現在のタイマー残り時間と状態情報を渡す（groupIdも追加）
-                var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, groupId);
+                var reviewWindow = new ReviewPageWindow(
+                    _remainingTime,
+                    _projectTaskCompletedStates,
+                    _projectTaskFlaggedStates,
+                    groupId,
+                    isVariantMode,
+                    variantSetNo);
                 reviewWindow.OnNavigateToTask = (g, p, t) => NavigateToTask(p, t, g);
                 reviewWindow.Closed += (s, args) => 
                 {
@@ -1544,8 +1607,9 @@ namespace MOSExcelMogiApp
                     int.TryParse(groupStr, out groupId);
                 }
 
-                // プロジェクトファイルパスを取得
-                string filePath = _viewModel.GetProjectFilePath(groupId, projectId);
+                string filePath = _viewModel.IsVariantMode
+                    ? _viewModel.GetVariantProjectFilePath(groupId, projectId, _viewModel.VariantSetNo)
+                    : _viewModel.GetProjectFilePath(groupId, projectId);
                 
                 if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
                 {

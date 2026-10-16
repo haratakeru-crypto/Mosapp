@@ -258,7 +258,8 @@ namespace Ui.ViewModels
             _excelCheckerService = excelCheckerService;
             LoadProjects();
             CheckCommand = new RelayCommand(ExecuteCheck);
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
+            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: false), _ => !_isOpeningProject);
+            OpenVariantProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: true), CanOpenVariantProject);
             ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring && !_isScoreResultOpen);
             EndExamCommand = new RelayCommand(ExecuteEndExam, _ => !_isScoreResultOpen);
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
@@ -594,7 +595,8 @@ namespace Ui.ViewModels
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
 
-        public string[] VariantPlaceholderSets { get; } = { "類題1", "類題2", "類題3", "類題4", "類題5" };
+        /// <summary>類題タブに出すプロジェクト（演習の先頭6件。プロジェクト1-1〜1-6）。</summary>
+        public IReadOnlyList<ProjectViewModel> VariantLaunchProjects { get; private set; } = Array.Empty<ProjectViewModel>();
 
         public int SelectedTabIndex
         {
@@ -628,6 +630,8 @@ namespace Ui.ViewModels
 
         public ICommand CheckCommand { get; }
         public ICommand OpenProjectCommand { get; }
+        /// <summary>類題タブから、そのプロジェクトの類題1を開く。</summary>
+        public ICommand OpenVariantProjectCommand { get; }
         public ICommand ScoreCommand { get; }
         public ICommand EndExamCommand { get; }
         public ICommand PauseExamCommand { get; }
@@ -1108,10 +1112,29 @@ namespace Ui.ViewModels
             OnPropertyChanged(nameof(ShowGoToVariantButton));
             OnPropertyChanged(nameof(GoToVariantButtonLabel));
             OnPropertyChanged(nameof(CanGoToVariant));
+            OnPropertyChanged(nameof(IsNextProjectVisible));
             CommandManager.InvalidateRequerySuggested();
         }
         
-        public bool IsNextProjectVisible => CurrentProject != null && CurrentProject.ProjectNumber <= 10;
+        public bool IsNextProjectVisible
+        {
+            get
+            {
+                if (CurrentProject == null)
+                    return false;
+
+                if (IsVariantMode)
+                {
+                    if (TryGetNextVariantProjectPath(out _, out _))
+                        return true;
+
+                    return TryGetCurrentGroupProjectId(out int groupId, out int projectId)
+                        && IsVariantExcelAvailable(groupId, projectId, VariantSetNo);
+                }
+
+                return CurrentProject.ProjectNumber <= 10;
+            }
+        }
 
         private void LoadProjects()
         {
@@ -1133,6 +1156,7 @@ namespace Ui.ViewModels
                 }
                 
                 ProjectGroups.Add(group);
+                VariantLaunchProjects = group.Projects.Take(6).ToList();
             }
         }
 
@@ -1231,7 +1255,17 @@ namespace Ui.ViewModels
             CommandManager.InvalidateRequerySuggested();
         }
 
-        private void ExecuteOpenProject(object parameter)
+        private bool CanOpenVariantProject(object parameter)
+        {
+            if (_isOpeningProject)
+                return false;
+            // ボタン生成直後は CommandParameter がまだ無く、ここで false にすると押せないままになる。
+            if (!(parameter is ProjectViewModel project))
+                return true;
+            return IsVariantExcelAvailable(project.GroupId, project.ProjectId, 1);
+        }
+
+        private void ExecuteOpenProject(object parameter, bool openAsVariant1)
         {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
@@ -1243,20 +1277,19 @@ namespace Ui.ViewModels
             //     return;
             // }
 
+            var projectViewModel = parameter as ProjectViewModel;
             string projectId;
-            if (parameter is ProjectViewModel projectViewModel)
+            if (projectViewModel != null)
             {
-                // Handle ProjectViewModel object
                 projectId = $"project{projectViewModel.GroupId}-{projectViewModel.ProjectId}";
                 System.Diagnostics.Debug.WriteLine($"Converted ProjectViewModel to projectId: {projectId}");
             }
             else
             {
-                // Handle string parameter
                 projectId = parameter?.ToString();
             }
             
-            if (string.IsNullOrEmpty(projectId))
+            if (string.IsNullOrEmpty(projectId) || (openAsVariant1 && projectViewModel == null))
             {
                 ResultMessage = "エラー: プロジェクトIDが指定されていません。";
                 return;
@@ -1267,16 +1300,23 @@ namespace Ui.ViewModels
             if (!WaitForExcelShutdownToCompleteBeforeOpeningProject())
             {
                 EnableProjectSelection();
+                if (openAsVariant1)
+                    IsVariantMode = false;
                 return;
             }
 
-            IsVariantMode = false;
+            if (!openAsVariant1)
+                IsVariantMode = false;
 
-            string filePath = GetProjectFilePath(projectId);
+            string filePath = openAsVariant1
+                ? GetVariantProjectFilePath(projectViewModel.GroupId, projectViewModel.ProjectId, 1)
+                : GetProjectFilePath(projectId);
             ClearStaleSharedExcelBeforeOpen(filePath);
             if (string.IsNullOrEmpty(filePath))
             {
                 EnableProjectSelection();
+                if (openAsVariant1)
+                    IsVariantMode = false;
                 ResultMessage = $"エラー: プロジェクトID '{projectId}' からファイルパスを取得できませんでした。";
                 System.Diagnostics.Debug.WriteLine($"Failed to get file path for projectId: {projectId}");
                 return;
@@ -1285,6 +1325,8 @@ namespace Ui.ViewModels
             if (!File.Exists(filePath))
             {
                 EnableProjectSelection();
+                if (openAsVariant1)
+                    IsVariantMode = false;
                 ResultMessage = $"エラー: ファイルが見つかりません: {filePath}\n\nファイルが存在するか確認してください。";
                 System.Diagnostics.Debug.WriteLine($"File not found: {filePath}");
                 return;
@@ -1376,6 +1418,8 @@ namespace Ui.ViewModels
                 if (!opened)
                 {
                     EnableProjectSelection();
+                    if (openAsVariant1)
+                        IsVariantMode = false;
                     ResultMessage = "エラー: Excel を起動できませんでした。";
                     return;
                 }
@@ -1408,6 +1452,12 @@ namespace Ui.ViewModels
                     };
                 }
 
+                if (openAsVariant1)
+                {
+                    VariantSetNo = 1;
+                    IsVariantMode = true;
+                }
+
                 IsExcelOverlayVisible = true;
                 ResultMessage = $"Excelファイルを開きました: {Path.GetFileName(filePath)}";
                 ShowAppBar();
@@ -1416,6 +1466,8 @@ namespace Ui.ViewModels
             catch (Exception ex)
             {
                 EnableProjectSelection();
+                if (openAsVariant1)
+                    IsVariantMode = false;
                 ExcelStartupInputGate.End();
                 System.Diagnostics.Debug.WriteLine($"[ExecuteOpenProject] failed error={ex.GetType().Name}:{ex.Message}");
                 ResultMessage = $"エラー: ファイルを開けませんでした: {ex.Message}";
@@ -2203,6 +2255,8 @@ namespace Ui.ViewModels
             }
 
             int taskCount = projectConfig["taskCount"].Value<int>();
+            if (IsVariantMode && VariantSetNo == 1)
+                taskCount = VariantProblemWorkbook.GetTaskCount(projectId);
 
             if (IsVariantMode)
             {
@@ -3965,28 +4019,22 @@ namespace Ui.ViewModels
             int groupId = int.Parse(CurrentProject.Group.Replace("Group ", ""));
             int currentProjectNumber = CurrentProject.ProjectNumber;
 
-            // プロジェクト10の場合はレビューページを開く
-            if (currentProjectNumber == 10)
+            if (IsVariantMode)
             {
-                System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Opening review page for Project 10");
-                    _isSwitchingProject = true;
-                Task shutdown = null;
-                try
+                if (TryGetNextVariantProjectPath(out int nextVariantProjectNumber, out string nextVariantFilePath))
                 {
-                    FlushCurrentTaskBoundaryBeforeReview();
-                    shutdown = BeginExcelShutdownForReview(() => _isSwitchingProject = false);
-                    ReviewPageWindow.SetPendingExcelCloseTask(shutdown);
-                    OpenReviewPageRequested?.Invoke(this, EventArgs.Empty);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Review transition error: {ex.Message}");
-                    _isSwitchingProject = false;
+                    await SwitchToNextProjectAsync(groupId, nextVariantProjectNumber, nextVariantFilePath, keepVariantMode: true);
                     return;
                 }
 
-                if (shutdown == null)
-                    _isSwitchingProject = false;
+                OpenReviewFromCurrentProject();
+                return;
+            }
+
+            // プロジェクト10の場合はレビューページを開く
+            if (currentProjectNumber == 10)
+            {
+                OpenReviewFromCurrentProject();
                 return;
             }
 
@@ -4003,10 +4051,60 @@ namespace Ui.ViewModels
                 return;
             }
 
+            await SwitchToNextProjectAsync(groupId, nextProjectNumber, nextFilePath, keepVariantMode: false);
+        }
+
+        private void OpenReviewFromCurrentProject()
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[ExecuteNextProject] Opening review page for {(IsVariantMode ? "類題" : "教材")} project {CurrentProject?.ProjectNumber}");
+            _isSwitchingProject = true;
+            Task shutdown = null;
+            try
+            {
+                FlushCurrentTaskBoundaryBeforeReview();
+                shutdown = BeginExcelShutdownForReview(() => _isSwitchingProject = false);
+                ReviewPageWindow.SetPendingExcelCloseTask(shutdown);
+                OpenReviewPageRequested?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Review transition error: {ex.Message}");
+                _isSwitchingProject = false;
+                return;
+            }
+
+            if (shutdown == null)
+                _isSwitchingProject = false;
+        }
+
+        private bool TryGetNextVariantProjectPath(out int nextProjectNumber, out string nextFilePath)
+        {
+            nextProjectNumber = 0;
+            nextFilePath = null;
+
+            if (CurrentProject == null || !TryGetCurrentGroupProjectId(out int groupId, out int projectId))
+                return false;
+
+            int candidate = projectId + 1;
+            string path = GetVariantProjectFilePath(groupId, candidate, VariantSetNo);
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return false;
+
+            nextProjectNumber = candidate;
+            nextFilePath = path;
+            return true;
+        }
+
+        private async Task SwitchToNextProjectAsync(
+            int groupId, int nextProjectNumber, string nextFilePath, bool keepVariantMode)
+        {
             _isSwitchingProject = true;
             try
             {
-                IsVariantMode = false;
+                if (!keepVariantMode)
+                    IsVariantMode = false;
+
                 await ExcelDelayedProjectOpenNotice.RunAsync(async () =>
                 {
                     await Task.Run(() =>
