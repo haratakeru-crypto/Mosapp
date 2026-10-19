@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "行番号［5］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［表示］→［ウィンドウ枠の固定］→［ウィンドウ枠の固定］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：行5より上のウィンドウ枠が固定されている"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "問題文のリンク先のURLをコピーする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "セル［G3］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［挿入］タブ→［リンク］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［アドレス］にURLを貼り付け、［OK］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：G3にハイパーリンクが設定されている"
+    }
+  ]
+}
