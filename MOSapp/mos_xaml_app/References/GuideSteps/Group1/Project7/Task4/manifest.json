@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［下半期売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［D5:I12］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［条件付き書式］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［セルの強調表示ルール］→［指定の値より大きい］を選択する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "「3000」を入力し、［濃い黄色の文字、黄色の背景］を選択して［OK］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：3000超が黄色書式で表示されている"
+    }
+  ]
+}

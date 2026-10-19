@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［下半期売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［D5:I12］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［条件付き書式］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［アイコン セット］→［3 つの矢印 (色分け)］を選択する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：3つの矢印アイコンセットが表示されている"
+    }
+  ]
+}

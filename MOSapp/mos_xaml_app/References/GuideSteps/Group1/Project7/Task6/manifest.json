@@ -1,0 +1,51 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "s1"
+    },
+    {
+      "image": "step02.png",
+      "caption": "s2"
+    },
+    {
+      "image": "step03.png",
+      "caption": "s3"
+    },
+    {
+      "image": "step04.png",
+      "caption": "s4"
+    },
+    {
+      "image": "step05.png",
+      "caption": "s5"
+    },
+    {
+      "image": "step06.png",
+      "caption": "s6"
+    },
+    {
+      "image": "step07.png",
+      "caption": "s7"
+    },
+    {
+      "image": "step08.png",
+      "caption": "s8"
+    },
+    {
+      "image": "step09.png",
+      "caption": "s9"
+    },
+    {
+      "image": "step10.png",
+      "caption": "s10"
+    },
+    {
+      "image": "step11.png",
+      "caption": "sd"
+    }
+  ]
+}
