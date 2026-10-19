@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［商品別売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "グラフエリアをクリックし、［書式］→［代替テキスト］をクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「有楽町店の売上グラフ」と入力して［閉じる］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "任意のセルを選択してグラフの選択を解除する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：代替テキストが設定されたグラフが表示されている"
+    }
+  ]
+}
