@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ファイル］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［情報］をクリックし、［タイトル］に「売上一覧」と入力する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［←］をクリックしてワークシート表示に戻る"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：タイトルに「売上一覧」が設定されている"
+    }
+  ]
+}
