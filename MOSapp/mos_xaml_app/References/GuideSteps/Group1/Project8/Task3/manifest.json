@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［試験結果］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［I4］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=cou」と入力し、［COUNT］をダブルクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "COUNT関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "セル範囲［L7:L56］を選択し、［値1］に表示を確認して［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：セル［I4］に出席者数が表示されている"
+    }
+  ]
+}
