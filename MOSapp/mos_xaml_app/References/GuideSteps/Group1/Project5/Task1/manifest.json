@@ -1,0 +1,43 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上実績］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "グラフエリアをクリックし、［グラフのデザイン］タブをクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［クイックレイアウト］→［レイアウト 1］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "凡例が非表示になり、商品名と%のデータラベルが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［グラフタイトル］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "グラフタイトル内をクリックして既存の文字列を削除する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "「売上構成比」と入力する"
+    },
+    {
+      "image": "step08.png",
+      "caption": "任意のセルをクリックしてグラフの選択を解除する"
+    },
+    {
+      "image": "step09.png",
+      "caption": "完成：タイトルが売上構成比の円グラフが表示されている"
+    }
+  ]
+}

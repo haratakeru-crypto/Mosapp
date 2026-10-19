@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［月別売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "グラフエリアをクリックし、［グラフのデザイン］タブをクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［グラフ要素を追加］→［データラベル］→［内部外側］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "任意のセルをクリックしてグラフの選択を解除する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：データラベルが内部外側に表示されている"
+    }
+  ]
+}

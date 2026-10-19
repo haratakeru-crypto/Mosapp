@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［月別売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "グラフエリアをクリックし、［グラフのデザイン］タブをクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［グラフ要素を追加］→［軸ラベル］→［第1横軸］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "軸ラベルの文字列を削除し、「単位：円」と入力する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "任意のセルをクリックしてグラフの選択を解除する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：軸ラベルに「単位：円」が表示されている"
+    }
+  ]
+}
