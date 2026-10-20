@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「青空文庫から…」から「ネット上で…」の3段落を選び、［ホーム］タブを確認する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［箇条書き］の▼→［リストのレベルの変更］→［レベル 3］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：箇条書きのレベルが 3 になっている"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "テキストボックス内の「ご参加お待ちしております」を選び、［ホーム］タブを確認する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［フォントサイズ］に「15」→［Enter］→［斜体］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "テキストボックス以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：文字列が 15pt の斜体になっている"
+    }
+  ]
+}

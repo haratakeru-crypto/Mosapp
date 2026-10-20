@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "図形を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "ハンドルを確認し、「ご参加お待ちしております」と入力する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "図形以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：図形に「ご参加お待ちしております」と入力されている"
+    }
+  ]
+}
