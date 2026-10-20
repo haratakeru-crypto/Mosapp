@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上報告］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［J5］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=su」と入力し、一覧から［SUM］をダブルクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "SUM関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "［数式］タブの［数式で使用］から［売上合計］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "［数値1］に「売上合計」と表示されたことを確認し、［OK］をクリックする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：セル［J5］に売上総合計が表示されている"
+    }
+  ]
+}

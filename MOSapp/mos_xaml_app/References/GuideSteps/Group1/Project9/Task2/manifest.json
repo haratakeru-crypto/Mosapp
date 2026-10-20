@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "名前ボックスの［⌵］をクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "一覧から［開催日］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "シート［申込一覧］のセル［G3］が選択されたことを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "ダブルクリックして日付を「5/10」に修正し、［Enter］を押す"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：開催日が「5/10」になっている"
+    }
+  ]
+}
