@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［担当者リスト］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［G5］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=if」と入力し、一覧から［IF］をダブルクリックして fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "IF関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "セル［F5］をクリックし、「F5」に続けて「>5」と入力する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "［値が真の場合］に「あり」、［値が偽の場合］に「なし」と入力し、［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "オートフィル機能を使って、セル［G5］の数式をセル［G26］までコピーする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：［昇給］列に IF の結果（あり／なし）が表示されている"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［出張精算］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［G5］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=if」と入力し、一覧から［IF］をダブルクリックして fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "IF関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "セル［E5］をクリックし、「E5」に続けて「>=300」と入力する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "［値が真の場合］に「10000」、［値が偽の場合］に「5000」と入力し、［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "オートフィル機能を使って、セル［G5］の数式をセル［G9］までコピーする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：［手当金額］列に IF の結果（10000／5000）が表示されている"
+    }
+  ]
+}
