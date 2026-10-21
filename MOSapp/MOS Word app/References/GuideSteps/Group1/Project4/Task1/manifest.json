@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「1.生活の中でできるエコ活動」を選び、［校閲］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［新しいコメント］→「最新の情報を確認」と入力→［コメントを投稿する］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：見出しにコメントが挿入されている"
+    }
+  ]
+}

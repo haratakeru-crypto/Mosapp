@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "1段目を選び、［ホーム］タブをクリックし［段落の設定］をクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［行間］→［倍数］、［間隔］に「1.3」→［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：1段目の行間が 1.3 になっている"
+    }
+  ]
+}

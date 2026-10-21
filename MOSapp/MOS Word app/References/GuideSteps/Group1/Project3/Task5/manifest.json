@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「●茨城県天心記念五浦美術館『…』」の先頭をクリックし、［レイアウト］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［区切り］→［段区切り］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：「●茨城県天心記念五浦美術館『…』」が2段目の先頭になっている"
+    }
+  ]
+}

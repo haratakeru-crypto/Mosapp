@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［デザイン］タブをクリックし、［スタイルセット］をクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［線（シンプル）］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：スタイルセット「線（シンプル）」が設定されている"
+    }
+  ]
+}

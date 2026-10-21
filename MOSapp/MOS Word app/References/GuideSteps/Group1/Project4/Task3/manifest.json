@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「エコと節約」のコメントの［その他のスレッド操作］→［スレッドを解決する］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［解決済みコメントへ移動］→［スレッドの削除］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［コメント一覧］の［×］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：「エコと節約」のコメントが削除されている"
+    }
+  ]
+}

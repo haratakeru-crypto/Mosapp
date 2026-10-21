@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「その他」に挿入されているコメントの［返信］をクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "「前田先生に最終確認」と入力→［返信を投稿する］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：コメントに返信が投稿されている"
+    }
+  ]
+}

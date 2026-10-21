@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［デザイン］タブをクリックし、［ページ罫線］をクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［囲む］→［オリーブ、アクセント3］、［1.5pt］→［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：文書の周囲にページ罫線が付いている"
+    }
+  ]
+}
