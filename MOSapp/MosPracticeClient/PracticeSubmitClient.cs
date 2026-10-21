@@ -47,12 +47,6 @@ namespace MosPracticeClient
                 return result;
             }
 
-            if (ExamineeStore.HasSubmitted(subject))
-            {
-                result.Success = true;
-                return result;
-            }
-
             if (string.IsNullOrEmpty(settings.BaseUrl) || string.IsNullOrEmpty(settings.IngestKey))
             {
                 result.Error = "送信先が設定されていません";
