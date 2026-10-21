@@ -101,8 +101,8 @@ namespace MOS_PowerPoint_app.Views
                     return;
                 }
 
-                int initialWrong = UpdateSummary(projectData);
-                await StartSeatChartSubmitAsync(initialWrong);
+                int latestWrong = UpdateSummary(projectData);
+                await StartSeatChartSubmitAsync(latestWrong);
 
                 // 結果を表示（非同期で読み込む）
                 await LoadProjectDataAsync();
@@ -464,7 +464,10 @@ namespace MOS_PowerPoint_app.Views
                     ProjectData projectData = await LoadProjectDataModelAsync();
                     if (projectData != null)
                     {
-                        UpdateSummary(projectData);
+                        // 2回目以降の採点も座席表へ送る
+                        _seatChartSubmitStarted = false;
+                        int latestWrong = UpdateSummary(projectData);
+                        await StartSeatChartSubmitAsync(latestWrong);
                         await LoadProjectDataAsync();
                     }
                 }
@@ -512,14 +515,14 @@ namespace MOS_PowerPoint_app.Views
             return latestWrong;
         }
 
-        private async Task StartSeatChartSubmitAsync(int initialWrongTasks)
+        private async Task StartSeatChartSubmitAsync(int wrongTasks)
         {
             if (_fromScoringLog || _seatChartSubmitStarted) return;
             _seatChartSubmitStarted = true;
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, initialWrongTasks, "PowerPoint");
+                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "PowerPoint");
             }
             catch (Exception ex)
             {

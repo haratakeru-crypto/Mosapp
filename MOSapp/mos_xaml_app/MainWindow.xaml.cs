@@ -75,11 +75,6 @@ namespace MOSExcelMogiApp
             _viewModel.SelectedTabIndex = 0;
         }
 
-        private void VariantPlaceholderButton_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.ResultMessage = "類題は後から接続します";
-        }
-
         private void VocabularyTab_StartRequested(object sender, MosPracticeClient.VocabularyStartEventArgs e)
         {
             if (e.Mode != MosPracticeClient.VocabularyStartMode.KeywordOnly)

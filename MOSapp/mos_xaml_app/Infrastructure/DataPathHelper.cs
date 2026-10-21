@@ -88,9 +88,11 @@ namespace MOSExcelMogiApp.Infrastructure
             string variantDirectory = Path.Combine(
                 ExcelDataRoot, $"Tab{groupId}", $"PracticeVariant{variantSetNo}");
             string canonical = Path.Combine(variantDirectory, $"Project{projectId}.xlsx");
-            return EnsureCanonicalFile(canonical, new[]
+            return ResolveExistingOrCanonical(canonical, new[]
             {
                 Path.Combine(variantDirectory, $"project{projectId}.xlsx"),
+                Path.Combine(variantDirectory, $"similar{groupId}-{projectId}.xlsx"),
+                Path.Combine(variantDirectory, $"similar{variantSetNo}-{projectId}.xlsx"),
                 configuredFallback
             });
         }
@@ -100,10 +102,27 @@ namespace MOSExcelMogiApp.Infrastructure
             string templateDirectory = Path.Combine(
                 ExcelDataRoot, $"Tab{groupId}", $"PracticeVariant{variantSetNo}", "Templates");
             string canonical = Path.Combine(templateDirectory, $"Project{projectId}.xlsx");
-            return EnsureCanonicalFile(canonical, new[]
+            return ResolveExistingOrCanonical(canonical, new[]
             {
-                Path.Combine(templateDirectory, $"project{projectId}.xlsx")
+                Path.Combine(templateDirectory, $"project{projectId}.xlsx"),
+                Path.Combine(templateDirectory, $"similar{groupId}-{projectId}.xlsx"),
+                Path.Combine(templateDirectory, $"similar{variantSetNo}-{projectId}.xlsx")
             });
+        }
+
+        private static string ResolveExistingOrCanonical(string canonicalPath, IEnumerable<string> fallbackPaths)
+        {
+            string resolved = EnsureCanonicalFile(canonicalPath, fallbackPaths);
+            if (File.Exists(resolved))
+                return resolved;
+
+            foreach (string fallbackPath in fallbackPaths)
+            {
+                if (!string.IsNullOrWhiteSpace(fallbackPath) && File.Exists(fallbackPath))
+                    return fallbackPath;
+            }
+
+            return resolved;
         }
 
         public static string ResolveJsonPath(string fileName)

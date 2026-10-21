@@ -46,6 +46,38 @@ namespace MOS_PowerPoint_app
             return Path.Combine(GetDataRoot(), $"Tab{groupId}");
         }
 
+        public static string GetVariantFolder(int groupId, int variantSetNo)
+        {
+            return Path.Combine(GetTabFolder(groupId), $"PracticeVariant{variantSetNo}");
+        }
+
+        public static string FindVariantWorkingFile(int groupId, int projectId, int variantSetNo = 1)
+        {
+            string folder = GetVariantFolder(groupId, variantSetNo);
+            foreach (string name in GetVariantFileNames(projectId, variantSetNo))
+            {
+                string path = Path.Combine(folder, name);
+                if (File.Exists(path))
+                    return path;
+            }
+
+            return null;
+        }
+
+        public static bool IsVariantFileAvailable(int groupId, int projectId, int variantSetNo = 1)
+        {
+            string path = FindVariantWorkingFile(groupId, projectId, variantSetNo);
+            return !string.IsNullOrEmpty(path) && File.Exists(path);
+        }
+
+        private static IEnumerable<string> GetVariantFileNames(int projectId, int variantSetNo)
+        {
+            yield return $"similar{variantSetNo}-{projectId}.pptx";
+            yield return $"similar{variantSetNo}-{projectId}.ppt";
+            yield return $"Project{projectId}.pptx";
+            yield return $"project{projectId}.pptx";
+        }
+
         public static string GetWorkingProjectPath(int groupId, int projectId)
         {
             string tabFolder = GetTabFolder(groupId);

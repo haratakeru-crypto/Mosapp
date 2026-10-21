@@ -74,6 +74,8 @@ namespace MOS_Word_app.Views
         /// </summary>
         public async Task RefreshResultsAsync()
         {
+            // 2回目以降の採点も座席表へ送る
+            _seatChartSubmitStarted = false;
             await LoadResultsAsync();
         }
 
@@ -155,17 +157,17 @@ namespace MOS_Word_app.Views
                     SummaryTextBlock.Text = $"「あとで見直す」と未閲覧（時間切れ）の合計: {latestWrong}問";
             });
 
-            await StartSeatChartSubmitAsync(initialWrong);
+            await StartSeatChartSubmitAsync(latestWrong);
         }
 
-        private async Task StartSeatChartSubmitAsync(int initialWrongTasks)
+        private async Task StartSeatChartSubmitAsync(int wrongTasks)
         {
             if (_fromScoringLog || _seatChartSubmitStarted) return;
             _seatChartSubmitStarted = true;
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, initialWrongTasks, "Word");
+                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Word");
             }
             catch (Exception ex)
             {

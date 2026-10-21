@@ -19,6 +19,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Windows.Interop;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Libraries;
 using MOSExcelMogiApp.Guide;
@@ -180,7 +181,14 @@ namespace MOSExcelMogiApp
             };
             this.PreviewMouseDown += (s, e) =>
             {
-                try { ScoringResultDialog.TryBringOpenToFront(); }
+                try
+                {
+                    // ボタンクリック中に結果画面を前面化すると MouseUp が吸われ Click が消える
+                    if (FindVisualAncestor<System.Windows.Controls.Primitives.ButtonBase>(
+                            e.OriginalSource as DependencyObject) != null)
+                        return;
+                    ScoringResultDialog.TryBringOpenToFront();
+                }
                 catch { }
             };
 
@@ -558,9 +566,13 @@ namespace MOSExcelMogiApp
                     int.TryParse(groupStr, out groupId);
                 }
                 
-                // 模試①（GroupId=2）の場合はCSVファイルから読み込む
-                if (groupId == 2)
+                if (_viewModel != null && _viewModel.IsVariantMode)
                 {
+                    LoadTasksFromVariantWorkbook();
+                }
+                else if (groupId == 2)
+                {
+                    // 模試①（GroupId=2）の場合はCSVファイルから読み込む
                     LoadTasksFromCsv(groupId);
                 }
                 else
@@ -710,6 +722,51 @@ namespace MOSExcelMogiApp
             }
         }
 
+        /// <summary>類題1は xlsx の問題文。類題2〜5と表に無いプロジェクトは空。</summary>
+        private void LoadTasksFromVariantWorkbook()
+        {
+            try
+            {
+                int variantSetNo = _viewModel?.VariantSetNo ?? 1;
+                IReadOnlyList<VariantTaskText> sheetTasks = variantSetNo == 1
+                    ? VariantProblemWorkbook.GetTasks(_currentProjectId)
+                    : Array.Empty<VariantTaskText>();
+
+                _tasks = sheetTasks
+                    .Select(task => new TaskInfo
+                    {
+                        TaskId = task.TaskId,
+                        Description = task.Description ?? string.Empty
+                    })
+                    .ToList();
+
+                _projectData = new ProjectData
+                {
+                    Projects = VariantProblemWorkbook.GetProjectIds()
+                        .Select(projectId => new ProjectInfo
+                        {
+                            ProjectId = projectId,
+                            Tasks = projectId == _currentProjectId ? _tasks : new List<TaskInfo>()
+                        })
+                        .ToList()
+                };
+
+                int maxTaskCount = Math.Max(_tasks.Count, 8);
+                if (!_projectTaskCompletedStates.ContainsKey(_currentProjectId))
+                    _projectTaskCompletedStates[_currentProjectId] = new bool[maxTaskCount];
+                if (!_projectTaskFlaggedStates.ContainsKey(_currentProjectId))
+                    _projectTaskFlaggedStates[_currentProjectId] = new bool[maxTaskCount];
+
+                System.Diagnostics.Debug.WriteLine(
+                    $"[LoadTasksFromVariantWorkbook] set={variantSetNo} project={_currentProjectId} tasks={_tasks.Count}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"類題xlsx読み込みエラー: {ex.Message}\n{ex.StackTrace}");
+                _tasks = new List<TaskInfo>();
+            }
+        }
+
         private void LoadTasksFromJson(int groupId)
         {
             try
@@ -843,9 +900,15 @@ namespace MOSExcelMogiApp
                     System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] Description: {currentTask.Description}");
                     System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] Contains '\"': {currentTask.Description.Contains("\"")}");
                     
-                    // "で囲まれた部分に下線を付けて表示
-                    SetTextWithUnderline(taskDescriptionTextBlock, currentTask.Description);
+                    // コピーできる部分を""で囲んでから表示（「…」と入力 の 「」内をコピー対象に）
+                    string descriptionForDisplay = WrapCopyablePartInQuotes(currentTask.Description);
+                    SetTextWithUnderline(taskDescriptionTextBlock, descriptionForDisplay);
                 }
+            }
+            else if (taskDescriptionTextBlock != null)
+            {
+                taskDescriptionTextBlock.Inlines.Clear();
+                taskDescriptionTextBlock.Text = string.Empty;
             }
 
             // タスクボタンの状態を更新
@@ -981,6 +1044,21 @@ namespace MOSExcelMogiApp
                     row.Visibility = Visibility.Collapsed;
             }
             catch { }
+        }
+
+        /// <summary>
+        /// 問題文からコピーすべき部分（「…」と入力 の 「」内など）を抽出し、半角ダブルクォートで囲んだ文字列を返します。
+        /// 既に"が含まれる問題文はそのまま返します。
+        /// 「と入力」に連なる一連の「…」をすべて対象にします。
+        /// </summary>
+        private static string WrapCopyablePartInQuotes(string description)
+        {
+            if (string.IsNullOrEmpty(description)) return description;
+            if (description.IndexOf('"') >= 0) return description;
+            return Regex.Replace(
+                description,
+                @"(?:「([^」]*)」(?:、[^「]*?)?)+と入力",
+                m => Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\""));
         }
 
         /// <summary>
@@ -1155,6 +1233,8 @@ namespace MOSExcelMogiApp
                     }
                 }
             }
+
+            UpdateTaskArrowButtons();
         }
 
         private void UpdateButtonTexts()
@@ -1198,27 +1278,79 @@ namespace MOSExcelMogiApp
 
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
+            if (TryMoveToAdjacentTask(-1))
+                SetCurrentTask(_currentTaskId, notifyGuide: true);
             ScoringResultDialog.TryBringOpenToFront();
-            if (_currentTaskId > 1)
-                SetCurrentTask(_currentTaskId - 1, notifyGuide: true);
         }
 
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
+            if (TryMoveToAdjacentTask(1))
+                SetCurrentTask(_currentTaskId, notifyGuide: true);
             ScoringResultDialog.TryBringOpenToFront();
-            if (_tasks != null && _currentTaskId < _tasks.Count)
-                SetCurrentTask(_currentTaskId + 1, notifyGuide: true);
+        }
+
+        /// <summary>現在タスクの前後へ移動。direction は -1（前）または +1（次）。</summary>
+        private bool TryMoveToAdjacentTask(int direction)
+        {
+            if (_tasks == null || _tasks.Count == 0)
+                return false;
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            if (orderedIds.Count == 0)
+                return false;
+
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (index < 0)
+                index = direction < 0 ? 0 : orderedIds.Count - 1;
+
+            int nextIndex = index + direction;
+            if (nextIndex < 0 || nextIndex >= orderedIds.Count)
+                return false;
+
+            _currentTaskId = orderedIds[nextIndex];
+            return true;
+        }
+
+        private void UpdateTaskArrowButtons()
+        {
+            var prev = FindName("PreviousTaskButton") as Button;
+            var next = FindName("NextTaskButton") as Button;
+            if (_tasks == null || _tasks.Count == 0)
+            {
+                if (prev != null) prev.IsEnabled = false;
+                if (next != null) next.IsEnabled = false;
+                return;
+            }
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (prev != null)
+                prev.IsEnabled = index > 0;
+            if (next != null)
+                next.IsEnabled = index >= 0 && index < orderedIds.Count - 1;
+        }
+
+        private static T FindVisualAncestor<T>(DependencyObject current) where T : class
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                    return match;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
         }
 
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
-            ScoringResultDialog.TryBringOpenToFront();
             if (sender is Button button && button.Tag != null)
             {
                 int taskId = int.Parse(button.Tag.ToString());
                 if (taskId >= 1 && taskId <= _tasks.Count)
                     SetCurrentTask(taskId, notifyGuide: true);
             }
+            ScoringResultDialog.TryBringOpenToFront();
         }
 
         /// <summary>
@@ -1456,10 +1588,19 @@ namespace MOSExcelMogiApp
                     int.TryParse(groupStr, out groupId);
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Opening ReviewPage with GroupId: {groupId}");
+                bool isVariantMode = _viewModel?.IsVariantMode == true;
+                int variantSetNo = _viewModel?.VariantSetNo ?? 1;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[AppBarWindow] Opening ReviewPage with GroupId: {groupId}, variant={isVariantMode}, set={variantSetNo}");
                 
                 // 現在のタイマー残り時間と状態情報を渡す（groupIdも追加）
-                var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, groupId);
+                var reviewWindow = new ReviewPageWindow(
+                    _remainingTime,
+                    _projectTaskCompletedStates,
+                    _projectTaskFlaggedStates,
+                    groupId,
+                    isVariantMode,
+                    variantSetNo);
                 reviewWindow.OnNavigateToTask = (g, p, t) => NavigateToTask(p, t, g);
                 reviewWindow.Closed += (s, args) => 
                 {
@@ -1557,8 +1698,9 @@ namespace MOSExcelMogiApp
                     int.TryParse(groupStr, out groupId);
                 }
 
-                // プロジェクトファイルパスを取得
-                string filePath = _viewModel.GetProjectFilePath(groupId, projectId);
+                string filePath = _viewModel.IsVariantMode
+                    ? _viewModel.GetVariantProjectFilePath(groupId, projectId, _viewModel.VariantSetNo)
+                    : _viewModel.GetProjectFilePath(groupId, projectId);
                 
                 if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
                 {

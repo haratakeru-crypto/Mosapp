@@ -114,12 +114,16 @@ namespace MOS_Word_app.Views
 
         public int CurrentProjectId => _currentProjectId;
         public int CurrentGroupId => _groupId;
+        public bool IsVariantMode => _isVariantMode;
+
+        private readonly bool _isVariantMode;
         
-        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false)
+        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, bool isVariantMode = false)
         {
             InitializeComponent();
             _currentProjectId = projectId;
             _groupId = groupId; // グループIDを保存
+            _isVariantMode = isVariantMode;
             var scoreBtn = FindName("ScoreButton") as System.Windows.Controls.Button;
             if (scoreBtn != null)
                 scoreBtn.Visibility = showScoreButton ? Visibility.Visible : Visibility.Collapsed;
@@ -147,7 +151,14 @@ namespace MOS_Word_app.Views
             };
             this.PreviewMouseDown += (s, e) =>
             {
-                try { ScoreResultWindow.TryBringOpenToFront(); }
+                try
+                {
+                    // ボタンクリック中に結果画面を前面化すると MouseUp が吸われ Click が消える
+                    if (FindVisualAncestor<System.Windows.Controls.Primitives.ButtonBase>(
+                            e.OriginalSource as DependencyObject) != null)
+                        return;
+                    ScoreResultWindow.TryBringOpenToFront();
+                }
                 catch { }
             };
         }
@@ -357,6 +368,12 @@ namespace MOS_Word_app.Views
             try
             {
                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId}");
+
+                if (_isVariantMode)
+                {
+                    ShowVariantAnswerSteps(_currentProjectId);
+                    return;
+                }
 
                 // 現在のプロジェクトのタスク数を取得
                 int taskCount = _tasks != null ? _tasks.Count : 0;
@@ -751,7 +768,7 @@ namespace MOS_Word_app.Views
                 this.Hide();
 
                 // 現在のタイマー残り時間と状態情報を渡す（閲覧状態も渡して結果画面で時間切れ表示に利用）
-                var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, null, _groupId);
+                var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, null, _groupId, _isVariantMode);
                 reviewWindow.OnNavigateToTask = NavigateToTask;
                 reviewWindow.Closed += (s, args) =>
                 {
@@ -982,6 +999,13 @@ namespace MOS_Word_app.Views
         {
             try
             {
+                if (_isVariantMode)
+                {
+                    LoadTasksFromVariantWorkbook();
+                    LoadCurrentProjectTasks();
+                    return;
+                }
+
                 // JSONファイルから問題文を読み込む（Word 用・PowerPoint と独立）
                 string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
                 
@@ -1005,6 +1029,26 @@ namespace MOS_Word_app.Views
             }
         }
         
+        private void LoadTasksFromVariantWorkbook()
+        {
+            _projectData = new ProjectData
+            {
+                Projects = VariantProblemWorkbook.GetProjectIds()
+                    .Select(projectId => new ProjectInfo
+                    {
+                        ProjectId = projectId,
+                        Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                            .Select(task => new TaskInfo
+                            {
+                                TaskId = task.TaskId,
+                                Description = task.Description ?? string.Empty
+                            })
+                            .ToList()
+                    })
+                    .ToList()
+            };
+        }
+
         private void LoadTasksFromJson(string jsonPath)
         {
             try
@@ -1485,10 +1529,11 @@ namespace MOS_Word_app.Views
             if (wordDescription != null)
             {
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] Word文書から問題文を取得して表示");
-                SetTextWithUnderline(taskDescriptionTextBlock, wordDescription);
+                SetTextWithUnderline(taskDescriptionTextBlock, WrapCopyablePartInQuotes(wordDescription));
                 UpdateTaskButtons();
                 UpdateButtonTexts();
                 MarkTaskAsViewed(_currentProjectId, _currentTaskId);
+                SyncTaskTracking();
                 RegisterCurrentTaskForRetryIfFromResult();
                 return;
             }
@@ -1514,17 +1559,14 @@ namespace MOS_Word_app.Views
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] クリップボード対象が見つかりません。通常の問題文を使用します");
             }
             
-            // クリップボード対象がある場合は下線付き表示、ない場合は通常表示
+            // コピーできる部分を""で囲んでから表示（「…」と入力 の 「」内をコピー対象に）
+            string descriptionForDisplay = clipboardTargetDescription ?? currentTask.Description;
+            descriptionForDisplay = WrapCopyablePartInQuotes(descriptionForDisplay);
             if (clipboardTargetDescription != null)
-            {
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（クリップボード対象）");
-                SetTextWithUnderline(taskDescriptionTextBlock, clipboardTargetDescription);
-            }
             else
-            {
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（通常の問題文）");
-                SetTextWithUnderline(taskDescriptionTextBlock, currentTask.Description);
-            }
+            SetTextWithUnderline(taskDescriptionTextBlock, descriptionForDisplay);
             
             // タスクボタンの状態を更新（チェックマークと旗マークも含む）
             UpdateTaskButtons();
@@ -1555,6 +1597,21 @@ namespace MOS_Word_app.Views
             }
         }
         
+        /// <summary>
+        /// 問題文からコピーすべき部分（「…」と入力 の 「」内など）を抽出し、半角ダブルクォートで囲んだ文字列を返します。
+        /// 既に"が含まれる問題文はそのまま返します。
+        /// 「と入力」に連なる一連の「…」をすべて対象にします。
+        /// </summary>
+        private static string WrapCopyablePartInQuotes(string description)
+        {
+            if (string.IsNullOrEmpty(description)) return description;
+            if (description.IndexOf('"') >= 0) return description;
+            return Regex.Replace(
+                description,
+                @"(?:「([^」]*)」(?:、[^「]*?)?)+と入力",
+                m => Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\""));
+        }
+
         /// <summary>
         /// テキスト内の"で囲まれた部分に下線を付けてTextBlockに設定します
         /// "自体は表示せず、その中のテキストだけに下線を付けます
@@ -1670,7 +1727,11 @@ namespace MOS_Word_app.Views
         
         private void UpdateTaskButtons()
         {
-            if (_tasks == null) return;
+            if (_tasks == null)
+            {
+                UpdateTaskArrowButtons();
+                return;
+            }
             
             // 現在のプロジェクトの状態を取得
             int maxTaskCount = _tasks != null ? _tasks.Count : 0;
@@ -1742,6 +1803,8 @@ namespace MOS_Word_app.Views
                     UpdateTaskButtonState(button, taskId, completedStates, flaggedStates);
                 }
             }
+
+            UpdateTaskArrowButtons();
         }
         
         private void UpdateTaskButtonState(System.Windows.Controls.Button button, int taskId, bool[] completedStates, bool[] flaggedStates)
@@ -1940,27 +2003,62 @@ namespace MOS_Word_app.Views
         
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
-            ScoreResultWindow.TryBringOpenToFront();
-            if (_currentTaskId > 1)
-            {
-                _currentTaskId--;
+            if (TryMoveToAdjacentTask(-1))
                 UpdateTaskDisplay();
-            }
+            ScoreResultWindow.TryBringOpenToFront();
         }
         
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
-            ScoreResultWindow.TryBringOpenToFront();
-            if (_tasks != null && _currentTaskId < _tasks.Count)
-            {
-                _currentTaskId++;
+            if (TryMoveToAdjacentTask(1))
                 UpdateTaskDisplay();
+            ScoreResultWindow.TryBringOpenToFront();
+        }
+
+        /// <summary>現在タスクの前後へ移動。direction は -1（前）または +1（次）。</summary>
+        private bool TryMoveToAdjacentTask(int direction)
+        {
+            if (_tasks == null || _tasks.Count == 0)
+                return false;
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            if (orderedIds.Count == 0)
+                return false;
+
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (index < 0)
+            {
+                // 未知の TaskId のときは一覧の端から探索
+                index = direction < 0 ? 0 : orderedIds.Count - 1;
             }
+
+            int nextIndex = index + direction;
+            if (nextIndex < 0 || nextIndex >= orderedIds.Count)
+                return false;
+
+            _currentTaskId = orderedIds[nextIndex];
+            return true;
+        }
+
+        private void UpdateTaskArrowButtons()
+        {
+            if (_tasks == null || _tasks.Count == 0)
+            {
+                if (PreviousTaskButton != null) PreviousTaskButton.IsEnabled = false;
+                if (NextTaskButton != null) NextTaskButton.IsEnabled = false;
+                return;
+            }
+
+            var orderedIds = _tasks.Select(t => t.TaskId).Distinct().OrderBy(id => id).ToList();
+            int index = orderedIds.IndexOf(_currentTaskId);
+            if (PreviousTaskButton != null)
+                PreviousTaskButton.IsEnabled = index > 0;
+            if (NextTaskButton != null)
+                NextTaskButton.IsEnabled = index >= 0 && index < orderedIds.Count - 1;
         }
         
         private void TaskButton_Click(object sender, RoutedEventArgs e)
         {
-            ScoreResultWindow.TryBringOpenToFront();
             var button = sender as System.Windows.Controls.Button;
             if (button == null || button.Tag == null) return;
             int taskId = int.Parse(button.Tag.ToString());
@@ -1969,6 +2067,18 @@ namespace MOS_Word_app.Views
                 _currentTaskId = taskId;
                 UpdateTaskDisplay();
             }
+            ScoreResultWindow.TryBringOpenToFront();
+        }
+
+        private static T FindVisualAncestor<T>(DependencyObject current) where T : class
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                    return match;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
         }
         
         private async void NextProject_Click(object sender, RoutedEventArgs e)
@@ -2057,7 +2167,7 @@ namespace MOS_Word_app.Views
                     try
                     {
                         nextPath = await System.Threading.Tasks.Task.Run(
-                            () => WordDataPathHelper.EnsureWorkingFile(_groupId, nextProjectId));
+                            () => ResolveExamFilePath(_groupId, nextProjectId));
                     }
                     catch (Exception ex)
                     {
@@ -2113,7 +2223,7 @@ namespace MOS_Word_app.Views
             try
             {
                 currentPath = await System.Threading.Tasks.Task.Run(
-                    () => WordDataPathHelper.EnsureWorkingFile(_groupId, projectId));
+                    () => ResolveExamFilePath(_groupId, projectId));
             }
             catch (Exception ex)
             {
@@ -2131,12 +2241,59 @@ namespace MOS_Word_app.Views
                 ApplyExamWindowLayout();
         }
 
+        private static void ShowVariantAnswerSteps(int projectId)
+        {
+            var tasks = VariantProblemWorkbook.GetTasks(projectId);
+            var text = new StringBuilder();
+            if (tasks.Count == 0)
+            {
+                text.Append("解答手順が登録されていません。");
+            }
+            else
+            {
+                foreach (var task in tasks)
+                {
+                    text.AppendLine($"タスク {task.TaskId}");
+                    text.AppendLine(string.IsNullOrWhiteSpace(task.AnswerSteps)
+                        ? "解答手順が登録されていません。"
+                        : task.AnswerSteps);
+                    text.AppendLine();
+                }
+            }
+
+            var window = new Window
+            {
+                Title = $"類題 プロジェクト {projectId} 解答手順",
+                Width = 640,
+                Height = 480,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Content = new ScrollViewer
+                {
+                    Padding = new Thickness(16),
+                    Content = new TextBlock
+                    {
+                        Text = text.ToString(),
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 14
+                    }
+                }
+            };
+            window.ShowDialog();
+        }
+
+        private string ResolveExamFilePath(int groupId, int projectId)
+        {
+            if (_isVariantMode)
+                return WordDataPathHelper.FindVariantWorkingFile(groupId, projectId, 1);
+            return WordDataPathHelper.EnsureWorkingFile(groupId, projectId);
+        }
+
         private void OpenProjectDocument(int projectId, int groupId, bool showPreparingDialog = true)
         {
             string filePath = null;
             try
             {
-                filePath = WordDataPathHelper.EnsureWorkingFile(groupId, projectId);
+                filePath = ResolveExamFilePath(groupId, projectId);
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 {
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}の作業ファイルが見つかりません。");

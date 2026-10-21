@@ -12,6 +12,7 @@
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("universities.json")]
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("references/json/mos%e6%a8%a1%e6%93%ac%e3%82%a2%e3%83%97%e3%83%aa%e5%95%8f%e9%a1%8" +
     "c%e6%96%87%e4%b8%80%e8%a6%a7_powerpoint.json")]
+[assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("references/powerpoint%e9%a1%9e%e9%a1%8c.xlsx")]
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("mos%e6%a8%a1%e6%93%ac%e3%82%a2%e3%83%97%e3%83%aa%e5%95%8f%e9%a1%8c%e6%96%87%e4%b8" +
     "%80%e8%a6%a7_powerpoint.json")]
 [assembly: System.Windows.Resources.AssemblyAssociatedContentFileAttribute("mos%e6%a8%a1%e6%93%ac%e3%82%a2%e3%83%97%e3%83%aa_%e5%85%a5%e5%8a%9b%e8%bf%bd%e5%8" +

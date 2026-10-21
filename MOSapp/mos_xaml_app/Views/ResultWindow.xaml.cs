@@ -60,6 +60,8 @@ namespace MOSExcelMogiApp.Views
         {
             try
             {
+                // 2回目以降の採点も座席表へ送る
+                _seatChartSubmitStarted = false;
                 // UIスレッドで再計算・再描画（連続発火に備えて少しだけ遅延）
                 await Dispatcher.InvokeAsync(async () =>
                 {
@@ -158,7 +160,7 @@ namespace MOSExcelMogiApp.Views
                     WrongCountTextBlock.Text = $"{currentWrongTasks}問";
                 });
 
-                await StartSeatChartSubmitAsync(initialWrongTasks);
+                await StartSeatChartSubmitAsync(currentWrongTasks);
 
                 // 結果を表示（非同期で読み込む）
                 await LoadProjectDataAsync();
@@ -280,14 +282,14 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
-        private async Task StartSeatChartSubmitAsync(int initialWrongTasks)
+        private async Task StartSeatChartSubmitAsync(int wrongTasks)
         {
             if (_fromScoringLog || _seatChartSubmitStarted) return;
             _seatChartSubmitStarted = true;
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, initialWrongTasks, "Excel");
+                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Excel");
             }
             catch (Exception ex)
             {

@@ -23,16 +23,10 @@ namespace MosPracticeClient
                 return;
             }
 
-            if (ExamineeStore.HasSubmitted(subject))
-            {
-                SetUi(statusText, qrImage, "座席表に送信しました", false, null);
-                return;
-            }
-
             var result = await PracticeSubmitClient.SubmitInitialAsync(wrongCount, subject).ConfigureAwait(false);
             if (result.Success)
             {
-                SetUi(statusText, qrImage, "座席表に送信しました", false, null);
+                SetUi(statusText, qrImage, "座席表に送信しました（×の数: " + wrongCount + "）", false, null);
                 return;
             }
 
@@ -62,7 +56,7 @@ namespace MosPracticeClient
             if (target.Dispatcher.CheckAccess())
                 Apply();
             else
-                target.Dispatcher.Invoke(Apply);
+                target.Dispatcher.BeginInvoke(new Action(Apply));
         }
 
         public static BitmapImage CreateQrImage(string url)

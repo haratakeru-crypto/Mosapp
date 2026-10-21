@@ -126,12 +126,13 @@ namespace MOS_Word_app
                 _appBarWindow == null ||
                 !_appBarWindow.IsLoaded ||
                 _appBarWindow.CurrentProjectId != project.ProjectId ||
-                _appBarWindow.CurrentGroupId != project.GroupId;
+                _appBarWindow.CurrentGroupId != project.GroupId ||
+                _appBarWindow.IsVariantMode != _viewModel.IsVariantMode;
 
             if (needRecreate)
             {
                 var oldAppBar = _appBarWindow;
-                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, false);
+                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, false, _viewModel.IsVariantMode);
                 _appBarWindow.Closed += OnAppBarWindowClosed;
                 oldAppBar?.Close();
             }

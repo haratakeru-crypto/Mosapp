@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -49,7 +50,9 @@ namespace MOS_Word_app
         public MainViewModel()
         {
             LoadProjects();
-            OpenProjectCommand = new RelayCommand(ExecuteOpenProject, _ => !_isOpeningProject);
+            LoadVariantLaunchProjects();
+            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: false), _ => !_isOpeningProject);
+            OpenVariantProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: true), CanOpenVariantProject);
             TabSearchCommand = new RelayCommand(ExecuteTabSearch);
             ResetAllInGroupCommand = new RelayCommand(ExecuteResetAllInGroup);
             TabTasks = new ObservableCollection<TabTaskInfo>();
@@ -57,7 +60,11 @@ namespace MOS_Word_app
 
         public ObservableCollection<ProjectGroupViewModel> ProjectGroups { get; set; } = new ObservableCollection<ProjectGroupViewModel>();
 
-        public string[] VariantPlaceholderSets { get; } = { "類題1", "類題2", "類題3", "類題4", "類題5" };
+        public IReadOnlyList<ProjectViewModel> VariantLaunchProjects { get; private set; } = Array.Empty<ProjectViewModel>();
+
+        public ICommand OpenVariantProjectCommand { get; }
+
+        public bool IsVariantMode { get; private set; }
 
         public int SelectedTabIndex
         {
@@ -158,6 +165,40 @@ namespace MOS_Word_app
             }
         }
 
+        private void LoadVariantLaunchProjects()
+        {
+            var projects = new List<ProjectViewModel>();
+            var ids = VariantProblemWorkbook.GetProjectIds().ToList();
+            if (ids.Count == 0)
+            {
+                for (int projectId = 1; projectId <= 8; projectId++)
+                    ids.Add(projectId);
+            }
+
+            foreach (int projectId in ids)
+            {
+                string filePath = WordDataPathHelper.FindVariantWorkingFile(1, projectId, 1);
+                projects.Add(new ProjectViewModel
+                {
+                    GroupId = 1,
+                    ProjectId = projectId,
+                    Name = $"プロジェクト1-{projectId}",
+                    FilePath = filePath
+                });
+            }
+
+            VariantLaunchProjects = projects;
+        }
+
+        private bool CanOpenVariantProject(object parameter)
+        {
+            if (_isOpeningProject)
+                return false;
+            if (!(parameter is ProjectViewModel project))
+                return true;
+            return WordDataPathHelper.IsVariantFileAvailable(project.GroupId, project.ProjectId, 1);
+        }
+
         private bool _isOpeningProject;
 
         public void EnableProjectSelection()
@@ -183,6 +224,11 @@ namespace MOS_Word_app
 
         private void ExecuteOpenProject(object parameter)
         {
+            ExecuteOpenProject(parameter, openAsVariant: false);
+        }
+
+        private void ExecuteOpenProject(object parameter, bool openAsVariant)
+        {
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
 
@@ -193,14 +239,25 @@ namespace MOS_Word_app
             var project = (ProjectViewModel)parameter;
             DisableProjectSelection();
             {
-                if (string.IsNullOrEmpty(project.FilePath))
+                if (openAsVariant)
+                {
+                    string variantPath = WordDataPathHelper.FindVariantWorkingFile(project.GroupId, project.ProjectId, 1);
+                    if (string.IsNullOrEmpty(variantPath) || !File.Exists(variantPath))
+                    {
+                        EnableProjectSelection();
+                        ResultMessage = $"エラー: 類題ファイルが見つかりません: {variantPath ?? "パスが設定されていません"}";
+                        return;
+                    }
+                    project.FilePath = variantPath;
+                }
+                else if (string.IsNullOrEmpty(project.FilePath))
                 {
                     EnableProjectSelection();
                     ResultMessage = $"エラー: ファイルが見つかりません: {project.FilePath ?? "パスが設定されていません"}";
                     return;
                 }
                 // 作業ファイルが無い場合は正規テンプレート（互換元からの安全な生成を含む）から作成する。
-                if (!File.Exists(project.FilePath))
+                else if (!File.Exists(project.FilePath))
                 {
                     try
                     {
@@ -278,6 +335,7 @@ namespace MOS_Word_app
                             return;
                         }
 
+                        IsVariantMode = openAsVariant;
                         CurrentProject = project;
                         HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                         ShowAppBarRequested?.Invoke(this, EventArgs.Empty);

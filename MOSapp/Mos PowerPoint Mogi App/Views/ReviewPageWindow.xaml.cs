@@ -23,6 +23,7 @@ namespace MOS_PowerPoint_app.Views
         private Dictionary<int, bool[]> _projectTaskViewedStates;
         private int _groupId;
         private bool _isScoring;
+        private readonly bool _isVariantMode;
 
         public Action<int, int> OnNavigateToTask { get; set; }
         public Action<IReadOnlyCollection<int>, string> OnShowResultRequested { get; set; }
@@ -32,7 +33,8 @@ namespace MOS_PowerPoint_app.Views
             Dictionary<int, bool[]> completedStates,
             Dictionary<int, bool[]> flaggedStates,
             Dictionary<int, bool[]> viewedStates,
-            int groupId = 1)
+            int groupId = 1,
+            bool isVariantMode = false)
         {
             InitializeComponent();
             _remainingTime = remainingTime;
@@ -40,6 +42,9 @@ namespace MOS_PowerPoint_app.Views
             _projectTaskFlaggedStates = flaggedStates ?? new Dictionary<int, bool[]>();
             _projectTaskViewedStates = viewedStates ?? new Dictionary<int, bool[]>();
             _groupId = groupId;
+            _isVariantMode = isVariantMode;
+            if (_isVariantMode && ShowResultButton != null)
+                ShowResultButton.Visibility = Visibility.Collapsed;
 
             LoadAllProjects();
             InitializeTimer();
@@ -84,6 +89,27 @@ namespace MOS_PowerPoint_app.Views
         {
             try
             {
+                if (_isVariantMode)
+                {
+                    var variantProjects = VariantProblemWorkbook.GetProjectIds()
+                        .Select(projectId => new ReviewProjectInfo
+                        {
+                            ProjectTitle = $"プロジェクト {projectId}",
+                            Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                                .Select(task => new ReviewTaskInfo
+                                {
+                                    TaskTitle = $"タスク {task.TaskId}",
+                                    Description = task.Description,
+                                    ProjectId = projectId,
+                                    TaskId = task.TaskId
+                                })
+                                .ToList()
+                        })
+                        .ToList();
+                    ProjectsItemsControl.ItemsSource = variantProjects;
+                    return;
+                }
+
                 string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
                     "MOS模擬アプリ問題文一覧_PowerPoint.json");
                 if (!File.Exists(jsonPath))

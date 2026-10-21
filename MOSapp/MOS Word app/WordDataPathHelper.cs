@@ -76,6 +76,29 @@ namespace MOS_Word_app
             return FindFirstExisting(GetWorkingFolder(groupId), GetCompatibleFileNames(projectId));
         }
 
+        public static string GetVariantFolder(int groupId, int variantSetNo)
+        {
+            return Path.Combine(GetWorkingFolder(groupId), $"PracticeVariant{variantSetNo}");
+        }
+
+        public static string FindVariantWorkingFile(int groupId, int projectId, int variantSetNo = 1)
+        {
+            string folder = GetVariantFolder(groupId, variantSetNo);
+            return FindFirstExisting(folder, GetVariantFileNames(projectId, variantSetNo));
+        }
+
+        public static string FindVariantTemplateFile(int groupId, int projectId, int variantSetNo = 1)
+        {
+            string folder = Path.Combine(GetVariantFolder(groupId, variantSetNo), "Templates");
+            return FindFirstExisting(folder, GetVariantFileNames(projectId, variantSetNo));
+        }
+
+        public static bool IsVariantFileAvailable(int groupId, int projectId, int variantSetNo = 1)
+        {
+            string path = FindVariantWorkingFile(groupId, projectId, variantSetNo);
+            return !string.IsNullOrEmpty(path) && File.Exists(path);
+        }
+
         /// <summary>
         /// 正規テンプレートを返す。未配置時は旧リセット元の Initial、Initial\Initial
         /// 既存データを安全にコピーして正規配置を作る。
@@ -196,6 +219,16 @@ namespace MOS_Word_app
         private static string GetCanonicalFileName(int projectId)
         {
             return $"Project{projectId}{(projectId == 7 ? ".doc" : ".docx")}";
+        }
+
+        private static IEnumerable<string> GetVariantFileNames(int projectId, int variantSetNo)
+        {
+            yield return $"similar{variantSetNo}-{projectId}.docx";
+            yield return $"similar{variantSetNo}-{projectId}.doc";
+            yield return $"Project{projectId}.docx";
+            yield return $"Project{projectId}.doc";
+            yield return $"project{projectId}.docx";
+            yield return $"project{projectId}.doc";
         }
 
         private static IEnumerable<string> GetCompatibleFileNames(int projectId)
