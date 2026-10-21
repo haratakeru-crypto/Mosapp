@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「5月21日より5日間の…」の先頭の画像をクリックし、［図の形式］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［文字列の折り返し］→［狭く］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "画像以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：段落先頭の画像の折り返しが「狭く」になっている"
+    }
+  ]
+}

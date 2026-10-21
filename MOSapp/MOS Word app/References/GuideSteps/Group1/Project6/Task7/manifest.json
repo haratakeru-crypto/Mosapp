@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "2ページの最後の空白の段落をクリックし、［挿入］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［表］→［表の挿入］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "列数「3」・行数「13」を入力し、［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "表の1行目に「最高売上」「平均売上」「合計売上」と入力する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "表以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：2ページの最後に13行3列の表が作成されている"
+    }
+  ]
+}

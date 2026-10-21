@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「実施月」から「富士の水だより」までを選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［挿入］タブ→［表］→［文字列を表にする］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "列数「2」・行数「7」を確認し、［文字列の幅に合わせる］→［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "表以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：実施月から富士の水だよりまでが7行2列の表になっている"
+    }
+  ]
+}

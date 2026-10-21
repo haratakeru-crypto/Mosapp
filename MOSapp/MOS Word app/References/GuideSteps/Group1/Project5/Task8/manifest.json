@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 8,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "文末の画像をクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［図の形式］タブ→［背景の削除］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "背景が紫で表示され、髪と靴が削除範囲と認識されていることを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［保持する領域としてマーク］で髪と靴をドラッグする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "保持範囲を確認し、［変更を保持］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "画像以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：文末の画像の背景が削除されている（髪と靴は残っている）"
+    }
+  ]
+}
