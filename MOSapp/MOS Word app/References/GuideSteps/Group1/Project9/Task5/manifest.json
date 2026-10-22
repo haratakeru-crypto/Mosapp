@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "左側の赤線を確認し、［校閲］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［承諾］→［すべての変更履歴を反映し、変更の記録を停止］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "文書の左側の赤線が非表示になったことを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：変更履歴がすべて承認され、記録が停止している"
+    }
+  ]
+}

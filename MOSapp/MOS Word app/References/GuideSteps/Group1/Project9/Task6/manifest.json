@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［校閲］→［変更履歴の記録］→［変更履歴のロック］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "パスワードに「456」と入力して［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［変更履歴の記録］［承諾］［元に戻す］がグレー表示になっていることを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：変更履歴がロックされている"
+    }
+  ]
+}

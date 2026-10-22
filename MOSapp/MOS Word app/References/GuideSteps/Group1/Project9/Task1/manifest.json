@@ -1,0 +1,15 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "段落番号「4」を右クリックし、［1から再開］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "完成：「ゴールデンウィーク」の段落番号が「1」から始まっている"
+    }
+  ]
+}
