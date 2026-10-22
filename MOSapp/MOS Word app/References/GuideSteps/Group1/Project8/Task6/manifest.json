@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "最後のページのSmartArtをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［SmartArtのデザイン］→［色の変更］→［カラフル - アクセント2から3］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "SmartArt以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：SmartArtの色が「カラフル」「アクセント2から3」になっている"
+    }
+  ]
+}

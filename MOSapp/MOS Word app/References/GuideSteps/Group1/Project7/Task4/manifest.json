@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ファイル］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［名前を付けて保存］→［参照］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "ファイル名に「朗読会」、種類は［書式なし(*.txt)］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［保存］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "ファイルの変換は既定のまま［OK］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：「朗読会」がテキストファイルとして保存されている"
+    }
+  ]
+}

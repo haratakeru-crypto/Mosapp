@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "最下部の「TOP」図形を選択し、［挿入］→［リンク］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［このドキュメント内］→［文書の先頭］→［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "図形以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：最下部の「TOP」図形に文頭へ戻るリンクが挿入されている"
+    }
+  ]
+}
