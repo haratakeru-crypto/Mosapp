@@ -118,8 +118,9 @@ namespace MOSExcelMogiApp
                 // 終了処理中にカーソルを待機状態にする
                 this.Cursor = Cursors.Wait;
 
-                // AppBar が残ると OnLastWindowClose でプロセスが残ることがある
+                // AppBar / 隠れた Review が残るとプロセスが残ることがある
                 CloseAppBarForExit();
+                CloseLeftoverReviewPages();
 
                 // 試験終了スレッドが動いていれば、Kill 完了まで短時間待つ（即アプリ落とし対策）
                 try
@@ -153,6 +154,14 @@ namespace MOSExcelMogiApp
                 return;
             try { bar.Closed -= OnAppBarWindowClosed; } catch { /* ignore */ }
             try { bar.Close(); } catch { /* ignore */ }
+        }
+
+        private static void CloseLeftoverReviewPages()
+        {
+            foreach (var review in Application.Current.Windows.OfType<Views.ReviewPageWindow>().ToList())
+            {
+                try { review.Close(); } catch { /* ignore */ }
+            }
         }
         
         private void OnShowAppBarRequested(object sender, EventArgs e)

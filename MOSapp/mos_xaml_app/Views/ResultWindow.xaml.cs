@@ -484,6 +484,43 @@ namespace MOSExcelMogiApp.Views
             return text;
         }
 
+        private static void RestoreProjectSelectionAsMainWindow(MOSExcelMogiApp.MainWindow mainWindow)
+        {
+            if (mainWindow == null)
+                return;
+            Application.Current.MainWindow = mainWindow;
+            mainWindow.Show();
+            mainWindow.WindowState = WindowState.Normal;
+            mainWindow.Activate();
+            mainWindow.Focus();
+        }
+
+        private void CloseLeftoverExamWindows()
+        {
+            try
+            {
+                var windowsToClose = new List<Window>();
+                foreach (Window window in Application.Current.Windows)
+                {
+                    if (window == null || ReferenceEquals(window, this))
+                        continue;
+                    string name = window.GetType().Name;
+                    if (name == "AppBarWindow" || name == "UiTestAppBarWindow" || name == "ReviewPageWindow")
+                        windowsToClose.Add(window);
+                }
+
+                foreach (var window in windowsToClose)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] Closing leftover window: {window.GetType().Name}");
+                    try { window.Close(); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error closing leftover windows: {ex.Message}");
+            }
+        }
+
         private async void EndButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] EndButton_Click called");
@@ -554,7 +591,6 @@ namespace MOSExcelMogiApp.Views
                         {
                             System.Diagnostics.Debug.WriteLine("[ResultWindow] Creating new MainWindow");
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
                         }
                         else
                         {
@@ -572,10 +608,7 @@ namespace MOSExcelMogiApp.Views
                         
                         // MainWindowを確実に表示
                         System.Diagnostics.Debug.WriteLine("[ResultWindow] Showing MainWindow");
-                        mainWindow.Show();
-                        mainWindow.WindowState = WindowState.Normal;
-                        mainWindow.Activate();
-                        mainWindow.Focus();
+                        RestoreProjectSelectionAsMainWindow(mainWindow);
                     }
                     catch (Exception ex)
                     {
@@ -584,8 +617,7 @@ namespace MOSExcelMogiApp.Views
                         try
                         {
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
-                            mainWindow.Show();
+                            RestoreProjectSelectionAsMainWindow(mainWindow);
                         }
                         catch (Exception ex2)
                         {
@@ -604,35 +636,7 @@ namespace MOSExcelMogiApp.Views
                     waitWindow = null;
                 }
                 
-                // AppBarWindowを閉じる
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing AppBarWindows");
-                        var windowsToClose = new List<Window>();
-                        foreach (Window window in Application.Current.Windows)
-                        {
-                            if (window.GetType().Name == "AppBarWindow" || window.GetType().Name == "UiTestAppBarWindow")
-                            {
-                                windowsToClose.Add(window);
-                            }
-                        }
-                        
-                        foreach (var window in windowsToClose)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Closing window: {window.GetType().Name}");
-                            window.Close();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error closing AppBarWindows: {ex.Message}");
-                    }
-                }, DispatcherPriority.Normal);
-                
-                // ReviewPageWindowを閉じる処理は削除
-                // （非表示になっているため、ユーザーには見えず、アプリケーション終了時に自動的に閉じられる）
+                await Dispatcher.InvokeAsync(() => CloseLeftoverExamWindows(), DispatcherPriority.Normal);
                 
                 // 結果画面を閉じる
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing ResultWindow");
@@ -727,7 +731,6 @@ namespace MOSExcelMogiApp.Views
                         {
                             System.Diagnostics.Debug.WriteLine("[ResultWindow] Creating new MainWindow");
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
                         }
                         else
                         {
@@ -743,12 +746,9 @@ namespace MOSExcelMogiApp.Views
                             }
                         }
                         
-                        // MainWindowを確実に表示
+                        // MainWindowを確実に表示し、本体窓をプロジェクト選択へ戻す
                         System.Diagnostics.Debug.WriteLine("[ResultWindow] Showing MainWindow");
-                        mainWindow.Show();
-                        mainWindow.WindowState = WindowState.Normal;
-                        mainWindow.Activate();
-                        mainWindow.Focus();
+                        RestoreProjectSelectionAsMainWindow(mainWindow);
                     }
                     catch (Exception ex)
                     {
@@ -757,8 +757,7 @@ namespace MOSExcelMogiApp.Views
                         try
                         {
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
-                            mainWindow.Show();
+                            RestoreProjectSelectionAsMainWindow(mainWindow);
                         }
                         catch (Exception ex2)
                         {
@@ -777,35 +776,7 @@ namespace MOSExcelMogiApp.Views
                     waitWindow = null;
                 }
                 
-                // AppBarWindowを閉じる
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing AppBarWindows");
-                        var windowsToClose = new List<Window>();
-                        foreach (Window window in Application.Current.Windows)
-                        {
-                            if (window.GetType().Name == "AppBarWindow" || window.GetType().Name == "UiTestAppBarWindow")
-                            {
-                                windowsToClose.Add(window);
-                            }
-                        }
-                        
-                        foreach (var window in windowsToClose)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Closing window: {window.GetType().Name}");
-                            window.Close();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error closing AppBarWindows: {ex.Message}");
-                    }
-                }, DispatcherPriority.Normal);
-                
-                // ReviewPageWindowを閉じる処理は削除
-                // （非表示になっているため、ユーザーには見えず、アプリケーション終了時に自動的に閉じられる）
+                await Dispatcher.InvokeAsync(() => CloseLeftoverExamWindows(), DispatcherPriority.Normal);
                 
                 // 結果画面を閉じる
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing ResultWindow");

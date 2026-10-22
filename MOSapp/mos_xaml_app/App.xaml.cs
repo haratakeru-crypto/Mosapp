@@ -63,6 +63,7 @@ namespace MOSExcelMogiApp
             var main = new MainWindow();
             MainWindow = main;
             main.Show();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
 
             CloseStartupSplash();
 

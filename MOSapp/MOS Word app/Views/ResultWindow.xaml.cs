@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -476,17 +477,44 @@ namespace MOS_Word_app.Views
             }
         }
 
+        private static void RestoreProjectSelectionAsMainWindow(MOS_Word_app.MainWindow mainWindow)
+        {
+            if (mainWindow == null)
+                return;
+            (mainWindow.DataContext as MOS_Word_app.MainViewModel)?.EnableProjectSelection();
+            Application.Current.MainWindow = mainWindow;
+            mainWindow.Show();
+            mainWindow.Activate();
+        }
+
+        private void HideLeftoverExamWindows()
+        {
+            try
+            {
+                foreach (Window window in Application.Current.Windows)
+                {
+                    if (window == null || ReferenceEquals(window, this))
+                        continue;
+                    if (window is UiTestAppBarWindow || window is AppBarWindow || window is ReviewPageWindow)
+                    {
+                        try { window.Hide(); } catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] Error hiding leftover windows: " + ex.Message);
+            }
+        }
+
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            // プロジェクト一覧画面（MainWindow）を表示してから結果画面を閉じる
-            var mainWindow = System.Windows.Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
-            if (mainWindow != null)
-            {
-                (mainWindow.DataContext as MOS_Word_app.MainViewModel)?.EnableProjectSelection();
-                mainWindow.Show();
-                mainWindow.Activate();
-            }
-            this.Close();
+            var mainWindow = Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
+            if (mainWindow == null)
+                mainWindow = new MOS_Word_app.MainWindow();
+            RestoreProjectSelectionAsMainWindow(mainWindow);
+            HideLeftoverExamWindows();
+            Close();
         }
     }
 

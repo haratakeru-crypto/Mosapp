@@ -92,6 +92,7 @@ namespace MOS_Word_app
             {
                 Cursor = Cursors.Wait;
                 CloseAppBarForExit();
+                CloseLeftoverReviewPages();
                 WordApplicationManager.CloseWordApplicationForAppExit();
             }
             catch (Exception ex)
@@ -114,6 +115,14 @@ namespace MOS_Word_app
 
             try { bar.Closed -= OnAppBarWindowClosed; } catch { /* ignore */ }
             try { bar.Close(); } catch { /* ignore */ }
+        }
+
+        private static void CloseLeftoverReviewPages()
+        {
+            foreach (var review in Application.Current.Windows.OfType<Views.ReviewPageWindow>().ToList())
+            {
+                try { review.Close(); } catch { /* ignore */ }
+            }
         }
 
         private void OnShowAppBarRequested(object sender, EventArgs e)

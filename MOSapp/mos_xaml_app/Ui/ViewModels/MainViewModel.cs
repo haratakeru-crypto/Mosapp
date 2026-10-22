@@ -94,7 +94,7 @@ namespace Ui.ViewModels
         private string _resultMessage;
         private bool _isExcelOverlayVisible;
         private bool _isShutdownWaitOverlayVisible;
-        private bool _showScoreButton;
+        private bool _showScoreButton = true;
         private bool _showVariantButton;
         private bool _showAnswerGuide;
         private bool _isAnswerGuideOpen;
@@ -989,7 +989,7 @@ namespace Ui.ViewModels
         
         public string CurrentProjectName => CurrentProject?.Name ?? "プロジェクトが選択されていません";
 
-        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは表示。</summary>
         public bool ShowScoreButton
         {
             get => _showScoreButton;

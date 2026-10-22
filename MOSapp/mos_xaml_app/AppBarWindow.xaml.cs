@@ -1602,11 +1602,13 @@ namespace MOSExcelMogiApp
                     isVariantMode,
                     variantSetNo);
                 reviewWindow.OnNavigateToTask = (g, p, t) => NavigateToTask(p, t, g);
-                reviewWindow.Closed += (s, args) => 
+                reviewWindow.Closed += (s, args) =>
                 {
                     _isOpeningReviewPage = false;
-                    // レビューページが閉じられたらメインウィンドウを再表示
-                    this.Show();
+                    // 採点中に AppBar を Close 済みなら Show しない（閉じた Window への Show 例外を防ぐ）
+                    if (!IsLoaded)
+                        return;
+                    Show();
                 };
                 
                 // ShowDialog()ではなくShow()を使用
@@ -1617,8 +1619,8 @@ namespace MOSExcelMogiApp
                 _isOpeningReviewPage = false;
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                // エラーが発生した場合はメインウィンドウを再表示
-                this.Show();
+                if (IsLoaded)
+                    Show();
             }
         }
 

@@ -980,17 +980,6 @@ namespace MOSExcelMogiApp.Views
                     }
 
                     System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] ResultWindow initial presentation gate passed");
-                    
-                    // Application.Current.MainWindowをResultWindowへ切り替える
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        var resultWindow = Application.Current.Windows.OfType<ResultWindow>().FirstOrDefault();
-                        if (resultWindow != null)
-                        {
-                            Application.Current.MainWindow = resultWindow;
-                            System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Set Application.Current.MainWindow to ResultWindow");
-                        }
-                    }, DispatcherPriority.Normal);
                 }
                 catch (Exception ex)
                 {
