@@ -156,6 +156,8 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="MainViewModel.cs" />
+    <Compile Include="Guide\AnswerGuideManifest.cs" />
+    <Compile Include="Guide\GuideStepsRepository.cs" />
     <Compile Include="WordDataPathHelper.cs" />
     <Compile Include="VariantProblemWorkbook.cs" />
     <Compile Include="WordProjectResetHelper.cs" />
@@ -181,6 +183,10 @@
     <Page Include="TabSearchWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\AnswerGuideWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="Views\UiTestAppBarWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -210,6 +216,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Compile Include="Views\AnswerGuideWindow.xaml.cs">
+      <DependentUpon>AnswerGuideWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Views\UiTestAppBarWindow.xaml.cs">
       <DependentUpon>UiTestAppBarWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -286,6 +296,15 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\JSON\MOS模擬アプリ問題文一覧_Word.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\GuideSteps\Group*\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\GuideSteps\Group*\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\GuideSteps\README.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\Word類題_問題と解答.xlsx">

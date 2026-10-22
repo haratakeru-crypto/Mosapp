@@ -21,6 +21,7 @@ using WordApp = Microsoft.Office.Interop.Word.Application;
 using WordDoc = Microsoft.Office.Interop.Word.Document;
 using WordWindow = Microsoft.Office.Interop.Word.Window;
 using Libraries;
+using MOS_Word_app.Guide;
 
 namespace MOS_Word_app.Views
 {
@@ -112,6 +113,8 @@ namespace MOS_Word_app.Views
         private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private string _lastTaskStartKey;
+        private AnswerGuideWindow _answerGuideWindow;
+        private readonly MainViewModel _viewModel;
 
         public int CurrentProjectId => _currentProjectId;
         public int CurrentGroupId => _groupId;
@@ -119,12 +122,19 @@ namespace MOS_Word_app.Views
 
         private readonly bool _isVariantMode;
         
-        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, bool isVariantMode = false)
+        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, bool isVariantMode = false, MainViewModel viewModel = null)
         {
             InitializeComponent();
             _currentProjectId = projectId;
             _groupId = groupId; // グループIDを保存
             _isVariantMode = isVariantMode;
+            _viewModel = viewModel;
+            if (_viewModel != null)
+            {
+                DataContext = _viewModel;
+                _viewModel.CloseAnswerGuideRequested += OnCloseAnswerGuideRequested;
+                _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            }
             var scoreBtn = FindName("ScoreButton") as System.Windows.Controls.Button;
             if (scoreBtn != null)
                 scoreBtn.Visibility = showScoreButton ? Visibility.Visible : Visibility.Collapsed;
@@ -173,7 +183,11 @@ namespace MOS_Word_app.Views
         private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
         {
             ScoreResultWindow.TryBringOpenToFront();
-            Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                SetWindowPosition();
+                ClampAnswerGuideToScreen();
+            }), DispatcherPriority.Background);
         }
 
         private void SetWindowPosition()
@@ -264,6 +278,7 @@ namespace MOS_Word_app.Views
             {
                 _timer.Stop();
                 UpdateTimerDisplay();
+                CloseAnswerGuide();
             }
         }
         
@@ -355,6 +370,7 @@ namespace MOS_Word_app.Views
                 return;
             }
 
+            CloseAnswerGuide();
             _isScoring = true;
             var scoreButton = sender as System.Windows.Controls.Button;
             if (scoreButton != null)
@@ -621,6 +637,7 @@ namespace MOS_Word_app.Views
                     NextProjectButton.IsEnabled = nextEnabled;
                 if (CloseExamButton != null)
                     CloseExamButton.IsEnabled = closeEnabled;
+                ApplyNavigationLockState();
                 if (_nextProjectPendingAfterScoreResult)
                 {
                     _nextProjectPendingAfterScoreResult = false;
@@ -639,6 +656,8 @@ namespace MOS_Word_app.Views
                 NextProjectButton.IsEnabled = enabled;
             if (CloseExamButton != null)
                 CloseExamButton.IsEnabled = enabled;
+            if (AnswerGuideButton != null)
+                AnswerGuideButton.IsEnabled = enabled && !_isScoring;
         }
 
         /// <summary>
@@ -729,6 +748,8 @@ namespace MOS_Word_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             var owner = Application.Current.MainWindow;
             var result = owner != null
                 ? MessageBox.Show(owner, "アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question)
@@ -736,6 +757,7 @@ namespace MOS_Word_app.Views
             if (result != MessageBoxResult.Yes)
                 return;
             MOS_Word_app.Views.WordStartupInputGate.End();
+            CloseAnswerGuide();
             _timer?.Stop();
             SaveAllWordDocumentsAndQuitWord();
             this.Close();
@@ -745,6 +767,9 @@ namespace MOS_Word_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
+            CloseAnswerGuide();
             try
             {
                 // 「結果に戻る」モードの場合は、隠れている ResultWindow を再表示する
@@ -2087,6 +2112,8 @@ namespace MOS_Word_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             ScoreResultWindow.TryBringOpenToFront();
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
@@ -2148,6 +2175,8 @@ namespace MOS_Word_app.Views
         {
             if (_isMovingToNextProject)
                 return;
+
+            CloseAnswerGuide();
 
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
             if (_currentProjectId >= maxProjectId)
@@ -2422,6 +2451,8 @@ namespace MOS_Word_app.Views
         
         private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             try
             {
                 var result = MessageBox.Show(
@@ -2926,11 +2957,164 @@ namespace MOS_Word_app.Views
             }
         }
         
+        private void OnCloseAnswerGuideRequested(object sender, EventArgs e)
+        {
+            CloseAnswerGuide();
+        }
+
+        private void AnswerGuideButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isScoring || _isScoreResultOpen)
+                return;
+
+            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
+                return;
+
+            if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+            {
+                _answerGuideWindow.BringToFrontPassive();
+                return;
+            }
+
+            OpenAnswerGuide();
+        }
+
+        private void OpenAnswerGuide()
+        {
+            var tasks = GuideStepsRepository.LoadProjectTasks(_groupId, _currentProjectId);
+            CloseAnswerGuide();
+
+            _answerGuideWindow = new AnswerGuideWindow(_groupId, _currentProjectId, tasks, () => _currentTaskId)
+            {
+                Owner = this
+            };
+            _answerGuideWindow.Closed += AnswerGuideWindow_Closed;
+            _answerGuideWindow.ApplyInitialPlacement(GetAnswerGuidePreferredBoundsDip());
+            _answerGuideWindow.Show();
+            _answerGuideWindow.OpenForAppBarTask(_currentTaskId);
+            _viewModel?.SetAnswerGuideOpen(true);
+            ApplyNavigationLockState();
+        }
+
+        private void AnswerGuideWindow_Closed(object sender, EventArgs e)
+        {
+            if (sender is AnswerGuideWindow window)
+                window.Closed -= AnswerGuideWindow_Closed;
+
+            if (ReferenceEquals(_answerGuideWindow, sender))
+                _answerGuideWindow = null;
+
+            _viewModel?.SetAnswerGuideOpen(false);
+            ApplyNavigationLockState();
+        }
+
+        private void CloseAnswerGuide()
+        {
+            if (_answerGuideWindow == null)
+            {
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+                return;
+            }
+
+            try
+            {
+                _answerGuideWindow.Closed -= AnswerGuideWindow_Closed;
+                if (_answerGuideWindow.IsVisible)
+                    _answerGuideWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] CloseAnswerGuide: {ex.Message}");
+            }
+            finally
+            {
+                _answerGuideWindow = null;
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+            }
+        }
+
+        private Rect GetAnswerGuidePreferredBoundsDip()
+        {
+            double width = 720;
+            double height = 640;
+            double left = SystemParameters.WorkArea.Right - width - 24;
+            double top = SystemParameters.WorkArea.Top + 24;
+
+            try
+            {
+                IntPtr wordHwnd = TryGetWordMainWindowHandle();
+                if (wordHwnd != IntPtr.Zero && GetWindowRect(wordHwnd, out RECT wordRect))
+                {
+                    var source = PresentationSource.FromVisual(this);
+                    Matrix transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+                    var topLeft = transform.Transform(new Point(wordRect.left, wordRect.top));
+                    var bottomRight = transform.Transform(new Point(wordRect.right, wordRect.bottom));
+                    double wordWidth = Math.Max(0, bottomRight.X - topLeft.X);
+                    left = topLeft.X + Math.Max(24, wordWidth - width - 24);
+                    top = topLeft.Y + 24;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] GetAnswerGuidePreferredBoundsDip: {ex.Message}");
+            }
+
+            return new Rect(left, top, width, height);
+        }
+
+        private void ClampAnswerGuideToScreen()
+        {
+            try
+            {
+                if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+                    _answerGuideWindow.ClampToScreen();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] ClampAnswerGuideToScreen: {ex.Message}");
+            }
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsAnswerGuideOpen) ||
+                e.PropertyName == nameof(MainViewModel.IsNavigationLocked) ||
+                e.PropertyName == nameof(MainViewModel.ShowAnswerGuideEffective))
+            {
+                ApplyNavigationLockState();
+            }
+        }
+
+        private void ApplyNavigationLockState()
+        {
+            bool scoringBusy = _isScoring || _isScoreResultOpen;
+            bool navigationEnabled = !scoringBusy && !(_viewModel?.IsNavigationLocked ?? false);
+
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = navigationEnabled;
+            if (ResetButton != null)
+                ResetButton.IsEnabled = navigationEnabled;
+            if (NextProjectButton != null)
+                NextProjectButton.IsEnabled = navigationEnabled;
+            if (CloseExamButton != null)
+                CloseExamButton.IsEnabled = navigationEnabled;
+            if (AnswerGuideButton != null)
+                AnswerGuideButton.IsEnabled = !scoringBusy;
+        }
+
         protected override void OnClosed(EventArgs e)
         {
             _isClosed = true;
+            CloseAnswerGuide();
             _timer?.Stop();
             _projectTimer?.Stop();
+            if (_viewModel != null)
+            {
+                _viewModel.CloseAnswerGuideRequested -= OnCloseAnswerGuideRequested;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            }
             base.OnClosed(e);
         }
     }

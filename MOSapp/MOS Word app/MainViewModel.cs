@@ -44,6 +44,8 @@ namespace MOS_Word_app
         private int _selectedTabIndex;
         private string _resultMessage;
         private bool _showScoreButton;
+        private bool _showAnswerGuide;
+        private bool _isAnswerGuideOpen;
         private TabTaskInfo _currentTabTask;
         private ProjectViewModel _currentProject;
 
@@ -123,6 +125,63 @@ namespace MOS_Word_app
         {
             get => _showScoreButton;
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
+        }
+
+        /// <summary>解答手順ガイドの表示。デフォルトは非表示。</summary>
+        public bool ShowAnswerGuide
+        {
+            get => _showAnswerGuide;
+            set
+            {
+                if (_showAnswerGuide == value)
+                    return;
+                _showAnswerGuide = value;
+                OnPropertyChanged(nameof(ShowAnswerGuide));
+                NotifyAnswerGuideStateChanged();
+                if (!value)
+                    RequestCloseAnswerGuide();
+            }
+        }
+
+        /// <summary>Group1 通常教材かつオプション ON のときだけ手順ボタンを出す。</summary>
+        public bool ShowAnswerGuideEffective
+        {
+            get
+            {
+                if (!ShowAnswerGuide || IsVariantMode)
+                    return false;
+                return CurrentProject == null || CurrentProject.GroupId == 1;
+            }
+        }
+
+        /// <summary>解答手順ガイド表示中。</summary>
+        public bool IsAnswerGuideOpen => _isAnswerGuideOpen;
+
+        /// <summary>リセット・レビュー・次プロ・終了を抑止する統合ロック。</summary>
+        public bool IsNavigationLocked => _isAnswerGuideOpen;
+
+        public event EventHandler CloseAnswerGuideRequested;
+
+        public void SetAnswerGuideOpen(bool open)
+        {
+            if (_isAnswerGuideOpen == open)
+                return;
+            _isAnswerGuideOpen = open;
+            OnPropertyChanged(nameof(IsAnswerGuideOpen));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        public void RequestCloseAnswerGuide()
+        {
+            CloseAnswerGuideRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void NotifyAnswerGuideStateChanged()
+        {
+            OnPropertyChanged(nameof(ShowAnswerGuideEffective));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
         }
 
         public event EventHandler ShowAppBarRequested;
@@ -337,6 +396,9 @@ namespace MOS_Word_app
 
                         IsVariantMode = openAsVariant;
                         CurrentProject = project;
+                        NotifyAnswerGuideStateChanged();
+                        if (IsVariantMode)
+                            RequestCloseAnswerGuide();
                         HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                         ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
                         ApplyExamWindowLayoutFromOpenProject();

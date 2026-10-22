@@ -141,7 +141,7 @@ namespace MOS_Word_app
             if (needRecreate)
             {
                 var oldAppBar = _appBarWindow;
-                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, false, _viewModel.IsVariantMode);
+                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, false, _viewModel.IsVariantMode, _viewModel);
                 _appBarWindow.Closed += OnAppBarWindowClosed;
                 oldAppBar?.Close();
             }
