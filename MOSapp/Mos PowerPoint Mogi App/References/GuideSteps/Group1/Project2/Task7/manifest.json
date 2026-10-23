@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド6を選ぶ→箇条書きプレースホルダーを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［アニメーション］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［効果のオプション］→［プラス］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［効果のオプション］→［すべて同時］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "プレースホルダー以外をクリックして選択解除"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：スライド「今年度募集について」の箇条書きが「プラス」ですべて同時に動く"
+    }
+  ]
+}

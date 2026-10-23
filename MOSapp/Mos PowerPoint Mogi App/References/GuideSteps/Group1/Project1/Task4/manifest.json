@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド6の箇条書きプレースホルダーを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ホーム］→［段の追加または削除］→［2段組み］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "プレースホルダー以外をクリックし、選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド6の箇条書きが2段組みになっている"
+    }
+  ]
+}

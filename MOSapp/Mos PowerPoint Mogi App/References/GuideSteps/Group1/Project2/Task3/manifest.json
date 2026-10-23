@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド3をクリック→［Shift］＋スライド5"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［画面切り替え］→［切り替え効果］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［切り替え］を選択"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド3・4・5に「切り替え」が設定されている"
+    }
+  ]
+}

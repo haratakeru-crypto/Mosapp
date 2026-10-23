@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド8を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ホーム］→［セクション］→［セクションの追加］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［セクション名］に「まとめ」と入力して［名前の変更］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "セクション「まとめ」が追加されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド8にセクション「まとめ」が追加されている"
+    }
+  ]
+}

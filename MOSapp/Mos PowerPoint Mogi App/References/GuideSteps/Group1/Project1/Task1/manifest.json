@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド3を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ホーム］→［新しいスライド］→［テーブルスライド］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "スライド3の後ろに挿入されたことを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド4に「テーブルスライド」が挿入されている"
+    }
+  ]
+}

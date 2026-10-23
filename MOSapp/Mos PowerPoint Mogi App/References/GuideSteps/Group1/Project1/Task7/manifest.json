@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［タイトルなしのセクション］を右クリック→［セクション名の変更］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［セクション名］に「はじめに」と入力して［名前の変更］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "セクション名が「はじめに」になったことを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド1のセクション名が「はじめに」になっている"
+    }
+  ]
+}
