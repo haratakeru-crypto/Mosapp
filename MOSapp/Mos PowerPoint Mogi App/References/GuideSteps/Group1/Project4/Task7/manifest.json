@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド2を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "テキストボックスを選ぶ→［図形の書式］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［図形の塗りつぶし］→［青、アクセント1、白+基本色60％］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［図形の枠線］→［濃い青］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［図形の枠線］→［太さ］→［0.75pt］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "テキストボックス以外をクリックして選択解除"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スライド2のテキストボックスに青、アクセント1、白+基本色60％＋枠線濃い青0.75pt"
+    }
+  ]
+}

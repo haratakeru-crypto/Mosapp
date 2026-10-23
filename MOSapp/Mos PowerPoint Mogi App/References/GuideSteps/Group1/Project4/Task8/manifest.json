@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 8,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド3を選ぶ→テキストボックスを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［図形の書式］→［配置］→［上下中央揃え］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "テキストボックス以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド3のテキストボックスを垂直中央に配置"
+    }
+  ]
+}

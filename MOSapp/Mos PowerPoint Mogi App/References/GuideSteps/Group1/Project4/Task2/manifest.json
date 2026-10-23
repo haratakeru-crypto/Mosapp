@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド4を選ぶ→「いつでも体験可能です！」をクリック"
+    },
+    {
+      "image": "step02.png",
+      "caption": "テキストボックスを確認する→文字列をドラッグ"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［図形の書式］→［文字の塗りつぶし］→［青、アクセント1］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "テキストボックス以外をクリックして選択解除"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド4の「いつでも体験可能です！」が青、アクセント1"
+    }
+  ]
+}

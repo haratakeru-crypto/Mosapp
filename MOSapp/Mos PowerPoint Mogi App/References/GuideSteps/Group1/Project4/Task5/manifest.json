@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド5を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "左の画像を選ぶ→［Shift］＋右の画像"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［図の形式］→［配置］→［上揃え］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "2つの画像以外をクリックして選択解除"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド5の右画像を左画像の上端に合わせる"
+    }
+  ]
+}

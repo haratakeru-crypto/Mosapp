@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド6を選ぶ→箇条書きプレースホルダーを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ホーム］→［SmartArtに変換］→［その他のSmartArtグラフィック］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［リスト］→［ターゲットリスト］→［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "SmartArt以外をクリックして選択解除"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド6の箇条書きがターゲットリスト"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド3を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［挿入］→［ズーム］→［スライドズーム］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "3スライドを選ぶ→［挿入］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "挿入を確認する→選択解除"
+    },
+    {
+      "image": "step05.png",
+      "caption": "前面のサムネイルを右下へドラッグ"
+    },
+    {
+      "image": "step06.png",
+      "caption": "最背面のサムネイルを左下へドラッグ"
+    },
+    {
+      "image": "step07.png",
+      "caption": "中央のサムネイルを下へドラッグ→選択解除"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：機能の概要にスライドズーム3リンク"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド7を選ぶ→［SmartArtグラフィックの挿入］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［手順］→［タイムライン］→［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "SmartArtとテキストウィンドウを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "「コンテンツ」→「デザイン」と入力"
+    },
+    {
+      "image": "step05.png",
+      "caption": "3行目を選ぶ→［Backspace］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "SmartArt以外をクリックして選択解除"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スライド7にタイムライン（コンテンツ／デザイン）"
+    }
+  ]
+}

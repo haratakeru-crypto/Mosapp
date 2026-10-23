@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド10を選ぶ→3Dモデルを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［3Dモデル］→［ビュー］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［上前面］を選ぶ"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［高さ］→「6.5」"
+    },
+    {
+      "image": "step05.png",
+      "caption": "3Dモデル以外をクリックして選択解除"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：スライド10の3Dモデルが上前面（高さ6.5）"
+    }
+  ]
+}
