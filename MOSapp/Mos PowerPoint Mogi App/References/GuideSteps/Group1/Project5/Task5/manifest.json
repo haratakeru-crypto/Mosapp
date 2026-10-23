@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド6を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "左の図形を選ぶ→［Shift］で中央と右の図形を選ぶ"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［図形の書式］→［グループ化］→［グループ化］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "ハンドルが3つの図形全体に付いていることを確認"
+    },
+    {
+      "image": "step05.png",
+      "caption": "図形以外をクリックして選択解除"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：スライド6の3つの論理積ゲートをグループ化"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ファイル］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［印刷］→［ノート］→［3スライド］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［カラー］→［グレースケール］→部数「4」"
+    },
+    {
+      "image": "step04.png",
+      "caption": "プレビューがグレースケールの［配布資料］になったことを確認"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［ホームに戻る］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：グレースケールの配布資料を3スライド/頁・4部"
+    }
+  ]
+}

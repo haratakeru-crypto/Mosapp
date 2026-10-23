@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド5を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "大きい四角を選ぶ→［図形の書式］→［幅］をコピー"
+    },
+    {
+      "image": "step03.png",
+      "caption": "小さい四角を選ぶ→［幅］に貼り付け"
+    },
+    {
+      "image": "step04.png",
+      "caption": "図形以外をクリックして選択解除"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド5の小さい四角を他の四角と同じ幅にする"
+    }
+  ]
+}

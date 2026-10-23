@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ファイル］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［印刷］→［フルページサイズのスライド］→［アウトライン］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「すべてのスライドを印刷」「部単位」を確認→部数「6」"
+    },
+    {
+      "image": "step04.png",
+      "caption": "プレビューが［アウトライン］になったことを確認"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［ホームに戻る］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：アウトラインを部単位に6部印刷"
+    }
+  ]
+}

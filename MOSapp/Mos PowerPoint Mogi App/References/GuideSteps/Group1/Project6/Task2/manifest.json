@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ファイル］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［情報］→［プレゼンテーションの保護］→［常に読み取り専用で開く］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "設定を確認→［ホームに戻る］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：プレゼンテーションを常に読み取り専用にする"
+    }
+  ]
+}
