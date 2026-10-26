@@ -36,6 +36,20 @@ namespace MosPracticeClient
             var settings = PracticeSubmitConfig.Load();
             var profile = ExamineeStore.Load();
             var scoredAt = DateTime.Now;
+            string attempt = "";
+            string range = "";
+            if (!string.IsNullOrEmpty(subject))
+            {
+                var logs = ScoringLogStore.Load(subject);
+                if (logs.Count > 0)
+                {
+                    var latest = logs[0];
+                    if (latest.ScoredAt != default(DateTime))
+                        scoredAt = latest.ScoredAt;
+                    attempt = logs.Count.ToString(CultureInfo.InvariantCulture);
+                    range = ScoringRangeSelection.ShortenRangeLabel(latest.RangeLabel);
+                }
+            }
             string at = scoredAt.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
 
             var result = new PracticeSubmitResult();
@@ -62,7 +76,9 @@ namespace MosPracticeClient
                 wrongCount,
                 scoredAt,
                 subject,
-                settings.QrPathId);
+                settings.QrPathId,
+                attempt,
+                range);
 
             try
             {
@@ -74,6 +90,10 @@ namespace MosPracticeClient
                     ["scoredAt"] = at,
                     ["subject"] = subject ?? ""
                 };
+                if (!string.IsNullOrEmpty(attempt))
+                    body["attempt"] = attempt;
+                if (!string.IsNullOrEmpty(range))
+                    body["range"] = range;
                 if (!string.IsNullOrWhiteSpace(profile.ClassroomName))
                     body["classroomName"] = profile.ClassroomName;
 

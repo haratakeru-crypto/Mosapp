@@ -35,6 +35,7 @@ namespace MosPracticeClient
     {
         const string FromProblemText = "問題文の中からキーワードを探し、そのキーワードがどこかを探します";
         const string KeywordOnlyText = "キーワードが表示されて、そのキーワードがどこのタブ・ボタン／関数かを探します。下から練習する種類を選んでください。";
+        const string KeywordOnlyTabText = "キーワードが表示されて、そのキーワードがどこのタブ・ボタンかを探します。下から練習する種類を選んでください。";
 
         static readonly SolidColorBrush SelectedBackground = Freeze(Color.FromRgb(0xFF, 0x5A, 0x36));
         static readonly SolidColorBrush SelectedForeground = Brushes.White;
@@ -56,6 +57,20 @@ namespace MosPracticeClient
         /// <summary>パスワードが合ったときだけ出る。位置設定モードを開く。</summary>
         public event EventHandler SettingsRequested;
 
+        /// <summary>Excel は関数練習がある。Word / PowerPoint は false にして「関数」「両方」を出さない。</summary>
+        public static readonly DependencyProperty ShowFunctionCategoriesProperty =
+            DependencyProperty.Register(
+                nameof(ShowFunctionCategories),
+                typeof(bool),
+                typeof(VocabularyTabControl),
+                new PropertyMetadata(true, OnShowFunctionCategoriesChanged));
+
+        public bool ShowFunctionCategories
+        {
+            get => (bool)GetValue(ShowFunctionCategoriesProperty);
+            set => SetValue(ShowFunctionCategoriesProperty, value);
+        }
+
         public VocabularyTabControl()
         {
             InitializeComponent();
@@ -73,7 +88,6 @@ namespace MosPracticeClient
         void KeywordOnlyButton_Click(object sender, RoutedEventArgs e)
         {
             _mode = Mode.KeywordOnly;
-            DescriptionText.Text = KeywordOnlyText;
             ApplyModeVisuals();
         }
 
@@ -130,6 +144,17 @@ namespace MosPracticeClient
             CategoryPanel.Visibility = keywordMode ? Visibility.Visible : Visibility.Collapsed;
             SettingsButton.Visibility = keywordMode ? Visibility.Visible : Visibility.Collapsed;
 
+            bool showFunctions = ShowFunctionCategories;
+            CategoryFunctionButton.Visibility = showFunctions ? Visibility.Visible : Visibility.Collapsed;
+            CategoryBothButton.Visibility = showFunctions ? Visibility.Visible : Visibility.Collapsed;
+            if (!showFunctions && (_category == VocabularyCategory.Function || _category == VocabularyCategory.Both))
+                _category = VocabularyCategory.None;
+
+            if (_mode == Mode.FromProblem)
+                DescriptionText.Text = FromProblemText;
+            else if (keywordMode)
+                DescriptionText.Text = showFunctions ? KeywordOnlyText : KeywordOnlyTabText;
+
             bool canStart = keywordMode && _category != VocabularyCategory.None;
             StartButton.Visibility = canStart ? Visibility.Visible : Visibility.Collapsed;
 
@@ -145,6 +170,11 @@ namespace MosPracticeClient
             ApplyCategoryButton(CategoryTabButton, _category == VocabularyCategory.TabButton);
             ApplyCategoryButton(CategoryFunctionButton, _category == VocabularyCategory.Function);
             ApplyCategoryButton(CategoryBothButton, _category == VocabularyCategory.Both);
+        }
+
+        static void OnShowFunctionCategoriesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            ((VocabularyTabControl)d).ApplyModeVisuals();
         }
 
         static void ApplyCategoryButton(Button button, bool selected)

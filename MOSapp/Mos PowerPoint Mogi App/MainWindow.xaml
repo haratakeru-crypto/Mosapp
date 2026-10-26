@@ -208,7 +208,7 @@
                 </ScrollViewer>
             </TabItem>
             <TabItem Header="単語帳">
-                <mos:VocabularyTabControl/>
+                <mos:VocabularyTabControl ShowFunctionCategories="False"/>
             </TabItem>
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">

@@ -52,6 +52,17 @@ namespace MosPracticeClient
                 .ToList();
         }
 
+        public static string ShortenRangeLabel(string rangeLabel)
+        {
+            string label = (rangeLabel ?? "").Trim();
+            if (label.Length == 0) return "";
+            if (label == "すべてのプロジェクト") return "すべて";
+            const string prefix = "プロジェクト";
+            if (label.StartsWith(prefix, StringComparison.Ordinal))
+                return "P" + label.Substring(prefix.Length);
+            return label;
+        }
+
         public static string FormatRangeLabel(ScoringRangeKind kind, IReadOnlyList<int> selectedIds)
         {
             switch (kind)
