@@ -34,8 +34,11 @@
                           Margin="0,0,15,0"
                           VerticalAlignment="Center"
                           FontSize="14"/>
-                <!-- 類題ボタンの表示の位置を空ける（Excelのみ） -->
-                <FrameworkElement Width="145" Margin="0,0,15,0"/>
+                <CheckBox Content="解答手順ガイドの表示"
+                          IsChecked="{Binding ShowAnswerGuide, Mode=TwoWay}"
+                          Margin="0,0,15,0"
+                          VerticalAlignment="Center"
+                          FontSize="14"/>
                 <!-- 全プロジェクトリセットボタン -->
                 <Button Content="全プロジェクトリセット"
                         Command="{Binding ResetAllProjectsCommand}"
