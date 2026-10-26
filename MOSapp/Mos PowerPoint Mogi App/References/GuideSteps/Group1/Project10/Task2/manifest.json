@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［表示］→［スライドマスター］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［スライドマスター］を確認→スライド1-7を選ぶ"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［挿入］→［スライド番号］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［ヘッダーとフッター］を確認→［スライド番号］をオン→［適用］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［スライドマスター］→［マスター表示を閉じる］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "すべてのスライド右下にスライド番号を確認"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スライドマスターにスライド番号"
+    }
+  ]
+}

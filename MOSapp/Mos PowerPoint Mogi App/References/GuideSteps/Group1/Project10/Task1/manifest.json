@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［表示］→［スライドマスター］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［スライドマスター］を確認→スライド1-7を選ぶ→［テーマ］→「木版活字」"
+    },
+    {
+      "image": "step03.png",
+      "caption": "テーマ変更を確認→［マスター表示を閉じる］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライドマスターにテーマ「木版活字」"
+    }
+  ]
+}

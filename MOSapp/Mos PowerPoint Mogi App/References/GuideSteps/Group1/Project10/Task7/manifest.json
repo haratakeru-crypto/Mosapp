@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［表示］→［配布資料マスター］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［配布資料マスター］を確認→［日付］をオフ→日付のプレースホルダー削除を確認"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［マスター表示を閉じる］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：配布資料マスターの日付を削除"
+    }
+  ]
+}

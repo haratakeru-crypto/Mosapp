@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド5を選ぶ→ビデオを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［再生］→［ビデオのトリミング］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ビデオのトリミング］を確認→開始「00:04」→終了「00:09」→［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "動画以外をクリックして選択解除"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド5のビデオが4秒〜9秒"
+    }
+  ]
+}

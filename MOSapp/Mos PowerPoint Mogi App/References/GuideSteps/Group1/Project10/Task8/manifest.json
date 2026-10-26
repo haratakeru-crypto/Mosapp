@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 8,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［表示］→［配布資料マスター］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［配布資料マスター］を確認→［フッター］に「四季を楽しむ」と入力→［マスター表示を閉じる］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：配布資料マスターのフッターに「四季を楽しむ」"
+    }
+  ]
+}
