@@ -69,8 +69,8 @@
                 </ItemsControl>
             </StackPanel>
 
-            <!-- Reason 行（×のときだけ「詳細」） -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20">
+            <!-- Reason 行は一旦非表示。Word の詳細誤答理由は未完成のため学生に見せない。戻すときは Visibility を外す。 -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20" Visibility="Collapsed">
                 <TextBlock Text="Reason" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <ItemsControl x:Name="ReasonsPanel" ItemsSource="{Binding}">
                     <ItemsControl.ItemsPanel>

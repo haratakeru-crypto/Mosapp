@@ -562,6 +562,7 @@ namespace MOS_Word_app.Views
                 {
                     scoreButton.IsEnabled = true;
                 }
+                ApplyNavigationLockState();
             }
         }
 

@@ -534,6 +534,7 @@ namespace MOS_Word_app.Views
         public Brush ResultColor { get; set; }
         /// <summary>×のときの学生向け理由。〇・時間切れは空。</summary>
         public string FailReason { get; set; }
-        public bool HasFailReason => ResultMark == "✖" && !string.IsNullOrEmpty(FailReason);
+        /// <summary>Word の詳細誤答理由は未完成のため、学生向け「詳細」は出さない。</summary>
+        public bool HasFailReason => false;
     }
 }

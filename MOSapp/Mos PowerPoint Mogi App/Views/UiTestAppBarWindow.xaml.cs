@@ -1224,6 +1224,7 @@ namespace MOS_PowerPoint_app.Views
                 CloseInstantScoringOverlay();
                 if (scoreButton != null)
                     scoreButton.IsEnabled = true;
+                ApplyNavigationLockState();
             }
         }
 
@@ -1290,6 +1291,7 @@ namespace MOS_PowerPoint_app.Views
             bool scoreEnabled = ScoreButton == null || ScoreButton.IsEnabled;
             bool nextEnabled = NextProjectButton == null || NextProjectButton.IsEnabled;
             bool closeEnabled = CloseExamButton == null || CloseExamButton.IsEnabled;
+            bool guideEnabled = AnswerGuideButton == null || AnswerGuideButton.IsEnabled;
             SetScoreResultActionsEnabled(false);
             _isScoreResultOpen = true;
             try
@@ -1310,6 +1312,8 @@ namespace MOS_PowerPoint_app.Views
                     NextProjectButton.IsEnabled = nextEnabled;
                 if (CloseExamButton != null)
                     CloseExamButton.IsEnabled = closeEnabled;
+                if (AnswerGuideButton != null)
+                    AnswerGuideButton.IsEnabled = guideEnabled;
                 if (_examResultPendingAfterScoreResult)
                 {
                     _examResultPendingAfterScoreResult = false;
