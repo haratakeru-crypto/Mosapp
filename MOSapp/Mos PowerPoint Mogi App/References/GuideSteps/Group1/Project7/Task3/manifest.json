@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド6を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ホーム］→［新しいスライド］→［アウトラインからスライド］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［アウトラインの挿入］を確認→「まとめ.docx」を選ぶ→［挿入］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "スライド7が挿入されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド6の後ろに「まとめ」のアウトラインからスライド"
+    }
+  ]
+}

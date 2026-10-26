@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド5を選ぶ→［Shift］を押しながらスライド6を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［挿入］→［ヘッダーとフッター］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ヘッダーとフッター］を確認→既存の文字列を削除し「参考事例」と入力→［適用］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "スライド5と6のフッターのみ「参考事例」に変わったことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド5・6のフッターに「参考事例」"
+    }
+  ]
+}

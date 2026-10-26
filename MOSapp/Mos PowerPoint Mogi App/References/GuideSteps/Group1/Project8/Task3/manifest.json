@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［デザイン］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［スライドのサイズ］→［ユーザー設定のスライドのサイズ］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［スライドのサイズ］を確認→［スライドのサイズ指定］→「画面に合わせる（16:9）」→［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライドのサイズが「画面に合わせる16：9」"
+    }
+  ]
+}

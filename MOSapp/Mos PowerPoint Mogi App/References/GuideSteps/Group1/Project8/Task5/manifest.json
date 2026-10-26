@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［表示］→［グレースケール］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "スライド2を選ぶ→イラストを選ぶ→［明るいグレースケール］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "イラスト以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド2のイラストが明るいグレースケール"
+    }
+  ]
+}

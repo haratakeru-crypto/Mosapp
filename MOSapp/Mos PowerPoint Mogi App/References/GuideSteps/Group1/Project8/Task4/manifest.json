@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［デザイン］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［スライドのサイズ］→［ユーザー設定のスライドのサイズ］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［スライドのサイズ］を確認→［幅］に「27.54」→［高さ］に「17.46」→［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［サイズに合わせて調整］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライドの大きさが高さ17.46cm・幅27.54cm"
+    }
+  ]
+}

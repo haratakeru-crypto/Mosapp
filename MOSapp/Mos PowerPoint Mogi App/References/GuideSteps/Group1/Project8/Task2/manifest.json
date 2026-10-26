@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド1を選ぶ→［デザイン］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［背景の書式設定］→作業ウィンドウを確認"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［塗りつぶしの色］→「濃い緑、テキスト2、白+基本色80％」を選ぶ"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［閉じる］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド1の背景が「濃い緑、テキスト2、白+基本色80％」"
+    }
+  ]
+}
