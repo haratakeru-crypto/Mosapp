@@ -59,6 +59,23 @@
                            Foreground="#1E40AF" 
                            HorizontalAlignment="Center"
                            Margin="0,0,0,30"/>
+
+                <StackPanel x:Name="TotalScorePanel"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,24"
+                            Visibility="Collapsed">
+                    <TextBlock Text="総合点"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="#374151"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TotalScoreTextBlock"
+                               Text=""
+                               FontSize="48"
+                               FontWeight="Bold"
+                               Foreground="#1E40AF"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
                 
                 <!-- 統計情報 -->
                 <Border Background="White" CornerRadius="8" Padding="30" Margin="0,0,0,20">

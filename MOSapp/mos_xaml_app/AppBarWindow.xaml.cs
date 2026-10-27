@@ -39,8 +39,14 @@ namespace MOSExcelMogiApp
         private int? _pendingTaskId = null;
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
-        private Dictionary<int, bool[]> _projectTaskCompletedStates = new Dictionary<int, bool[]>();
-        private Dictionary<int, bool[]> _projectTaskFlaggedStates = new Dictionary<int, bool[]>();
+        private readonly Dictionary<int, bool[]> _textbookTaskCompletedStates = new Dictionary<int, bool[]>();
+        private readonly Dictionary<int, bool[]> _variantTaskCompletedStates = new Dictionary<int, bool[]>();
+        private readonly Dictionary<int, bool[]> _textbookTaskFlaggedStates = new Dictionary<int, bool[]>();
+        private readonly Dictionary<int, bool[]> _variantTaskFlaggedStates = new Dictionary<int, bool[]>();
+        private Dictionary<int, bool[]> _projectTaskCompletedStates =>
+            _viewModel?.IsVariantMode == true ? _variantTaskCompletedStates : _textbookTaskCompletedStates;
+        private Dictionary<int, bool[]> _projectTaskFlaggedStates =>
+            _viewModel?.IsVariantMode == true ? _variantTaskFlaggedStates : _textbookTaskFlaggedStates;
         private bool _isPaused = false;
         private bool _fromResultWindow = false; // 結果画面から来たかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
@@ -2060,6 +2066,12 @@ namespace MOSExcelMogiApp
             if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
                 return;
 
+            if (_viewModel.IsVariantMode)
+            {
+                OpenVariantAnswerSteps();
+                return;
+            }
+
             if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
             {
                 _answerGuideWindow.BringToFrontPassive();
@@ -2067,6 +2079,34 @@ namespace MOSExcelMogiApp
             }
 
             OpenAnswerGuide();
+        }
+
+        private void OpenVariantAnswerSteps()
+        {
+            int projectId = _currentProjectId;
+            int taskId = _currentTaskId;
+            int setNo = _viewModel?.VariantSetNo ?? 1;
+            string steps = string.Empty;
+            try
+            {
+                VariantTaskText task = VariantProblemWorkbook.GetTasks(projectId)
+                    .FirstOrDefault(item => item.TaskId == taskId);
+                steps = task?.AnswerSteps ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OpenVariantAnswerSteps] {ex.Message}");
+            }
+
+            if (string.IsNullOrWhiteSpace(steps))
+                steps = "手順未登録";
+
+            var window = new AnswerStepsWindow($"類題{setNo} プロジェクト {projectId} タスク {taskId} 解答手順", steps)
+            {
+                Owner = this,
+                Topmost = true
+            };
+            window.ShowDialog();
         }
 
         private void OpenAnswerGuide()
@@ -2339,14 +2379,20 @@ namespace MOSExcelMogiApp
             CommandManager.InvalidateRequerySuggested();
         }
 
+        private int GetCurrentVariantSetNo()
+        {
+            return (_viewModel != null && _viewModel.IsVariantMode) ? _viewModel.VariantSetNo : 0;
+        }
+
         private void WriteCurrentTaskFile()
         {
             try
             {
                 if (_currentProjectId <= 0 || _currentTaskId <= 0) return;
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
-                string content = $"{_currentProjectId},{_currentTaskId},{attemptNo}";
-                File.WriteAllText(ExcelLogReader.GetCurrentTaskFilePath(), content, Encoding.UTF8);
+                int variantSetNo = GetCurrentVariantSetNo();
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId, variantSetNo);
+                var context = TaskLogContext.Create(_currentProjectId, _currentTaskId, attemptNo, variantSetNo);
+                File.WriteAllText(ExcelLogReader.GetCurrentTaskFilePath(), context.FormatCurrentTaskLine(), Encoding.UTF8);
             }
             catch (Exception ex)
             {
@@ -2372,7 +2418,7 @@ namespace MOSExcelMogiApp
             _pendingResultRetry = false;
             if (!_resultRetryIsWrong)
                 return;
-            int attemptNo = ExcelTaskAttemptRegistry.Increment(projectId, taskId);
+            int attemptNo = ExcelTaskAttemptRegistry.Increment(projectId, taskId, GetCurrentVariantSetNo());
             System.Diagnostics.Debug.WriteLine($"[ResultRetry] P{projectId} T{taskId} attempt={attemptNo}");
         }
 

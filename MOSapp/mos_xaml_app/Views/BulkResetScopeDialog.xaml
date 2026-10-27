@@ -1,0 +1,80 @@
+<Window x:Class="MOSExcelMogiApp.Views.BulkResetScopeDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="リセットする範囲"
+        Width="420"
+        SizeToContent="Height"
+        MinHeight="240"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        WindowStyle="SingleBorderWindow"
+        Background="White">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="リセットする範囲を選んでください。選択した側の作業ファイルは初期状態に戻ります。"
+                   FontSize="14" Foreground="#374151" TextWrapping="Wrap"
+                   Margin="0,0,0,16"/>
+
+        <StackPanel Grid.Row="1">
+            <RadioButton x:Name="ScopeTextbook" Content="演習" GroupName="ResetScope"
+                         Margin="0,0,0,8" FontSize="14" Checked="ScopeOption_Changed"/>
+            <RadioButton x:Name="ScopeVariant" Content="類題" GroupName="ResetScope"
+                         Margin="0,0,0,8" FontSize="14" Checked="ScopeOption_Changed"/>
+            <RadioButton x:Name="ScopeAll" Content="すべて" GroupName="ResetScope"
+                         Margin="0,0,0,8" FontSize="14" Checked="ScopeOption_Changed"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="2" x:Name="AllWarningText"
+                   Text="演習と類題の作業ファイルをすべて初期状態に戻します。編集内容は失われます。"
+                   FontSize="13" Foreground="#B91C1C" TextWrapping="Wrap"
+                   Margin="0,4,0,16"
+                   Visibility="Collapsed"/>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="リセット" Name="OkButton"
+                    Width="100" Height="32"
+                    Background="#B45309" Foreground="White"
+                    BorderThickness="0"
+                    IsDefault="True"
+                    IsEnabled="False"
+                    Click="OkButton_Click"
+                    Margin="0,0,10,0">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#D97706"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#FCD34D"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="キャンセル" Name="CancelButton"
+                    Width="100" Height="32"
+                    Background="#6B7280" Foreground="White"
+                    BorderThickness="0"
+                    IsCancel="True"
+                    Click="CancelButton_Click">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#4B5563"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

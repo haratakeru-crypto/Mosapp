@@ -1068,13 +1068,13 @@ namespace ExcelAddIn1
         /// 全ワークブックの構造・並べ替え/フィルター・テーブルスタイル・図形・ハイパーリンクは
         /// 各シートで <see cref="BuildSnapshot"/> を1回だけ実行してまとめて判定する。
         /// </summary>
-        private void FlushPendingBoundaryDiffsForTask(int projectId, int taskId, int attemptNo)
+        private void FlushPendingBoundaryDiffsForTask(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             if (projectId <= 0 || taskId <= 0) return;
             var capturedSheetKeys = new HashSet<string>(StringComparer.Ordinal);
             var cache = new SnapshotReadCache();
-            FlushPendingSelectedSheetsLayoutDiffsForTask(projectId, taskId, attemptNo, capturedSheetKeys, cache);
-            FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(projectId, taskId, attemptNo, capturedSheetKeys, cache);
+            FlushPendingSelectedSheetsLayoutDiffsForTask(projectId, taskId, attemptNo, variantSetNo, capturedSheetKeys, cache);
+            FlushPendingWorkbookSheetsBoundaryDiffsSinglePass(projectId, taskId, attemptNo, variantSetNo, capturedSheetKeys, cache);
         }
 
         /// <summary>
@@ -1085,6 +1085,7 @@ namespace ExcelAddIn1
             int projectId,
             int taskId,
             int attemptNo,
+            int variantSetNo,
             HashSet<string> alreadyCapturedSheetKeys,
             SnapshotReadCache cache)
         {
@@ -1130,7 +1131,7 @@ namespace ExcelAddIn1
                                 string sheetName = "";
                                 try { sheetName = ws.Name ?? "?"; } catch { sheetName = "?"; }
 
-                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                                Logger.RunWithTaskContext(projectId, taskId, attemptNo, variantSetNo, () =>
                                 {
                                 if (rowChanged)
                                 {
@@ -1204,6 +1205,7 @@ namespace ExcelAddIn1
             int projectId,
             int taskId,
             int attemptNo,
+            int variantSetNo,
             HashSet<string> capturedSheetKeys,
             SnapshotReadCache cache)
         {
@@ -1238,7 +1240,7 @@ namespace ExcelAddIn1
                         SheetLayoutSnapshot now = snap.Value;
                         if (!now.Equals(old))
                         {
-                            Logger.RunWithTaskContext(projectId, taskId, attemptNo, () =>
+                            Logger.RunWithTaskContext(projectId, taskId, attemptNo, variantSetNo, () =>
                             {
                                 CompareAndLogLayoutChanges(old, now, ws, suppressLayoutLog: false, trigger: LayoutChangeTrigger.Other);
                             });

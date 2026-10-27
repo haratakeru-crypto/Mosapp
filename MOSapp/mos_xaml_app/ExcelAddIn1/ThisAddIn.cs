@@ -16,6 +16,7 @@ namespace ExcelAddIn1
         private int _currentTaskProjectId = -1;
         private int _currentTaskTaskId = -1;
         private int _currentTaskAttemptNo = 1;
+        private int _currentTaskVariantSetNo = 0;
         private bool _ignoreNextAutoLayoutChangeAfterTaskStart;
         private string _lastRangeSelectionAddress;
         /// <summary>複数セル／複数領域の最終選択。グラフ挿入直後の1セル縮小では AddChart に使わない。</summary>
@@ -491,7 +492,7 @@ namespace ExcelAddIn1
         }
 
         /// <summary>
-        /// ホストが mos_excel_flush_boundary.txt に P,T,A を置いたとき、未記録レイアウト差分を確定して削除する。
+        /// ホストが mos_excel_flush_boundary.txt に P,T,A[,Vn] を置いたとき、未記録レイアウト差分を確定して削除する。
         /// ExcelLogReader はファイル消滅を成功とみなす（タイムアウト防止のため失敗時も削除）。
         /// </summary>
         private void ProcessBoundaryFlushRequest()
@@ -499,31 +500,13 @@ namespace ExcelAddIn1
             if (!File.Exists(BoundaryFlushRequestPath))
                 return;
 
-            int projectId = 0;
-            int taskId = 0;
-            int attemptNo = 1;
             try
             {
                 string text = File.ReadAllText(BoundaryFlushRequestPath).Trim();
-                if (!string.IsNullOrEmpty(text))
+                if (TaskLogFormat.TryParseCurrentTaskLine(text, out TaskLogContext context) && context.IsValid)
                 {
-                    string[] parts = text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2)
-                    {
-                        int.TryParse(parts[0].Trim(), out projectId);
-                        int.TryParse(parts[1].Trim(), out taskId);
-                        if (parts.Length >= 3)
-                        {
-                            int.TryParse(parts[2].Trim(), out attemptNo);
-                            if (attemptNo < 1) attemptNo = 1;
-                        }
-                    }
-                }
-
-                if (projectId > 0 && taskId > 0)
-                {
-                    FlushPendingBoundaryDiffsForTask(projectId, taskId, attemptNo);
-                    WriteDiagnostic($"BoundaryFlush done: {projectId}-{taskId}-{attemptNo}");
+                    FlushPendingBoundaryDiffsForTask(context.ProjectId, context.TaskId, context.AttemptNo, context.VariantSetNo);
+                    WriteDiagnostic($"BoundaryFlush done: {context.FormatTaskToken()}");
                 }
                 else
                 {
@@ -596,44 +579,40 @@ namespace ExcelAddIn1
                 }
 
                 if (string.IsNullOrEmpty(line)) return;
-                var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 2) return;
+                if (!TaskLogFormat.TryParseCurrentTaskLine(line, out TaskLogContext context) || !context.IsValid)
+                    return;
 
-                if (!int.TryParse(parts[0].Trim(), out int projectId)) return;
-                if (!int.TryParse(parts[1].Trim(), out int taskId)) return;
-                int attemptNo = 1;
-                if (parts.Length >= 3)
-                {
-                    int.TryParse(parts[2].Trim(), out attemptNo);
-                    if (attemptNo < 1) attemptNo = 1;
-                }
-
-                if (projectId == _currentTaskProjectId && taskId == _currentTaskTaskId && attemptNo == _currentTaskAttemptNo)
+                if (context.ProjectId == _currentTaskProjectId
+                    && context.TaskId == _currentTaskTaskId
+                    && context.AttemptNo == _currentTaskAttemptNo
+                    && context.VariantSetNo == _currentTaskVariantSetNo)
                     return;
 
                 int prevProjectId = _currentTaskProjectId;
                 int prevTaskId = _currentTaskTaskId;
                 int prevAttemptNo = _currentTaskAttemptNo;
+                int prevVariantSetNo = _currentTaskVariantSetNo;
 
                 // タスク切替直前に未確定差分を「旧タスク」文脈で確定し、同一シート継続時の取りこぼしを防ぐ。
                 if (prevProjectId > 0 && prevTaskId > 0)
                 {
                     // 選択シートのレイアウトを先に確定したうえで、全シートは BuildSnapshot を1回／シートにまとめる。
-                    FlushPendingBoundaryDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo);
+                    FlushPendingBoundaryDiffsForTask(prevProjectId, prevTaskId, prevAttemptNo, prevVariantSetNo);
                 }
 
-                _currentTaskProjectId = projectId;
-                _currentTaskTaskId = taskId;
-                _currentTaskAttemptNo = attemptNo;
+                _currentTaskProjectId = context.ProjectId;
+                _currentTaskTaskId = context.TaskId;
+                _currentTaskAttemptNo = context.AttemptNo;
+                _currentTaskVariantSetNo = context.VariantSetNo;
                 _lastMultiCellRangeSelectionAddress = null;
 
-                Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
-                Logger.LogTaskStart(projectId, taskId, attemptNo);
+                Logger.SetCurrentTaskContext(context.ProjectId, context.TaskId, context.AttemptNo, context.VariantSetNo);
+                Logger.LogTaskStart(context.ProjectId, context.TaskId, context.AttemptNo, context.VariantSetNo);
                 // TaskStart 直後の自動イベント（SheetActivate/WindowActivate）で出る
                 // 最初のレイアウト差分だけ無視する。
                 _ignoreNextAutoLayoutChangeAfterTaskStart = true;
                 InitializeLayoutSnapshotsForAllOpenWorkbooks("Startup");
-                WriteDiagnostic($"Task context updated: {projectId}-{taskId}-{attemptNo} (ignore next auto layout change)");
+                WriteDiagnostic($"Task context updated: {context.FormatTaskToken()} (ignore next auto layout change)");
             }
             catch (Exception ex)
             {

@@ -19,6 +19,7 @@ using System.Threading;
 using System.Text;
 using Libraries;
 using MOSExcelMogiApp.Infrastructure;
+using MOSExcelMogiApp.Models;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -85,7 +86,7 @@ namespace MOSExcelMogiApp.Views
             _groupId = groupId;
             _isVariantMode = isVariantMode;
             _variantSetNo = variantSetNo;
-            if (_isVariantMode && EndExamButton != null)
+            if (_isVariantMode && _variantSetNo != 1 && EndExamButton != null)
                 EndExamButton.Visibility = Visibility.Collapsed;
             NavigateToTaskCommand = new RelayCommand<ReviewTaskInfo>(NavigateToTask);
             LoadAllProjects();
@@ -836,7 +837,10 @@ namespace MOSExcelMogiApp.Views
                     await Task.Delay(100);
                     
                     // 保存されている採点結果を取得
-                    var allResults = Models.ExamResultStorage.GetAllResults();
+                    ExamResultScope resultScope = _isVariantMode
+                        ? ExamResultScope.Variant(_variantSetNo)
+                        : ExamResultScope.Textbook;
+                    var allResults = Models.ExamResultStorage.GetAllResults(resultScope);
                     System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] All results retrieved: {allResults?.Count ?? 0} projects");
                     if (allResults != null && allResults.Count > 0)
                     {
@@ -847,7 +851,7 @@ namespace MOSExcelMogiApp.Views
                     }
                     
                     // 採点直後のスナップショットを保存（復習前の正答率用）
-                    MOSExcelMogiApp.Models.ExamResultStorage.SaveInitialResultsIfEmpty(allResults);
+                    MOSExcelMogiApp.Models.ExamResultStorage.SaveInitialResultsIfEmpty(resultScope, allResults);
 
                     try
                     {
@@ -873,7 +877,7 @@ namespace MOSExcelMogiApp.Views
 
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        resultWindow = new ResultWindow(allResults, _groupId);
+                        resultWindow = new ResultWindow(allResults, _groupId, isVariantMode: _isVariantMode, variantSetNo: _variantSetNo);
                         onInitialPresentationCompleted = (_, __) =>
                         {
                             try
@@ -1239,8 +1243,8 @@ namespace MOSExcelMogiApp.Views
         {
             try
             {
-                // ExamResultStorageをクリア
-                Models.ExamResultStorage.Clear();
+                ExamResultScope resultScope = CurrentResultScope();
+                Models.ExamResultStorage.Clear(resultScope);
                 _scoringExcelApp = null;
                 _scoringExcelCreatedBySession = false;
                 _scoringExcelCreatedPid = -1;
@@ -1280,6 +1284,21 @@ namespace MOSExcelMogiApp.Views
                 
                 // プロジェクトリストを先に作成
                 var projectList = new List<(int projectId, int taskCount, string libraryName, string filePath)>();
+                if (_isVariantMode)
+                {
+                    if (_variantSetNo == 1)
+                    {
+                        foreach (int projectId in VariantProblemWorkbook.GetProjectIds())
+                        {
+                            int taskCount = VariantProblemWorkbook.GetTaskCount(projectId);
+                            string libraryName = VariantExam.GetLibraryName(config, _groupId, projectId, _variantSetNo);
+                            string filePath = VariantExam.GetWorkingFilePath(config, _groupId, projectId, _variantSetNo);
+                            projectList.Add((projectId, taskCount, libraryName, filePath));
+                        }
+                    }
+                }
+                else
+                {
                 foreach (var project in groupProjects)
                 {
                     var projectProperty = project as JProperty;
@@ -1293,6 +1312,7 @@ namespace MOSExcelMogiApp.Views
                         
                         projectList.Add((projectId, taskCount, libraryName, filePath));
                     }
+                }
                 }
 
                 if (projectIds != null && projectIds.Count > 0)
@@ -1321,7 +1341,7 @@ namespace MOSExcelMogiApp.Views
 
                     if (string.IsNullOrEmpty(project.filePath) || !File.Exists(project.filePath) || _scoringExcelApp == null)
                     {
-                        SaveAllFalse(project.projectId, project.taskCount);
+                        SaveAllFalse(project.projectId, project.taskCount, resultScope);
                         progress?.Invoke(
                             $"プロジェクト{project.projectId}を採点しました（{idx + 1}/{projectList.Count}）",
                             idx + 1,
@@ -1336,7 +1356,7 @@ namespace MOSExcelMogiApp.Views
                         opened = OpenProjectWorkbook(project.filePath);
                         if (!opened)
                         {
-                            SaveAllFalse(project.projectId, project.taskCount);
+                            SaveAllFalse(project.projectId, project.taskCount, resultScope);
                             continue;
                         }
 
@@ -1346,7 +1366,7 @@ namespace MOSExcelMogiApp.Views
                             project.filePath,
                             project.projectId,
                             out List<string> failReasons);
-                        Models.ExamResultStorage.SaveProjectResult(project.projectId, results, failReasons);
+                        Models.ExamResultStorage.SaveProjectResult(resultScope, project.projectId, results, failReasons);
                         ExcelGradingPerf.Log(
                             "ScoreAllProjects.Project",
                             projectSw.ElapsedMilliseconds,
@@ -1356,7 +1376,7 @@ namespace MOSExcelMogiApp.Views
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error scoring project {project.projectId}: {ex.Message}");
-                        SaveAllFalse(project.projectId, project.taskCount);
+                        SaveAllFalse(project.projectId, project.taskCount, resultScope);
                     }
                     finally
                     {
@@ -1383,7 +1403,12 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
-        private static void SaveAllFalse(int projectId, int taskCount)
+        private ExamResultScope CurrentResultScope()
+        {
+            return _isVariantMode ? ExamResultScope.Variant(_variantSetNo) : ExamResultScope.Textbook;
+        }
+
+        private static void SaveAllFalse(int projectId, int taskCount, ExamResultScope scope)
         {
             var falseResults = new List<bool>();
             var failReasons = new List<string>();
@@ -1392,7 +1417,7 @@ namespace MOSExcelMogiApp.Views
                 falseResults.Add(false);
                 failReasons.Add(ExcelScoreExplanation.UnavailableText);
             }
-            Models.ExamResultStorage.SaveProjectResult(projectId, falseResults, failReasons);
+            Models.ExamResultStorage.SaveProjectResult(scope, projectId, falseResults, failReasons);
         }
 
         private bool OpenProjectWorkbook(string filePath)
@@ -1776,7 +1801,9 @@ namespace MOSExcelMogiApp.Views
                 {
                     if (!IsExpectedWorkbookAlreadyActive(path))
                         TryActivateFromSession(path);
-                });
+                },
+                skipDestructiveValidation: _isVariantMode && _variantSetNo != 1,
+                variantSetNo: _isVariantMode ? _variantSetNo : 0);
         }
         
         private void CloseAppBarWindows()

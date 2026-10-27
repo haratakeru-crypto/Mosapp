@@ -27,20 +27,31 @@ namespace Libraries
             string expectedFilePath,
             int slotProjectId,
             out List<string> failReasons,
-            Action<string> ensureExpectedWorkbookActive = null)
+            Action<string> ensureExpectedWorkbookActive = null,
+            bool skipDestructiveValidation = false,
+            int variantSetNo = 0)
         {
             var results = new List<bool>();
             failReasons = new List<string>();
+            bool writeVariantDiag = skipDestructiveValidation || variantSetNo > 0;
 
             try
             {
                 Debug.WriteLine(
                     $"[ExcelScoreProject] ScoreProject libraryName={libraryName}, taskCount={taskCount}, slotProjectId={slotProjectId}");
+                if (writeVariantDiag)
+                {
+                    VariantCheckSupport.DiagReset();
+                    VariantCheckSupport.Diag(
+                        $"--- Score start library={libraryName} tasks={taskCount} slot={slotProjectId} file={expectedFilePath ?? "<active>"} variantSet={variantSetNo} ---");
+                }
 
                 var parts = libraryName.Replace("ExcelChecker", "").Split('_');
                 if (parts.Length < 2)
                 {
                     Debug.WriteLine($"[ExcelScoreProject] Invalid library name format: {libraryName}");
+                    if (writeVariantDiag)
+                        VariantCheckSupport.Diag($"FAIL invalid-library {libraryName}");
                     FillAllUnavailable(results, failReasons, taskCount);
                     return results;
                 }
@@ -56,6 +67,8 @@ namespace Libraries
                 if (checkerType == null)
                 {
                     Debug.WriteLine($"[ExcelScoreProject] Checker type not found: {fullTypeName}");
+                    if (writeVariantDiag)
+                        VariantCheckSupport.Diag($"FAIL checker-type-not-found {fullTypeName}");
                     FillAllUnavailable(results, failReasons, taskCount);
                     return results;
                 }
@@ -86,6 +99,8 @@ namespace Libraries
                     if (binding == null)
                     {
                         Debug.WriteLine($"[ExcelScoreProject] No method found for task {i}, returning false");
+                        if (writeVariantDiag)
+                            VariantCheckSupport.Diag($"T{i} FAIL no-method");
                         results.Add(false);
                         failReasons.Add(ExcelScoreExplanation.UnavailableText);
                         continue;
@@ -104,6 +119,8 @@ namespace Libraries
                                 taskSw.ElapsedMilliseconds,
                                 $"P{slotProjectId} T{i} invoke-failed");
                             ExcelScoreExplanation.ClearCheckerReason();
+                            if (writeVariantDiag)
+                                VariantCheckSupport.Diag($"T{i} {resolvedName} FAIL invoke");
                             results.Add(false);
                             failReasons.Add(ExcelScoreExplanation.UnavailableText);
                             continue;
@@ -114,19 +131,31 @@ namespace Libraries
                             "GradeTask.CheckerInvoke",
                             taskSw.ElapsedMilliseconds,
                             $"P{slotProjectId} T{i} passed={invokeResult}");
-                        var gateSw = Stopwatch.StartNew();
-                        // ログ・免除設定は画面上のスロット番号（VSTO の [Task N-...]）に合わせる
-                        invokeResult = ExcelScoreExplanation.Apply(slotProjectId, i, invokeResult, checkerReason, out string reason);
-                        ExcelGradingPerf.Log(
-                            "GradeTask.DestructiveValidation",
-                            gateSw.ElapsedMilliseconds,
-                            $"P{slotProjectId} T{i} passed={invokeResult}");
+                        string reason = checkerReason;
+                        if (!skipDestructiveValidation)
+                        {
+                            var gateSw = Stopwatch.StartNew();
+                            // ログ・免除設定は画面上のスロット番号（VSTO の [Task N-...]）に合わせる
+                            invokeResult = ExcelScoreExplanation.Apply(
+                                slotProjectId, i, invokeResult, checkerReason, out reason, variantSetNo);
+                            ExcelGradingPerf.Log(
+                                "GradeTask.DestructiveValidation",
+                                gateSw.ElapsedMilliseconds,
+                                $"P{slotProjectId} T{i} passed={invokeResult}");
+                        }
                         Debug.WriteLine($"[ExcelScoreProject] Method {resolvedName} result: {invokeResult}");
+                        if (writeVariantDiag)
+                        {
+                            VariantCheckSupport.Diag(
+                                $"T{i} {resolvedName} {(invokeResult ? "PASS" : "FAIL")} reason={reason ?? ""}");
+                        }
                         results.Add(invokeResult);
                         failReasons.Add(invokeResult ? "" : (reason ?? ExcelScoreExplanation.RequirementMissText));
                     }
                     catch (Exception ex)
                     {
+                        if (writeVariantDiag)
+                            VariantCheckSupport.Diag($"T{i} {resolvedName} FAIL exception={ex.Message}");
                         Debug.WriteLine($"[ExcelScoreProject] Error invoking method {resolvedName}: {ex.Message}");
                         Debug.WriteLine($"StackTrace: {ex.StackTrace}");
                         results.Add(false);
@@ -138,6 +167,8 @@ namespace Libraries
             {
                 Debug.WriteLine($"[ExcelScoreProject] Error in ScoreProject: {ex.Message}");
                 Debug.WriteLine($"StackTrace: {ex.StackTrace}");
+                if (writeVariantDiag)
+                    VariantCheckSupport.Diag("ScoreProject exception " + ex.Message);
 
                 while (results.Count < taskCount)
                 {
@@ -146,7 +177,51 @@ namespace Libraries
                 }
             }
 
+            if (writeVariantDiag)
+            {
+                VariantCheckSupport.Diag(
+                    $"--- Score end library={libraryName} passed={results.FindAll(x => x).Count}/{results.Count} ---");
+            }
+
             return results;
+        }
+
+        public static List<int> ListMissingTasks(string libraryName, int taskCount)
+        {
+            var missing = new List<int>();
+            if (string.IsNullOrWhiteSpace(libraryName) || taskCount <= 0)
+            {
+                for (int i = 1; i <= taskCount; i++)
+                    missing.Add(i);
+                return missing;
+            }
+
+            var parts = libraryName.Replace("ExcelChecker", "").Split('_');
+            if (parts.Length < 2)
+            {
+                for (int i = 1; i <= taskCount; i++)
+                    missing.Add(i);
+                return missing;
+            }
+
+            string groupId = parts[0];
+            string projectId = parts[1];
+            string fullTypeName = $"Libraries.Group{groupId}.{libraryName}";
+            Type checkerType = ResolveCheckerType(libraryName, groupId, fullTypeName);
+            if (checkerType == null)
+            {
+                for (int i = 1; i <= taskCount; i++)
+                    missing.Add(i);
+                return missing;
+            }
+
+            for (int i = 1; i <= taskCount; i++)
+            {
+                if (CheckTaskMethodBinding.TryResolve(checkerType, groupId, projectId, i) == null)
+                    missing.Add(i);
+            }
+
+            return missing;
         }
 
         private static void FillAllUnavailable(List<bool> results, List<string> failReasons, int taskCount)

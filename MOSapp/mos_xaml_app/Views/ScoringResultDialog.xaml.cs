@@ -17,7 +17,8 @@ namespace MOSExcelMogiApp.Views
         public Brush Color { get; set; }
         public int TaskId { get; set; }
         public string ReasonText { get; set; }
-        public bool IsClickable => Text == "X" || Text == "▲";
+        public bool AllowClick { get; set; } = true;
+        public bool IsClickable => AllowClick && (Text == "X" || Text == "▲");
         public bool HasReason => !string.IsNullOrEmpty(ReasonText);
     }
 
@@ -111,14 +112,23 @@ namespace MOSExcelMogiApp.Views
         /// <summary>
         /// 採点結果を最前面のモーダルで表示する（Excel が前面に出ても維持）。
         /// </summary>
-        public static void ShowResults(Window owner, int taskCount, List<bool> results, int groupId, int projectId, IList<string> failReasons = null)
+        public static void ShowResults(
+            Window owner,
+            int taskCount,
+            List<bool> results,
+            int groupId,
+            int projectId,
+            IList<string> failReasons = null,
+            bool hideDetails = false)
         {
-            var w = new ScoringResultDialog(taskCount, results, groupId, projectId, failReasons)
+            var w = new ScoringResultDialog(taskCount, results, groupId, projectId, hideDetails ? null : failReasons)
             {
                 Owner = owner,
                 Topmost = true,
                 ShowInTaskbar = true
             };
+            if (hideDetails)
+                w.ApplyHiddenDetails();
 
             bool ownerWasTopmost = false;
             if (owner != null)
@@ -346,6 +356,19 @@ namespace MOSExcelMogiApp.Views
                 .ToList();
             ResultsControl.ItemsSource = resultItems;
             ReasonsControl.ItemsSource = resultItems;
+        }
+
+        internal void ApplyHiddenDetails()
+        {
+            if (ReasonRow != null)
+                ReasonRow.Visibility = Visibility.Collapsed;
+
+            if (ResultsControl?.ItemsSource is IEnumerable<ResultItem> items)
+            {
+                foreach (ResultItem item in items)
+                    item.AllowClick = false;
+                ResultsControl.Items.Refresh();
+            }
         }
 
         private void DisplayResults(List<bool> results, IList<string> failReasons)

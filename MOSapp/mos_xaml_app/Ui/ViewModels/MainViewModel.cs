@@ -22,6 +22,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 using ExcelWorkbook = Microsoft.Office.Interop.Excel.Workbook;
+using MOSExcelMogiApp.Models;
 using MOSExcelMogiApp.Vocabulary;
 using MosPracticeClient;
 
@@ -252,6 +253,7 @@ namespace Ui.ViewModels
         private int _examExcelPid;
         private bool _examExcelWindowSeen;
         private bool _isOpeningProject;
+        private bool _isBulkResetInProgress;
         private bool _isScoreResultOpen;
         private bool _endExamPendingAfterScoreResult;
         private int _attachRetryAttempts;
@@ -262,7 +264,7 @@ namespace Ui.ViewModels
             _excelCheckerService = excelCheckerService;
             LoadProjects();
             CheckCommand = new RelayCommand(ExecuteCheck);
-            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: false), _ => !_isOpeningProject);
+            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: false), _ => !_isOpeningProject && !_isBulkResetInProgress);
             OpenVariantProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: true), CanOpenVariantProject);
             ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring && !_isScoreResultOpen);
             EndExamCommand = new RelayCommand(ExecuteEndExam, _ => !IsNavigationLocked);
@@ -333,12 +335,16 @@ namespace Ui.ViewModels
         /// <summary>単語帳中は採点ボタンを出さない。</summary>
         public bool ShowScoreButtonEffective => ShowScoreButton && !IsVocabularyMode;
 
-        /// <summary>Group1 通常教材かつオプション ON のときだけ手順ボタンを出す。</summary>
+        /// <summary>通常教材は紙芝居手順、類題第1回はテキスト手順を出す。</summary>
         public bool ShowAnswerGuideEffective
         {
             get
             {
-                if (!ShowAnswerGuide || IsVocabularyMode || IsVariantMode)
+                if (IsVocabularyMode)
+                    return false;
+                if (IsVariantMode)
+                    return VariantSetNo == 1;
+                if (!ShowAnswerGuide)
                     return false;
                 if (!TryGetCurrentGroupProjectId(out int groupId, out _))
                     return false;
@@ -1136,7 +1142,7 @@ namespace Ui.ViewModels
             return 0;
         }
 
-        private bool TryGetCurrentGroupProjectId(out int groupId, out int projectId)
+        public bool TryGetCurrentGroupProjectId(out int groupId, out int projectId)
         {
             groupId = 0;
             projectId = 0;
@@ -1154,6 +1160,71 @@ namespace Ui.ViewModels
         {
             string path = GetVariantProjectFilePath(groupId, projectId, variantSetNo);
             return !string.IsNullOrEmpty(path) && File.Exists(path);
+        }
+
+        public List<ExcelResetTarget> GetBulkResetTargets(ExcelBulkResetScope scope)
+        {
+            var targets = new List<ExcelResetTarget>();
+            if (scope == ExcelBulkResetScope.Textbook || scope == ExcelBulkResetScope.All)
+            {
+                if (ProjectGroups != null && ProjectGroups.Count > 0)
+                {
+                    var group = ProjectGroups[0];
+                    foreach (var project in group.Projects)
+                    {
+                        targets.Add(new ExcelResetTarget
+                        {
+                            GroupId = group.GroupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = 0,
+                            Label = "演習 プロジェクト" + project.ProjectId,
+                            WorkingPath = GetProjectFilePath(group.GroupId, project.ProjectId),
+                            TemplatePath = DataPathHelper.ResolveTemplateFilePath(group.GroupId, project.ProjectId),
+                            InitialPath = DataPathHelper.GetInitialFilePath(group.GroupId, project.ProjectId)
+                        });
+                    }
+                }
+            }
+
+            if (scope == ExcelBulkResetScope.Variant || scope == ExcelBulkResetScope.All)
+            {
+                if (VariantLaunchProjects != null)
+                {
+                    int variantSetNo = ExcelBulkResetCoordinator.DefaultVariantSetNo;
+                    foreach (var project in VariantLaunchProjects)
+                    {
+                        string templatePath = GetVariantTemplateFilePath(project.GroupId, project.ProjectId, variantSetNo);
+                        if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+                            continue;
+                        targets.Add(new ExcelResetTarget
+                        {
+                            GroupId = project.GroupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = variantSetNo,
+                            Label = "類題 プロジェクト" + project.ProjectId,
+                            WorkingPath = GetVariantWorkingFilePath(project.GroupId, project.ProjectId, variantSetNo),
+                            TemplatePath = templatePath
+                        });
+                    }
+                }
+            }
+
+            return targets;
+        }
+
+        public ExcelResetTarget TryGetCurrentOpenResetTarget(IList<ExcelResetTarget> targets)
+        {
+            if (targets == null || !TryGetCurrentGroupProjectId(out int groupId, out int projectId))
+                return null;
+
+            int variantSetNo = IsVariantMode ? VariantSetNo : 0;
+            foreach (ExcelResetTarget target in targets)
+            {
+                if (target.GroupId == groupId && target.ProjectId == projectId && target.VariantSetNo == variantSetNo)
+                    return target;
+            }
+
+            return null;
         }
 
         private void NotifyVariantButtonStateChanged()
@@ -1242,8 +1313,20 @@ namespace Ui.ViewModels
         public bool IsAnswerGuideOpen => _isAnswerGuideOpen;
 
         /// <summary>終了・リセット・レビュー・次プロ・教材類題切替を抑止する統合ロック。</summary>
+        public bool IsBulkResetInProgress => _isBulkResetInProgress;
+
         public bool IsNavigationLocked =>
-            _isAnswerGuideOpen || _isInstantScoring || _isScoreResultOpen;
+            _isAnswerGuideOpen || _isInstantScoring || _isScoreResultOpen || _isBulkResetInProgress;
+
+        public void SetBulkResetInProgress(bool value)
+        {
+            if (_isBulkResetInProgress == value)
+                return;
+            _isBulkResetInProgress = value;
+            OnPropertyChanged(nameof(IsBulkResetInProgress));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
 
         public void SetAnswerGuideOpen(bool open)
         {
@@ -1342,7 +1425,7 @@ namespace Ui.ViewModels
 
         private bool CanOpenVariantProject(object parameter)
         {
-            if (_isOpeningProject)
+            if (_isOpeningProject || _isBulkResetInProgress)
                 return false;
             // ボタン生成直後は CommandParameter がまだ無く、ここで false にすると押せないままになる。
             if (!(parameter is ProjectViewModel project))
@@ -1352,6 +1435,8 @@ namespace Ui.ViewModels
 
         private void ExecuteOpenProject(object parameter, bool openAsVariant1)
         {
+            if (_isBulkResetInProgress)
+                return;
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
 
@@ -2350,27 +2435,25 @@ namespace Ui.ViewModels
             if (IsVariantMode && VariantSetNo == 1)
                 taskCount = VariantProblemWorkbook.GetTaskCount(projectId);
 
+            string libraryName = GetScoringLibraryName(config, groupId, projectId);
+            ExamResultScope resultScope = IsVariantMode
+                ? ExamResultScope.Variant(VariantSetNo)
+                : ExamResultScope.Textbook;
+
+#if DEBUG
             if (IsVariantMode)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                var missingTasks = ExcelScoreProject.ListMissingTasks(libraryName, taskCount);
+                if (missingTasks.Count > 0)
                 {
-                    try
-                    {
-                        var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
-                            ?? Application.Current.MainWindow;
-                        ShowScoreResultDialog(() =>
-                            ScoringResultDialog.ShowVariantResults(owner, taskCount, groupId, projectId, VariantSetNo));
-                        ResultMessage = $"類題{VariantSetNo}: {taskCount}問の解答手順を表示できます";
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"結果の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                });
-                return;
+                    MessageBox.Show(
+                        $"類題チェッカー {libraryName} に未実装のタスクがあります: {string.Join(", ", missingTasks)}",
+                        "採点",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
             }
-
-            string libraryName = GetScoringLibraryName(config, groupId, projectId);
+#endif
 
             // 採点はすぐ始める。300ms を超えたときだけ「採点中です」を出す。
             const int scoringNoticeDelayMs = 300;
@@ -2429,13 +2512,15 @@ namespace Ui.ViewModels
                 // flush は呼び出し側。二重の破壊検知は核内 Apply に一本化。
                 var scored = await Task.Run(() =>
                 {
-                    ExcelLogReader.RequestOpenTaskBoundaryFlush(projectId);
+                    ExcelLogReader.RequestOpenTaskBoundaryFlush(projectId, variantSetNo: IsVariantMode ? VariantSetNo : 0);
                     List<bool> projectResults = ExcelScoreProject.ScoreProject(
                         libraryName,
                         taskCount,
                         expectedFilePath: null,
                         slotProjectId: projectId,
-                        out List<string> reasons);
+                        out List<string> reasons,
+                        skipDestructiveValidation: IsVariantMode && VariantSetNo != 1,
+                        variantSetNo: IsVariantMode ? VariantSetNo : 0);
                     return Tuple.Create(projectResults, reasons);
                 });
                 results = scored.Item1;
@@ -2468,11 +2553,12 @@ namespace Ui.ViewModels
             {
                 try
                 {
-                    MOSExcelMogiApp.Models.ExamResultStorage.SaveProjectResult(projectId, results, failReasons);
+                    ExamResultStorage.SaveProjectResult(resultScope, projectId, results, failReasons);
                     var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
                         ?? Application.Current.MainWindow;
                     ShowScoreResultDialog(() =>
-                        ScoringResultDialog.ShowResults(owner, taskCount, results, groupId, projectId, failReasons));
+                        ScoringResultDialog.ShowResults(
+                            owner, taskCount, results, groupId, projectId, failReasons, hideDetails: IsVariantMode));
                     ResultMessage = $"採点完了: {taskCount}問のタスクを採点しました";
                 }
                 catch (Exception ex)

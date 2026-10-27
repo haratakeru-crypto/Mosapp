@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using Libraries;
 using MOSExcelMogiApp;
 using MOSExcelMogiApp.Infrastructure;
 
@@ -29,16 +30,29 @@ namespace MOSExcelMogiApp.Views
         private Dictionary<int, List<bool>> _initialProjectResults;
         private bool _seatChartSubmitStarted;
         private readonly bool _fromScoringLog;
+        private readonly bool _isVariantMode;
+        private readonly int _variantSetNo;
+        private readonly MOSExcelMogiApp.Models.ExamResultScope _resultScope;
 
-        public ResultWindow(Dictionary<int, List<bool>> allProjectResults = null, int groupId = 1, bool fromScoringLog = false)
+        public ResultWindow(
+            Dictionary<int, List<bool>> allProjectResults = null,
+            int groupId = 1,
+            bool fromScoringLog = false,
+            bool isVariantMode = false,
+            int variantSetNo = 1)
         {
             InitializeComponent();
             _allProjectResults = allProjectResults ?? new Dictionary<int, List<bool>>();
             _groupId = groupId;
             _fromScoringLog = fromScoringLog;
+            _isVariantMode = isVariantMode;
+            _variantSetNo = variantSetNo < 1 ? 1 : variantSetNo;
+            _resultScope = _isVariantMode
+                ? MOSExcelMogiApp.Models.ExamResultScope.Variant(_variantSetNo)
+                : MOSExcelMogiApp.Models.ExamResultScope.Textbook;
             _initialProjectResults = fromScoringLog
                 ? CloneResults(_allProjectResults)
-                : MOSExcelMogiApp.Models.ExamResultStorage.GetInitialResults();
+                : MOSExcelMogiApp.Models.ExamResultStorage.GetInitialResults(_resultScope);
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_allProjectResults?.Count ?? 0} projects, groupId: {_groupId}, fromLog: {_fromScoringLog}");
             
             this.Loaded += ResultWindow_Loaded;
@@ -67,7 +81,7 @@ namespace MOSExcelMogiApp.Views
                 {
                     await Task.Delay(20);
 
-                    var currentResults = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                    var currentResults = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
                     if (currentResults != null && currentResults.Count > 0)
                     {
                         _allProjectResults = currentResults;
@@ -141,7 +155,7 @@ namespace MOSExcelMogiApp.Views
                 // 現在（復習後）の正答率を計算（保存されている最新結果を使用）
                 var currentResults = _fromScoringLog
                     ? _allProjectResults
-                    : MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                    : MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
                 if (currentResults == null || currentResults.Count == 0)
                 {
                     currentResults = _allProjectResults;
@@ -158,6 +172,7 @@ namespace MOSExcelMogiApp.Views
                 {
                     CorrectRateTextBlock.Text = $"正答率：{initialCorrectRate:F1}％　復習後：{currentCorrectRate:F1}％";
                     WrongCountTextBlock.Text = $"{currentWrongTasks}問";
+                    UpdateTotalScoreDisplay(currentResults);
                 });
 
                 await StartSeatChartSubmitAsync(currentWrongTasks);
@@ -182,6 +197,7 @@ namespace MOSExcelMogiApp.Views
                 // 採点直後も復習後も 100% として表示
                 CorrectRateTextBlock.Text = "正答率：100.0％　復習後：100.0％";
                 WrongCountTextBlock.Text = "0問";
+                UpdateTotalScoreDisplay(_allProjectResults);
             });
 
             await StartSeatChartSubmitAsync(0);
@@ -203,6 +219,24 @@ namespace MOSExcelMogiApp.Views
                 // バックグラウンドでJSONファイルを読み込む
                 ProjectData projectData = await Task.Run(() =>
                 {
+                    if (_isVariantMode && _variantSetNo == 1)
+                    {
+                        return new ProjectData
+                        {
+                            Projects = VariantProblemWorkbook.GetProjectIds()
+                                .Select(projectId => new ProjectInfo
+                                {
+                                    ProjectId = projectId,
+                                    Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                                        .Select(task => new TaskInfo
+                                        {
+                                            TaskId = task.TaskId,
+                                            Description = task.Description
+                                        }).ToList()
+                                }).ToList()
+                        };
+                    }
+
                     // Group番号に応じたJSONファイルを選択
                     string jsonFileName = _groupId switch
                     {
@@ -854,9 +888,29 @@ namespace MOSExcelMogiApp.Views
             return filteredProjects;
         }
 
-        private static string FailReasonFor(int projectId, int taskId)
+        private void UpdateTotalScoreDisplay(Dictionary<int, List<bool>> results)
         {
-            return MOSExcelMogiApp.Models.ExamResultStorage.GetFailReason(projectId, taskId);
+            if (TotalScorePanel == null || TotalScoreTextBlock == null)
+                return;
+
+            if (!_isVariantMode)
+            {
+                TotalScorePanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            TotalScorePanel.Visibility = Visibility.Visible;
+            if (PracticeScoreClient.TryCompute(VariantExam.FlattenResults(results), out int total, out string error))
+                TotalScoreTextBlock.Text = total.ToString();
+            else
+                TotalScoreTextBlock.Text = error ?? "総合点を表示できません。";
+        }
+
+        private string FailReasonFor(int projectId, int taskId)
+        {
+            if (_isVariantMode)
+                return "";
+            return MOSExcelMogiApp.Models.ExamResultStorage.GetFailReason(_resultScope, projectId, taskId);
         }
 
         private void FailReason_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -968,7 +1022,7 @@ namespace MOSExcelMogiApp.Views
             Dictionary<int, List<bool>> results = _allProjectResults;
             if (!_fromScoringLog)
             {
-                var stored = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                var stored = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
                 if (stored != null && stored.Count > 0)
                     results = stored;
             }

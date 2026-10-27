@@ -76,7 +76,7 @@
         </StackPanel>
 
         <!-- Reason Row（×のときだけ「詳細」） -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10,6">
+        <StackPanel x:Name="ReasonRow" Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10,6">
             <TextBlock Text="Reason" FontWeight="Bold" Width="60" TextAlignment="Center" Margin="5,0"
                        VerticalAlignment="Center"/>
             <ItemsControl x:Name="ReasonsControl" VerticalAlignment="Center">

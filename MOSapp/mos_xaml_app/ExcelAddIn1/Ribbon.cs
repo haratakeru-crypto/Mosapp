@@ -23,6 +23,7 @@ namespace ExcelAddIn1
         private int _backstageProjectId = -1;
         private int _backstageTaskId = -1;
         private int _backstageAttemptNo = 1;
+        private int _backstageVariantSetNo = 0;
 
         public string GetCustomUI(string ribbonID)
         {
@@ -66,10 +67,11 @@ namespace ExcelAddIn1
                     return;
                 }
 
-                Logger.GetCurrentTaskContext(out int p, out int t, out int a);
+                Logger.GetCurrentTaskContext(out int p, out int t, out int a, out int v);
                 _backstageProjectId = p;
                 _backstageTaskId = t;
                 _backstageAttemptNo = a;
+                _backstageVariantSetNo = v;
                 _backstageWorkbookKey = GetWorkbookKey(wb);
                 _backstagePropertySnapshot = CaptureWorkbookProperties(wb);
                 _backstageCaptureActive = true;
@@ -119,7 +121,7 @@ namespace ExcelAddIn1
                 {
                     string wbName = SafeWorkbookName(wb);
                     string detail = string.Join(",", changed);
-                    Logger.RunWithTaskContext(_backstageProjectId, _backstageTaskId, _backstageAttemptNo, () =>
+                    Logger.RunWithTaskContext(_backstageProjectId, _backstageTaskId, _backstageAttemptNo, _backstageVariantSetNo, () =>
                     {
                         Logger.LogOperation("SetWorkbookProperty", $"{wbName}!{detail}");
                     });
@@ -143,6 +145,7 @@ namespace ExcelAddIn1
             _backstageProjectId = -1;
             _backstageTaskId = -1;
             _backstageAttemptNo = 1;
+            _backstageVariantSetNo = 0;
         }
 
         /// <summary>Backstage の「情報」で編集されやすい組み込みプロパティと、カスタム &quot;Tags&quot;。</summary>

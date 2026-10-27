@@ -27,7 +27,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>13</ApplicationRevision>
+    <ApplicationRevision>15</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -95,6 +95,10 @@
     <Reference Include="System.Drawing" />
     <Reference Include="UIAutomationClient" />
     <Reference Include="UIAutomationTypes" />
+    <Reference Include="MosExcel.PracticeScoring">
+      <HintPath>ThirdParty\MosExcel.PracticeScoring.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
@@ -110,6 +114,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Views\ScoringResultDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\BulkResetScopeDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -157,6 +165,10 @@
       <DependentUpon>ScoringResultDialog.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Views\BulkResetScopeDialog.xaml.cs">
+      <DependentUpon>BulkResetScopeDialog.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Views\ScoreReasonWindow.cs" />
     <Compile Include="Views\UiTestAppBarWindow.xaml.cs">
       <DependentUpon>UiTestAppBarWindow.xaml</DependentUpon>
@@ -197,6 +209,8 @@
     <Compile Include="Infrastructure\DataPathHelper.cs" />
     <Compile Include="Infrastructure\ExcelCheckerRepository.cs" />
     <Compile Include="Infrastructure\VariantProblemWorkbook.cs" />
+    <Compile Include="Infrastructure\VariantExam.cs" />
+    <Compile Include="Models\ExamResultScope.cs" />
     <Compile Include="Models\ExamResultStorage.cs" />
     <Compile Include="Ui\ViewModels\MainViewModel.cs" />
     <Compile Include="Libraries\Group1\ExcelChecker1_1.cs" />
@@ -209,6 +223,12 @@
     <Compile Include="Libraries\Group1\ExcelChecker1_8.cs" />
     <Compile Include="Libraries\Group1\ExcelChecker1_9.cs" />
     <Compile Include="Libraries\Group1\ExcelChecker1_10.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_1_PV1.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_2_PV1.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_3_PV1.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_4_PV1.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_5_PV1.cs" />
+    <Compile Include="Libraries\Group1\ExcelChecker1_6_PV1.cs" />
     <Compile Include="Libraries\Group2\ExcelChecker2_1.cs" />
     <Compile Include="Libraries\Group2\ExcelChecker2_2.cs" />
     <Compile Include="Libraries\Group2\ExcelChecker2_3.cs" />
@@ -229,9 +249,14 @@
     <Compile Include="Libraries\Group3\ExcelChecker3_8.cs" />
     <Compile Include="Libraries\Group3\ExcelChecker3_9.cs" />
     <Compile Include="Libraries\Group3\ExcelChecker3_10.cs" />
+    <Compile Include="Libraries\TaskLogContext.cs" />
     <Compile Include="Libraries\ExcelLogReader.cs" />
+    <Compile Include="Libraries\ExcelProjectResetHelper.cs" />
+    <Compile Include="Libraries\ExcelBulkResetCoordinator.cs" />
     <Compile Include="Libraries\ExcelScoreExplanation.cs" />
     <Compile Include="Libraries\ExcelScoreProject.cs" />
+    <Compile Include="Libraries\PracticeScoreClient.cs" />
+    <Compile Include="Libraries\VariantCheckSupport.cs" />
     <Compile Include="Libraries\ExcelGradingPerf.cs" />
     <Compile Include="Libraries\ResetPerfLog.cs" />
     <Compile Include="Libraries\ExcelResetReadyWatch.cs" />
@@ -382,12 +407,22 @@
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <PublishFile Include="MosExcel.PracticeScoring">
+      <Visible>False</Visible>
+      <PublishState>Include</PublishState>
+      <IncludeHash>True</IncludeHash>
+      <FileType>Assembly</FileType>
+    </PublishFile>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsurePracticeScoringDll" BeforeTargets="ResolveAssemblyReferences">
+    <Error
+      Condition="!Exists('$(ProjectDir)ThirdParty\MosExcel.PracticeScoring.dll')"
+      Text="ThirdParty\MosExcel.PracticeScoring.dll がありません。リポジトリの ThirdParty フォルダを確認してください。" />
+  </Target>
   <Target Name="CopyMosPracticeSessionWatch" AfterTargets="Build">
-    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe"
-          DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true"
-          Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
+    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
   </Target>
   <Target Name="AfterPublish">
     <PropertyGroup>
