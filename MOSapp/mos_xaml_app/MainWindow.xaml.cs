@@ -96,7 +96,12 @@ namespace MOSExcelMogiApp
         private void ScoringLog_EntryClicked(object sender, MosPracticeClient.ScoringLogEntry entry)
         {
             if (entry == null) return;
-            var window = new Views.ResultWindow(entry.ProjectResults, entry.GroupId, fromScoringLog: true);
+            var window = new Views.ResultWindow(
+                entry.ProjectResults,
+                entry.GroupId,
+                fromScoringLog: true,
+                isVariantMode: entry.IsVariantMode,
+                variantSetNo: entry.VariantSetNo);
             window.Owner = this;
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             window.Show();

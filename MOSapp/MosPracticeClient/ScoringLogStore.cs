@@ -20,6 +20,12 @@ namespace MosPracticeClient
         [JsonProperty("groupId")]
         public int GroupId { get; set; }
 
+        [JsonProperty("isVariantMode")]
+        public bool IsVariantMode { get; set; }
+
+        [JsonProperty("variantSetNo")]
+        public int VariantSetNo { get; set; }
+
         [JsonProperty("projectResults")]
         public Dictionary<int, List<bool>> ProjectResults { get; set; }
 
@@ -29,11 +35,18 @@ namespace MosPracticeClient
             get
             {
                 string label = string.IsNullOrWhiteSpace(RangeLabel) ? "採点" : RangeLabel.Trim();
+                if (IsVariantMode)
+                    return $"類題 {label} {ScoredAt:M/d H:mm}";
                 return $"{label} {ScoredAt:M/d H:mm}";
             }
         }
 
-        public static ScoringLogEntry Create(string rangeLabel, int groupId, Dictionary<int, List<bool>> projectResults)
+        public static ScoringLogEntry Create(
+            string rangeLabel,
+            int groupId,
+            Dictionary<int, List<bool>> projectResults,
+            bool isVariantMode = false,
+            int variantSetNo = 0)
         {
             return new ScoringLogEntry
             {
@@ -41,6 +54,8 @@ namespace MosPracticeClient
                 RangeLabel = rangeLabel ?? "",
                 ScoredAt = DateTime.Now,
                 GroupId = groupId,
+                IsVariantMode = isVariantMode,
+                VariantSetNo = isVariantMode && variantSetNo > 0 ? variantSetNo : 0,
                 ProjectResults = CloneResults(projectResults)
             };
         }

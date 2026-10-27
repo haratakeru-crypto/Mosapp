@@ -859,7 +859,12 @@ namespace MOSExcelMogiApp.Views
                         {
                             MosPracticeClient.ScoringLogStore.Append(
                                 MosPracticeClient.ScoringLogStore.SubjectExcel,
-                                MosPracticeClient.ScoringLogEntry.Create(scoringRangeLabel, _groupId, allResults));
+                                MosPracticeClient.ScoringLogEntry.Create(
+                                    scoringRangeLabel,
+                                    _groupId,
+                                    allResults,
+                                    _isVariantMode,
+                                    _variantSetNo));
                         }
                     }
                     catch (Exception logEx)

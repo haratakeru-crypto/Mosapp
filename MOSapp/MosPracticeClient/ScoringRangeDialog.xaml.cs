@@ -21,6 +21,7 @@ namespace MosPracticeClient
                 .OrderBy(id => id)
                 .ToList();
             InitializeComponent();
+            ApplyAvailableRangeOptions();
             BuildCustomCheckboxes();
             UpdateStartButtonState();
         }
@@ -61,6 +62,25 @@ namespace MosPracticeClient
             }
 
             return false;
+        }
+
+        private void ApplyAvailableRangeOptions()
+        {
+            SetOptionVisibility(Range1To3, ScoringRangeKind.Projects1To3);
+            SetOptionVisibility(Range4To6, ScoringRangeKind.Projects4To6);
+            SetOptionVisibility(Range7To9, ScoringRangeKind.Projects7To9);
+            SetOptionVisibility(Range1To9, ScoringRangeKind.Projects1To9);
+        }
+
+        private void SetOptionVisibility(RadioButton button, ScoringRangeKind kind)
+        {
+            if (button == null)
+                return;
+
+            bool offer = ScoringRangeSelection.ShouldOffer(kind, _availableProjectIds);
+            button.Visibility = offer ? Visibility.Visible : Visibility.Collapsed;
+            if (!offer && button.IsChecked == true && RangeAll != null)
+                RangeAll.IsChecked = true;
         }
 
         private void BuildCustomCheckboxes()

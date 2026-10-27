@@ -4,7 +4,7 @@
         Title="採点する範囲"
         Width="420"
         SizeToContent="Height"
-        MinHeight="280"
+        MinHeight="200"
         MaxHeight="560"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"

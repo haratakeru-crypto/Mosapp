@@ -52,6 +52,25 @@ namespace MosPracticeClient
                 .ToList();
         }
 
+        public static bool ShouldOffer(ScoringRangeKind kind, IReadOnlyCollection<int> availableProjectIds)
+        {
+            if (kind == ScoringRangeKind.All || kind == ScoringRangeKind.Custom)
+                return true;
+
+            var resolved = Resolve(kind, availableProjectIds);
+            if (resolved.Count == 0)
+                return false;
+
+            if (kind == ScoringRangeKind.Projects1To9)
+            {
+                var all = Resolve(ScoringRangeKind.All, availableProjectIds);
+                if (resolved.SequenceEqual(all))
+                    return false;
+            }
+
+            return true;
+        }
+
         public static string FormatRangeLabel(ScoringRangeKind kind, IReadOnlyList<int> selectedIds)
         {
             switch (kind)
