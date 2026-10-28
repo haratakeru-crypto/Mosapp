@@ -25,7 +25,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>11</ApplicationRevision>
+    <ApplicationRevision>12</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
@@ -383,10 +383,7 @@
     <Exec Command="taskkill /IM MosPracticeSessionWatch.exe /F /T &gt;NUL 2&gt;&amp;1 &amp; ping -n 2 127.0.0.1 &gt;NUL &amp; exit /b 0" />
   </Target>
   <Target Name="CopyMosPracticeSessionWatch" AfterTargets="Build">
-    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe"
-          DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true"
-          Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
+    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
   </Target>
   <!-- 発行時に VSTO アドインの出力を publish\WordAddIn にコピーする（Import の後に定義して確実に実行されるようにする） -->
   <Target Name="AfterPublish">
