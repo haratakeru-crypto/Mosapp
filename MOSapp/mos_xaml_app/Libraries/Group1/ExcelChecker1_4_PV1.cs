@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.IO.Packaging;
+using System.Text.RegularExpressions;
 using Excel = Microsoft.Office.Interop.Excel;
 using Libraries;
 
@@ -7,6 +10,7 @@ namespace Libraries.Group1
     public class ExcelChecker1_4_PV1
     {
         private const int Style4ChartStyleId = 205;
+        private const int Style4C14StyleId = 102;
 
         public bool CheckTask_1_4_01() => Run(CheckTask_1_4_01_Impl);
         public bool CheckTask_1_4_02() => Run(CheckTask_1_4_02_Impl);
@@ -80,19 +84,161 @@ namespace Libraries.Group1
                 return VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
             }
 
+            int comStyleId = -1;
             object styleObj = chart.ChartStyle;
-            if (styleObj == null || !int.TryParse(Convert.ToString(styleObj), out int styleId))
-            {
-                VariantCheckSupport.Diag("4-3 ChartStyle parse=fail location=" + location
-                    + " value=" + VariantCheckSupport.TryRead(() => chart.ChartStyle));
-                return VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
-            }
+            if (styleObj != null)
+                int.TryParse(Convert.ToString(styleObj), out comStyleId);
 
-            bool styleOk = styleId == Style4ChartStyleId;
-            VariantCheckSupport.Diag($"4-3 location={location} ChartStyle={styleId} expected={Style4ChartStyleId} styleOk={styleOk}");
-            return styleOk
+            bool comOk = comStyleId == Style4ChartStyleId;
+            string xmlDetail = "skip";
+            bool xmlOk = false;
+            if (!comOk)
+                xmlOk = TryPersistedStyle4(workbook, filePath, out xmlDetail);
+
+            VariantCheckSupport.Diag(
+                $"4-3 location={location} ChartStyle={comStyleId} expected={Style4ChartStyleId} comOk={comOk} xml={xmlDetail} xmlOk={xmlOk}");
+            return (comOk || xmlOk)
                 ? true
                 : VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
+        }
+
+        /// <summary>
+        /// スタイル4適用直後の ChartStyle は 205 だが、保存して開き直すと COM は 2 に戻る。
+        /// ディスク上の ChartStyle パーツ id="205" と c14:style val="102" で判定する。
+        /// SaveCopyAs は開いているブックの COM 状態（2）を書いてしまうため使わない。
+        /// </summary>
+        private static bool TryPersistedStyle4(Excel.Workbook workbook, string filePath, out string detail)
+        {
+            string sourcePath = null;
+            try { sourcePath = workbook?.FullName; } catch { }
+            if (string.IsNullOrEmpty(sourcePath))
+                sourcePath = filePath;
+
+            if (TryReadPersistedStyle4FromPath(sourcePath, out detail))
+                return true;
+
+            if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
+                return false;
+            if (detail != null && !detail.StartsWith("err:", StringComparison.Ordinal)
+                && !string.Equals(detail, "no-file", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string tempPath = Path.Combine(
+                Path.GetTempPath(),
+                "mos_pv1_4_3_" + Guid.NewGuid().ToString("N") + ".xlsx");
+            try
+            {
+                File.Copy(sourcePath, tempPath, true);
+                return TryReadPersistedStyle4FromPath(tempPath, out detail);
+            }
+            catch (Exception ex)
+            {
+                detail = "copy-err:" + ex.GetType().Name;
+                return false;
+            }
+            finally
+            {
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+            }
+        }
+
+        private static bool TryReadPersistedStyle4FromPath(string path, out string detail)
+        {
+            detail = "none";
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                detail = "no-file";
+                return false;
+            }
+
+            try
+            {
+                using (FileStream stream = new FileStream(
+                    path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (Package package = Package.Open(stream, FileMode.Open, FileAccess.Read))
+                {
+                    int partId = -1;
+                    int c14 = -1;
+                    foreach (PackagePart part in package.GetParts())
+                    {
+                        string uri = part.Uri != null ? part.Uri.OriginalString : string.Empty;
+                        if (!uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        bool isStylePart = uri.IndexOf("/xl/charts/style", StringComparison.OrdinalIgnoreCase) >= 0;
+                        bool isChartPart = uri.IndexOf("/xl/charts/chart", StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (!isStylePart && !isChartPart)
+                            continue;
+
+                        string xml;
+                        using (Stream partStream = part.GetStream(FileMode.Open, FileAccess.Read))
+                        using (var reader = new StreamReader(partStream))
+                            xml = reader.ReadToEnd();
+
+                        if (isStylePart)
+                        {
+                            int foundId;
+                            TryReadChartStylePartId(xml, out foundId);
+                            if (foundId > 0)
+                                partId = foundId;
+                            if (foundId == Style4ChartStyleId)
+                            {
+                                detail = "partId=" + foundId;
+                                return true;
+                            }
+                        }
+
+                        if (isChartPart)
+                        {
+                            int foundC14;
+                            TryReadC14StyleId(xml, out foundC14);
+                            if (foundC14 > 0)
+                                c14 = foundC14;
+                            if (foundC14 == Style4C14StyleId)
+                            {
+                                detail = "c14=" + foundC14;
+                                return true;
+                            }
+                        }
+                    }
+
+                    detail = "partId=" + partId + " c14=" + c14;
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                detail = "err:" + ex.GetType().Name;
+                return false;
+            }
+        }
+
+        private static bool TryReadChartStylePartId(string xml, out int chartStyleId)
+        {
+            chartStyleId = -1;
+            if (string.IsNullOrEmpty(xml))
+                return false;
+
+            Match partMatch = Regex.Match(
+                xml, @"chartStyle\b[^>]*\bid\s*=\s*""(\d+)""", RegexOptions.IgnoreCase);
+            if (!partMatch.Success)
+                return false;
+            return int.TryParse(partMatch.Groups[1].Value, out chartStyleId);
+        }
+
+        private static bool TryReadC14StyleId(string xml, out int c14StyleId)
+        {
+            c14StyleId = -1;
+            if (string.IsNullOrEmpty(xml))
+                return false;
+
+            Match c14Match = Regex.Match(
+                xml, @"c14:style\s+val\s*=\s*""(\d+)""", RegexOptions.IgnoreCase);
+            if (!c14Match.Success)
+                return false;
+            return int.TryParse(c14Match.Groups[1].Value, out c14StyleId);
         }
 
         private static Excel.Chart FindStyleTargetChart(Excel.Workbook workbook, out string location)
