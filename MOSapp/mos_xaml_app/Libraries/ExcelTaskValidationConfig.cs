@@ -441,18 +441,10 @@ namespace Libraries
                         case 2:
                         case 3:
                             return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
-                        case 4: // 集計行
-                            return ExcelValidationExemptFlags.RangeEdit
-                                | ExcelValidationExemptFlags.SheetStructure
-                                | ExcelValidationExemptFlags.ShapeOrImage
-                                | ExcelValidationExemptFlags.CellFormatOnly;
-                        case 5: // PDF 取り込み。出席名簿への漏れは対象シート外
-                            return ExcelValidationExemptFlags.ExternalImport
-                                | ExcelValidationExemptFlags.RangeEdit
-                                | ExcelValidationExemptFlags.SheetStructure
-                                | ExcelValidationExemptFlags.CellFormatOnly
-                                | ExcelValidationExemptFlags.WorkbookProperty
-                                | ExcelValidationExemptFlags.ShapeOrImage;
+                        case 4: // 最後の列の強調
+                            return ExcelValidationExemptFlags.SheetStructure;
+                        case 5: // 選択範囲内で中央（正答ログは空）
+                            return ExcelValidationExemptFlags.CellFormatOnly;
                         case 6: // 分類プロパティ
                             return ExcelValidationExemptFlags.WorkbookProperty;
                         default:

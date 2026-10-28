@@ -80,29 +80,10 @@ namespace Libraries.Group1
             Excel.Workbook workbook = VariantCheckSupport.GetWorkbook(app, filePath);
             Excel.Worksheet sheet = VariantCheckSupport.FindSheet(workbook, "出席名簿");
             Excel.ListObject table = sheet != null ? VariantCheckSupport.FirstTable(sheet) : null;
-            if (table == null || !table.ShowTotals)
+            if (table == null)
                 return VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
 
-            bool sumOk = false;
-            bool lastNone = false;
-            try
-            {
-                foreach (Excel.ListColumn column in table.ListColumns)
-                {
-                    string name = column.Name ?? string.Empty;
-                    if (name.Contains("参加回数"))
-                        sumOk = column.TotalsCalculation == Excel.XlTotalsCalculation.xlTotalsCalculationSum;
-
-                    if (column.Index == table.ListColumns.Count)
-                        lastNone = column.TotalsCalculation == Excel.XlTotalsCalculation.xlTotalsCalculationNone;
-                }
-            }
-            catch
-            {
-                return VariantCheckSupport.Miss(ExcelScoreExplanation.UnavailableText);
-            }
-
-            return sumOk && lastNone
+            return table.ShowTableStyleLastColumn
                 ? true
                 : VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
         }
@@ -115,10 +96,26 @@ namespace Libraries.Group1
             if (sheet == null)
                 return VariantCheckSupport.Miss(ExcelScoreExplanation.UnavailableText);
 
-            string a3 = VariantCheckSupport.CellText(sheet.Range["A3"]);
-            bool hasConnection = false;
-            try { hasConnection = workbook.Connections.Count > 0; } catch { }
-            return (!string.IsNullOrWhiteSpace(a3) || hasConnection)
+            int align = 0;
+            try
+            {
+                align = Convert.ToInt32(sheet.Range["A1"].HorizontalAlignment);
+            }
+            catch
+            {
+                return VariantCheckSupport.Miss(ExcelScoreExplanation.UnavailableText);
+            }
+
+            int rightAlign = 0;
+            try
+            {
+                rightAlign = Convert.ToInt32(sheet.Range["F1"].HorizontalAlignment);
+            }
+            catch { }
+
+            bool ok = align == (int)Excel.XlHAlign.xlHAlignCenterAcrossSelection
+                && rightAlign != (int)Excel.XlHAlign.xlHAlignCenterAcrossSelection;
+            return ok
                 ? true
                 : VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
         }
