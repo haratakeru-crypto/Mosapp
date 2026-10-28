@@ -45,6 +45,7 @@ namespace MOS_PowerPoint_app
                 _viewModel.ScoreCompleted += OnScoreCompleted;
 
                 ApplyExamineeTabState();
+                MosPracticeClient.ExamineeStore.EnsureSessionWatch();
                 Closing += MainWindow_Closing;
             }
             catch (Exception ex)

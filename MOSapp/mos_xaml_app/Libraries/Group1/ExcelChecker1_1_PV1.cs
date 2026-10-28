@@ -135,8 +135,7 @@ namespace Libraries.Group1
 
                         int barColor = ReadDataBarOleColor(condition);
 
-                        bool solid = false;
-                        try { solid = Convert.ToInt32(condition.BarFillType) == 0 || Convert.ToInt32(condition.FillType) == 0; } catch { solid = true; }
+                        bool solid = IsSolidDataBar(condition);
 
                         if (IsBlueDataBar(barColor) && solid)
                             return true;
@@ -229,8 +228,7 @@ namespace Libraries.Group1
                     int.TryParse(typeText, out type);
                     int barColor = ReadDataBarOleColor(condition);
 
-                    bool solid = false;
-                    try { solid = Convert.ToInt32(condition.BarFillType) == 0 || Convert.ToInt32(condition.FillType) == 0; } catch { solid = true; }
+                    bool solid = IsSolidDataBar(condition);
 
                     bool typeOk = type == 4;
                     bool rangeOk = applies == "G5:G28";
@@ -264,6 +262,19 @@ namespace Libraries.Group1
             try { return Convert.ToInt32(condition.BarColor); } catch { }
             try { return Convert.ToInt32(condition.Color); } catch { }
             return -1;
+        }
+
+        private static bool IsSolidDataBar(dynamic condition)
+        {
+            try
+            {
+                // xlDataBarFillSolid = 0 / xlDataBarFillGradient = 1
+                return Convert.ToInt32(condition.BarFillType) == 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static bool IsBlueDataBar(int color)

@@ -171,7 +171,9 @@ namespace Libraries.Group1
             Excel.ListObject table = VariantCheckSupport.FirstTable(sheet);
             if (table == null)
                 return VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
-            return table.ShowHeaders
+
+            string range = VariantCheckSupport.NormalizeAddress(table.Range.Address);
+            return table.ShowHeaders && range == "A4:D20"
                 ? true
                 : VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
         }

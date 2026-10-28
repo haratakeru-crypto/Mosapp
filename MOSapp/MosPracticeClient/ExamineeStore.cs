@@ -31,6 +31,12 @@ namespace MosPracticeClient
             }
         }
 
+        public static void EnsureSessionWatch()
+        {
+            if (IsRegistered)
+                SessionWatchLauncher.EnsureRunning();
+        }
+
         public static ExamineeProfile Load()
         {
             try

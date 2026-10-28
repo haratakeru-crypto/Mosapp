@@ -41,6 +41,7 @@ namespace MOS_Word_app
             _viewModel.ExamEnded += OnExamEnded;
 
             ApplyExamineeTabState();
+            MosPracticeClient.ExamineeStore.EnsureSessionWatch();
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
         }
