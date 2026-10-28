@@ -153,7 +153,7 @@ namespace MOS_PowerPoint_app
             if (needRecreate)
             {
                 var oldAppBar = _appBarWindow;
-                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, true, false, () => _viewModel.ScoreCommand.Execute(null), _viewModel.IsVariantMode, _viewModel);
+                _appBarWindow = new Views.UiTestAppBarWindow(project.ProjectId, project.GroupId, _viewModel.ShowScoreButton, false, () => _viewModel.ScoreCommand.Execute(null), _viewModel.IsVariantMode, _viewModel);
                 _appBarWindow.Closed += OnAppBarWindowClosed;
                 oldAppBar?.Close();
             }

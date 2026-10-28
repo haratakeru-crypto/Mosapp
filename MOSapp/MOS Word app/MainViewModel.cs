@@ -43,7 +43,7 @@ namespace MOS_Word_app
 
         private int _selectedTabIndex;
         private string _resultMessage;
-        private bool _showScoreButton;
+        private bool _showScoreButton = true;
         private bool _showAnswerGuide;
         private bool _isAnswerGuideOpen;
         private TabTaskInfo _currentTabTask;
@@ -120,7 +120,7 @@ namespace MOS_Word_app
 
         public string CurrentProjectName => CurrentProject?.Name ?? "";
 
-        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは表示。</summary>
         public bool ShowScoreButton
         {
             get => _showScoreButton;

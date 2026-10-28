@@ -28,7 +28,7 @@ namespace MOS_PowerPoint_app
     {
         private int _selectedTabIndex;
         private string _resultMessage;
-        private bool _showScoreButton;
+        private bool _showScoreButton = true;
         private bool _showAnswerGuide;
         private bool _isAnswerGuideOpen;
         private ProjectViewModel _currentProject;
@@ -91,7 +91,7 @@ namespace MOS_PowerPoint_app
             }
         }
 
-        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは表示。</summary>
         public bool ShowScoreButton
         {
             get => _showScoreButton;
