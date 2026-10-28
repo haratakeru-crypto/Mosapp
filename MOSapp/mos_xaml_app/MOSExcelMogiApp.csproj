@@ -213,6 +213,8 @@
     <Compile Include="Infrastructure\VariantExam.cs" />
     <Compile Include="Models\ExamResultScope.cs" />
     <Compile Include="Models\ExamResultStorage.cs" />
+    <Compile Include="Models\TaskReviewState.cs" />
+    <Compile Include="Models\TaskReviewStateStore.cs" />
     <Compile Include="Ui\ViewModels\MainViewModel.cs" />
     <Compile Include="Libraries\Group1\ExcelChecker1_1.cs" />
     <Compile Include="Libraries\Group1\ExcelChecker1_2.cs" />
@@ -424,6 +426,9 @@
     <Error
       Condition="!Exists('$(ProjectDir)ThirdParty\MosExcel.PracticeScoring.dll')"
       Text="ThirdParty\MosExcel.PracticeScoring.dll がありません。リポジトリの ThirdParty フォルダを確認してください。" />
+  </Target>
+  <Target Name="StopMosPracticeSessionWatchForCopy" BeforeTargets="CopyMosPracticeSessionWatch" Condition="'$(Configuration)' == 'Debug'">
+    <Exec Command="taskkill /IM MosPracticeSessionWatch.exe /F /T &gt;NUL 2&gt;&amp;1 &amp; ping -n 2 127.0.0.1 &gt;NUL &amp; exit /b 0" />
   </Target>
   <Target Name="CopyMosPracticeSessionWatch" AfterTargets="Build">
     <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />

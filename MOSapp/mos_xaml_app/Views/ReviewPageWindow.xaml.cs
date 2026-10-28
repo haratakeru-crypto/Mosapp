@@ -660,6 +660,25 @@ namespace MOSExcelMogiApp.Views
                 .ToList();
         }
 
+        private IEnumerable<(int ProjectId, int TaskId)> GetTasksForScoring(ISet<int> projectIds)
+        {
+            var projects = ProjectsItemsControl.ItemsSource as IEnumerable<ReviewProjectInfo>;
+            if (projects == null)
+                yield break;
+
+            foreach (var project in projects)
+            {
+                foreach (var task in project.Tasks ?? Enumerable.Empty<ReviewTaskInfo>())
+                {
+                    if (task.ProjectId <= 0 || task.TaskId <= 0)
+                        continue;
+                    if (projectIds != null && !projectIds.Contains(task.ProjectId))
+                        continue;
+                    yield return (task.ProjectId, task.TaskId);
+                }
+            }
+        }
+
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isScoring)
@@ -679,6 +698,28 @@ namespace MOSExcelMogiApp.Views
                 if (!string.IsNullOrWhiteSpace(rangeLabel))
                     scoringRangeLabel = rangeLabel;
             }
+
+            if (TaskReviewState.RequiresDispositionBeforeScoring(_isVariantMode, _variantSetNo))
+            {
+                var unmarked = TaskReviewState.FindUnmarked(
+                    GetTasksForScoring(scoringProjectIds),
+                    _projectTaskCompletedStates,
+                    _projectTaskFlaggedStates);
+                if (unmarked.Count > 0)
+                {
+                    MessageBoxResult proceed = MessageBox.Show(
+                        this,
+                        TaskReviewState.FormatUnmarkedMessage(unmarked),
+                        "未選択の問題があります",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (proceed != MessageBoxResult.Yes)
+                        return;
+                }
+            }
+
+            Dictionary<int, bool[]> completedSnapshot = TaskReviewState.Clone(_projectTaskCompletedStates);
+            Dictionary<int, bool[]> flaggedSnapshot = TaskReviewState.Clone(_projectTaskFlaggedStates);
 
             _isScoring = true;
             Window scoringOverlay = null;
@@ -882,7 +923,13 @@ namespace MOSExcelMogiApp.Views
 
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        resultWindow = new ResultWindow(allResults, _groupId, isVariantMode: _isVariantMode, variantSetNo: _variantSetNo);
+                        resultWindow = new ResultWindow(
+                            allResults,
+                            _groupId,
+                            isVariantMode: _isVariantMode,
+                            variantSetNo: _variantSetNo,
+                            completedStates: completedSnapshot,
+                            flaggedStates: flaggedSnapshot);
                         onInitialPresentationCompleted = (_, __) =>
                         {
                             try

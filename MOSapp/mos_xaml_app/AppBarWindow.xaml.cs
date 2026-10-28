@@ -24,6 +24,7 @@ using System.Threading;
 using Libraries;
 using MOSExcelMogiApp.Guide;
 using MOSExcelMogiApp.Infrastructure;
+using MOSExcelMogiApp.Models;
 
 namespace MOSExcelMogiApp
 {
@@ -39,14 +40,17 @@ namespace MOSExcelMogiApp
         private int? _pendingTaskId = null;
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
-        private readonly Dictionary<int, bool[]> _textbookTaskCompletedStates = new Dictionary<int, bool[]>();
-        private readonly Dictionary<int, bool[]> _variantTaskCompletedStates = new Dictionary<int, bool[]>();
-        private readonly Dictionary<int, bool[]> _textbookTaskFlaggedStates = new Dictionary<int, bool[]>();
-        private readonly Dictionary<int, bool[]> _variantTaskFlaggedStates = new Dictionary<int, bool[]>();
+        private ExamResultScope CurrentReviewScope()
+        {
+            if (_viewModel?.IsVariantMode == true)
+                return ExamResultScope.Variant(_viewModel.VariantSetNo);
+            return ExamResultScope.Textbook;
+        }
+
         private Dictionary<int, bool[]> _projectTaskCompletedStates =>
-            _viewModel?.IsVariantMode == true ? _variantTaskCompletedStates : _textbookTaskCompletedStates;
+            TaskReviewStateStore.Completed(CurrentReviewScope());
         private Dictionary<int, bool[]> _projectTaskFlaggedStates =>
-            _viewModel?.IsVariantMode == true ? _variantTaskFlaggedStates : _textbookTaskFlaggedStates;
+            TaskReviewStateStore.Flagged(CurrentReviewScope());
         private bool _isPaused = false;
         private bool _fromResultWindow = false; // 結果画面から来たかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
@@ -1917,6 +1921,11 @@ namespace MOSExcelMogiApp
             }
         }
 
+        private int CurrentReviewStateCapacity()
+        {
+            return Math.Max(_tasks?.Count ?? 8, Math.Max(8, _currentTaskId));
+        }
+
         private void FlagButton_Click(object sender, RoutedEventArgs e)
         {
             if (_viewModel != null && _viewModel.IsVocabularyMode)
@@ -1924,50 +1933,13 @@ namespace MOSExcelMogiApp
                 _viewModel.VocabularyMarkReviewLater();
                 return;
             }
-            System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Current TaskId={_currentTaskId}, ProjectId={_currentProjectId}");
-            
-            // 現在のプロジェクトの状態を取得または初期化
-            if (!_projectTaskFlaggedStates.ContainsKey(_currentProjectId))
-            {
-                _projectTaskFlaggedStates[_currentProjectId] = new bool[8];
-            }
 
-            bool[] flaggedStates = _projectTaskFlaggedStates[_currentProjectId];
-
-            // TaskIdは1始まり、配列は0始まりなので -1
-            int index = _currentTaskId - 1;
-            System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Calculated array index={index} (TaskId {_currentTaskId} - 1)");
-            
-            if (index >= 0 && index < flaggedStates.Length)
-            {
-                if (!flaggedStates[index])
-                {
-                    // フラグを設定
-                    flaggedStates[index] = true;
-                    System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Set flaggedStates[{index}] = true for TaskId {_currentTaskId}");
-                }
-                else
-                {
-                    // フラグを解除
-                    flaggedStates[index] = false;
-                    System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Set flaggedStates[{index}] = false for TaskId {_currentTaskId}");
-                }
-                
-                // デバッグ: 現在の配列状態を表示
-                for (int i = 0; i < flaggedStates.Length; i++)
-                {
-                    if (flaggedStates[i])
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Array state: flaggedStates[{i}] = true (corresponds to TaskId {i + 1})");
-                    }
-                }
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] ERROR: Index {index} is out of range (0-{flaggedStates.Length - 1})");
-            }
-
-            // UIを更新
+            TaskReviewState.ToggleReviewLater(
+                _projectTaskCompletedStates,
+                _projectTaskFlaggedStates,
+                _currentProjectId,
+                _currentTaskId,
+                CurrentReviewStateCapacity());
             UpdateTaskDisplay();
         }
 
@@ -1978,50 +1950,13 @@ namespace MOSExcelMogiApp
                 _viewModel.VocabularyMarkAnswered();
                 return;
             }
-            System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Current TaskId={_currentTaskId}, ProjectId={_currentProjectId}");
-            
-            // 現在のプロジェクトの状態を取得または初期化
-            if (!_projectTaskCompletedStates.ContainsKey(_currentProjectId))
-            {
-                _projectTaskCompletedStates[_currentProjectId] = new bool[8];
-            }
 
-            bool[] completedStates = _projectTaskCompletedStates[_currentProjectId];
-
-            // TaskIdは1始まり、配列は0始まりなので -1
-            int index = _currentTaskId - 1;
-            System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Calculated array index={index} (TaskId {_currentTaskId} - 1)");
-            
-            if (index >= 0 && index < completedStates.Length)
-            {
-                if (!completedStates[index])
-                {
-                    // チェックマークを設定
-                    completedStates[index] = true;
-                    System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Set completedStates[{index}] = true for TaskId {_currentTaskId}");
-                }
-                else
-                {
-                    // チェックマークを解除
-                    completedStates[index] = false;
-                    System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Set completedStates[{index}] = false for TaskId {_currentTaskId}");
-                }
-                
-                // デバッグ: 現在の配列状態を表示
-                for (int i = 0; i < completedStates.Length; i++)
-                {
-                    if (completedStates[i])
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Array state: completedStates[{i}] = true (corresponds to TaskId {i + 1})");
-                    }
-                }
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] ERROR: Index {index} is out of range (0-{completedStates.Length - 1})");
-            }
-
-            // UIを更新
+            TaskReviewState.ToggleCompleted(
+                _projectTaskCompletedStates,
+                _projectTaskFlaggedStates,
+                _currentProjectId,
+                _currentTaskId,
+                CurrentReviewStateCapacity());
             UpdateTaskDisplay();
         }
 

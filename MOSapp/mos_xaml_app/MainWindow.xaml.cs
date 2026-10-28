@@ -22,6 +22,7 @@ using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 using ExcelWorkbook = Microsoft.Office.Interop.Excel.Workbook;
 using Libraries;
 using MOSExcelMogiApp.Infrastructure;
+using MOSExcelMogiApp.Models;
 using MOSExcelMogiApp.Views;
 
 namespace MOSExcelMogiApp
@@ -58,6 +59,7 @@ namespace MOSExcelMogiApp
             _viewModel.ExamEnded += OnExamEnded;
 
             ApplyExamineeTabState();
+            MosPracticeClient.ExamineeStore.EnsureSessionWatch();
             Closing += MainWindow_Closing;
         }
 
@@ -332,6 +334,11 @@ namespace MOSExcelMogiApp
                         Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
                     });
 
+                if (scope == ExcelBulkResetScope.Textbook || scope == ExcelBulkResetScope.All)
+                    TaskReviewStateStore.Clear(ExamResultScope.Textbook);
+                if (scope == ExcelBulkResetScope.Variant || scope == ExcelBulkResetScope.All)
+                    TaskReviewStateStore.Clear(ExamResultScope.Variant(ExcelBulkResetCoordinator.DefaultVariantSetNo));
+
                 if (result.ReopenTarget != null)
                 {
                     reopenPath = result.ReopenTarget.WorkingPath;
@@ -470,6 +477,7 @@ namespace MOSExcelMogiApp
                     int retryCount = ExcelProjectResetHelper.RestoreFromTemplate(templatePath, projectFilePath, initialFilePath);
                     copySw.Stop();
                     ExcelProjectResetHelper.ClearLogsAfterSuccessfulCopy(projectId, 0);
+                    TaskReviewStateStore.ClearProject(ExamResultScope.Textbook, projectId);
                     if (logResetPerf)
                     {
                         ResetPerfLog.Write("excel", projectId, "copy", copySw.ElapsedMilliseconds, "main", "lockRetries=" + retryCount);
@@ -698,6 +706,7 @@ namespace MOSExcelMogiApp
                     int retryCount = ExcelProjectResetHelper.RestoreFromTemplate(templatePath, projectFilePath);
                     copySw.Stop();
                     ExcelProjectResetHelper.ClearLogsAfterSuccessfulCopy(projectId, variantSetNo);
+                    TaskReviewStateStore.ClearProject(ExamResultScope.Variant(variantSetNo), projectId);
                     if (logResetPerf)
                     {
                         ResetPerfLog.Write("excel", projectId, "copy", copySw.ElapsedMilliseconds, "main", "variant=" + variantSetNo + " lockRetries=" + retryCount);

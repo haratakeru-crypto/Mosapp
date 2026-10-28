@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using Libraries;
 using MOSExcelMogiApp;
 using MOSExcelMogiApp.Infrastructure;
+using MOSExcelMogiApp.Models;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -33,26 +34,36 @@ namespace MOSExcelMogiApp.Views
         private readonly bool _isVariantMode;
         private readonly int _variantSetNo;
         private readonly MOSExcelMogiApp.Models.ExamResultScope _resultScope;
+        private readonly Dictionary<int, bool[]> _completedStates;
+        private readonly Dictionary<int, bool[]> _flaggedStates;
+
+        public bool ShowDispositionColumns { get; }
 
         public ResultWindow(
             Dictionary<int, List<bool>> allProjectResults = null,
             int groupId = 1,
             bool fromScoringLog = false,
             bool isVariantMode = false,
-            int variantSetNo = 1)
+            int variantSetNo = 1,
+            Dictionary<int, bool[]> completedStates = null,
+            Dictionary<int, bool[]> flaggedStates = null)
         {
-            InitializeComponent();
             _allProjectResults = allProjectResults ?? new Dictionary<int, List<bool>>();
             _groupId = groupId;
             _fromScoringLog = fromScoringLog;
             _isVariantMode = isVariantMode;
             _variantSetNo = variantSetNo < 1 ? 1 : variantSetNo;
+            ShowDispositionColumns = TaskReviewState.ShowDispositionColumns(_isVariantMode);
+            _completedStates = TaskReviewState.Clone(completedStates);
+            _flaggedStates = TaskReviewState.Clone(flaggedStates);
             _resultScope = _isVariantMode
                 ? MOSExcelMogiApp.Models.ExamResultScope.Variant(_variantSetNo)
                 : MOSExcelMogiApp.Models.ExamResultScope.Textbook;
             _initialProjectResults = fromScoringLog
                 ? CloneResults(_allProjectResults)
                 : MOSExcelMogiApp.Models.ExamResultStorage.GetInitialResults(_resultScope);
+
+            InitializeComponent();
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_allProjectResults?.Count ?? 0} projects, groupId: {_groupId}, fromLog: {_fromScoringLog}");
             
             this.Loaded += ResultWindow_Loaded;
@@ -301,8 +312,8 @@ namespace MOSExcelMogiApp.Views
                         }
                     }
                     
-                    ProjectsItemsControl.ItemsSource = resultProjects;
-                    _allProjects = resultProjects; // すべてのプロジェクトを保存
+                    _allProjects = resultProjects;
+                    ApplyWrongOnlyFilter();
                 }, System.Windows.Threading.DispatcherPriority.Normal);
                 
                 // UI更新の機会を与える
@@ -397,13 +408,18 @@ namespace MOSExcelMogiApp.Views
                         var resultProject = new ResultProjectInfo
                         {
                             ProjectTitle = $"プロジェクト {project.ProjectId}",
-                            Tasks = project.Tasks?.Select((task, index) =>
+                            Tasks = project.Tasks?.Select(task =>
                             {
+                                int arrayIndex = task.TaskId - 1;
                                 bool? isCorrect = null;
-                                if (projectResults != null && index < projectResults.Count)
+                                if (projectResults != null && arrayIndex >= 0 && arrayIndex < projectResults.Count)
                                 {
-                                    isCorrect = projectResults[index];
+                                    isCorrect = projectResults[arrayIndex];
                                 }
+
+                                bool isCompleted = TaskReviewState.GetFlag(_completedStates, project.ProjectId, task.TaskId);
+                                bool isFlagged = TaskReviewState.GetFlag(_flaggedStates, project.ProjectId, task.TaskId);
+                                string resultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "";
                                 
                                 return new ResultTaskInfo
                                 {
@@ -412,10 +428,14 @@ namespace MOSExcelMogiApp.Views
                                     GroupId = _groupId,
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
-                                    ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
+                                    ResultMark = resultMark,
                                     FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
                                     PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId),
-                                    ResultColor = null // 後でUIスレッドで設定
+                                    ResultColor = null,
+                                    ShowDispositionColumns = ShowDispositionColumns,
+                                    IsCompleted = isCompleted,
+                                    IsFlagged = isFlagged,
+                                    IsCompletedAndWrong = isCompleted && resultMark == "×"
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
                         };
@@ -434,65 +454,22 @@ namespace MOSExcelMogiApp.Views
         
         private List<ResultProjectInfo> ProcessProjectData(ProjectData projectData)
         {
-            var resultProjects = new List<ResultProjectInfo>();
-            
-            try
+            var resultProjects = ProcessProjectDataRaw(projectData);
+            foreach (var project in resultProjects)
             {
-                if (projectData?.Projects != null)
+                if (project.Tasks == null)
+                    continue;
+                foreach (var task in project.Tasks)
                 {
-                    foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
-                    {
-                        if (!IsIncludedProject(project.ProjectId))
-                            continue;
-
-                        // 採点結果を取得
-                        var projectResults = _allProjectResults.ContainsKey(project.ProjectId) 
-                            ? _allProjectResults[project.ProjectId] 
-                            : null;
-                        
-                        var resultProject = new ResultProjectInfo
-                        {
-                            ProjectTitle = $"プロジェクト {project.ProjectId}",
-                            Tasks = project.Tasks?.Select((task, index) =>
-                            {
-                                bool? isCorrect = null;
-                                if (projectResults != null && index < projectResults.Count)
-                                {
-                                    isCorrect = projectResults[index];
-                                }
-                                
-                                return new ResultTaskInfo
-                                {
-                                    TaskTitle = $"タスク {task.TaskId}",
-                                    Description = RemoveQuotes(task.Description),
-                                    GroupId = _groupId,
-                                    ProjectId = project.ProjectId,
-                                    TaskId = task.TaskId,
-                                    ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
-                                    FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
-                                    PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId),
-                                    ResultColor = isCorrect.HasValue 
-                                        ? (isCorrect.Value ? Brushes.Green : Brushes.Red)
-                                        : Brushes.Gray
-                                };
-                            }).ToList() ?? new List<ResultTaskInfo>()
-                        };
-
-                        if (resultProject.Tasks != null)
-                        {
-                            foreach (var task in resultProject.Tasks)
-                                ApplyPriorityBadgeColors(task);
-                        }
-                        
-                        resultProjects.Add(resultProject);
-                    }
+                    if (task.ResultMark == "〇")
+                        task.ResultColor = Brushes.Green;
+                    else if (task.ResultMark == "×")
+                        task.ResultColor = Brushes.Red;
+                    else
+                        task.ResultColor = Brushes.Gray;
+                    ApplyPriorityBadgeColors(task);
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error in ProcessProjectData: {ex.Message}\n{ex.StackTrace}");
-            }
-            
             return resultProjects;
         }
         
@@ -856,21 +833,22 @@ namespace MOSExcelMogiApp.Views
         private void ShowWrongOnlyButton_Click(object sender, RoutedEventArgs e)
         {
             _showingWrongOnly = !_showingWrongOnly;
-            
+            ApplyWrongOnlyFilter();
+        }
+
+        private void ApplyWrongOnlyFilter()
+        {
             if (_showingWrongOnly)
             {
-                // ×の問題のみ表示
-                var wrongOnlyProjects = FilterWrongTasks(_allProjects);
-                ProjectsItemsControl.ItemsSource = wrongOnlyProjects;
+                ProjectsItemsControl.ItemsSource = FilterWrongTasks(_allProjects);
                 ShowWrongOnlyButton.Content = "全て表示";
-                ShowWrongOnlyButton.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 64, 175)); // #1E40AF
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(30, 64, 175));
             }
             else
             {
-                // 全て表示
                 ProjectsItemsControl.ItemsSource = _allProjects;
                 ShowWrongOnlyButton.Content = "間違えた問題のみ表示";
-                ShowWrongOnlyButton.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 38, 38)); // #DC2626
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38));
             }
         }
 
@@ -924,22 +902,60 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
+        private const int PassingScoreThreshold = 700;
+
         private void UpdateTotalScoreDisplay(Dictionary<int, List<bool>> results)
         {
             if (TotalScorePanel == null || TotalScoreTextBlock == null)
                 return;
 
+            if (PassingRangeBadge != null)
+                PassingRangeBadge.Visibility = Visibility.Collapsed;
+
             if (!_isVariantMode)
             {
                 TotalScorePanel.Visibility = Visibility.Collapsed;
+                if (LostPointsTextBlock != null)
+                    LostPointsTextBlock.Visibility = Visibility.Collapsed;
                 return;
             }
 
             TotalScorePanel.Visibility = Visibility.Visible;
             if (PracticeScoreClient.TryCompute(VariantExam.FlattenResults(results), out int total, out string error))
+            {
                 TotalScoreTextBlock.Text = total.ToString();
+                if (PassingRangeBadge != null && total >= PassingScoreThreshold)
+                    PassingRangeBadge.Visibility = Visibility.Visible;
+            }
             else
+            {
                 TotalScoreTextBlock.Text = error ?? "総合点を表示できません。";
+            }
+
+            UpdateLostPointsDisplay(results);
+        }
+
+        private void UpdateLostPointsDisplay(Dictionary<int, List<bool>> results)
+        {
+            if (LostPointsTextBlock == null)
+                return;
+
+            if (!TaskReviewState.ShowLostPoints(_isVariantMode))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            int completedWrongCount = TaskReviewState.CountCompletedWrong(results, _completedStates);
+            string message = TaskReviewState.FormatLostPointsMessage(completedWrongCount);
+            if (string.IsNullOrEmpty(message))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            LostPointsTextBlock.Text = message;
+            LostPointsTextBlock.Visibility = Visibility.Visible;
         }
 
         private string FailReasonFor(int projectId, int taskId)
@@ -1092,6 +1108,10 @@ namespace MOSExcelMogiApp.Views
         public bool HasPriorityBadge => !string.IsNullOrEmpty(PriorityBadgeText);
         public Brush PriorityBadgeBackground { get; set; }
         public Brush PriorityBadgeForeground { get; set; }
+        public bool ShowDispositionColumns { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool IsFlagged { get; set; }
+        public bool IsCompletedAndWrong { get; set; }
     }
 
     // JSON デシリアライズ用のクラス
