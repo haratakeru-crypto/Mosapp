@@ -211,7 +211,15 @@
                 <mos:VocabularyTabControl ShowFunctionCategories="False"/>
             </TabItem>
             <TabItem Header="ゲーム">
-                <Grid Background="#F0F0F3"/>
+                <mos:GameTabControl JudgeUrl="https://mos-ppt-3sec-judge.netlify.app/" SnipeUrl="https://mos-ppt-3sec-snipe.netlify.app/">
+                    <mos:GameTabControl.ButtonBackground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#D04423" Offset="0"/>
+                            <GradientStop Color="#FF6B35" Offset="0.5"/>
+                            <GradientStop Color="#FF8C65" Offset="1"/>
+                        </LinearGradientBrush>
+                    </mos:GameTabControl.ButtonBackground>
+                </mos:GameTabControl>
             </TabItem>
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">

@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>3秒スナイプ！ PowerPoint</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --card-border: #30363d;
+      --text: #f0f6fc;
+      --subtext: #8b949e;
+      --pass-color: #2ea043;
+      --pass-glow: rgba(46, 160, 67, 0.4);
+      --hold-color: #f85149;
+      --hold-glow: rgba(248, 81, 73, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: manipulation;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Yu Gothic UI", Meiryo, Roboto, "Helvetica Neue", sans-serif;
+    }
+
+    #game-container {
+      width: 100%;
+      height: 100dvh;
+      max-width: 480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding-top: max(12px, env(safe-area-inset-top));
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      position: relative;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      padding: 4px 0;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--subtext);
+    }
+
+    .round-label {
+      color: #58a6ff;
+      margin-right: 8px;
+    }
+
+    .combo-badge {
+      font-size: 16px;
+      color: #e3b341;
+      text-shadow: 0 0 10px rgba(227, 179, 65, 0.5);
+      transition: transform 0.15s ease;
+    }
+
+    .fuse-track {
+      width: 100%;
+      height: 12px;
+      background: #21262d;
+      border-radius: 6px;
+      position: relative;
+      overflow: visible;
+      border: 1px solid #30363d;
+    }
+
+    .fuse-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff4d4d, #f9cb28);
+      border-radius: 6px;
+      transform-origin: left center;
+      transition: width 0.05s linear;
+    }
+
+    .fuse-spark {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, #fff 10%, #ffeb3b 40%, #ff5722 80%, transparent 100%);
+      border-radius: 50%;
+      box-shadow: 0 0 12px #ff9800, 0 0 20px #ff5722;
+      animation: flicker 0.08s infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes flicker {
+      0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+    }
+
+    .card-area {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 12px 0;
+      perspective: 1000px;
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      max-height: 520px;
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+      position: absolute;
+    }
+
+    .card-category {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      color: #58a6ff;
+    }
+
+    .card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 0;
+      gap: 16px;
+    }
+
+    .card-question {
+      font-size: clamp(15px, 4.2vw, 20px);
+      line-height: 1.5;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .card-choices {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .choice-box {
+      flex: 1;
+      min-width: 0;
+      appearance: none;
+      font: inherit;
+      background: #0d1117;
+      border: 2px solid #30363d;
+      border-radius: 12px;
+      padding: 14px 8px;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .choice-box:active:not(:disabled) {
+      transform: scale(0.96);
+      filter: brightness(1.2);
+    }
+
+    .choice-box:disabled {
+      cursor: default;
+    }
+
+    .choice-box.left {
+      border-color: rgba(248, 81, 73, 0.45);
+    }
+
+    .choice-box.right {
+      border-color: rgba(46, 160, 67, 0.45);
+    }
+
+    .choice-box.picked-ok {
+      background: rgba(46, 160, 67, 0.22);
+      border-color: var(--pass-color);
+    }
+
+    .choice-box.picked-ng {
+      background: rgba(248, 81, 73, 0.22);
+      border-color: var(--hold-color);
+    }
+
+    .choice-box.dim {
+      opacity: 0.35;
+    }
+
+    .choice-dir {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--subtext);
+      margin-bottom: 4px;
+    }
+
+    .choice-label {
+      display: block;
+      font-size: clamp(13px, 3.6vw, 16px);
+      font-weight: 800;
+      line-height: 1.3;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+
+    .choice-box.left .choice-label { color: #ff7b72; }
+    .choice-box.right .choice-label { color: #7ee787; }
+
+    .verdict {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(36px, 11vw, 56px);
+      font-weight: 900;
+      letter-spacing: 2px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 8;
+      background: rgba(13, 17, 23, 0.62);
+      border-radius: 20px;
+      text-shadow: 0 3px 12px #000;
+      transition: opacity 0.12s ease;
+    }
+
+    .verdict.show { opacity: 1; }
+    .verdict.ok { color: #7ee787; }
+    .verdict.ng { color: #ff7b72; }
+
+    #combo-popup {
+      position: absolute;
+      top: 42%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.5);
+      font-size: clamp(22px, 6vw, 30px);
+      font-weight: 900;
+      color: #ffdf5d;
+      text-shadow: 0 0 16px rgba(255, 223, 93, 0.8), 0 3px 8px #000;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 100;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .popup-animate {
+      animation: comboPop 0.75s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+    }
+
+    @keyframes comboPop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+      30% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+      70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -70%) scale(0.9); }
+    }
+
+    .shake {
+      animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    }
+
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-4px, 0, 0); }
+      20%, 80% { transform: translate3d(6px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-7px, 0, 0); }
+      40%, 60% { transform: translate3d(7px, 0, 0); }
+    }
+
+    .overlay-screen {
+      position: absolute;
+      inset: 0;
+      background: rgba(13, 17, 23, 0.97);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 200;
+      text-align: center;
+    }
+
+    .overlay-subtitle {
+      font-size: 14px;
+      font-weight: 800;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+
+    .overlay-title {
+      font-size: 26px;
+      font-weight: 900;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ff7b72, #e3b341, #7ee787);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .overlay-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--subtext);
+      margin-bottom: 16px;
+    }
+
+    .time-pick {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 280px;
+      margin-bottom: 20px;
+    }
+
+    .time-btn {
+      flex: 1;
+      appearance: none;
+      font: inherit;
+      background: #161b22;
+      color: var(--subtext);
+      border: 2px solid #30363d;
+      border-radius: 14px;
+      padding: 12px 8px;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .time-btn.selected {
+      color: #ffdf5d;
+      border-color: #e3b341;
+      background: rgba(227, 179, 65, 0.12);
+      box-shadow: 0 0 12px rgba(227, 179, 65, 0.25);
+    }
+
+    .btn-start {
+      background: linear-gradient(135deg, #238636, #2ea043);
+      color: white;
+      border: none;
+      padding: 16px 36px;
+      font-size: 17px;
+      font-weight: 800;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px var(--pass-glow);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-start:active {
+      transform: scale(0.96);
+    }
+
+    #round-screen {
+      background: rgba(13, 17, 23, 0.9);
+    }
+
+    .round-title {
+      font-size: 30px;
+      font-weight: 900;
+      color: #ffdf5d;
+      text-shadow: 0 0 16px rgba(255, 223, 93, 0.6);
+      margin-bottom: 8px;
+    }
+
+    .round-desc {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    #result-screen {
+      justify-content: flex-start;
+      overflow-y: auto;
+      padding-top: 32px;
+    }
+
+    .result-stats {
+      width: 100%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-around;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--subtext);
+    }
+
+    .result-comparison {
+      font-size: 14px;
+      color: #ffdf5d;
+      font-weight: 700;
+      margin-bottom: 16px;
+      background: rgba(227, 179, 65, 0.1);
+      padding: 10px 14px;
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+
+    .result-section {
+      width: 100%;
+      text-align: left;
+      margin-bottom: 14px;
+    }
+
+    .result-section h3 {
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .result-section.unsolvable h3 { color: #ff7b72; }
+    .result-section.timeout h3 { color: #e3b341; }
+
+    .result-list {
+      list-style: none;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 4px 10px;
+    }
+
+    .result-list li {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text);
+      padding: 6px 0;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .result-list li:last-child {
+      border-bottom: none;
+    }
+
+    .result-list .item-id {
+      color: #58a6ff;
+      font-weight: 800;
+      margin-right: 6px;
+    }
+
+    .result-list .item-count {
+      color: #e3b341;
+      font-weight: 800;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    .result-empty {
+      font-size: 12px;
+      color: var(--subtext);
+      padding: 6px 0;
+    }
+
+    .key-hint {
+      font-size: 12px;
+      color: var(--subtext);
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <header>
+      <div class="status-bar">
+        <span><span id="round-text" class="round-label">第 1 周</span><span id="progress-text">1 / 68 問</span></span>
+        <span id="combo-display" class="combo-badge"></span>
+      </div>
+      <div class="fuse-track">
+        <div id="fuse-fill" class="fuse-fill"></div>
+        <div id="fuse-spark" class="fuse-spark"></div>
+      </div>
+    </header>
+
+    <div class="card-area" id="card-area">
+      <div id="card" class="card">
+        <div class="card-category" id="card-category">CATEGORY</div>
+        <div class="card-body">
+          <div class="card-question" id="card-question">問題文がロードされます</div>
+          <div class="card-choices">
+            <button type="button" class="choice-box left" id="choice-left">
+              <span class="choice-dir">👈 ←</span>
+              <span class="choice-label" id="hint-left">左</span>
+            </button>
+            <button type="button" class="choice-box right" id="choice-right">
+              <span class="choice-dir">→ 👉</span>
+              <span class="choice-label" id="hint-right">右</span>
+            </button>
+          </div>
+        </div>
+        <div class="verdict" id="verdict"></div>
+      </div>
+    </div>
+
+    <div id="combo-popup"></div>
+
+    <div class="overlay-screen" id="start-screen">
+      <div class="overlay-subtitle" id="start-subtitle">3秒で正解を見抜く！</div>
+      <div class="overlay-title">3秒スナイプ！ PowerPoint</div>
+      <p class="overlay-desc">
+        MOS PowerPoint の問題文を読んで、最初に押すタブ／ボタンを選べ。<br><br>
+        ⏱ <b>1問の猶予はたったの<span id="time-limit-text">3</span>秒</b><br>
+        問題の中の2択から正解をスナイプせよ。<br>
+        外した問題と燃え尽きた問題は<b>爆発して次の周へ</b>！<br>
+        全部当てたらクリア。
+      </p>
+      <div class="time-pick" role="group" aria-label="制限時間">
+        <button type="button" class="time-btn selected" data-ms="3000" id="time-3">3秒</button>
+        <button type="button" class="time-btn" data-ms="5000" id="time-5">5秒</button>
+      </div>
+      <button class="btn-start" id="start-btn">クリックして開始（音量ON推奨）</button>
+      <p class="key-hint">PC：← 左の選択肢 ／ → 右の選択肢</p>
+    </div>
+
+    <div class="overlay-screen" id="round-screen" style="display: none;">
+      <div class="round-title" id="round-title">第 2 周</div>
+      <div class="round-desc" id="round-desc">外した 0 問</div>
+    </div>
+
+    <div class="overlay-screen" id="result-screen" style="display: none;">
+      <div class="overlay-title">スナイプ完了！</div>
+      <div class="result-comparison" id="result-comparison"></div>
+      <div class="result-stats">
+        <div class="stat-item">
+          <span class="stat-value" id="stat-pass" style="color: #7ee787;">0</span>
+          <span class="stat-label">正解</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="stat-wrong" style="color: #ff7b72;">0</span>
+          <span class="stat-label">誤答</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="stat-timeout" style="color: #e3b341;">0</span>
+          <span class="stat-label">時間切れ</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="stat-max-combo" style="color: #ffdf5d;">0</span>
+          <span class="stat-label">最大連続</span>
+        </div>
+      </div>
+      <div class="result-section unsolvable">
+        <h3>誤答した問題</h3>
+        <ul class="result-list" id="list-wrong"></ul>
+      </div>
+      <div class="result-section timeout">
+        <h3>時間切れになった問題</h3>
+        <ul class="result-list" id="list-timeout"></ul>
+      </div>
+      <button class="btn-start" id="restart-btn">もう一度挑戦</button>
+    </div>
+  </div>
+
+  <script src="questions.js"></script>
+  <script>
+    const TIME_STORAGE_KEY = 'mos-snipe-time-limit';
+    const ROUND_BANNER_MS = 1400;
+    const FEEDBACK_MS = 2000;
+    let timeLimit = 3000;
+
+    function vibrate(pattern) {
+      if ('vibrate' in navigator) {
+        try { navigator.vibrate(pattern); } catch (e) {}
+      }
+    }
+
+    class SoundEngine {
+      constructor() { this.ctx = null; }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playSizzle() {
+        if (!this.ctx) return;
+        const bufferSize = this.ctx.sampleRate * 0.03;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.08;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 3500;
+        noise.connect(filter);
+        filter.connect(this.ctx.destination);
+        noise.start();
+      }
+
+      playSlash() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(1400, now);
+        osc1.frequency.exponentialRampToValueAtTime(3200, now + 0.12);
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(1800, now);
+        osc2.frequency.exponentialRampToValueAtTime(4200, now + 0.15);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.22);
+        osc2.stop(now + 0.22);
+      }
+
+      playWhoosh() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const bufferSize = this.ctx.sampleRate * 0.14;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+        filter.frequency.exponentialRampToValueAtTime(180, now + 0.14);
+        filter.Q.value = 3;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(now);
+      }
+
+      playExplosion() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const oscGain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(25, now + 0.38);
+        oscGain.gain.setValueAtTime(0.5, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+        osc.connect(oscGain);
+        oscGain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.38);
+
+        const bufferSize = this.ctx.sampleRate * 0.38;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(600, now);
+        filter.frequency.linearRampToValueAtTime(70, now + 0.35);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.5, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.ctx.destination);
+        noise.start(now);
+      }
+
+      playFanfare() {
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const now = this.ctx.currentTime + idx * 0.055;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        });
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    let round = 1;
+    let roundQueue = [];
+    let nextRoundQueue = [];
+    let roundIndex = 0;
+    let combo = 0;
+    let maxCombo = 0;
+    let solved = [];
+    let wrongCounts = new Map();
+    let timeoutCounts = new Map();
+    let totalWrongs = 0;
+    let totalTimeouts = 0;
+    let startTime = 0;
+    let cardStartTime = 0;
+    let timerRaf = null;
+    let lastSizzleTime = 0;
+    let isProcessing = true;
+    let isPlaying = false;
+    let leftChoice = '';
+    let rightChoice = '';
+    let correctOnRight = false;
+
+    const container = document.getElementById('game-container');
+    const card = document.getElementById('card');
+    const cardCategory = document.getElementById('card-category');
+    const cardQuestion = document.getElementById('card-question');
+    const verdict = document.getElementById('verdict');
+    const fuseFill = document.getElementById('fuse-fill');
+    const fuseSpark = document.getElementById('fuse-spark');
+    const roundText = document.getElementById('round-text');
+    const progressText = document.getElementById('progress-text');
+    const comboDisplay = document.getElementById('combo-display');
+    const comboPopup = document.getElementById('combo-popup');
+    const startScreen = document.getElementById('start-screen');
+    const roundScreen = document.getElementById('round-screen');
+    const resultScreen = document.getElementById('result-screen');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const choiceLeft = document.getElementById('choice-left');
+    const choiceRight = document.getElementById('choice-right');
+    const hintLeft = document.getElementById('hint-left');
+    const hintRight = document.getElementById('hint-right');
+
+    const TITLES = [
+      { min: 3, text: "🔥 3連スナイプ！" },
+      { min: 5, text: "⚡ 5連！瞬殺！" },
+      { min: 8, text: "🌪 神速スナイプ！" },
+      { min: 10, text: "👑 完全無欠のスナイパー！" }
+    ];
+
+    function shuffle(items) {
+      const arr = items.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function setTimeLimit(ms) {
+      timeLimit = ms === 5000 ? 5000 : 3000;
+      const sec = String(timeLimit / 1000);
+      document.querySelectorAll('.time-btn').forEach((btn) => {
+        btn.classList.toggle('selected', Number(btn.dataset.ms) === timeLimit);
+      });
+      document.getElementById('start-subtitle').textContent = `${sec}秒で正解を見抜く！`;
+      document.getElementById('time-limit-text').textContent = sec;
+      try { localStorage.setItem(TIME_STORAGE_KEY, String(timeLimit)); } catch (e) {}
+    }
+
+    document.querySelectorAll('.time-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setTimeLimit(Number(btn.dataset.ms)));
+    });
+
+    try {
+      const saved = Number(localStorage.getItem(TIME_STORAGE_KEY));
+      if (saved === 3000 || saved === 5000) setTimeLimit(saved);
+    } catch (e) {}
+
+    startBtn.addEventListener('click', () => {
+      sound.init();
+      startScreen.style.display = 'none';
+      startGame();
+    });
+
+    restartBtn.addEventListener('click', () => {
+      resultScreen.style.display = 'none';
+      startScreen.style.display = 'flex';
+    });
+
+    function startGame() {
+      round = 1;
+      roundQueue = shuffle(QUESTIONS);
+      nextRoundQueue = [];
+      roundIndex = 0;
+      combo = 0;
+      maxCombo = 0;
+      solved = [];
+      wrongCounts = new Map();
+      timeoutCounts = new Map();
+      totalWrongs = 0;
+      totalTimeouts = 0;
+      isPlaying = true;
+      startTime = performance.now();
+      updateComboDisplay();
+      loadQuestion();
+    }
+
+    function assignChoices(question) {
+      correctOnRight = Math.random() < 0.5;
+      leftChoice = correctOnRight ? question.wrong : question.correct;
+      rightChoice = correctOnRight ? question.correct : question.wrong;
+      hintLeft.textContent = leftChoice;
+      hintRight.textContent = rightChoice;
+      resetChoiceStyles();
+    }
+
+    function resetChoiceStyles() {
+      [choiceLeft, choiceRight].forEach((el) => {
+        el.classList.remove('picked-ok', 'picked-ng', 'dim');
+        el.disabled = false;
+      });
+    }
+
+    function setChoicesEnabled(enabled) {
+      choiceLeft.disabled = !enabled;
+      choiceRight.disabled = !enabled;
+    }
+
+    function showVerdict(kind, text) {
+      verdict.textContent = text;
+      verdict.className = 'verdict show ' + kind;
+    }
+
+    function hideVerdict() {
+      verdict.className = 'verdict';
+      verdict.textContent = '';
+    }
+
+    function advanceAfterFeedback() {
+      setTimeout(() => {
+        roundIndex++;
+        loadQuestion();
+      }, FEEDBACK_MS);
+    }
+
+    function loadQuestion() {
+      if (roundIndex >= roundQueue.length) {
+        finishRound();
+        return;
+      }
+      const question = roundQueue[roundIndex];
+      roundText.textContent = `第 ${round} 周`;
+      progressText.textContent = `${roundIndex + 1} / ${roundQueue.length} 問`;
+      cardCategory.textContent = question.cat;
+      cardQuestion.textContent = question.q;
+      assignChoices(question);
+      hideVerdict();
+      card.style.opacity = '1';
+
+      isProcessing = false;
+      cardStartTime = performance.now();
+      cancelAnimationFrame(timerRaf);
+      timerTick();
+    }
+
+    function finishRound() {
+      if (nextRoundQueue.length === 0) {
+        endGame();
+        return;
+      }
+      round++;
+      roundQueue = shuffle(nextRoundQueue);
+      nextRoundQueue = [];
+      roundIndex = 0;
+      isProcessing = true;
+
+      document.getElementById('round-title').textContent = `第 ${round} 周`;
+      document.getElementById('round-desc').textContent = `外した ${roundQueue.length} 問`;
+      roundScreen.style.display = 'flex';
+      setTimeout(() => {
+        roundScreen.style.display = 'none';
+        loadQuestion();
+      }, ROUND_BANNER_MS);
+    }
+
+    function timerTick() {
+      const now = performance.now();
+      const elapsed = now - cardStartTime;
+      const remainingRatio = Math.max(0, 1 - (elapsed / timeLimit));
+      const percentage = remainingRatio * 100;
+
+      fuseFill.style.width = `${percentage}%`;
+      fuseSpark.style.left = `${percentage}%`;
+
+      if (now - lastSizzleTime > 160) {
+        sound.playSizzle();
+        lastSizzleTime = now;
+      }
+
+      if (remainingRatio <= 0) {
+        handleTimeUp();
+      } else {
+        timerRaf = requestAnimationFrame(timerTick);
+      }
+    }
+
+    function handleTimeUp() {
+      cancelAnimationFrame(timerRaf);
+      isProcessing = true;
+      setChoicesEnabled(false);
+      sound.playExplosion();
+      vibrate([50, 40, 100]);
+
+      container.classList.add('shake');
+      setTimeout(() => container.classList.remove('shake'), 400);
+
+      combo = 0;
+      updateComboDisplay();
+
+      const question = roundQueue[roundIndex];
+      nextRoundQueue.push(question);
+      timeoutCounts.set(question.id, (timeoutCounts.get(question.id) || 0) + 1);
+      totalTimeouts++;
+
+      choiceLeft.classList.add('dim');
+      choiceRight.classList.add('dim');
+      showVerdict('ng', 'タイムアップ！');
+      advanceAfterFeedback();
+    }
+
+    function missQuestion(question) {
+      nextRoundQueue.push(question);
+      wrongCounts.set(question.id, (wrongCounts.get(question.id) || 0) + 1);
+      totalWrongs++;
+      combo = 0;
+      updateComboDisplay();
+      sound.playExplosion();
+      vibrate([50, 40, 100]);
+      container.classList.add('shake');
+      setTimeout(() => container.classList.remove('shake'), 400);
+    }
+
+    function decide(side) {
+      if (isProcessing || !isPlaying) return;
+      isProcessing = true;
+      setChoicesEnabled(false);
+      cancelAnimationFrame(timerRaf);
+
+      const question = roundQueue[roundIndex];
+      const picked = side === 'right' ? rightChoice : leftChoice;
+      const isCorrect = picked === question.correct;
+      const pickedEl = side === 'right' ? choiceRight : choiceLeft;
+      const otherEl = side === 'right' ? choiceLeft : choiceRight;
+
+      if (isCorrect) {
+        combo++;
+        if (combo > maxCombo) maxCombo = combo;
+        updateComboDisplay();
+        checkComboTitle();
+        sound.playSlash();
+        vibrate(25);
+        solved.push(question);
+        pickedEl.classList.add('picked-ok');
+        otherEl.classList.add('dim');
+        showVerdict('ok', '正解！');
+      } else {
+        missQuestion(question);
+        pickedEl.classList.add('picked-ng');
+        otherEl.classList.add('dim');
+        showVerdict('ng', '不正解！');
+      }
+      advanceAfterFeedback();
+    }
+
+    function updateComboDisplay() {
+      if (combo > 1) {
+        comboDisplay.textContent = `⚡ ${combo} 連スナイプ！`;
+        comboDisplay.style.transform = 'scale(1.15)';
+        setTimeout(() => comboDisplay.style.transform = 'scale(1)', 140);
+      } else {
+        comboDisplay.textContent = '';
+      }
+    }
+
+    function checkComboTitle() {
+      const match = [...TITLES].reverse().find(t => combo === t.min);
+      if (match) {
+        sound.playFanfare();
+        vibrate([40, 40, 80]);
+        comboPopup.textContent = match.text;
+        comboPopup.classList.remove('popup-animate');
+        void comboPopup.offsetWidth;
+        comboPopup.classList.add('popup-animate');
+      }
+    }
+
+    function questionOrder(a, b) {
+      const [ap, at] = a.id.split('-').map(Number);
+      const [bp, bt] = b.id.split('-').map(Number);
+      return ap - bp || at - bt;
+    }
+
+    function renderList(listEl, items, countOf) {
+      listEl.innerHTML = '';
+      if (items.length === 0) {
+        const empty = document.createElement('li');
+        empty.className = 'result-empty';
+        empty.textContent = 'なし';
+        listEl.appendChild(empty);
+        return;
+      }
+      items.forEach(item => {
+        const li = document.createElement('li');
+        const id = document.createElement('span');
+        id.className = 'item-id';
+        id.textContent = `[${item.id}]`;
+        li.appendChild(id);
+        li.appendChild(document.createTextNode(item.q));
+        if (countOf) {
+          const count = document.createElement('span');
+          count.className = 'item-count';
+          count.textContent = `×${countOf(item)}`;
+          li.appendChild(count);
+        }
+        listEl.appendChild(li);
+      });
+    }
+
+    function endGame() {
+      cancelAnimationFrame(timerRaf);
+      isPlaying = false;
+      isProcessing = true;
+      const totalElapsedSeconds = ((performance.now() - startTime) / 1000).toFixed(1);
+
+      document.getElementById('stat-pass').textContent = solved.length;
+      document.getElementById('stat-wrong').textContent = totalWrongs;
+      document.getElementById('stat-timeout').textContent = totalTimeouts;
+      document.getElementById('stat-max-combo').textContent = maxCombo;
+      document.getElementById('result-comparison').innerHTML =
+        `全 ${QUESTIONS.length} 問を <b>${round} 周</b>・<b>${totalElapsedSeconds} 秒</b> でスナイプ完了！`;
+
+      const missed = QUESTIONS
+        .filter(q => wrongCounts.has(q.id))
+        .sort((a, b) => wrongCounts.get(b.id) - wrongCounts.get(a.id) || questionOrder(a, b));
+      renderList(document.getElementById('list-wrong'), missed, q => wrongCounts.get(q.id));
+
+      const timedOut = QUESTIONS
+        .filter(q => timeoutCounts.has(q.id))
+        .sort((a, b) => timeoutCounts.get(b.id) - timeoutCounts.get(a.id) || questionOrder(a, b));
+      renderList(document.getElementById('list-timeout'), timedOut, q => timeoutCounts.get(q.id));
+
+      resultScreen.scrollTop = 0;
+      resultScreen.style.display = 'flex';
+    }
+
+    choiceLeft.addEventListener('click', () => decide('left'));
+    choiceRight.addEventListener('click', () => decide('right'));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      if (startScreen.style.display !== 'none' && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        startBtn.click();
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        decide('right');
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        decide('left');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -239,7 +239,15 @@
                                           SettingsRequested="VocabularyTab_SettingsRequested"/>
             </TabItem>
             <TabItem Header="ゲーム">
-                <Grid Background="#F0F0F3"/>
+                <mos:GameTabControl JudgeUrl="https://mos-excel-3sec-judge.netlify.app/" SnipeUrl="https://mos-excel-3sec-snipe.netlify.app/">
+                    <mos:GameTabControl.ButtonBackground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#028760" Offset="0"/>
+                            <GradientStop Color="#4CAF80" Offset="0.5"/>
+                            <GradientStop Color="#7FD7A0" Offset="1"/>
+                        </LinearGradientBrush>
+                    </mos:GameTabControl.ButtonBackground>
+                </mos:GameTabControl>
             </TabItem>
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">
