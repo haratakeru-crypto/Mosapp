@@ -75,6 +75,22 @@
                                FontWeight="Bold"
                                Foreground="#1E40AF"
                                HorizontalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,10,0,0">
+                        <Border Background="#1E40AF" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                            <TextBlock Text="優先" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <TextBlock Text=" → " FontSize="14" Foreground="#6B7280" VerticalAlignment="Center"/>
+                        <Border Background="#D97706" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                            <TextBlock Text="次点" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <TextBlock Text="の順で、解けるようになりましょう"
+                                   FontSize="14"
+                                   Foreground="#6B7280"
+                                   VerticalAlignment="Center"
+                                   Margin="6,0,0,0"/>
+                    </StackPanel>
                 </StackPanel>
                 
                 <!-- 統計情報 -->
@@ -230,9 +246,32 @@
                                                             
                                                             <!-- タスク情報 -->
                                                             <StackPanel Grid.Column="0" Margin="15,10">
-                                                                <TextBlock Text="{Binding TaskTitle}" 
-                                                                           FontSize="19" FontWeight="SemiBold" 
-                                                                           Foreground="#374151" Margin="0,0,0,4"/>
+                                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                                    <TextBlock Text="{Binding TaskTitle}"
+                                                                               FontSize="19" FontWeight="SemiBold"
+                                                                               Foreground="#374151"
+                                                                               VerticalAlignment="Center"/>
+                                                                    <Border Margin="10,0,0,0"
+                                                                            CornerRadius="4"
+                                                                            Padding="8,2"
+                                                                            VerticalAlignment="Center"
+                                                                            Background="{Binding PriorityBadgeBackground}">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding HasPriorityBadge}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="{Binding PriorityBadgeText}"
+                                                                                   FontSize="13"
+                                                                                   FontWeight="Bold"
+                                                                                   Foreground="{Binding PriorityBadgeForeground}"/>
+                                                                    </Border>
+                                                                </StackPanel>
                                                                 <TextBlock Text="{Binding Description}" 
                                                                            FontSize="17" Foreground="#6B7280" 
                                                                            TextWrapping="Wrap" LineHeight="21"/>

@@ -296,6 +296,8 @@ namespace MOSExcelMogiApp.Views
                             {
                                 task.ResultColor = Brushes.Gray;
                             }
+
+                            ApplyPriorityBadgeColors(task);
                         }
                     }
                     
@@ -412,6 +414,7 @@ namespace MOSExcelMogiApp.Views
                                     TaskId = task.TaskId,
                                     ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
                                     FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
+                                    PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId),
                                     ResultColor = null // 後でUIスレッドで設定
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
@@ -467,12 +470,19 @@ namespace MOSExcelMogiApp.Views
                                     TaskId = task.TaskId,
                                     ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
                                     FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
+                                    PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId),
                                     ResultColor = isCorrect.HasValue 
                                         ? (isCorrect.Value ? Brushes.Green : Brushes.Red)
                                         : Brushes.Gray
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
                         };
+
+                        if (resultProject.Tasks != null)
+                        {
+                            foreach (var task in resultProject.Tasks)
+                                ApplyPriorityBadgeColors(task);
+                        }
                         
                         resultProjects.Add(resultProject);
                     }
@@ -888,6 +898,32 @@ namespace MOSExcelMogiApp.Views
             return filteredProjects;
         }
 
+        private string PriorityBadgeFor(int projectId, int taskId)
+        {
+            if (!_isVariantMode)
+                return string.Empty;
+            return VariantPriorityLookup.GetBadgeText(_variantSetNo, projectId, taskId);
+        }
+
+        private static void ApplyPriorityBadgeColors(ResultTaskInfo task)
+        {
+            if (task == null || !task.HasPriorityBadge)
+                return;
+
+            if (task.PriorityBadgeText == "優先")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF));
+                task.PriorityBadgeForeground = Brushes.White;
+                return;
+            }
+
+            if (task.PriorityBadgeText == "次点")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06));
+                task.PriorityBadgeForeground = Brushes.White;
+            }
+        }
+
         private void UpdateTotalScoreDisplay(Dictionary<int, List<bool>> results)
         {
             if (TotalScorePanel == null || TotalScoreTextBlock == null)
@@ -1052,6 +1088,10 @@ namespace MOSExcelMogiApp.Views
         public string FailReason { get; set; }
         public bool HasFailReason => !string.IsNullOrEmpty(FailReason);
         public Brush ResultColor { get; set; }
+        public string PriorityBadgeText { get; set; }
+        public bool HasPriorityBadge => !string.IsNullOrEmpty(PriorityBadgeText);
+        public Brush PriorityBadgeBackground { get; set; }
+        public Brush PriorityBadgeForeground { get; set; }
     }
 
     // JSON デシリアライズ用のクラス

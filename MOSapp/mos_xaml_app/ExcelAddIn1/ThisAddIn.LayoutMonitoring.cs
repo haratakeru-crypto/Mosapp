@@ -62,10 +62,12 @@ namespace ExcelAddIn1
             if (workbook == null) return;
             try
             {
-                var ws = workbook.ActiveSheet as Excel.Worksheet;
+                var ws = TryGetActiveWorksheet(workbook, reason);
                 if (ws == null)
                 {
                     WriteDiagnostic($"LayoutSnapshot active skipped reason={reason} (no worksheet)");
+                    // グラフ選択や強制終了直後でも、ゲートは閉じる。基準取得は初回シート表示時に行う。
+                    WriteDiagnostic(WithOpenToken("Baseline completed reason=" + reason + " sheet=(none)"));
                     return;
                 }
 
@@ -91,6 +93,42 @@ namespace ExcelAddIn1
             {
                 WriteDiagnostic($"InitializeLayoutSnapshotsForWorkbook reason={reason}: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 強制終了直後は ActiveSheet がまだ無いことがある。短い再試行のあと、無ければ null。
+        /// </summary>
+        private Excel.Worksheet TryGetActiveWorksheet(Excel.Workbook workbook, string reason)
+        {
+            var ws = workbook.ActiveSheet as Excel.Worksheet;
+            if (ws != null)
+                return ws;
+
+            var wait = Stopwatch.StartNew();
+            const int retryMs = 500;
+            const int intervalMs = 100;
+            while (wait.ElapsedMilliseconds < retryMs)
+            {
+                System.Threading.Thread.Sleep(intervalMs);
+                try
+                {
+                    ws = workbook.ActiveSheet as Excel.Worksheet;
+                }
+                catch (Exception ex)
+                {
+                    WriteDiagnostic($"LayoutSnapshot worksheet wait error reason={reason}: {ex.Message}");
+                    return null;
+                }
+
+                if (ws != null)
+                {
+                    WriteDiagnostic(
+                        $"LayoutSnapshot worksheet appeared reason={reason} wait={wait.ElapsedMilliseconds}ms");
+                    return ws;
+                }
+            }
+
+            return null;
         }
 
         private void RemoveLayoutSnapshotsForWorkbook(Excel.Workbook workbook)
