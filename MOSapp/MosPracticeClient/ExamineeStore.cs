@@ -66,6 +66,7 @@ namespace MosPracticeClient
         }
 
         public static string VocabMistakesPath => Path.Combine(DataDirectory, "vocab_mistakes.json");
+        public static string ExcelTaskReviewStatePath => Path.Combine(DataDirectory, "excel-task-review-state.json");
 
         /// <summary>単語帳の間違い記録のキー。大学名か名前が空なら null。</summary>
         public static string VocabUserKey(ExamineeProfile profile)
@@ -101,6 +102,15 @@ namespace MosPracticeClient
         {
             RemoveVocabMistakes(Load());
             ScoringLogStore.ClearAll();
+            try
+            {
+                if (File.Exists(ExcelTaskReviewStatePath))
+                    File.Delete(ExcelTaskReviewStatePath);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExamineeStore] ExcelTaskReviewState delete: " + ex.Message);
+            }
             try
             {
                 if (File.Exists(ExamineePath))

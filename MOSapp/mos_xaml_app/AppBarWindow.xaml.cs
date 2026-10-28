@@ -1940,6 +1940,7 @@ namespace MOSExcelMogiApp
                 _currentProjectId,
                 _currentTaskId,
                 CurrentReviewStateCapacity());
+            TaskReviewStateStore.Persist();
             UpdateTaskDisplay();
         }
 
@@ -1957,6 +1958,7 @@ namespace MOSExcelMogiApp
                 _currentProjectId,
                 _currentTaskId,
                 CurrentReviewStateCapacity());
+            TaskReviewStateStore.Persist();
             UpdateTaskDisplay();
         }
 
