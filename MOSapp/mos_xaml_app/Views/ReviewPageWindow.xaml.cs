@@ -905,7 +905,9 @@ namespace MOSExcelMogiApp.Views
                                     _groupId,
                                     allResults,
                                     _isVariantMode,
-                                    _variantSetNo));
+                                    _variantSetNo,
+                                    completedSnapshot,
+                                    flaggedSnapshot));
                         }
                     }
                     catch (Exception logEx)

@@ -29,6 +29,12 @@ namespace MosPracticeClient
         [JsonProperty("projectResults")]
         public Dictionary<int, List<bool>> ProjectResults { get; set; }
 
+        [JsonProperty("completedStates")]
+        public Dictionary<int, List<bool>> CompletedStates { get; set; }
+
+        [JsonProperty("flaggedStates")]
+        public Dictionary<int, List<bool>> FlaggedStates { get; set; }
+
         [JsonIgnore]
         public string DisplayTitle
         {
@@ -46,7 +52,9 @@ namespace MosPracticeClient
             int groupId,
             Dictionary<int, List<bool>> projectResults,
             bool isVariantMode = false,
-            int variantSetNo = 0)
+            int variantSetNo = 0,
+            Dictionary<int, bool[]> completedStates = null,
+            Dictionary<int, bool[]> flaggedStates = null)
         {
             return new ScoringLogEntry
             {
@@ -56,8 +64,20 @@ namespace MosPracticeClient
                 GroupId = groupId,
                 IsVariantMode = isVariantMode,
                 VariantSetNo = isVariantMode && variantSetNo > 0 ? variantSetNo : 0,
-                ProjectResults = CloneResults(projectResults)
+                ProjectResults = CloneResults(projectResults),
+                CompletedStates = CloneFlags(completedStates),
+                FlaggedStates = CloneFlags(flaggedStates)
             };
+        }
+
+        public Dictionary<int, bool[]> GetCompletedStates()
+        {
+            return ToBoolArrays(CompletedStates);
+        }
+
+        public Dictionary<int, bool[]> GetFlaggedStates()
+        {
+            return ToBoolArrays(FlaggedStates);
         }
 
         static Dictionary<int, List<bool>> CloneResults(Dictionary<int, List<bool>> source)
@@ -66,6 +86,24 @@ namespace MosPracticeClient
             if (source == null) return clone;
             foreach (var kv in source)
                 clone[kv.Key] = kv.Value != null ? new List<bool>(kv.Value) : new List<bool>();
+            return clone;
+        }
+
+        static Dictionary<int, List<bool>> CloneFlags(Dictionary<int, bool[]> source)
+        {
+            var clone = new Dictionary<int, List<bool>>();
+            if (source == null) return clone;
+            foreach (var kv in source)
+                clone[kv.Key] = kv.Value != null ? new List<bool>(kv.Value) : new List<bool>();
+            return clone;
+        }
+
+        static Dictionary<int, bool[]> ToBoolArrays(Dictionary<int, List<bool>> source)
+        {
+            var clone = new Dictionary<int, bool[]>();
+            if (source == null) return clone;
+            foreach (var kv in source)
+                clone[kv.Key] = kv.Value != null ? kv.Value.ToArray() : Array.Empty<bool>();
             return clone;
         }
     }

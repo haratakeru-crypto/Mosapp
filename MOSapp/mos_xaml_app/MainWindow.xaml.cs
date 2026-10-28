@@ -103,7 +103,9 @@ namespace MOSExcelMogiApp
                 entry.GroupId,
                 fromScoringLog: true,
                 isVariantMode: entry.IsVariantMode,
-                variantSetNo: entry.VariantSetNo);
+                variantSetNo: entry.VariantSetNo,
+                completedStates: entry.GetCompletedStates(),
+                flaggedStates: entry.GetFlaggedStates());
             window.Owner = this;
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             window.Show();
