@@ -35,10 +35,25 @@ namespace ExcelAddIn1
             System.Diagnostics.Debug.WriteLine("[ExcelAddIn1.Ribbon] Ribbon_Load completed");
         }
 
-        /// <summary>単語帳モード用: リボン idMso クリックを Vocab イベントとして記録し、既定動作は継続する。</summary>
+        /// <summary>単語帳モード用: 通常ボタンの idMso クリックを記録し、既定動作は継続する。</summary>
         public void VocabCommandOnAction(IRibbonControl control, ref bool cancelDefault)
         {
             cancelDefault = false;
+            LogVocabCommand(control);
+        }
+
+        /// <summary>
+        /// 単語帳モード用: トグルボタン（ShowFormulas など）の idMso クリックを記録し、既定動作は継続する。
+        /// toggleButton は pressed 引数が必須。通常コマンド用署名だと「署名が一致しません」になる。
+        /// </summary>
+        public void VocabToggleCommandOnAction(IRibbonControl control, bool pressed, ref bool cancelDefault)
+        {
+            cancelDefault = false;
+            LogVocabCommand(control);
+        }
+
+        static void LogVocabCommand(IRibbonControl control)
+        {
             try
             {
                 string id = control?.Id ?? "";
@@ -358,7 +373,7 @@ namespace ExcelAddIn1
     <command idMso=""SortCustomExcel"" onAction=""VocabCommandOnAction"" />
     <command idMso=""FreezePanes"" onAction=""VocabCommandOnAction"" />
     <command idMso=""HyperlinkInsert"" onAction=""VocabCommandOnAction"" />
-    <command idMso=""ShowFormulas"" onAction=""VocabCommandOnAction"" />
+    <command idMso=""ShowFormulas"" onAction=""VocabToggleCommandOnAction"" />
     <command idMso=""SparklineLineInsert"" onAction=""VocabCommandOnAction"" />
     <command idMso=""SparklineColumnInsert"" onAction=""VocabCommandOnAction"" />
     <command idMso=""HeaderFooterInsert"" onAction=""VocabCommandOnAction"" />

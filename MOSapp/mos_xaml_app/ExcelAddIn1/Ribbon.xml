@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="Ribbon_Load">
   <!-- <commands> の onAction は button / toggleButton / checkBox のみ可（menu・gallery 不可） -->
+  <!-- 通常ボタンは VocabCommandOnAction、トグルは VocabToggleCommandOnAction（署名が違う） -->
   <commands>
     <command idMso="SortAscendingExcel" onAction="VocabCommandOnAction" />
     <command idMso="SortDescendingExcel" onAction="VocabCommandOnAction" />
@@ -8,7 +9,7 @@
     <command idMso="SortCustomExcel" onAction="VocabCommandOnAction" />
     <command idMso="FreezePanes" onAction="VocabCommandOnAction" />
     <command idMso="HyperlinkInsert" onAction="VocabCommandOnAction" />
-    <command idMso="ShowFormulas" onAction="VocabCommandOnAction" />
+    <command idMso="ShowFormulas" onAction="VocabToggleCommandOnAction" />
     <command idMso="SparklineLineInsert" onAction="VocabCommandOnAction" />
     <command idMso="SparklineColumnInsert" onAction="VocabCommandOnAction" />
     <command idMso="SparklineWinLossInsert" onAction="VocabCommandOnAction" />
