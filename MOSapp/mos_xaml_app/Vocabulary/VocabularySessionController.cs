@@ -1501,6 +1501,8 @@ namespace MOSExcelMogiApp.Vocabulary
 
         static void LogQuiz(string line)
         {
+            if (!Libraries.ExcelDiagFlags.IsVerbose)
+                return;
             try
             {
                 File.AppendAllText(

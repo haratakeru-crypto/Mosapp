@@ -659,6 +659,9 @@ namespace ExcelAddIn1
 
         private static void WriteDiagnostic(string message)
         {
+            if (!ExcelDiagFlags.ShouldWriteDiagnostic(message))
+                return;
+
             try
             {
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");

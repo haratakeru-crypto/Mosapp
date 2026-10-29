@@ -208,6 +208,7 @@
     </Compile>
     <Compile Include="TaskLogContext.cs" />
     <Compile Include="Logger.cs" />
+    <Compile Include="ExcelDiagFlags.cs" />
     <Compile Include="VocabLogger.cs" />
     <Compile Include="LogPaneUserControl.cs">
       <SubType>UserControl</SubType>

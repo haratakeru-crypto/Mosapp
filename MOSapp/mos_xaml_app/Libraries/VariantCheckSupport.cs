@@ -22,6 +22,8 @@ namespace Libraries
 
         public static void DiagReset()
         {
+            if (!ExcelDiagFlags.IsVerbose)
+                return;
             try
             {
                 File.WriteAllText(DiagLogPath, string.Empty);
@@ -35,12 +37,15 @@ namespace Libraries
         {
             string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)
                 + " " + (message ?? string.Empty);
-            try
+            if (ExcelDiagFlags.IsVerbose)
             {
-                File.AppendAllText(DiagLogPath, line + Environment.NewLine);
-            }
-            catch
-            {
+                try
+                {
+                    File.AppendAllText(DiagLogPath, line + Environment.NewLine);
+                }
+                catch
+                {
+                }
             }
 
             Debug.WriteLine("[VariantScore] " + line);

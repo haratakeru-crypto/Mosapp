@@ -254,6 +254,7 @@
     <Compile Include="Libraries\Group3\ExcelChecker3_10.cs" />
     <Compile Include="Libraries\TaskLogContext.cs" />
     <Compile Include="Libraries\ExcelLogReader.cs" />
+    <Compile Include="Libraries\ExcelDiagFlags.cs" />
     <Compile Include="Libraries\ExcelProjectResetHelper.cs" />
     <Compile Include="Libraries\ExcelBulkResetCoordinator.cs" />
     <Compile Include="Libraries\ExcelScoreExplanation.cs" />

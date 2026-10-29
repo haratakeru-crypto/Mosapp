@@ -116,6 +116,8 @@ namespace Libraries
         {
             if (string.IsNullOrEmpty(message))
                 return;
+            if (!ExcelDiagFlags.IsVerbose)
+                return;
 
             try
             {

@@ -203,6 +203,8 @@ namespace Libraries
 
         public static void AppendDestructiveError(int projectId, int taskId, int attemptNo, string message, int variantSetNo = 0)
         {
+            if (!ExcelDiagFlags.IsVerbose)
+                return;
             try
             {
                 var context = TaskLogContext.Create(projectId, taskId, attemptNo, variantSetNo);
@@ -320,6 +322,10 @@ namespace Libraries
             catch { }
         }
 
+        /// <summary>
+        /// VSTO 診断ログ。詳細は Debug、または %TEMP%\mos_excel_diag.on があるときだけ書く。
+        /// 起動待ちの Startup completed / Baseline completed は常に残す。
+        /// </summary>
         public static string GetDiagnosticLogPath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_excel_addin_diag.txt");

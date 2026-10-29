@@ -6,6 +6,7 @@ namespace ExcelAddIn1
 {
     /// <summary>
     /// Excel 操作ログを %TEMP%\mos_excel_log.txt に記録する。
+    /// [Op] / [TaskStart] は採点用。Executed は Debug、または %TEMP%\mos_excel_diag.on があるときだけ書く。
     /// </summary>
     public static class Logger
     {
@@ -18,6 +19,9 @@ namespace ExcelAddIn1
 
         public static void LogCommand(string commandId)
         {
+            if (!ExcelDiagFlags.IsVerbose)
+                return;
+
             try
             {
                 lock (LockObject)
