@@ -100,7 +100,6 @@
       background: linear-gradient(90deg, #ff4d4d, #f9cb28);
       border-radius: 6px;
       transform-origin: left center;
-      transition: width 0.05s linear;
     }
 
     .fuse-spark {
@@ -719,6 +718,7 @@
     let startTime = 0;
     let cardStartTime = 0;
     let timerRaf = null;
+    let timeUpTimer = null;
     let lastSizzleTime = 0;
     let isProcessing = true;
     let isPlaying = false;
@@ -802,10 +802,7 @@
 
       resetCardTransform();
 
-      isProcessing = false;
-      cardStartTime = performance.now();
-      cancelAnimationFrame(timerRaf);
-      timerTick();
+      startFuse(TIME_LIMIT);
     }
 
     function finishRound() {
@@ -828,29 +825,47 @@
       }, ROUND_BANNER_MS);
     }
 
-    function timerTick() {
+    function stopFuse() {
+      clearTimeout(timeUpTimer);
+      cancelAnimationFrame(timerRaf);
+      const elapsed = performance.now() - cardStartTime;
+      const remaining = Math.max(0, 1 - (elapsed / TIME_LIMIT));
+      fuseFill.style.transition = 'none';
+      fuseSpark.style.transition = 'none';
+      fuseFill.style.width = `${remaining * 100}%`;
+      fuseSpark.style.left = `${remaining * 100}%`;
+    }
+
+    function startFuse(ms) {
+      clearTimeout(timeUpTimer);
+      cancelAnimationFrame(timerRaf);
+      isProcessing = false;
+      fuseFill.style.transition = 'none';
+      fuseSpark.style.transition = 'none';
+      fuseFill.style.width = '100%';
+      fuseSpark.style.left = '100%';
+      void fuseFill.offsetWidth;
+      fuseFill.style.transition = `width ${ms}ms linear`;
+      fuseSpark.style.transition = `left ${ms}ms linear`;
+      fuseFill.style.width = '0%';
+      fuseSpark.style.left = '0%';
+      cardStartTime = performance.now();
+      timeUpTimer = setTimeout(handleTimeUp, ms);
+      sizzleTick();
+    }
+
+    function sizzleTick() {
+      if (isProcessing) return;
       const now = performance.now();
-      const elapsed = now - cardStartTime;
-      const remainingRatio = Math.max(0, 1 - (elapsed / TIME_LIMIT));
-      const percentage = remainingRatio * 100;
-
-      fuseFill.style.width = `${percentage}%`;
-      fuseSpark.style.left = `${percentage}%`;
-
       if (now - lastSizzleTime > 160) {
         sound.playSizzle();
         lastSizzleTime = now;
       }
-
-      if (remainingRatio <= 0) {
-        handleTimeUp();
-      } else {
-        timerRaf = requestAnimationFrame(timerTick);
-      }
+      timerRaf = requestAnimationFrame(sizzleTick);
     }
 
     function handleTimeUp() {
-      cancelAnimationFrame(timerRaf);
+      stopFuse();
       isProcessing = true;
       isDragging = false;
       sound.playExplosion();
@@ -884,7 +899,7 @@
       if (isProcessing || !isPlaying) return;
       isProcessing = true;
       isDragging = false;
-      cancelAnimationFrame(timerRaf);
+      stopFuse();
 
       combo++;
       if (combo > maxCombo) maxCombo = combo;
@@ -978,7 +993,7 @@
     }
 
     function endGame() {
-      cancelAnimationFrame(timerRaf);
+      stopFuse();
       isPlaying = false;
       isProcessing = true;
       const totalElapsedSeconds = ((performance.now() - startTime) / 1000).toFixed(1);
