@@ -23,14 +23,14 @@ namespace MosPracticeClient
             InitializeComponent();
         }
 
-        /// <summary>3秒ジャッジの Web ゲーム URL。</summary>
+        /// <summary>5秒ジャッジの Web ゲーム URL。</summary>
         public string JudgeUrl
         {
             get => (string)GetValue(JudgeUrlProperty);
             set => SetValue(JudgeUrlProperty, value);
         }
 
-        /// <summary>3秒スナイプの Web ゲーム URL。</summary>
+        /// <summary>5秒スナイプの Web ゲーム URL。</summary>
         public string SnipeUrl
         {
             get => (string)GetValue(SnipeUrlProperty);
@@ -43,9 +43,9 @@ namespace MosPracticeClient
             set => SetValue(ButtonBackgroundProperty, value);
         }
 
-        void JudgeButton_Click(object sender, RoutedEventArgs e) => OpenGame(JudgeUrl, "3秒ジャッジ");
+        void JudgeButton_Click(object sender, RoutedEventArgs e) => OpenGame(JudgeUrl, "5秒ジャッジ");
 
-        void SnipeButton_Click(object sender, RoutedEventArgs e) => OpenGame(SnipeUrl, "3秒スナイプ");
+        void SnipeButton_Click(object sender, RoutedEventArgs e) => OpenGame(SnipeUrl, "5秒スナイプ");
 
         void OpenGame(string url, string gameName)
         {

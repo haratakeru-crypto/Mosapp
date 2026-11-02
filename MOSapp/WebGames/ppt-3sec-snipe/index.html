@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>3秒スナイプ！ PowerPoint</title>
+  <title>5秒スナイプ！ PowerPoint</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -336,36 +336,6 @@
       margin-bottom: 16px;
     }
 
-    .time-pick {
-      display: flex;
-      gap: 10px;
-      width: 100%;
-      max-width: 280px;
-      margin-bottom: 20px;
-    }
-
-    .time-btn {
-      flex: 1;
-      appearance: none;
-      font: inherit;
-      background: #161b22;
-      color: var(--subtext);
-      border: 2px solid #30363d;
-      border-radius: 14px;
-      padding: 12px 8px;
-      font-size: 18px;
-      font-weight: 800;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .time-btn.selected {
-      color: #ffdf5d;
-      border-color: #e3b341;
-      background: rgba(227, 179, 65, 0.12);
-      box-shadow: 0 0 12px rgba(227, 179, 65, 0.25);
-    }
-
     .btn-start {
       background: linear-gradient(135deg, #238636, #2ea043);
       color: white;
@@ -544,19 +514,15 @@
     <div id="combo-popup"></div>
 
     <div class="overlay-screen" id="start-screen">
-      <div class="overlay-subtitle" id="start-subtitle">3秒で正解を見抜く！</div>
-      <div class="overlay-title">3秒スナイプ！ PowerPoint</div>
+      <div class="overlay-subtitle" id="start-subtitle">5秒で正解を見抜く！</div>
+      <div class="overlay-title">5秒スナイプ！ PowerPoint</div>
       <p class="overlay-desc">
         MOS PowerPoint の問題文を読んで、最初に押すタブ／ボタンを選べ。<br><br>
-        ⏱ <b>1問の猶予はたったの<span id="time-limit-text">3</span>秒</b><br>
+        ⏱ <b>1問の猶予はたったの5秒</b><br>
         問題の中の2択から正解をスナイプせよ。<br>
-        外した問題と燃え尽きた問題は<b>爆発して次の周へ</b>！<br>
+        <b>1周は10問</b>。外した問題は残り、正解した分だけ新しい問題が入る。<br>
         全部当てたらクリア。
       </p>
-      <div class="time-pick" role="group" aria-label="制限時間">
-        <button type="button" class="time-btn selected" data-ms="3000" id="time-3">3秒</button>
-        <button type="button" class="time-btn" data-ms="5000" id="time-5">5秒</button>
-      </div>
       <button class="btn-start" id="start-btn">クリックして開始（音量ON推奨）</button>
       <p class="key-hint">PC：← 左の選択肢 ／ → 右の選択肢</p>
     </div>
@@ -601,10 +567,9 @@
 
   <script src="questions.js"></script>
   <script>
-    const TIME_STORAGE_KEY = 'mos-snipe-time-limit';
     const ROUND_BANNER_MS = 1400;
     const FEEDBACK_MS = 400;
-    let timeLimit = 3000;
+    const timeLimit = 5000;
 
     function vibrate(pattern) {
       if ('vibrate' in navigator) {
@@ -741,6 +706,8 @@
     const sound = new SoundEngine();
 
     let round = 1;
+    const ROUND_SIZE = 10;
+    let pool = [];
     let roundQueue = [];
     let nextRoundQueue = [];
     let roundIndex = 0;
@@ -799,26 +766,6 @@
       return arr;
     }
 
-    function setTimeLimit(ms) {
-      timeLimit = ms === 5000 ? 5000 : 3000;
-      const sec = String(timeLimit / 1000);
-      document.querySelectorAll('.time-btn').forEach((btn) => {
-        btn.classList.toggle('selected', Number(btn.dataset.ms) === timeLimit);
-      });
-      document.getElementById('start-subtitle').textContent = `${sec}秒で正解を見抜く！`;
-      document.getElementById('time-limit-text').textContent = sec;
-      try { localStorage.setItem(TIME_STORAGE_KEY, String(timeLimit)); } catch (e) {}
-    }
-
-    document.querySelectorAll('.time-btn').forEach((btn) => {
-      btn.addEventListener('click', () => setTimeLimit(Number(btn.dataset.ms)));
-    });
-
-    try {
-      const saved = Number(localStorage.getItem(TIME_STORAGE_KEY));
-      if (saved === 3000 || saved === 5000) setTimeLimit(saved);
-    } catch (e) {}
-
     startBtn.addEventListener('click', () => {
       sound.init();
       startScreen.style.display = 'none';
@@ -830,10 +777,24 @@
       startScreen.style.display = 'flex';
     });
 
+    function takeCards(blocked, count) {
+      const picked = [];
+      const rest = [];
+      const blockedIds = new Set(blocked.map((q) => q.sourceId));
+      pool.forEach((card) => {
+        const clash = blockedIds.has(card.sourceId) || picked.some((q) => q.sourceId === card.sourceId);
+        if (picked.length < count && !clash) picked.push(card);
+        else rest.push(card);
+      });
+      pool = rest;
+      return picked;
+    }
+
     function startGame() {
       round = 1;
-      roundQueue = shuffle(QUESTIONS);
+      pool = shuffle(QUESTIONS);
       nextRoundQueue = [];
+      roundQueue = takeCards([], ROUND_SIZE);
       roundIndex = 0;
       combo = 0;
       maxCombo = 0;
@@ -904,18 +865,20 @@
     }
 
     function finishRound() {
-      if (nextRoundQueue.length === 0) {
+      const missed = nextRoundQueue;
+      nextRoundQueue = [];
+      const fresh = takeCards(missed, Math.max(0, ROUND_SIZE - missed.length));
+      if (missed.length === 0 && fresh.length === 0) {
         endGame();
         return;
       }
       round++;
-      roundQueue = shuffle(nextRoundQueue);
-      nextRoundQueue = [];
+      roundQueue = shuffle(missed.concat(fresh));
       roundIndex = 0;
       isProcessing = true;
 
       document.getElementById('round-title').textContent = `第 ${round} 周`;
-      document.getElementById('round-desc').textContent = `外した ${roundQueue.length} 問`;
+      document.getElementById('round-desc').textContent = `外した ${missed.length} 問、新しい ${fresh.length} 問`;
       roundScreen.style.display = 'flex';
       setTimeout(() => {
         roundScreen.style.display = 'none';
