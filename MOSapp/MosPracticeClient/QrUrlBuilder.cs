@@ -7,14 +7,29 @@ namespace MosPracticeClient
 {
     public static class QrUrlBuilder
     {
-        public static string BuildCanonical(string university, string name, string classroom, string wrong, string at, string subject)
+        public static string BuildCanonical(
+            string university,
+            string name,
+            string classroom,
+            string wrong,
+            string at,
+            string subject,
+            string attempt = null,
+            string range = null)
         {
-            return "university=" + (university ?? "")
+            string text = "university=" + (university ?? "")
                 + "\nname=" + (name ?? "")
                 + "\nclassroom=" + (classroom ?? "")
                 + "\nwrong=" + (wrong ?? "")
                 + "\nat=" + (at ?? "")
                 + "\nsubject=" + (subject ?? "");
+            string attemptValue = attempt ?? "";
+            string rangeValue = range ?? "";
+            if (attemptValue.Length > 0 || rangeValue.Length > 0)
+            {
+                text += "\nattempt=" + attemptValue + "\nrange=" + rangeValue;
+            }
+            return text;
         }
 
         public static string SignHex(string canonical, string key)
@@ -38,12 +53,17 @@ namespace MosPracticeClient
             int wrongCount,
             DateTime scoredAt,
             string subject,
-            string qrPathId = null)
+            string qrPathId = null,
+            string attempt = null,
+            string range = null)
         {
             string at = scoredAt.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
             string wrong = wrongCount.ToString(CultureInfo.InvariantCulture);
             string classroomValue = classroom ?? "";
-            string canonical = BuildCanonical(university, name, classroomValue, wrong, at, subject);
+            string attemptValue = attempt ?? "";
+            string rangeValue = range ?? "";
+            string canonical = BuildCanonical(
+                university, name, classroomValue, wrong, at, subject, attemptValue, rangeValue);
             string sig = SignHex(canonical, ingestKey);
 
             var q = new StringBuilder();
@@ -55,6 +75,10 @@ namespace MosPracticeClient
             q.Append("&at=").Append(Encode(at));
             if (!string.IsNullOrEmpty(subject))
                 q.Append("&subject=").Append(Encode(subject));
+            if (attemptValue.Length > 0)
+                q.Append("&attempt=").Append(Encode(attemptValue));
+            if (rangeValue.Length > 0)
+                q.Append("&range=").Append(Encode(rangeValue));
             q.Append("&sig=").Append(Encode(sig));
 
             string root = (baseUrl ?? "").Trim().TrimEnd('/');
