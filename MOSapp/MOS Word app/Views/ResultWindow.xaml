@@ -64,7 +64,8 @@
                             HorizontalAlignment="Center"
                             Margin="0,0,0,24"
                             Visibility="Collapsed">
-                    <TextBlock Text="総合点"
+                    <TextBlock x:Name="TotalScoreLabel"
+                               Text="総合点"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="#374151"

@@ -97,7 +97,7 @@ namespace Ui.ViewModels
         private bool _isShutdownWaitOverlayVisible;
         private bool _showScoreButton = true;
         private bool _showVariantButton;
-        private bool _showAnswerGuide;
+        private bool _showAnswerGuide = true;
         private bool _isAnswerGuideOpen;
         private int _variantSetNo = 1;
         private bool _isVariantMode;
@@ -1015,7 +1015,7 @@ namespace Ui.ViewModels
             }
         }
 
-        /// <summary>解答手順ガイドの表示。デフォルトは非表示。</summary>
+        /// <summary>解答手順ガイドの表示。デフォルトは表示。</summary>
         public bool ShowAnswerGuide
         {
             get => _showAnswerGuide;

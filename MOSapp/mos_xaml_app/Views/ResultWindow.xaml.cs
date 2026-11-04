@@ -921,18 +921,46 @@ namespace MOSExcelMogiApp.Views
             }
 
             TotalScorePanel.Visibility = Visibility.Visible;
-            if (PracticeScoreClient.TryCompute(VariantExam.FlattenResults(results), out int total, out string error))
+            bool showPracticeTotal = HasAllVariantProjects(results);
+            if (TotalScoreLabel != null)
+                TotalScoreLabel.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+            TotalScoreTextBlock.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+
+            if (showPracticeTotal)
             {
-                TotalScoreTextBlock.Text = total.ToString();
-                if (PassingRangeBadge != null && total >= PassingScoreThreshold)
-                    PassingRangeBadge.Visibility = Visibility.Visible;
+                if (PracticeScoreClient.TryCompute(VariantExam.FlattenResults(results), out int total, out string error))
+                {
+                    TotalScoreTextBlock.Text = $"{total}点/1000点";
+                    if (PassingRangeBadge != null && total >= PassingScoreThreshold)
+                        PassingRangeBadge.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    TotalScoreTextBlock.Text = error ?? "総合点を表示できません。";
+                }
             }
             else
             {
-                TotalScoreTextBlock.Text = error ?? "総合点を表示できません。";
+                TotalScoreTextBlock.Text = string.Empty;
             }
 
             UpdateLostPointsDisplay(results);
+        }
+
+        /// <summary>全プロジェクト採点時だけ 1000 点満点の総合点を出す（一部採点は未採点を不正解扱いするため）。</summary>
+        private static bool HasAllVariantProjects(Dictionary<int, List<bool>> results)
+        {
+            var expected = VariantProblemWorkbook.GetProjectIds();
+            if (expected == null || expected.Count == 0 || results == null)
+                return false;
+
+            foreach (int projectId in expected)
+            {
+                if (!results.ContainsKey(projectId))
+                    return false;
+            }
+
+            return true;
         }
 
         private void UpdateLostPointsDisplay(Dictionary<int, List<bool>> results)

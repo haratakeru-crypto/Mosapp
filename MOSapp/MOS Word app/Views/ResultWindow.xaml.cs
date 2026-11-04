@@ -200,14 +200,42 @@ namespace MOS_Word_app.Views
             Dictionary<int, List<bool>> results = _fromScoringLog
                 ? _snapshotResults
                 : ScoreResultStore.GetProjectResults(_groupId, ResultVariantSetNo);
-            int total = WordPracticeScore.Compute(WordPracticeScore.FlattenResults(results));
 
             TotalScorePanel.Visibility = Visibility.Visible;
-            TotalScoreTextBlock.Text = $"{total}点/1000点";
-            if (PassingRangeBadge != null && total >= WordPracticeScore.PassingScoreThreshold)
-                PassingRangeBadge.Visibility = Visibility.Visible;
+            bool showPracticeTotal = HasAllVariantProjects(results);
+            if (TotalScoreLabel != null)
+                TotalScoreLabel.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+            TotalScoreTextBlock.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+
+            if (showPracticeTotal)
+            {
+                int total = WordPracticeScore.Compute(WordPracticeScore.FlattenResults(results));
+                TotalScoreTextBlock.Text = $"{total}点/1000点";
+                if (PassingRangeBadge != null && total >= WordPracticeScore.PassingScoreThreshold)
+                    PassingRangeBadge.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TotalScoreTextBlock.Text = string.Empty;
+            }
 
             UpdateLostPointsDisplay(results);
+        }
+
+        /// <summary>全プロジェクト採点時だけ 1000 点満点の総合点を出す（一部採点は未採点を不正解扱いするため）。</summary>
+        private static bool HasAllVariantProjects(Dictionary<int, List<bool>> results)
+        {
+            var expected = VariantProblemWorkbook.GetProjectIds();
+            if (expected == null || expected.Count == 0 || results == null)
+                return false;
+
+            foreach (int projectId in expected)
+            {
+                if (!results.ContainsKey(projectId))
+                    return false;
+            }
+
+            return true;
         }
 
         private void UpdateLostPointsDisplay(Dictionary<int, List<bool>> results)

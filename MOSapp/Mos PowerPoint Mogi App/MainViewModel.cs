@@ -29,7 +29,7 @@ namespace MOS_PowerPoint_app
         private int _selectedTabIndex;
         private string _resultMessage;
         private bool _showScoreButton = true;
-        private bool _showAnswerGuide;
+        private bool _showAnswerGuide = true;
         private bool _isAnswerGuideOpen;
         private ProjectViewModel _currentProject;
         private ObservableCollection<TaskResult> _taskResults;
@@ -98,7 +98,7 @@ namespace MOS_PowerPoint_app
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
         }
 
-        /// <summary>解答手順ガイドの表示。デフォルトは非表示。</summary>
+        /// <summary>解答手順ガイドの表示。デフォルトは表示。</summary>
         public bool ShowAnswerGuide
         {
             get => _showAnswerGuide;
