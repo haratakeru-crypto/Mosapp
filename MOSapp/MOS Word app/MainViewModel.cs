@@ -44,8 +44,9 @@ namespace MOS_Word_app
         private int _selectedTabIndex;
         private string _resultMessage;
         private bool _showScoreButton = true;
-        private bool _showAnswerGuide;
+        private bool _showAnswerGuide = true;
         private bool _isAnswerGuideOpen;
+        private bool _isBulkResetInProgress;
         private TabTaskInfo _currentTabTask;
         private ProjectViewModel _currentProject;
 
@@ -53,10 +54,9 @@ namespace MOS_Word_app
         {
             LoadProjects();
             LoadVariantLaunchProjects();
-            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: false), _ => !_isOpeningProject);
+            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: false), _ => !_isOpeningProject && !_isBulkResetInProgress);
             OpenVariantProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: true), CanOpenVariantProject);
             TabSearchCommand = new RelayCommand(ExecuteTabSearch);
-            ResetAllInGroupCommand = new RelayCommand(ExecuteResetAllInGroup);
             TabTasks = new ObservableCollection<TabTaskInfo>();
         }
 
@@ -93,7 +93,18 @@ namespace MOS_Word_app
 
         public ICommand OpenProjectCommand { get; }
         public ICommand TabSearchCommand { get; }
-        public ICommand ResetAllInGroupCommand { get; }
+
+        public bool IsBulkResetInProgress => _isBulkResetInProgress;
+
+        public void SetBulkResetInProgress(bool value)
+        {
+            if (_isBulkResetInProgress == value)
+                return;
+            _isBulkResetInProgress = value;
+            OnPropertyChanged(nameof(IsBulkResetInProgress));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
 
         public ObservableCollection<TabTaskInfo> TabTasks { get; set; }
 
@@ -127,7 +138,7 @@ namespace MOS_Word_app
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
         }
 
-        /// <summary>解答手順ガイドの表示。デフォルトは非表示。</summary>
+        /// <summary>解答手順ガイドの表示。デフォルトは表示。</summary>
         public bool ShowAnswerGuide
         {
             get => _showAnswerGuide;
@@ -143,12 +154,14 @@ namespace MOS_Word_app
             }
         }
 
-        /// <summary>Group1 通常教材かつオプション ON のときだけ手順ボタンを出す。</summary>
+        /// <summary>通常教材は紙芝居手順、類題第1回はテキスト手順を出す。</summary>
         public bool ShowAnswerGuideEffective
         {
             get
             {
-                if (!ShowAnswerGuide || IsVariantMode)
+                if (IsVariantMode)
+                    return true;
+                if (!ShowAnswerGuide)
                     return false;
                 return CurrentProject == null || CurrentProject.GroupId == 1;
             }
@@ -158,7 +171,7 @@ namespace MOS_Word_app
         public bool IsAnswerGuideOpen => _isAnswerGuideOpen;
 
         /// <summary>リセット・レビュー・次プロ・終了を抑止する統合ロック。</summary>
-        public bool IsNavigationLocked => _isAnswerGuideOpen;
+        public bool IsNavigationLocked => _isAnswerGuideOpen || _isBulkResetInProgress;
 
         public event EventHandler CloseAnswerGuideRequested;
 
@@ -249,9 +262,100 @@ namespace MOS_Word_app
             VariantLaunchProjects = projects;
         }
 
+        public List<WordResetTarget> GetBulkResetTargets(WordBulkResetScope scope)
+        {
+            var targets = new List<WordResetTarget>();
+            int groupId = CurrentGroupIdForReset;
+
+            if (scope == WordBulkResetScope.Textbook || scope == WordBulkResetScope.All)
+            {
+                ProjectGroupViewModel group = ProjectGroups?.FirstOrDefault(g => g.GroupId == groupId);
+                if (group?.Projects != null)
+                {
+                    foreach (ProjectViewModel project in group.Projects)
+                    {
+                        string templatePath;
+                        try
+                        {
+                            templatePath = WordDataPathHelper.EnsureCanonicalTemplate(groupId, project.ProjectId);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+
+                        targets.Add(new WordResetTarget
+                        {
+                            GroupId = groupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = 0,
+                            Label = "演習 プロジェクト" + project.ProjectId,
+                            WorkingPath = WordDataPathHelper.GetWorkingFilePathForSource(
+                                groupId, project.ProjectId, templatePath),
+                            TemplatePath = templatePath
+                        });
+                    }
+                }
+            }
+
+            if (scope == WordBulkResetScope.Variant || scope == WordBulkResetScope.All)
+            {
+                int variantSetNo = WordBulkResetCoordinator.DefaultVariantSetNo;
+                if (VariantLaunchProjects != null)
+                {
+                    foreach (ProjectViewModel project in VariantLaunchProjects)
+                    {
+                        string templatePath = WordDataPathHelper.FindVariantTemplateFile(
+                            project.GroupId, project.ProjectId, variantSetNo);
+                        if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+                            continue;
+
+                        targets.Add(new WordResetTarget
+                        {
+                            GroupId = project.GroupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = variantSetNo,
+                            Label = "類題 プロジェクト" + project.ProjectId,
+                            WorkingPath = WordDataPathHelper.ResolveVariantWorkingFilePath(
+                                project.GroupId, project.ProjectId, variantSetNo, templatePath),
+                            TemplatePath = templatePath
+                        });
+                    }
+                }
+            }
+
+            return targets;
+        }
+
+        /// <summary>一括リセット前後に Word 文書を閉じる。</summary>
+        public static void CloseAllOpenWordDocuments()
+        {
+            CloseAllWordDocuments();
+        }
+
+        public static bool IsWordFileLocked(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                return false;
+
+            try
+            {
+                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                    return false;
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private bool CanOpenVariantProject(object parameter)
         {
-            if (_isOpeningProject)
+            if (_isOpeningProject || _isBulkResetInProgress)
                 return false;
             if (!(parameter is ProjectViewModel project))
                 return true;
@@ -288,6 +392,9 @@ namespace MOS_Word_app
 
         private void ExecuteOpenProject(object parameter, bool openAsVariant)
         {
+            if (_isBulkResetInProgress)
+                return;
+
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
 
@@ -406,62 +513,6 @@ namespace MOS_Word_app
                         ResultMessage = $"Wordファイルを開きました: {Path.GetFileName(project.FilePath)}";
                     }));
                 });
-            }
-        }
-
-        private void ExecuteResetAllInGroup(object parameter)
-        {
-            int groupId = 1;
-            if (parameter != null)
-            {
-                if (parameter is int g)
-                    groupId = g;
-                else if (parameter is string s && int.TryParse(s, out int parsed))
-                    groupId = parsed;
-            }
-            var result = MessageBox.Show(
-                $"このタブの全プロジェクトをリセットしますか？\n現在の変更内容は失われます。",
-                "すべてリセット確認",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-            if (result != MessageBoxResult.Yes)
-                return;
-            try
-            {
-                LogReader.ClearLog();
-                LogReader.ClearTaskEvidence(); // 旧 mos_word_task_evidence.txt が残っていれば削除のみ
-                LogReader.ClearDestructiveLog();
-                LogReader.ClearSnapshot();
-                LogReader.ClearCurrentTaskFile();
-                WordTaskAttemptRegistry.ClearAll();
-                for (int projectId = 1; projectId <= 10; projectId++)
-                {
-                    try
-                    {
-                        WordProjectResetHelper.ResetProject(groupId, projectId);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ExecuteResetAllInGroup] Project{projectId} リセットエラー: {ex.Message}");
-                        MessageBox.Show($"プロジェクト{projectId}のリセット中にエラーが発生しました: {ex.Message}", "リセットエラー", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
-                }
-                // すべてリセット後、開いているWord文書をすべて閉じる（次に開くときに初期化されたファイルが開く）
-                CloseAllWordDocuments();
-                // 開いている試験バーがあれば全プロジェクトの解答済み・フラグ状態をクリア
-                var uiTestBar = System.Windows.Application.Current.Windows.OfType<Views.UiTestAppBarWindow>().FirstOrDefault();
-                if (uiTestBar != null)
-                    uiTestBar.ClearAllProjectStates();
-                var appBar = System.Windows.Application.Current.Windows.OfType<Views.AppBarWindow>().FirstOrDefault();
-                if (appBar != null)
-                    appBar.ClearAllProjectStates();
-                ResultMessage = "すべてリセットしました。";
-                MessageBox.Show("このタブの全プロジェクトをリセットしました。", "リセット完了", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                ResultMessage = $"リセット中にエラーが発生しました: {ex.Message}";
-                MessageBox.Show($"リセット中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -805,7 +856,8 @@ namespace MOS_Word_app
     public class TaskResult
     {
         public int TaskNumber { get; set; }
-        public bool IsPassed { get; set; }
+        /// <summary>true=〇 / false=✖ / null=未判定（－）。</summary>
+        public bool? IsPassed { get; set; }
         public string TaskName { get; set; }
         /// <summary>×のときの学生向け理由。合格時は空。</summary>
         public string FailReason { get; set; }

@@ -19,6 +19,7 @@ namespace MOS_Word_app.Views
     /// </summary>
     public partial class ResultWindow : System.Windows.Window
     {
+        private Dictionary<int, bool[]> _projectTaskCompletedStates;
         private Dictionary<int, bool[]> _projectTaskFlaggedStates;
         private Dictionary<int, bool[]> _projectTaskViewedStates;
         private int _groupId;
@@ -28,29 +29,52 @@ namespace MOS_Word_app.Views
         private bool _seatChartSubmitStarted;
         private HashSet<int> _includedProjectIds;
         private readonly bool _fromScoringLog;
+        private readonly bool _isVariantMode;
         private Dictionary<int, List<bool>> _snapshotResults;
 
         public Action<int, int> OnNavigateToTask { get; set; }
 
-        public ResultWindow(Dictionary<int, bool[]> projectTaskFlaggedStates = null, Dictionary<int, bool[]> projectTaskViewedStates = null, int groupId = 1)
-            : this(projectTaskFlaggedStates, projectTaskViewedStates, groupId, null, false)
+        public bool ShowDispositionColumns => _isVariantMode;
+
+        public ResultWindow(
+            Dictionary<int, bool[]> projectTaskFlaggedStates = null,
+            Dictionary<int, bool[]> projectTaskViewedStates = null,
+            int groupId = 1,
+            bool isVariantMode = false,
+            Dictionary<int, bool[]> completedStates = null)
+            : this(projectTaskFlaggedStates, projectTaskViewedStates, groupId, null, false, isVariantMode, completedStates)
         {
         }
 
-        public ResultWindow(Dictionary<int, List<bool>> snapshotResults, int groupId, bool fromScoringLog)
-            : this(null, null, groupId, snapshotResults, fromScoringLog)
+        public ResultWindow(
+            Dictionary<int, List<bool>> snapshotResults,
+            int groupId,
+            bool fromScoringLog,
+            bool isVariantMode = false,
+            Dictionary<int, bool[]> completedStates = null,
+            Dictionary<int, bool[]> flaggedStates = null)
+            : this(flaggedStates, null, groupId, snapshotResults, fromScoringLog, isVariantMode, completedStates)
         {
         }
 
-        public ResultWindow(Dictionary<int, bool[]> projectTaskFlaggedStates, Dictionary<int, bool[]> projectTaskViewedStates, int groupId, Dictionary<int, List<bool>> snapshotResults, bool fromScoringLog)
+        public ResultWindow(
+            Dictionary<int, bool[]> projectTaskFlaggedStates,
+            Dictionary<int, bool[]> projectTaskViewedStates,
+            int groupId,
+            Dictionary<int, List<bool>> snapshotResults,
+            bool fromScoringLog,
+            bool isVariantMode = false,
+            Dictionary<int, bool[]> completedStates = null)
         {
             InitializeComponent();
             this.Closed += (s, args) => { _isWindowClosed = true; };
-            _projectTaskFlaggedStates = projectTaskFlaggedStates ?? new Dictionary<int, bool[]>();
+            _projectTaskCompletedStates = WordTaskReviewState.Clone(completedStates);
+            _projectTaskFlaggedStates = WordTaskReviewState.Clone(projectTaskFlaggedStates);
             _projectTaskViewedStates = projectTaskViewedStates ?? new Dictionary<int, bool[]>();
             _groupId = groupId;
             _snapshotResults = snapshotResults;
             _fromScoringLog = fromScoringLog;
+            _isVariantMode = isVariantMode;
             this.Loaded += ResultWindow_Loaded;
             if (!_fromScoringLog)
             {
@@ -84,19 +108,7 @@ namespace MOS_Word_app.Views
         {
             try
             {
-                string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
-
-                if (!File.Exists(jsonPath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] 正誤判定表JSONが見つかりません。BaseDirectory={AppDomain.CurrentDomain.BaseDirectory}");
-                }
-
-                var projectData = await System.Threading.Tasks.Task.Run(() =>
-                {
-                    if (!File.Exists(jsonPath)) return null;
-                    string jsonContent = File.ReadAllText(jsonPath, Encoding.UTF8);
-                    return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
-                });
+                var projectData = await System.Threading.Tasks.Task.Run(LoadProjectData);
 
                 if (projectData == null || projectData.Projects == null)
                 {
@@ -109,7 +121,6 @@ namespace MOS_Word_app.Views
                     return;
                 }
 
-                System.Diagnostics.Debug.WriteLine($"[ResultWindow] 問題文JSONを読み込みました: {jsonPath}");
                 RefreshIncludedProjectIds(projectData);
                 await UpdateSummaryAsync(projectData);
 
@@ -124,6 +135,7 @@ namespace MOS_Word_app.Views
                             if (task.ResultMark == "✖") task.ResultColor = Brushes.Red;
                             else if (task.ResultMark == "〇") task.ResultColor = Brushes.Green;
                             else if (task.ResultMark == "時間切れ") task.ResultColor = new SolidColorBrush(Color.FromRgb(0xB4, 0x53, 0x09));
+                            else if (task.ResultMark == "－") task.ResultColor = new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80));
                             else task.ResultColor = Brushes.Transparent;
                         }
                     }
@@ -144,10 +156,12 @@ namespace MOS_Word_app.Views
             int totalTasks = projectData.Projects
                 .Where(p => IsIncludedProject(p.ProjectId))
                 .Sum(p => p.Tasks?.Count ?? 0);
+            int unimplemented = CountUnimplementedTasks(projectData);
+            int countedTasks = Math.Max(0, totalTasks - unimplemented);
             int initialWrong = CountWrongTasks(projectData, useInitialSnapshot: true);
             int latestWrong = CountWrongTasks(projectData, useInitialSnapshot: false);
-            double initialAccuracy = totalTasks > 0 ? (double)(totalTasks - initialWrong) / totalTasks * 100.0 : 0.0;
-            double latestAccuracy = totalTasks > 0 ? (double)(totalTasks - latestWrong) / totalTasks * 100.0 : 0.0;
+            double initialAccuracy = countedTasks > 0 ? (double)(countedTasks - initialWrong) / countedTasks * 100.0 : 0.0;
+            double latestAccuracy = countedTasks > 0 ? (double)(countedTasks - latestWrong) / countedTasks * 100.0 : 0.0;
 
             await Dispatcher.InvokeAsync(() =>
             {
@@ -156,9 +170,65 @@ namespace MOS_Word_app.Views
                     AccuracyTextBlock.Text = $"正答率: 初回 {initialAccuracy:F1}% / 修正後 {latestAccuracy:F1}%";
                 if (SummaryTextBlock != null)
                     SummaryTextBlock.Text = $"「あとで見直す」と未閲覧（時間切れ）の合計: {latestWrong}問";
+                UpdateTotalScoreDisplay();
             });
 
             await StartSeatChartSubmitAsync(latestWrong);
+        }
+
+        private void UpdateTotalScoreDisplay()
+        {
+            if (TotalScorePanel == null || TotalScoreTextBlock == null)
+                return;
+
+            if (PassingRangeBadge != null)
+                PassingRangeBadge.Visibility = Visibility.Collapsed;
+
+            if (!_isVariantMode)
+            {
+                TotalScorePanel.Visibility = Visibility.Collapsed;
+                if (LostPointsTextBlock != null)
+                    LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            Dictionary<int, List<bool>> results = _fromScoringLog
+                ? _snapshotResults
+                : ScoreResultStore.GetProjectResults(_groupId);
+            int total = WordPracticeScore.Compute(WordPracticeScore.FlattenResults(results));
+
+            TotalScorePanel.Visibility = Visibility.Visible;
+            TotalScoreTextBlock.Text = $"{total}点/1000点";
+            if (PassingRangeBadge != null && total >= WordPracticeScore.PassingScoreThreshold)
+                PassingRangeBadge.Visibility = Visibility.Visible;
+
+            UpdateLostPointsDisplay(results);
+        }
+
+        private void UpdateLostPointsDisplay(Dictionary<int, List<bool>> results)
+        {
+            if (LostPointsTextBlock == null)
+                return;
+
+            if (!WordTaskReviewState.ShowLostPoints(_isVariantMode))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            int completedWrongCount = WordTaskReviewState.CountCompletedWrong(
+                results,
+                _projectTaskCompletedStates,
+                IsUnimplementedTask);
+            string message = WordTaskReviewState.FormatLostPointsMessage(completedWrongCount);
+            if (string.IsNullOrEmpty(message))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            LostPointsTextBlock.Text = message;
+            LostPointsTextBlock.Visibility = Visibility.Visible;
         }
 
         private async Task StartSeatChartSubmitAsync(int wrongTasks)
@@ -209,6 +279,76 @@ namespace MOS_Word_app.Views
             return countsAsWrong;
         }
 
+        private int CountUnimplementedTasks(ProjectData projectData)
+        {
+            if (!_isVariantMode || projectData?.Projects == null)
+                return 0;
+
+            int count = 0;
+            foreach (var project in projectData.Projects)
+            {
+                if (!IsIncludedProject(project.ProjectId) || project.Tasks == null)
+                    continue;
+                foreach (var task in project.Tasks)
+                {
+                    if (IsUnimplementedTask(project.ProjectId, task.TaskId))
+                        count++;
+                }
+            }
+            return count;
+        }
+
+        private bool IsUnimplementedTask(int projectId, int taskId)
+        {
+            if (!_isVariantMode)
+                return false;
+
+            if (!_fromScoringLog)
+            {
+                string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId);
+                if (string.IsNullOrEmpty(reason))
+                    reason = ScoreResultStore.GetInitialFailReason(_groupId, projectId, taskId);
+                if (WordVariantScoring.IsUnimplementedReason(reason))
+                    return true;
+            }
+
+            return !WordVariantScoring.IsTaskImplemented(_groupId, projectId, taskId);
+        }
+
+        private ProjectData LoadProjectData()
+        {
+            if (_isVariantMode)
+            {
+                return new ProjectData
+                {
+                    Projects = VariantProblemWorkbook.GetProjectIds()
+                        .Select(projectId => new ProjectInfo
+                        {
+                            ProjectId = projectId,
+                            Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                                .Select(task => new TaskInfo
+                                {
+                                    TaskId = task.TaskId,
+                                    Description = task.Description
+                                })
+                                .ToList()
+                        })
+                        .ToList()
+                };
+            }
+
+            string jsonPath = WordDataPathHelper.FindProblemJson("MOS模擬アプリ問題文一覧_Word.json");
+            if (!File.Exists(jsonPath))
+            {
+                System.Diagnostics.Debug.WriteLine($"[ResultWindow] 正誤判定表JSONが見つかりません。BaseDirectory={AppDomain.CurrentDomain.BaseDirectory}");
+                return null;
+            }
+
+            string jsonContent = File.ReadAllText(jsonPath, Encoding.UTF8);
+            System.Diagnostics.Debug.WriteLine($"[ResultWindow] 問題文JSONを読み込みました: {jsonPath}");
+            return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
+        }
+
         /// <summary>
         /// 採点結果がなく未閲覧の先頭タスク（時間切れ表示用）。
         /// </summary>
@@ -242,6 +382,8 @@ namespace MOS_Word_app.Views
             int firstUnviewedProjectId, int firstUnviewedTaskId, out bool countsAsWrong, bool useInitialSnapshot = false)
         {
             countsAsWrong = false;
+            if (IsUnimplementedTask(projectId, taskId))
+                return "－";
             if (_fromScoringLog)
             {
                 bool? passed = TryGetSnapshotPassed(projectId, taskId);
@@ -250,7 +392,7 @@ namespace MOS_Word_app.Views
                 countsAsWrong = !passed.Value;
                 return passed.Value ? "〇" : "✖";
             }
-            if (isFlagged)
+            if (isFlagged && !_isVariantMode)
             {
                 countsAsWrong = true;
                 return "✖";
@@ -304,7 +446,8 @@ namespace MOS_Word_app.Views
                         string resultMark = ComputeResultMark(project.ProjectId, task.TaskId, isFlagged, isUnread,
                             firstProjectId, firstTaskId, out _);
                         string failReason = ResolveDisplayedFailReason(project.ProjectId, task.TaskId, resultMark);
-                        return new ResultTaskInfo
+                        bool isCompleted = WordTaskReviewState.GetFlag(_projectTaskCompletedStates, project.ProjectId, task.TaskId);
+                        var resultTask = new ResultTaskInfo
                         {
                             TaskTitle = $"タスク {task.TaskId}",
                             Description = RemoveQuotes(task.Description),
@@ -312,13 +455,47 @@ namespace MOS_Word_app.Views
                             TaskId = task.TaskId,
                             ResultMark = resultMark,
                             ResultColor = null,
-                            FailReason = failReason
+                            FailReason = failReason,
+                            ShowDispositionColumns = ShowDispositionColumns,
+                            IsCompleted = isCompleted,
+                            IsFlagged = isFlagged,
+                            IsCompletedAndWrong = isCompleted && resultMark == "✖",
+                            PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId)
                         };
+                        ApplyPriorityBadgeColors(resultTask);
+                        return resultTask;
                     }).ToList() ?? new List<ResultTaskInfo>()
                 };
                 resultProjects.Add(resultProject);
             }
             return resultProjects;
+        }
+
+        private string PriorityBadgeFor(int projectId, int taskId)
+        {
+            if (!_isVariantMode)
+                return string.Empty;
+            return WordVariantPriorityLookup.GetBadgeText(
+                WordVariantScoring.DefaultVariantSetNo, projectId, taskId);
+        }
+
+        private static void ApplyPriorityBadgeColors(ResultTaskInfo task)
+        {
+            if (task == null || !task.HasPriorityBadge)
+                return;
+
+            if (task.PriorityBadgeText == "優先")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF));
+                task.PriorityBadgeForeground = Brushes.White;
+                return;
+            }
+
+            if (task.PriorityBadgeText == "次点")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06));
+                task.PriorityBadgeForeground = Brushes.White;
+            }
         }
 
         private void RefreshIncludedProjectIds(ProjectData projectData)
@@ -442,6 +619,7 @@ namespace MOS_Word_app.Views
             if (taskInfo == null || OnNavigateToTask == null || taskInfo.ProjectId <= 0 || taskInfo.TaskId <= 0) return;
             try
             {
+                bool canRetry = taskInfo.ResultMark != "－";
                 var initialWrongKeys = ScoreResultStore.GetInitialWrongKeys(_groupId).ToList();
                 var uiTestAppBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
                 if (uiTestAppBar != null)
@@ -450,7 +628,8 @@ namespace MOS_Word_app.Views
                     uiTestAppBar.Activate();
                     uiTestAppBar.SetReturnToResultMode(this);
                     uiTestAppBar.SetInitialWrongTaskKeys(initialWrongKeys);
-                    uiTestAppBar.TryEnqueueRetryTask(taskInfo.ProjectId, taskInfo.TaskId);
+                    if (canRetry)
+                        uiTestAppBar.TryEnqueueRetryTask(taskInfo.ProjectId, taskInfo.TaskId);
                     uiTestAppBar.ApplyExamWindowLayout();
                 }
                 else
@@ -462,7 +641,8 @@ namespace MOS_Word_app.Views
                         appBarWindow.Activate();
                         appBarWindow.SetReturnToResultMode(this);
                         appBarWindow.SetInitialWrongTaskKeys(initialWrongKeys);
-                        appBarWindow.TryEnqueueRetryTask(taskInfo.ProjectId, taskInfo.TaskId);
+                        if (canRetry)
+                            appBarWindow.TryEnqueueRetryTask(taskInfo.ProjectId, taskInfo.TaskId);
                         appBarWindow.ApplyExamWindowLayout();
                     }
                 }
@@ -536,5 +716,13 @@ namespace MOS_Word_app.Views
         public string FailReason { get; set; }
         /// <summary>Word の詳細誤答理由は未完成のため、学生向け「詳細」は出さない。</summary>
         public bool HasFailReason => false;
+        public bool ShowDispositionColumns { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool IsFlagged { get; set; }
+        public bool IsCompletedAndWrong { get; set; }
+        public string PriorityBadgeText { get; set; }
+        public bool HasPriorityBadge => !string.IsNullOrEmpty(PriorityBadgeText);
+        public Brush PriorityBadgeBackground { get; set; }
+        public Brush PriorityBadgeForeground { get; set; }
     }
 }

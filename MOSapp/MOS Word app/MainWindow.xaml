@@ -41,9 +41,8 @@
                           VerticalAlignment="Center"
                           FontSize="14"/>
                 <!-- 全プロジェクトリセットボタン -->
-                <Button Content="全プロジェクトリセット"
-                        Command="{Binding ResetAllInGroupCommand}"
-                        CommandParameter="{Binding CurrentGroupIdForReset}"
+                <Button x:Name="ProjectResetButton" Content="全プロジェクトリセット"
+                        Click="ProjectResetButton_Click"
                         Margin="0,0,15,0"
                         Padding="15,8"
                         MinWidth="140"

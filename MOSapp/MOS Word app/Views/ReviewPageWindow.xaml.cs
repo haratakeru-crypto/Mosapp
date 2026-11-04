@@ -52,8 +52,6 @@ namespace MOS_Word_app.Views
             _appBarWindow = appBarWindow;
             _groupId = groupId;
             _isVariantMode = isVariantMode;
-            if (_isVariantMode && EndExamButton != null)
-                EndExamButton.Visibility = Visibility.Collapsed;
             NavigateToTaskCommand = new RelayCommand<ReviewTaskInfo>(NavigateToTask);
             LoadAllProjects();
             InitializeTimer();
@@ -530,6 +528,25 @@ namespace MOS_Word_app.Views
                 .ToList();
         }
 
+        private IEnumerable<(int ProjectId, int TaskId)> GetTasksForScoring(ISet<int> projectIds)
+        {
+            var projects = ProjectsItemsControl.ItemsSource as IEnumerable<ReviewProjectInfo>;
+            if (projects == null)
+                yield break;
+
+            foreach (var project in projects)
+            {
+                foreach (var task in project.Tasks ?? Enumerable.Empty<ReviewTaskInfo>())
+                {
+                    if (task.ProjectId <= 0 || task.TaskId <= 0)
+                        continue;
+                    if (projectIds != null && !projectIds.Contains(task.ProjectId))
+                        continue;
+                    yield return (task.ProjectId, task.TaskId);
+                }
+            }
+        }
+
         private async void EndExamButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isScoring)
@@ -543,12 +560,41 @@ namespace MOS_Word_app.Views
             var availableIds = GetAvailableProjectIds();
             if (availableIds.Count > 0)
             {
-                if (!MosPracticeClient.ScoringRangeDialog.TrySelect(this, availableIds, out var selectedIds, out var rangeLabel))
+                if (!MosPracticeClient.ScoringRangeDialog.TrySelect(
+                    this,
+                    availableIds,
+                    out var selectedIds,
+                    out var rangeLabel,
+                    _isVariantMode
+                        ? MosPracticeClient.ScoringRangeProfile.WordVariant
+                        : MosPracticeClient.ScoringRangeProfile.Standard))
                     return;
                 scoringProjectIds = new HashSet<int>(selectedIds);
                 if (!string.IsNullOrWhiteSpace(rangeLabel))
                     scoringRangeLabel = rangeLabel;
             }
+
+            if (WordTaskReviewState.RequiresDispositionBeforeScoring(_isVariantMode))
+            {
+                var unmarked = WordTaskReviewState.FindUnmarked(
+                    GetTasksForScoring(scoringProjectIds),
+                    _projectTaskCompletedStates,
+                    _projectTaskFlaggedStates);
+                if (unmarked.Count > 0)
+                {
+                    MessageBoxResult proceed = MessageBox.Show(
+                        this,
+                        WordTaskReviewState.FormatUnmarkedMessage(unmarked),
+                        "未選択の問題があります",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (proceed != MessageBoxResult.Yes)
+                        return;
+                }
+            }
+
+            Dictionary<int, bool[]> completedSnapshot = WordTaskReviewState.Clone(_projectTaskCompletedStates);
+            Dictionary<int, bool[]> flaggedSnapshot = WordTaskReviewState.Clone(_projectTaskFlaggedStates);
 
             _isScoring = true;
             ScoringProgressOverlay scoringOverlay = null;
@@ -590,18 +636,39 @@ namespace MOS_Word_app.Views
                 await System.Threading.Tasks.Task.Yield();
                 
                 // 全プロジェクト一括採点（結果画面の 〇/✖ 表示用）
-                await System.Threading.Tasks.Task.Run(() => WordBatchScoring.ScoreAllProjects(
-                    _groupId,
-                    scoringProjectIds,
-                    (message, completed, total) =>
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    if (_isVariantMode)
                     {
-                        Dispatcher.BeginInvoke(new Action(() =>
-                        {
-                            if (scoringOverlay?.Window == null || !scoringOverlay.Window.IsVisible)
-                                return;
-                            scoringOverlay.Update(message, completed, total);
-                        }));
-                    }));
+                        WordVariantScoring.ScoreAllProjects(
+                            _groupId,
+                            scoringProjectIds,
+                            (message, completed, total) =>
+                            {
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    if (scoringOverlay?.Window == null || !scoringOverlay.Window.IsVisible)
+                                        return;
+                                    scoringOverlay.Update(message, completed, total);
+                                }));
+                            });
+                    }
+                    else
+                    {
+                        WordBatchScoring.ScoreAllProjects(
+                            _groupId,
+                            scoringProjectIds,
+                            (message, completed, total) =>
+                            {
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    if (scoringOverlay?.Window == null || !scoringOverlay.Window.IsVisible)
+                                        return;
+                                    scoringOverlay.Update(message, completed, total);
+                                }));
+                            });
+                    }
+                });
                 ScoreResultStore.SnapshotGroup(_groupId);
                 try
                 {
@@ -613,7 +680,11 @@ namespace MOS_Word_app.Views
                             MosPracticeClient.ScoringLogEntry.Create(
                                 scoringRangeLabel,
                                 _groupId,
-                                logResults));
+                                logResults,
+                                isVariantMode: _isVariantMode,
+                                variantSetNo: _isVariantMode ? WordVariantScoring.DefaultVariantSetNo : 0,
+                                completedStates: completedSnapshot,
+                                flaggedStates: flaggedSnapshot));
                     }
                 }
                 catch (Exception logEx)
@@ -640,7 +711,12 @@ namespace MOS_Word_app.Views
                 ResultWindow resultWindow = null;
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    resultWindow = new ResultWindow(_projectTaskFlaggedStates, _projectTaskViewedStates, _groupId);
+                    resultWindow = new ResultWindow(
+                        flaggedSnapshot,
+                        _projectTaskViewedStates,
+                        _groupId,
+                        isVariantMode: _isVariantMode,
+                        completedStates: completedSnapshot);
                     resultWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                     resultWindow.Topmost = true;
                     
