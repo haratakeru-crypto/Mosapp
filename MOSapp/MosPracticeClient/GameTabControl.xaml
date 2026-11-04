@@ -39,18 +39,18 @@
     </UserControl.Resources>
     <Grid Background="#F0F0F3">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-            <Button Style="{StaticResource GameButtonStyle}" Click="JudgeButton_Click">
-                <TextBlock TextAlignment="Center" TextWrapping="Wrap">
-                    <Run Text="3秒で解けるか解けないか判断！" FontSize="16" FontWeight="Medium"/>
-                    <LineBreak/>
-                    <Run Text="3秒ジャッジ！" FontSize="26"/>
-                </TextBlock>
-            </Button>
             <Button Style="{StaticResource GameButtonStyle}" Click="SnipeButton_Click">
                 <TextBlock TextAlignment="Center" TextWrapping="Wrap">
-                    <Run Text="3秒で正解を見抜く！" FontSize="16" FontWeight="Medium"/>
+                    <Run Text="5秒で正解を見抜く！" FontSize="16" FontWeight="Medium"/>
                     <LineBreak/>
-                    <Run Text="3秒スナイプ！" FontSize="26"/>
+                    <Run Text="5秒スナイプ！" FontSize="26"/>
+                </TextBlock>
+            </Button>
+            <Button Style="{StaticResource GameButtonStyle}" Click="JudgeButton_Click">
+                <TextBlock TextAlignment="Center" TextWrapping="Wrap">
+                    <Run Text="5秒で解けるか解けないか判断！" FontSize="16" FontWeight="Medium"/>
+                    <LineBreak/>
+                    <Run Text="5秒ジャッジ！" FontSize="26"/>
                 </TextBlock>
             </Button>
         </StackPanel>
