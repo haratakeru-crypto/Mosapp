@@ -7,12 +7,12 @@ using System.Windows;
 // アセンブリに関する一般的な情報は、次の方法で制御されます
 // アセンブリに関連付けられている情報を変更するには、
 // これらの属性値を変更してください。
-[assembly: AssemblyTitle("MOS Excel App")]
+[assembly: AssemblyTitle("前田式Excel演習システム")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("MOS Excel App")]
-[assembly: AssemblyCopyright("Copyright ©  2025")]
+[assembly: AssemblyCompany("Rabbit")]
+[assembly: AssemblyProduct("前田式Excel演習システム")]
+[assembly: AssemblyCopyright("Copyright © Rabbit 2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

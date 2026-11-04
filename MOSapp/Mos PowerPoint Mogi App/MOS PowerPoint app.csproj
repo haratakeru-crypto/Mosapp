@@ -17,6 +17,7 @@
     <Deterministic>true</Deterministic>
     <UseWPF>true</UseWPF>
     <IsWebBootstrapper>false</IsWebBootstrapper>
+    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -27,11 +28,13 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>12</ApplicationRevision>
+    <ApplicationRevision>13</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <ProductName>前田式PowerPoint演習システム</ProductName>
+    <PublisherName>Rabbit</PublisherName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -289,6 +292,7 @@
     <None Include="Libraries\Group1\PowerPointChecker1_8.csproj" />
     <None Include="Libraries\Group1\PowerPointChecker1_9.csproj" />
     <None Include="Libraries\Group1\PowerPointCheckerCommon.csproj" />
+    <None Include="AppIcon.ico" />
     <None Include="MOS PowerPoint app_TemporaryKey.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
