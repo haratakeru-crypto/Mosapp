@@ -292,8 +292,7 @@ namespace Libraries
             ClearDestructiveLogForProject(projectId, variantSetNo);
             WordTaskAttemptRegistry.ClearProject(projectId);
             ClearCurrentTaskFileIfMatches(projectId, variantSetNo);
-            if (variantSetNo == 0)
-                ClearSnapshot();
+            ClearSnapshotIfMatches(projectId, variantSetNo);
         }
 
         public static void ClearCurrentTaskFileIfMatches(int projectId, int variantSetNo)
@@ -969,6 +968,42 @@ namespace Libraries
             }
         }
 
+        /// <summary>スナップショットが指定 scope（教材 / 類題）に属するときだけ削除する。</summary>
+        public static void ClearSnapshotIfMatches(int projectId, int variantSetNo)
+        {
+            string path = GetSnapshotFilePath();
+            if (!File.Exists(path))
+                return;
+
+            try
+            {
+                int snapProjectId = 0;
+                int snapVariantSetNo = 0;
+                foreach (string line in File.ReadAllLines(path, Encoding.UTF8))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+                        continue;
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0)
+                        continue;
+                    string key = line.Substring(0, eq).Trim();
+                    string val = line.Substring(eq + 1).Trim();
+                    if (key == "ProjectId")
+                        int.TryParse(val, out snapProjectId);
+                    else if (key == "VariantSetNo")
+                        int.TryParse(val, out snapVariantSetNo);
+                }
+
+                int expectedVariant = variantSetNo < 0 ? 0 : variantSetNo;
+                if (snapProjectId == projectId && snapVariantSetNo == expectedVariant)
+                    ClearSnapshot();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearSnapshotIfMatches: {ex.Message}");
+            }
+        }
+
         /// <summary>アプリ側がタスク表示時に記録（記録主体は試験アプリ）。類題は Vn-p-t-a。</summary>
         public static void LogTaskStart(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
@@ -989,13 +1024,14 @@ namespace Libraries
             }
         }
 
-        public static List<string> GetOperationsForTask(int projectId, int taskId, int attemptNo)
+        public static List<string> GetOperationsForTask(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             var result = new List<string>();
             string path = GetLogFilePath();
             if (!File.Exists(path))
                 return result;
 
+            int expectedVariant = variantSetNo < 0 ? 0 : variantSetNo;
             try
             {
                 string[] lines = ReadCachedLines(path);
@@ -1025,14 +1061,14 @@ namespace Libraries
                     int opIdx = line.IndexOf("[Op]", StringComparison.OrdinalIgnoreCase);
                     if (opIdx < 0)
                         continue;
-                    // 行に [Task P-T-A] があれば VSTO 記録時のタスクを優先（TaskStart より後に並んでも誤帰属しない）
+                    // 行に [Task P-T-A] / [Task Vn-P-T-A] があれば VSTO 記録時のタスクを優先
                     if (TryParseExplicitOpTask(line, opIdx, out var opCtx))
                     {
                         if (opCtx.ProjectId != projectId || opCtx.TaskId != taskId
-                            || opCtx.AttemptNo != attemptNo || opCtx.VariantSetNo != 0)
+                            || opCtx.AttemptNo != attemptNo || opCtx.VariantSetNo != expectedVariant)
                             continue;
                     }
-                    else if (curP != projectId || curT != taskId || curA != attemptNo || curV != 0)
+                    else if (curP != projectId || curT != taskId || curA != attemptNo || curV != expectedVariant)
                     {
                         continue;
                     }
@@ -1050,19 +1086,20 @@ namespace Libraries
             return result;
         }
 
-        public static bool HasDisallowedOperations(int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes)
+        public static bool HasDisallowedOperations(
+            int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes, int variantSetNo = 0)
         {
-            return CollectDisallowedOperationTypes(projectId, taskId, attemptNo, allowedOperationTypes).Count > 0;
+            return CollectDisallowedOperationTypes(projectId, taskId, attemptNo, allowedOperationTypes, variantSetNo).Count > 0;
         }
 
         /// <summary>許可外 [Op] 種別を出現順・重複なしで返す。</summary>
         public static List<string> CollectDisallowedOperationTypes(
-            int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes)
+            int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes, int variantSetNo = 0)
         {
             var result = new List<string>();
             if (allowedOperationTypes == null)
                 return result;
-            var ops = GetOperationsForTask(projectId, taskId, attemptNo);
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo, variantSetNo);
             if (ops.Count == 0)
                 return result;
 
@@ -1080,14 +1117,14 @@ namespace Libraries
             return result;
         }
 
-        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
+        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             try
             {
                 string path = GetDestructiveErrorLogPath();
                 if (!File.Exists(path))
                     return false;
-                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                string prefix = DestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
                 foreach (string line in ReadCachedLines(path))
                 {
                     if (line != null && line.StartsWith(prefix, StringComparison.Ordinal))
@@ -1104,7 +1141,8 @@ namespace Libraries
         /// <summary>
         /// mos_word_destructive_errors.log の当該行から差分トークンを取り出す（" | " 区切り、重複なし）。
         /// </summary>
-        public static List<string> GetLoggedDestructiveErrorTokens(int projectId, int taskId, int attemptNo)
+        public static List<string> GetLoggedDestructiveErrorTokens(
+            int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             var result = new List<string>();
             try
@@ -1112,7 +1150,7 @@ namespace Libraries
                 string path = GetDestructiveErrorLogPath();
                 if (!File.Exists(path))
                     return result;
-                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                string prefix = DestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
                 var seen = new HashSet<string>(StringComparer.Ordinal);
                 foreach (string line in ReadCachedLines(path))
                 {
@@ -1138,13 +1176,14 @@ namespace Libraries
             return result;
         }
 
-        public static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, IList<string> errors)
+        public static void AppendDestructiveErrors(
+            int projectId, int taskId, int attemptNo, IList<string> errors, int variantSetNo = 0)
         {
             if (errors == null || errors.Count == 0)
                 return;
             try
             {
-                string key = $"{projectId},{taskId},{attemptNo}:";
+                string key = DestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
                 string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
                 File.AppendAllText(GetDestructiveErrorLogPath(), key + body + Environment.NewLine, new UTF8Encoding(false));
             }
@@ -1156,6 +1195,11 @@ namespace Libraries
             {
                 InvalidateBatchScoringLogCache();
             }
+        }
+
+        private static string DestructivePrefix(int projectId, int taskId, int attemptNo, int variantSetNo)
+        {
+            return WordTaskLogContext.Create(projectId, taskId, attemptNo, variantSetNo).FormatDestructivePrefix();
         }
 
         /// <summary>VSTO の [Op] 行に付く [Task P-T-A] / [Task Vn-P-T-A] を解析（[Op] より前にある場合のみ）。</summary>

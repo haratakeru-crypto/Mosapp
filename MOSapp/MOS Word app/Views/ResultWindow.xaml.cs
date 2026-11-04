@@ -137,6 +137,8 @@ namespace MOS_Word_app.Views
                             else if (task.ResultMark == "時間切れ") task.ResultColor = new SolidColorBrush(Color.FromRgb(0xB4, 0x53, 0x09));
                             else if (task.ResultMark == "－") task.ResultColor = new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80));
                             else task.ResultColor = Brushes.Transparent;
+
+                            ApplyPriorityBadgeColors(task);
                         }
                     }
                     _allProjects = resultProjects;
@@ -462,7 +464,6 @@ namespace MOS_Word_app.Views
                             IsCompletedAndWrong = isCompleted && resultMark == "✖",
                             PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId)
                         };
-                        ApplyPriorityBadgeColors(resultTask);
                         return resultTask;
                     }).ToList() ?? new List<ResultTaskInfo>()
                 };

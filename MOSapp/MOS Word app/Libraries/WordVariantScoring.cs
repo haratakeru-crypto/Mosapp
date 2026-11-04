@@ -12,7 +12,7 @@ using WordDoc = Microsoft.Office.Interop.Word.Document;
 namespace MOS_Word_app
 {
     /// <summary>
-    /// 類題第1回のその場採点と一括採点。教材用 WordChecker / 破壊的操作ゲートは使わない。
+    /// 類題第1回のその場採点と一括採点。採点前に破壊的操作ゲート（セット1）を通す。
     /// 未実装メソッド・DLL なしは IsPassed=null（画面は「－」）。
     /// </summary>
     public static class WordVariantScoring
@@ -44,8 +44,11 @@ namespace MOS_Word_app
             return $"CheckTask_{groupId}_{projectId}_{taskId:D2}";
         }
 
-        public static IReadOnlyList<TaskResult> ScoreProject(int groupId, int projectId)
+        public static IReadOnlyList<TaskResult> ScoreProject(int groupId, int projectId, int variantSetNo = DefaultVariantSetNo)
         {
+            if (variantSetNo < 1)
+                variantSetNo = DefaultVariantSetNo;
+
             var tasks = VariantProblemWorkbook.GetTasks(projectId);
             var results = new List<TaskResult>(tasks.Count);
             if (tasks.Count == 0)
@@ -55,6 +58,21 @@ namespace MOS_Word_app
 
             foreach (VariantTaskText task in tasks)
             {
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, task.TaskId);
+                if (!WordGradingGate.TryPass(
+                    groupId, projectId, task.TaskId, attemptNo, out List<string> gateActions, variantSetNo))
+                {
+                    results.Add(new TaskResult
+                    {
+                        TaskNumber = task.TaskId,
+                        IsPassed = false,
+                        TaskName = $"タスク{task.TaskId}",
+                        FailReason = WordScoreExplanation.ResolveFailReason(
+                            passed: false, gateFailed: true, gateStudentActions: gateActions)
+                    });
+                    continue;
+                }
+
                 bool? passed = TryScoreTask(checkerType, checkerInstance, groupId, projectId, task.TaskId);
                 results.Add(new TaskResult
                 {
@@ -116,7 +134,7 @@ namespace MOS_Word_app
                             continue;
                         }
 
-                        IReadOnlyList<TaskResult> results = ScoreProject(groupId, projectId);
+                        IReadOnlyList<TaskResult> results = ScoreProject(groupId, projectId, variantSetNo);
                         RecordProjectResults(groupId, projectId, tasks, results);
                     }
                     catch (Exception ex)
@@ -170,6 +188,16 @@ namespace MOS_Word_app
 
                 if (!TryActivateDocument(wordApp, filePath) && !OpenDocument(wordApp, filePath))
                     return null;
+
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
+                if (!WordGradingGate.TryPass(
+                    groupId, projectId, taskId, attemptNo, out List<string> gateActions, variantSetNo))
+                {
+                    string gateFail = WordScoreExplanation.ResolveFailReason(
+                        passed: false, gateFailed: true, gateStudentActions: gateActions);
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, false, gateFail);
+                    return false;
+                }
 
                 TryLoadChecker(groupId, projectId, out Type checkerType, out object checkerInstance);
                 bool? passed = TryScoreTask(checkerType, checkerInstance, groupId, projectId, taskId);

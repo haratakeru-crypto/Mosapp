@@ -892,7 +892,8 @@ namespace MOS_Word_app.Views
             {
                 int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
                 int flags = CurrentVariantSetNo > 0
-                    ? 0
+                    ? (int)WordVariantValidationConfig.GetExemptFlags(
+                        CurrentVariantSetNo, _currentProjectId, _currentTaskId)
                     : (int)WordTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
                 var context = WordTaskLogContext.Create(
                     _currentProjectId, _currentTaskId, attemptNo, CurrentVariantSetNo, flags);
@@ -1676,28 +1677,11 @@ namespace MOS_Word_app.Views
                 m => Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\""));
         }
 
-        /// <summary>
-        /// 類題でクリックコピーする語句。xlsx の「」内を "…" にして下線・青文字にする。
-        /// </summary>
-        private static readonly Dictionary<string, string[]> VariantCopyablePhrases =
-            new Dictionary<string, string[]>(StringComparer.Ordinal)
-            {
-                ["1-1"] = new[] { "写真展案内完成" },
-                ["1-4"] = new[] { "人物を主題にした写真のこと" },
-                ["4-4"] = new[] { "開場時刻を再確認" },
-                ["5-3"] = new[] { "鉢植え" },
-                ["6-1"] = new[] { "star@example.jp" },
-                ["6-2"] = new[] { "夜の部は19時開始です" },
-                ["6-4"] = new[] { "ぜひ" },
-                ["7-4"] = new[] { "記録" },
-                ["8-1"] = new[] { "食器" }
-            };
-
         private static string WrapVariantCopyablePhrases(int projectId, int taskId, string description)
         {
             if (string.IsNullOrEmpty(description))
                 return description;
-            if (!VariantCopyablePhrases.TryGetValue(projectId + "-" + taskId, out string[] phrases))
+            if (!WordVariantCopyTargets.TryGetPhrases(projectId, taskId, out string[] phrases))
                 return description;
 
             foreach (string phrase in phrases)
