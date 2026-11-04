@@ -39,7 +39,7 @@
                 </ItemsControl>
             </StackPanel>
 
-            <!-- Result 行（〇 / ✖）-->
+            <!-- Result 行（〇 / ✖ / 未判定は－）-->
             <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
                 <TextBlock Text="Result" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <ItemsControl x:Name="ResultPanel" ItemsSource="{Binding}">
@@ -53,12 +53,16 @@
                             <TextBlock MinWidth="48" TextAlignment="Center" VerticalAlignment="Center" Margin="0,0,8,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="✖"/>
-                                        <Setter Property="Foreground" Value="#C62828"/>
+                                        <Setter Property="Text" Value="－"/>
+                                        <Setter Property="Foreground" Value="#9E9E9E"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsPassed}" Value="True">
                                                 <Setter Property="Text" Value="〇"/>
                                                 <Setter Property="Foreground" Value="#2E7D32"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsPassed}" Value="False">
+                                                <Setter Property="Text" Value="✖"/>
+                                                <Setter Property="Foreground" Value="#C62828"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -69,8 +73,8 @@
                 </ItemsControl>
             </StackPanel>
 
-            <!-- Reason 行（×のときだけ「詳細」） -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20">
+            <!-- Reason 行は一旦非表示。Word の詳細誤答理由は未完成のため学生に見せない。戻すときは Visibility を外す。 -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20" Visibility="Collapsed">
                 <TextBlock Text="Reason" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <ItemsControl x:Name="ReasonsPanel" ItemsSource="{Binding}">
                     <ItemsControl.ItemsPanel>

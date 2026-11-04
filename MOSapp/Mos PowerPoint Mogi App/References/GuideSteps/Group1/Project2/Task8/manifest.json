@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 8,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド4を選ぶ→星の図形を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［アニメーション］→［アニメーションスタイル］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［その他のアニメーションの軌跡効果］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［ニュートロン］→［OK］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "図形以外をクリックして選択解除"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：スライド4の星に軌跡「ニュートロン」が設定されている"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［担当者別売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［H5:K19］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［コピー］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "セル［A5］を選択する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［貼り付け］→［元の列幅を保持］を選択する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：列幅を保持して貼り付けた表が表示されている"
+    }
+  ]
+}

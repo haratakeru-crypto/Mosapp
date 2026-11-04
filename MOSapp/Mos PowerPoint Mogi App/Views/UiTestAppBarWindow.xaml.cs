@@ -23,6 +23,7 @@ using Microsoft.Office.Interop.PowerPoint;
 using System.Configuration;
 using Libraries.Group1;
 using Libraries;
+using MOS_PowerPoint_app.Guide;
 
 namespace MOS_PowerPoint_app.Views
 {
@@ -134,6 +135,8 @@ namespace MOS_PowerPoint_app.Views
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（9番目以降）
         private readonly Action _onScoreClick; // 採点ボタン押下時（プロジェクト一覧の採点と同じ処理を実行）
         private readonly bool _isVariantMode;
+        private AnswerGuideWindow _answerGuideWindow;
+        private readonly MainViewModel _viewModel;
 
         public int CurrentProjectId => _currentProjectId;
         public int CurrentGroupId => _groupId;
@@ -151,13 +154,20 @@ namespace MOS_PowerPoint_app.Views
         private Timer _instantScoringNoticeTimer;
         private bool _instantScoringFinished;
 
-        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null, bool isVariantMode = false)
+        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, Action onScoreClick = null, bool isVariantMode = false, MainViewModel viewModel = null)
         {
             InitializeComponent();
             _currentProjectId = projectId;
             _groupId = groupId; // グループIDを保存
             _onScoreClick = onScoreClick;
             _isVariantMode = isVariantMode;
+            _viewModel = viewModel;
+            if (_viewModel != null)
+            {
+                DataContext = _viewModel;
+                _viewModel.CloseAnswerGuideRequested += OnCloseAnswerGuideRequested;
+                _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            }
             var scoreBtn = FindName("ScoreButton") as System.Windows.Controls.Button;
             if (scoreBtn != null)
                 scoreBtn.Visibility = showScoreButton ? Visibility.Visible : Visibility.Collapsed;
@@ -239,7 +249,11 @@ namespace MOS_PowerPoint_app.Views
         private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
         {
             ScoreResultWindow.TryBringOpenToFront();
-            Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                SetWindowPosition();
+                ClampAnswerGuideToScreen();
+            }), DispatcherPriority.Background);
         }
         
         private void PositionPowerPointWindow()
@@ -443,6 +457,7 @@ namespace MOS_PowerPoint_app.Views
             {
                 _timer.Stop();
                 UpdateTimerDisplay();
+                CloseAnswerGuide();
                 if (_isScoreResultOpen)
                 {
                     _examResultPendingAfterScoreResult = true;
@@ -870,6 +885,14 @@ namespace MOS_PowerPoint_app.Views
                     MessageBoxImage.Warning);
                 return results;
             }
+
+            // 再オープン前に、表示中タスクの証跡を Word/Excel 型で1回確定する。
+            var flushTimer = Stopwatch.StartNew();
+            bool flushOk = Libraries.PPLogReader.TryRequestCurrentTaskEvidenceFlush(2000, out string flushDetail);
+            PPGradingPerf.Log(
+                "ScoreAllProjects.EvidenceFlush",
+                flushTimer.ElapsedMilliseconds,
+                $"ok={flushOk} {flushDetail}");
             
             PowerPointGrader grader = null;
             Libraries.PPLogReader.BeginBatchScoringFastPoll();
@@ -1155,6 +1178,7 @@ namespace MOS_PowerPoint_app.Views
             if (_isScoring)
                 return;
 
+            CloseAnswerGuide();
             var scoreButton = sender as System.Windows.Controls.Button;
             if (scoreButton != null)
                 scoreButton.IsEnabled = false;
@@ -1200,6 +1224,7 @@ namespace MOS_PowerPoint_app.Views
                 CloseInstantScoringOverlay();
                 if (scoreButton != null)
                     scoreButton.IsEnabled = true;
+                ApplyNavigationLockState();
             }
         }
 
@@ -1266,6 +1291,7 @@ namespace MOS_PowerPoint_app.Views
             bool scoreEnabled = ScoreButton == null || ScoreButton.IsEnabled;
             bool nextEnabled = NextProjectButton == null || NextProjectButton.IsEnabled;
             bool closeEnabled = CloseExamButton == null || CloseExamButton.IsEnabled;
+            bool guideEnabled = AnswerGuideButton == null || AnswerGuideButton.IsEnabled;
             SetScoreResultActionsEnabled(false);
             _isScoreResultOpen = true;
             try
@@ -1286,6 +1312,8 @@ namespace MOS_PowerPoint_app.Views
                     NextProjectButton.IsEnabled = nextEnabled;
                 if (CloseExamButton != null)
                     CloseExamButton.IsEnabled = closeEnabled;
+                if (AnswerGuideButton != null)
+                    AnswerGuideButton.IsEnabled = guideEnabled;
                 if (_examResultPendingAfterScoreResult)
                 {
                     _examResultPendingAfterScoreResult = false;
@@ -1310,6 +1338,8 @@ namespace MOS_PowerPoint_app.Views
                 NextProjectButton.IsEnabled = enabled;
             if (CloseExamButton != null)
                 CloseExamButton.IsEnabled = enabled;
+            if (AnswerGuideButton != null)
+                AnswerGuideButton.IsEnabled = enabled && !_isScoring;
         }
 
         /// <summary>
@@ -1403,10 +1433,13 @@ namespace MOS_PowerPoint_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
             PowerPointStartupInputGate.End();
+            CloseAnswerGuide();
             _timer?.Stop();
             _projectTimer?.Stop();
             SaveAllPowerPointPresentations();
@@ -1436,6 +1469,9 @@ namespace MOS_PowerPoint_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
+            CloseAnswerGuide();
             ShowReviewPageWindow();
         }
 
@@ -2620,6 +2656,8 @@ namespace MOS_PowerPoint_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             ScoreResultWindow.TryBringOpenToFront();
             await MoveToNextProjectAsync();
         }
@@ -2629,6 +2667,7 @@ namespace MOS_PowerPoint_app.Views
             if (_isMovingToNextProject)
                 return;
 
+            CloseAnswerGuide();
             _isMovingToNextProject = true;
             try
             {
@@ -2650,15 +2689,17 @@ namespace MOS_PowerPoint_app.Views
             // 破壊的操作の記録は VSTO タスク境界と Grader ゲートに一本化（Word 方式）。
             // プロジェクト遷移時は destructive_errors.log へ追記しない。
 
-            // current_task を消す前に、印刷系タスク（5-1/11-7）は同期再評価して証跡を確定する。
-            // 最終タスク 11-7 での高速遷移時の取りこぼしを防ぐため、アプリ側でも境界補完する。
+            // current_task を消す前に、表示中タスクの証跡を VSTO へ確定させる（Word/Excel 型 flush）。
+            // 印刷系は従来どおりアプリ側の同期補完も残す。
             try
             {
+                bool flushOk = Libraries.PPLogReader.TryRequestCurrentTaskEvidenceFlush(2000, out string flushDetail);
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] EvidenceFlush ok={flushOk} {flushDetail}");
                 TryFinalizePrintEvidenceBeforeProjectTransition();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Print evidence finalize error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[MoveToNextProject] Evidence finalize error: {ex.Message}");
             }
 
             await Dispatcher.Yield(DispatcherPriority.Background);
@@ -3214,6 +3255,8 @@ namespace MOS_PowerPoint_app.Views
         
         private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             try
             {
                 var result = MessageBox.Show(
@@ -3591,10 +3634,163 @@ namespace MOS_PowerPoint_app.Views
             }
         }
         
+        private void OnCloseAnswerGuideRequested(object sender, EventArgs e)
+        {
+            CloseAnswerGuide();
+        }
+
+        private void AnswerGuideButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isScoring || _isScoreResultOpen)
+                return;
+
+            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
+                return;
+
+            if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+            {
+                _answerGuideWindow.BringToFrontPassive();
+                return;
+            }
+
+            OpenAnswerGuide();
+        }
+
+        private void OpenAnswerGuide()
+        {
+            var tasks = GuideStepsRepository.LoadProjectTasks(_groupId, _currentProjectId);
+            CloseAnswerGuide();
+
+            _answerGuideWindow = new AnswerGuideWindow(_groupId, _currentProjectId, tasks, () => _currentTaskId)
+            {
+                Owner = this
+            };
+            _answerGuideWindow.Closed += AnswerGuideWindow_Closed;
+            _answerGuideWindow.ApplyInitialPlacement(GetAnswerGuidePreferredBoundsDip());
+            _answerGuideWindow.Show();
+            _answerGuideWindow.OpenForAppBarTask(_currentTaskId);
+            _viewModel?.SetAnswerGuideOpen(true);
+            ApplyNavigationLockState();
+        }
+
+        private void AnswerGuideWindow_Closed(object sender, EventArgs e)
+        {
+            if (sender is AnswerGuideWindow window)
+                window.Closed -= AnswerGuideWindow_Closed;
+
+            if (ReferenceEquals(_answerGuideWindow, sender))
+                _answerGuideWindow = null;
+
+            _viewModel?.SetAnswerGuideOpen(false);
+            ApplyNavigationLockState();
+        }
+
+        private void CloseAnswerGuide()
+        {
+            if (_answerGuideWindow == null)
+            {
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+                return;
+            }
+
+            try
+            {
+                _answerGuideWindow.Closed -= AnswerGuideWindow_Closed;
+                if (_answerGuideWindow.IsVisible)
+                    _answerGuideWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] CloseAnswerGuide: {ex.Message}");
+            }
+            finally
+            {
+                _answerGuideWindow = null;
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+            }
+        }
+
+        private Rect GetAnswerGuidePreferredBoundsDip()
+        {
+            double width = 720;
+            double height = 640;
+            double left = SystemParameters.WorkArea.Right - width - 24;
+            double top = SystemParameters.WorkArea.Top + 24;
+
+            try
+            {
+                IntPtr pptHwnd = TryGetPowerPointMainWindowHandle();
+                if (pptHwnd != IntPtr.Zero && GetWindowRect(pptHwnd, out RECT pptRect))
+                {
+                    var source = PresentationSource.FromVisual(this);
+                    Matrix transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+                    var topLeft = transform.Transform(new System.Windows.Point(pptRect.left, pptRect.top));
+                    var bottomRight = transform.Transform(new System.Windows.Point(pptRect.right, pptRect.bottom));
+                    double pptWidth = Math.Max(0, bottomRight.X - topLeft.X);
+                    left = topLeft.X + Math.Max(24, pptWidth - width - 24);
+                    top = topLeft.Y + 24;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] GetAnswerGuidePreferredBoundsDip: {ex.Message}");
+            }
+
+            return new Rect(left, top, width, height);
+        }
+
+        private void ClampAnswerGuideToScreen()
+        {
+            try
+            {
+                if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+                    _answerGuideWindow.ClampToScreen();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] ClampAnswerGuideToScreen: {ex.Message}");
+            }
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsAnswerGuideOpen) ||
+                e.PropertyName == nameof(MainViewModel.IsNavigationLocked) ||
+                e.PropertyName == nameof(MainViewModel.ShowAnswerGuideEffective))
+            {
+                ApplyNavigationLockState();
+            }
+        }
+
+        private void ApplyNavigationLockState()
+        {
+            bool scoringBusy = _isScoring || _isScoreResultOpen;
+            bool navigationEnabled = !scoringBusy && !(_viewModel?.IsNavigationLocked ?? false);
+
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = navigationEnabled;
+            if (ResetButton != null)
+                ResetButton.IsEnabled = navigationEnabled;
+            if (NextProjectButton != null)
+                NextProjectButton.IsEnabled = navigationEnabled;
+            if (CloseExamButton != null)
+                CloseExamButton.IsEnabled = navigationEnabled;
+            if (AnswerGuideButton != null)
+                AnswerGuideButton.IsEnabled = !scoringBusy;
+        }
+
         protected override void OnClosed(EventArgs e)
         {
+            CloseAnswerGuide();
             _timer?.Stop();
             _projectTimer?.Stop();
+            if (_viewModel != null)
+            {
+                _viewModel.CloseAnswerGuideRequested -= OnCloseAnswerGuideRequested;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            }
             // ウィンドウを閉じる際にタスク情報をクリアし、次回起動時に古い情報でチェックが走るのを防ぐ
             Libraries.PPLogReader.ClearCurrentTaskFile();
             base.OnClosed(e);

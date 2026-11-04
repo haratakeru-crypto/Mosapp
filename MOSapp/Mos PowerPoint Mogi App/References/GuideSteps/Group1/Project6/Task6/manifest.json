@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ファイル］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［印刷］→［アウトライン］→［ノート］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［部単位で印刷］→［ページ単位で印刷］→部数「3」"
+    },
+    {
+      "image": "step04.png",
+      "caption": "プレビューが［ノート］になったことを確認"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［ホームに戻る］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：ノートをページ単位に3部印刷"
+    }
+  ]
+}

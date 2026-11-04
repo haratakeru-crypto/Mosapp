@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "表内をクリックし、［テーブルレイアウト］→［並べ替え］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［最優先されるキー］を「合計」、［降順］にして［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "表以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：「小豆島のうまいもの市場売上」下の表が「合計」の降順になっている"
+    }
+  ]
+}

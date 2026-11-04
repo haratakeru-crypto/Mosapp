@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「TOEICテスト対策セミナー…」のタイトル右側の画像を選択し、［図の形式］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［図の効果］→［面取り］→［ハードエッジ］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "画像以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：タイトル右側の画像に図の効果「面取り ハードエッジ」が設定されている"
+    }
+  ]
+}

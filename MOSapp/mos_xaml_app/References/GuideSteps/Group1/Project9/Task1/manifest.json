@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［学生名簿］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［C5:C24］を選択し、名前ボックスをクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "名前ボックスに「氏名」と入力し、［Enter］で確定する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：名前ボックスに「氏名」が表示されている"
+    }
+  ]
+}

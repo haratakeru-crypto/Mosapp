@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［5年間売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［A4:C10］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［挿入］タブをクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［縦棒／横棒グラフの挿入］→［積み上げ縦棒］を選択する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "ワークシート上にグラフが作成されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "任意のセルをクリックしてグラフの選択を解除する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：積み上げ縦棒グラフが作成されている"
+    }
+  ]
+}

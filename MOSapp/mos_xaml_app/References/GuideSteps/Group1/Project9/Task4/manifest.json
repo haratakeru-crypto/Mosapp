@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［学生名簿］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［G5］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=con」と入力し、一覧から［CONCAT］をダブルクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "CONCAT関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "セル［E5:F5］を選択し、［テキスト1］を確認して［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "セル［G5］のフィルハンドルを［G24］までドラッグする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：［学部学科］に結合結果が表示されている"
+    }
+  ]
+}

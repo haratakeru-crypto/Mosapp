@@ -20,8 +20,20 @@ namespace MosPracticeClient
         [JsonProperty("groupId")]
         public int GroupId { get; set; }
 
+        [JsonProperty("isVariantMode")]
+        public bool IsVariantMode { get; set; }
+
+        [JsonProperty("variantSetNo")]
+        public int VariantSetNo { get; set; }
+
         [JsonProperty("projectResults")]
         public Dictionary<int, List<bool>> ProjectResults { get; set; }
+
+        [JsonProperty("completedStates")]
+        public Dictionary<int, List<bool>> CompletedStates { get; set; }
+
+        [JsonProperty("flaggedStates")]
+        public Dictionary<int, List<bool>> FlaggedStates { get; set; }
 
         [JsonIgnore]
         public string DisplayTitle
@@ -29,11 +41,20 @@ namespace MosPracticeClient
             get
             {
                 string label = string.IsNullOrWhiteSpace(RangeLabel) ? "採点" : RangeLabel.Trim();
+                if (IsVariantMode)
+                    return $"類題 {label} {ScoredAt:M/d H:mm}";
                 return $"{label} {ScoredAt:M/d H:mm}";
             }
         }
 
-        public static ScoringLogEntry Create(string rangeLabel, int groupId, Dictionary<int, List<bool>> projectResults)
+        public static ScoringLogEntry Create(
+            string rangeLabel,
+            int groupId,
+            Dictionary<int, List<bool>> projectResults,
+            bool isVariantMode = false,
+            int variantSetNo = 0,
+            Dictionary<int, bool[]> completedStates = null,
+            Dictionary<int, bool[]> flaggedStates = null)
         {
             return new ScoringLogEntry
             {
@@ -41,8 +62,22 @@ namespace MosPracticeClient
                 RangeLabel = rangeLabel ?? "",
                 ScoredAt = DateTime.Now,
                 GroupId = groupId,
-                ProjectResults = CloneResults(projectResults)
+                IsVariantMode = isVariantMode,
+                VariantSetNo = isVariantMode && variantSetNo > 0 ? variantSetNo : 0,
+                ProjectResults = CloneResults(projectResults),
+                CompletedStates = CloneFlags(completedStates),
+                FlaggedStates = CloneFlags(flaggedStates)
             };
+        }
+
+        public Dictionary<int, bool[]> GetCompletedStates()
+        {
+            return ToBoolArrays(CompletedStates);
+        }
+
+        public Dictionary<int, bool[]> GetFlaggedStates()
+        {
+            return ToBoolArrays(FlaggedStates);
         }
 
         static Dictionary<int, List<bool>> CloneResults(Dictionary<int, List<bool>> source)
@@ -51,6 +86,24 @@ namespace MosPracticeClient
             if (source == null) return clone;
             foreach (var kv in source)
                 clone[kv.Key] = kv.Value != null ? new List<bool>(kv.Value) : new List<bool>();
+            return clone;
+        }
+
+        static Dictionary<int, List<bool>> CloneFlags(Dictionary<int, bool[]> source)
+        {
+            var clone = new Dictionary<int, List<bool>>();
+            if (source == null) return clone;
+            foreach (var kv in source)
+                clone[kv.Key] = kv.Value != null ? new List<bool>(kv.Value) : new List<bool>();
+            return clone;
+        }
+
+        static Dictionary<int, bool[]> ToBoolArrays(Dictionary<int, List<bool>> source)
+        {
+            var clone = new Dictionary<int, bool[]>();
+            if (source == null) return clone;
+            foreach (var kv in source)
+                clone[kv.Key] = kv.Value != null ? kv.Value.ToArray() : Array.Empty<bool>();
             return clone;
         }
     }

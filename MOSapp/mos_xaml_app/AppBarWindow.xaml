@@ -181,6 +181,30 @@
                             </Button.Style>
                         </Button>
 
+                        <Button Name="AnswerGuideButton" Content="手順"
+                                Visibility="{Binding ShowAnswerGuideEffective, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Background="White"
+                                Foreground="#0F766E"
+                                Padding="24,10"
+                                Margin="0,0,10,0"
+                                BorderThickness="0"
+                                FontWeight="Medium"
+                                FontSize="16"
+                                Click="AnswerGuideButton_Click">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#F3F4F6"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Background" Value="#E5E7EB"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <Button Name="PauseButton" Content="一時停止" 
                                 Visibility="Collapsed"
                                 Background="White" 
@@ -543,7 +567,8 @@
                                 </Button>
 
                                 <!-- 右側: 終了ボタン（ここに配置） -->
-                                <Button Content="終了" 
+                                <Button x:Name="EndButton"
+                                        Content="終了" 
                                         Click="EndButton_Click"
                                         Background="#EF4444" 
                                         Foreground="White" 

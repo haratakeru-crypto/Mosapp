@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「参考文献一覧」のセクション内にカーソルを置き、［レイアウト］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［段組み］→［2段］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：参考文献一覧が2段組みになっている"
+    }
+  ]
+}

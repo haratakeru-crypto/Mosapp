@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［試験結果］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "テーブル内のセルを選び、［テーブルデザイン］→［クイックスタイル］を開く"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［オレンジ、テーブルスタイル（中間）10］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：オレンジのテーブルスタイルが設定されている"
+    }
+  ]
+}

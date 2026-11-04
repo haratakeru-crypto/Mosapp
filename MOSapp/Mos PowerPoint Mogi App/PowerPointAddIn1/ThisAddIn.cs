@@ -16,6 +16,7 @@ namespace PowerPointAddIn1
     public partial class ThisAddIn
     {
         private static readonly string CurrentTaskFilePath = Path.Combine(Path.GetTempPath(), "mos_ppt_current_task.txt");
+        private static readonly string EvidenceFlushRequestPath = Path.Combine(Path.GetTempPath(), "mos_ppt_flush_evidence.txt");
         private const int CurrentTaskFieldCount = 5;
 
         /// <summary>
@@ -262,17 +263,16 @@ namespace PowerPointAddIn1
                 UpdateTaskFilePollInterval();
                 WriteHeartbeatIfDue();
 
+                // 採点アプリからの証跡フラッシュ要求（その場採点開始／一括前／プロジェクト遷移前）。
+                ProcessEvidenceFlushRequest();
+
                 if (!File.Exists(CurrentTaskFilePath))
                 {
-                    // 最終タスク（11-7 / P6-7）でレビュー遷移時に current_task が消えるケースでも、
-                    // 離脱直前の印刷設定を1回だけ再評価して証跡を確定する。
-                    if (_currentTaskProjectId == 11 && _currentTaskTaskId == 7)
+                    // 最終タスクでレビュー遷移時に current_task が消えるケースでも、
+                    // 直前タスクの証跡を1回だけ再評価して確定する。
+                    if (_currentTaskProjectId > 0 && _currentTaskTaskId > 0)
                     {
-                        TryLogTask11_7PrintOnTaskBoundary();
-                    }
-                    if (_currentTaskProjectId == 6 && _currentTaskTaskId == 7)
-                    {
-                        TryLogTask6_7PrintOnTaskBoundary();
+                        FlushEvidenceForTask(_currentTaskProjectId, _currentTaskTaskId);
                     }
                     _currentTaskProjectId = -1;
                     _currentTaskTaskId = -1;
@@ -295,52 +295,10 @@ namespace PowerPointAddIn1
                     return;
 
                 // --- タスク切り替え時の処理 ---
-                // 11-7 / P6-5 はポーリング取りこぼし対策として、タスク離脱直前に印刷設定を即時再評価して証跡を確定する。
-                if (taskIdentityChanged && _currentTaskProjectId == 11 && _currentTaskTaskId == 7)
+                // ポーリング取りこぼし対策として、離脱直前に証跡タスクを即時再評価する。
+                if (taskIdentityChanged && _currentTaskProjectId > 0 && _currentTaskTaskId > 0)
                 {
-                    TryLogTask11_7PrintOnTaskBoundary();
-                }
-                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 5)
-                {
-                    TryLogTask6_5PrintOnTaskBoundary();
-                }
-                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 6)
-                {
-                    TryLogTask6_6PrintOnTaskBoundary();
-                }
-                if (taskIdentityChanged && _currentTaskProjectId == 6 && _currentTaskTaskId == 7)
-                {
-                    TryLogTask6_7PrintOnTaskBoundary();
-                }
-                // 4-3 は光彩が 4-4 で外れるため、離脱直前に COM/OpenXML で証跡を確定する。
-                if (taskIdentityChanged && _currentTaskProjectId == 4 && _currentTaskTaskId == 3)
-                {
-                    TryLogTask4_3GlowOnTaskBoundary();
-                }
-                // P8-3 は P8-4 で寸法が上書きされるため、離脱直前に 16:9 を証跡確定する。
-                if (taskIdentityChanged && _currentTaskProjectId == 8 && _currentTaskTaskId == 3)
-                {
-                    TryLogTask8_3SlideSize16x9OnTaskBoundary();
-                }
-                // P8-5 は表示グレースケールが保存されにくいため、離脱直前にオフ→オンを再確認する。
-                if (taskIdentityChanged && _currentTaskProjectId == 8 && _currentTaskTaskId == 5)
-                {
-                    TryObserveTask8_5Grayscale();
-                }
-                // P2-1 は P2-4 で画面切り替えが上書きされるため、離脱直前に証跡を確定する。
-                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 1)
-                {
-                    TryLogTask2_1SplitHorizontalOutOnTaskBoundary();
-                }
-                // P2-2 も P2-4 で継続時間が上書きされるため、離脱直前に証跡を確定する。
-                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 2)
-                {
-                    TryLogTask2_2TransitionDuration3SecOnTaskBoundary();
-                }
-                // P2-3 も P2-4 で画面切り替えが上書きされるため、離脱直前に証跡を確定する。
-                if (taskIdentityChanged && _currentTaskProjectId == 2 && _currentTaskTaskId == 3)
-                {
-                    TryLogTask2_3SwitchRightOnTaskBoundary();
+                    FlushEvidenceForTask(_currentTaskProjectId, _currentTaskTaskId);
                 }
 
                 // 新しいタスクを開始する前に、直前のタスクの破壊的操作チェックを行う
@@ -1265,6 +1223,96 @@ namespace PowerPointAddIn1
                 finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// ホストが mos_ppt_flush_evidence.txt に P,T,A を置いたとき、該当タスクの証跡を確定して削除する。
+        /// PPLogReader はファイル消滅を成功とみなす（失敗時も削除してタイムアウトを防ぐ）。
+        /// </summary>
+        private void ProcessEvidenceFlushRequest()
+        {
+            if (!File.Exists(EvidenceFlushRequestPath))
+                return;
+
+            int projectId = 0;
+            int taskId = 0;
+            int attemptNo = 1;
+            try
+            {
+                string text = File.ReadAllText(EvidenceFlushRequestPath).Trim();
+                if (!string.IsNullOrEmpty(text))
+                {
+                    string[] parts = text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2)
+                    {
+                        int.TryParse(parts[0].Trim(), out projectId);
+                        int.TryParse(parts[1].Trim(), out taskId);
+                        if (parts.Length >= 3)
+                        {
+                            int.TryParse(parts[2].Trim(), out attemptNo);
+                            if (attemptNo < 1) attemptNo = 1;
+                        }
+                    }
+                }
+
+                if (projectId > 0 && taskId > 0)
+                {
+                    int prevProjectId = _currentTaskProjectId;
+                    int prevTaskId = _currentTaskTaskId;
+                    int prevAttemptNo = _currentTaskAttemptNo;
+                    try
+                    {
+                        Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
+                        FlushEvidenceForTask(projectId, taskId);
+                        System.Diagnostics.Debug.WriteLine($"[PowerPointAddIn1] EvidenceFlush done: {projectId}-{taskId}-{attemptNo}");
+                    }
+                    finally
+                    {
+                        // フラッシュ用に一時変更したコンテキストを、可能な範囲で戻す
+                        if (prevProjectId > 0 && prevTaskId > 0)
+                            Logger.SetCurrentTaskContext(prevProjectId, prevTaskId, prevAttemptNo);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PowerPointAddIn1] EvidenceFlush error: " + ex.Message);
+            }
+            finally
+            {
+                try { File.Delete(EvidenceFlushRequestPath); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 離脱境界／採点直前フラッシュ共通の証跡確定。条件不一致なら書かない（推測合格はしない）。
+        /// </summary>
+        private void FlushEvidenceForTask(int projectId, int taskId)
+        {
+            if (projectId <= 0 || taskId <= 0) return;
+
+            if (projectId == 5 && taskId == 1)
+                TryLogTask5_1PrintOnTaskBoundary();
+            else if (projectId == 6 && taskId == 5)
+                TryLogTask6_5PrintOnTaskBoundary();
+            else if (projectId == 6 && taskId == 6)
+                TryLogTask6_6PrintOnTaskBoundary();
+            else if (projectId == 6 && taskId == 7)
+                TryLogTask6_7PrintOnTaskBoundary();
+            else if (projectId == 11 && taskId == 7)
+                TryLogTask11_7PrintOnTaskBoundary();
+            else if (projectId == 4 && taskId == 3)
+                TryLogTask4_3GlowOnTaskBoundary();
+            else if (projectId == 8 && taskId == 3)
+                TryLogTask8_3SlideSize16x9OnTaskBoundary();
+            else if (projectId == 8 && taskId == 5)
+                TryObserveTask8_5Grayscale();
+            else if (projectId == 2 && taskId == 1)
+                TryLogTask2_1SplitHorizontalOutOnTaskBoundary();
+            else if (projectId == 2 && taskId == 2)
+                TryLogTask2_2TransitionDuration3SecOnTaskBoundary();
+            else if (projectId == 2 && taskId == 3)
+                TryLogTask2_3SwitchRightOnTaskBoundary();
         }
 
         /// <summary>

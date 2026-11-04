@@ -1,0 +1,15 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［レイアウト］→［余白］→［やや狭い］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "完成：余白が「やや狭い」になっている"
+    }
+  ]
+}

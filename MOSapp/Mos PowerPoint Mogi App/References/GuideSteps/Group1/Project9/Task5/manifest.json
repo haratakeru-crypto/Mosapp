@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド2を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "グラフを選ぶ"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［グラフのデザイン］→［グラフ要素を追加］→［データテーブル］→［凡例マーカーなし］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "データテーブルを確認"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［グラフ要素を追加］→［グラフタイトル］→［なし］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "［グラフ要素を追加］→［凡例］→［なし］"
+    },
+    {
+      "image": "step07.png",
+      "caption": "グラフ以外をクリックして選択解除"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：データテーブル（凡例マーカーなし）・タイトルと凡例なし"
+    }
+  ]
+}

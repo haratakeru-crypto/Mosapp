@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ホーム］→［置換］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［検索する文字列］に「事例」と入力し、［置換後の文字列］を空にして［オプション］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［書式］→［フォント］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［スタイル］→［斜体］→［OK］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［書式］に「フォント:斜体」と表示されたことを確認し［すべて置換］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "「20個の項目を置換しました」を確認し［OK］"
+    },
+    {
+      "image": "step07.png",
+      "caption": "［閉じる］"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：すべての「事例」が斜体になっている"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド2を選ぶ→男の子の画像を選ぶ→［図の形式］→［代替テキスト］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［装飾用にする］→［閉じる］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "図形以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド「MOSって何？」の男の子画像の代替テキストを装飾化"
+    }
+  ]
+}

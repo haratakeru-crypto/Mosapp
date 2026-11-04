@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「1.セキュリティ対策ソフト…」から「4.使わなくなった機器…」を選択し、［ホーム］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［箇条書き］→［新しい行頭文字の定義］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［記号］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［フォント］→［Webdings］、文字コードに「120」と入力し［OK］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "行頭文字のプレビューを確認し［OK］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：「その他意識してほしいこと」下の行頭文字が Webdings「120」になっている"
+    }
+  ]
+}

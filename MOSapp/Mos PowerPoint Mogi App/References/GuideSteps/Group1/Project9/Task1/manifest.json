@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド5を選ぶ→［メディアの挿入］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ビデオの挿入］を確認→「受講の様子.mp4」を選ぶ→［挿入］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "動画以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド「スクールの様子」に動画「受講の様子」"
+    }
+  ]
+}

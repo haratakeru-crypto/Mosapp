@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド1を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "子供の画像を選ぶ→［図の形式］→［クイックスタイル］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［楕円、ぼかし］を選ぶ"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［アート効果］→［テクスチャライザー］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "画像以外をクリックして選択解除"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：スライド1の子供の画像に楕円ぼかし＋テクスチャライザー"
+    }
+  ]
+}

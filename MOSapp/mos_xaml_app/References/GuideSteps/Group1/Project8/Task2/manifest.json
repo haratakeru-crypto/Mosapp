@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［イベント売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［J3］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=max」と入力し、［MAX］をダブルクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "MAX関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "セル範囲［D5:G16］を選択する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "［数値1］に「売上一覧[[1日目]:[4日目]]」と表示されたことを確認し、［OK］をクリックする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：セル［J3］に最高売上が表示されている"
+    }
+  ]
+}

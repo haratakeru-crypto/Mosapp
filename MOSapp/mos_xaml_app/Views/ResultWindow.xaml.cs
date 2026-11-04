@@ -8,8 +8,10 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using Libraries;
 using MOSExcelMogiApp;
 using MOSExcelMogiApp.Infrastructure;
+using MOSExcelMogiApp.Models;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -29,16 +31,39 @@ namespace MOSExcelMogiApp.Views
         private Dictionary<int, List<bool>> _initialProjectResults;
         private bool _seatChartSubmitStarted;
         private readonly bool _fromScoringLog;
+        private readonly bool _isVariantMode;
+        private readonly int _variantSetNo;
+        private readonly MOSExcelMogiApp.Models.ExamResultScope _resultScope;
+        private readonly Dictionary<int, bool[]> _completedStates;
+        private readonly Dictionary<int, bool[]> _flaggedStates;
 
-        public ResultWindow(Dictionary<int, List<bool>> allProjectResults = null, int groupId = 1, bool fromScoringLog = false)
+        public bool ShowDispositionColumns { get; }
+
+        public ResultWindow(
+            Dictionary<int, List<bool>> allProjectResults = null,
+            int groupId = 1,
+            bool fromScoringLog = false,
+            bool isVariantMode = false,
+            int variantSetNo = 1,
+            Dictionary<int, bool[]> completedStates = null,
+            Dictionary<int, bool[]> flaggedStates = null)
         {
-            InitializeComponent();
             _allProjectResults = allProjectResults ?? new Dictionary<int, List<bool>>();
             _groupId = groupId;
             _fromScoringLog = fromScoringLog;
+            _isVariantMode = isVariantMode;
+            _variantSetNo = variantSetNo < 1 ? 1 : variantSetNo;
+            ShowDispositionColumns = TaskReviewState.ShowDispositionColumns(_isVariantMode);
+            _completedStates = TaskReviewState.Clone(completedStates);
+            _flaggedStates = TaskReviewState.Clone(flaggedStates);
+            _resultScope = _isVariantMode
+                ? MOSExcelMogiApp.Models.ExamResultScope.Variant(_variantSetNo)
+                : MOSExcelMogiApp.Models.ExamResultScope.Textbook;
             _initialProjectResults = fromScoringLog
                 ? CloneResults(_allProjectResults)
-                : MOSExcelMogiApp.Models.ExamResultStorage.GetInitialResults();
+                : MOSExcelMogiApp.Models.ExamResultStorage.GetInitialResults(_resultScope);
+
+            InitializeComponent();
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_allProjectResults?.Count ?? 0} projects, groupId: {_groupId}, fromLog: {_fromScoringLog}");
             
             this.Loaded += ResultWindow_Loaded;
@@ -67,7 +92,7 @@ namespace MOSExcelMogiApp.Views
                 {
                     await Task.Delay(20);
 
-                    var currentResults = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                    var currentResults = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
                     if (currentResults != null && currentResults.Count > 0)
                     {
                         _allProjectResults = currentResults;
@@ -141,7 +166,7 @@ namespace MOSExcelMogiApp.Views
                 // 現在（復習後）の正答率を計算（保存されている最新結果を使用）
                 var currentResults = _fromScoringLog
                     ? _allProjectResults
-                    : MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                    : MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
                 if (currentResults == null || currentResults.Count == 0)
                 {
                     currentResults = _allProjectResults;
@@ -158,6 +183,7 @@ namespace MOSExcelMogiApp.Views
                 {
                     CorrectRateTextBlock.Text = $"正答率：{initialCorrectRate:F1}％　復習後：{currentCorrectRate:F1}％";
                     WrongCountTextBlock.Text = $"{currentWrongTasks}問";
+                    UpdateTotalScoreDisplay(currentResults);
                 });
 
                 await StartSeatChartSubmitAsync(currentWrongTasks);
@@ -182,6 +208,7 @@ namespace MOSExcelMogiApp.Views
                 // 採点直後も復習後も 100% として表示
                 CorrectRateTextBlock.Text = "正答率：100.0％　復習後：100.0％";
                 WrongCountTextBlock.Text = "0問";
+                UpdateTotalScoreDisplay(_allProjectResults);
             });
 
             await StartSeatChartSubmitAsync(0);
@@ -203,6 +230,24 @@ namespace MOSExcelMogiApp.Views
                 // バックグラウンドでJSONファイルを読み込む
                 ProjectData projectData = await Task.Run(() =>
                 {
+                    if (_isVariantMode && _variantSetNo == 1)
+                    {
+                        return new ProjectData
+                        {
+                            Projects = VariantProblemWorkbook.GetProjectIds()
+                                .Select(projectId => new ProjectInfo
+                                {
+                                    ProjectId = projectId,
+                                    Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                                        .Select(task => new TaskInfo
+                                        {
+                                            TaskId = task.TaskId,
+                                            Description = task.Description
+                                        }).ToList()
+                                }).ToList()
+                        };
+                    }
+
                     // Group番号に応じたJSONファイルを選択
                     string jsonFileName = _groupId switch
                     {
@@ -262,11 +307,13 @@ namespace MOSExcelMogiApp.Views
                             {
                                 task.ResultColor = Brushes.Gray;
                             }
+
+                            ApplyPriorityBadgeColors(task);
                         }
                     }
                     
-                    ProjectsItemsControl.ItemsSource = resultProjects;
-                    _allProjects = resultProjects; // すべてのプロジェクトを保存
+                    _allProjects = resultProjects;
+                    ApplyWrongOnlyFilter();
                 }, System.Windows.Threading.DispatcherPriority.Normal);
                 
                 // UI更新の機会を与える
@@ -361,13 +408,18 @@ namespace MOSExcelMogiApp.Views
                         var resultProject = new ResultProjectInfo
                         {
                             ProjectTitle = $"プロジェクト {project.ProjectId}",
-                            Tasks = project.Tasks?.Select((task, index) =>
+                            Tasks = project.Tasks?.Select(task =>
                             {
+                                int arrayIndex = task.TaskId - 1;
                                 bool? isCorrect = null;
-                                if (projectResults != null && index < projectResults.Count)
+                                if (projectResults != null && arrayIndex >= 0 && arrayIndex < projectResults.Count)
                                 {
-                                    isCorrect = projectResults[index];
+                                    isCorrect = projectResults[arrayIndex];
                                 }
+
+                                bool isCompleted = TaskReviewState.GetFlag(_completedStates, project.ProjectId, task.TaskId);
+                                bool isFlagged = TaskReviewState.GetFlag(_flaggedStates, project.ProjectId, task.TaskId);
+                                string resultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "";
                                 
                                 return new ResultTaskInfo
                                 {
@@ -376,9 +428,14 @@ namespace MOSExcelMogiApp.Views
                                     GroupId = _groupId,
                                     ProjectId = project.ProjectId,
                                     TaskId = task.TaskId,
-                                    ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
+                                    ResultMark = resultMark,
                                     FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
-                                    ResultColor = null // 後でUIスレッドで設定
+                                    PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId),
+                                    ResultColor = null,
+                                    ShowDispositionColumns = ShowDispositionColumns,
+                                    IsCompleted = isCompleted,
+                                    IsFlagged = isFlagged,
+                                    IsCompletedAndWrong = isCompleted && resultMark == "×"
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
                         };
@@ -397,58 +454,22 @@ namespace MOSExcelMogiApp.Views
         
         private List<ResultProjectInfo> ProcessProjectData(ProjectData projectData)
         {
-            var resultProjects = new List<ResultProjectInfo>();
-            
-            try
+            var resultProjects = ProcessProjectDataRaw(projectData);
+            foreach (var project in resultProjects)
             {
-                if (projectData?.Projects != null)
+                if (project.Tasks == null)
+                    continue;
+                foreach (var task in project.Tasks)
                 {
-                    foreach (var project in projectData.Projects.OrderBy(p => p.ProjectId))
-                    {
-                        if (!IsIncludedProject(project.ProjectId))
-                            continue;
-
-                        // 採点結果を取得
-                        var projectResults = _allProjectResults.ContainsKey(project.ProjectId) 
-                            ? _allProjectResults[project.ProjectId] 
-                            : null;
-                        
-                        var resultProject = new ResultProjectInfo
-                        {
-                            ProjectTitle = $"プロジェクト {project.ProjectId}",
-                            Tasks = project.Tasks?.Select((task, index) =>
-                            {
-                                bool? isCorrect = null;
-                                if (projectResults != null && index < projectResults.Count)
-                                {
-                                    isCorrect = projectResults[index];
-                                }
-                                
-                                return new ResultTaskInfo
-                                {
-                                    TaskTitle = $"タスク {task.TaskId}",
-                                    Description = RemoveQuotes(task.Description),
-                                    GroupId = _groupId,
-                                    ProjectId = project.ProjectId,
-                                    TaskId = task.TaskId,
-                                    ResultMark = isCorrect.HasValue ? (isCorrect.Value ? "〇" : "×") : "",
-                                    FailReason = isCorrect == false ? FailReasonFor(project.ProjectId, task.TaskId) : "",
-                                    ResultColor = isCorrect.HasValue 
-                                        ? (isCorrect.Value ? Brushes.Green : Brushes.Red)
-                                        : Brushes.Gray
-                                };
-                            }).ToList() ?? new List<ResultTaskInfo>()
-                        };
-                        
-                        resultProjects.Add(resultProject);
-                    }
+                    if (task.ResultMark == "〇")
+                        task.ResultColor = Brushes.Green;
+                    else if (task.ResultMark == "×")
+                        task.ResultColor = Brushes.Red;
+                    else
+                        task.ResultColor = Brushes.Gray;
+                    ApplyPriorityBadgeColors(task);
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error in ProcessProjectData: {ex.Message}\n{ex.StackTrace}");
-            }
-            
             return resultProjects;
         }
         
@@ -482,6 +503,43 @@ namespace MOSExcelMogiApp.Views
                 text = text.Substring(1, text.Length - 2);
             }
             return text;
+        }
+
+        private static void RestoreProjectSelectionAsMainWindow(MOSExcelMogiApp.MainWindow mainWindow)
+        {
+            if (mainWindow == null)
+                return;
+            Application.Current.MainWindow = mainWindow;
+            mainWindow.Show();
+            mainWindow.WindowState = WindowState.Normal;
+            mainWindow.Activate();
+            mainWindow.Focus();
+        }
+
+        private void CloseLeftoverExamWindows()
+        {
+            try
+            {
+                var windowsToClose = new List<Window>();
+                foreach (Window window in Application.Current.Windows)
+                {
+                    if (window == null || ReferenceEquals(window, this))
+                        continue;
+                    string name = window.GetType().Name;
+                    if (name == "AppBarWindow" || name == "UiTestAppBarWindow" || name == "ReviewPageWindow")
+                        windowsToClose.Add(window);
+                }
+
+                foreach (var window in windowsToClose)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] Closing leftover window: {window.GetType().Name}");
+                    try { window.Close(); } catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error closing leftover windows: {ex.Message}");
+            }
         }
 
         private async void EndButton_Click(object sender, RoutedEventArgs e)
@@ -554,7 +612,6 @@ namespace MOSExcelMogiApp.Views
                         {
                             System.Diagnostics.Debug.WriteLine("[ResultWindow] Creating new MainWindow");
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
                         }
                         else
                         {
@@ -572,10 +629,7 @@ namespace MOSExcelMogiApp.Views
                         
                         // MainWindowを確実に表示
                         System.Diagnostics.Debug.WriteLine("[ResultWindow] Showing MainWindow");
-                        mainWindow.Show();
-                        mainWindow.WindowState = WindowState.Normal;
-                        mainWindow.Activate();
-                        mainWindow.Focus();
+                        RestoreProjectSelectionAsMainWindow(mainWindow);
                     }
                     catch (Exception ex)
                     {
@@ -584,8 +638,7 @@ namespace MOSExcelMogiApp.Views
                         try
                         {
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
-                            mainWindow.Show();
+                            RestoreProjectSelectionAsMainWindow(mainWindow);
                         }
                         catch (Exception ex2)
                         {
@@ -604,35 +657,7 @@ namespace MOSExcelMogiApp.Views
                     waitWindow = null;
                 }
                 
-                // AppBarWindowを閉じる
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing AppBarWindows");
-                        var windowsToClose = new List<Window>();
-                        foreach (Window window in Application.Current.Windows)
-                        {
-                            if (window.GetType().Name == "AppBarWindow" || window.GetType().Name == "UiTestAppBarWindow")
-                            {
-                                windowsToClose.Add(window);
-                            }
-                        }
-                        
-                        foreach (var window in windowsToClose)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Closing window: {window.GetType().Name}");
-                            window.Close();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error closing AppBarWindows: {ex.Message}");
-                    }
-                }, DispatcherPriority.Normal);
-                
-                // ReviewPageWindowを閉じる処理は削除
-                // （非表示になっているため、ユーザーには見えず、アプリケーション終了時に自動的に閉じられる）
+                await Dispatcher.InvokeAsync(() => CloseLeftoverExamWindows(), DispatcherPriority.Normal);
                 
                 // 結果画面を閉じる
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing ResultWindow");
@@ -727,7 +752,6 @@ namespace MOSExcelMogiApp.Views
                         {
                             System.Diagnostics.Debug.WriteLine("[ResultWindow] Creating new MainWindow");
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
                         }
                         else
                         {
@@ -743,12 +767,9 @@ namespace MOSExcelMogiApp.Views
                             }
                         }
                         
-                        // MainWindowを確実に表示
+                        // MainWindowを確実に表示し、本体窓をプロジェクト選択へ戻す
                         System.Diagnostics.Debug.WriteLine("[ResultWindow] Showing MainWindow");
-                        mainWindow.Show();
-                        mainWindow.WindowState = WindowState.Normal;
-                        mainWindow.Activate();
-                        mainWindow.Focus();
+                        RestoreProjectSelectionAsMainWindow(mainWindow);
                     }
                     catch (Exception ex)
                     {
@@ -757,8 +778,7 @@ namespace MOSExcelMogiApp.Views
                         try
                         {
                             mainWindow = new MOSExcelMogiApp.MainWindow();
-                            Application.Current.MainWindow = mainWindow;
-                            mainWindow.Show();
+                            RestoreProjectSelectionAsMainWindow(mainWindow);
                         }
                         catch (Exception ex2)
                         {
@@ -777,35 +797,7 @@ namespace MOSExcelMogiApp.Views
                     waitWindow = null;
                 }
                 
-                // AppBarWindowを閉じる
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    try
-                    {
-                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing AppBarWindows");
-                        var windowsToClose = new List<Window>();
-                        foreach (Window window in Application.Current.Windows)
-                        {
-                            if (window.GetType().Name == "AppBarWindow" || window.GetType().Name == "UiTestAppBarWindow")
-                            {
-                                windowsToClose.Add(window);
-                            }
-                        }
-                        
-                        foreach (var window in windowsToClose)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Closing window: {window.GetType().Name}");
-                            window.Close();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error closing AppBarWindows: {ex.Message}");
-                    }
-                }, DispatcherPriority.Normal);
-                
-                // ReviewPageWindowを閉じる処理は削除
-                // （非表示になっているため、ユーザーには見えず、アプリケーション終了時に自動的に閉じられる）
+                await Dispatcher.InvokeAsync(() => CloseLeftoverExamWindows(), DispatcherPriority.Normal);
                 
                 // 結果画面を閉じる
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing ResultWindow");
@@ -841,21 +833,22 @@ namespace MOSExcelMogiApp.Views
         private void ShowWrongOnlyButton_Click(object sender, RoutedEventArgs e)
         {
             _showingWrongOnly = !_showingWrongOnly;
-            
+            ApplyWrongOnlyFilter();
+        }
+
+        private void ApplyWrongOnlyFilter()
+        {
             if (_showingWrongOnly)
             {
-                // ×の問題のみ表示
-                var wrongOnlyProjects = FilterWrongTasks(_allProjects);
-                ProjectsItemsControl.ItemsSource = wrongOnlyProjects;
+                ProjectsItemsControl.ItemsSource = FilterWrongTasks(_allProjects);
                 ShowWrongOnlyButton.Content = "全て表示";
-                ShowWrongOnlyButton.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 64, 175)); // #1E40AF
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(30, 64, 175));
             }
             else
             {
-                // 全て表示
                 ProjectsItemsControl.ItemsSource = _allProjects;
                 ShowWrongOnlyButton.Content = "間違えた問題のみ表示";
-                ShowWrongOnlyButton.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(220, 38, 38)); // #DC2626
+                ShowWrongOnlyButton.Background = new SolidColorBrush(Color.FromRgb(220, 38, 38));
             }
         }
 
@@ -883,9 +876,121 @@ namespace MOSExcelMogiApp.Views
             return filteredProjects;
         }
 
-        private static string FailReasonFor(int projectId, int taskId)
+        private string PriorityBadgeFor(int projectId, int taskId)
         {
-            return MOSExcelMogiApp.Models.ExamResultStorage.GetFailReason(projectId, taskId);
+            if (!_isVariantMode)
+                return string.Empty;
+            return VariantPriorityLookup.GetBadgeText(_variantSetNo, projectId, taskId);
+        }
+
+        private static void ApplyPriorityBadgeColors(ResultTaskInfo task)
+        {
+            if (task == null || !task.HasPriorityBadge)
+                return;
+
+            if (task.PriorityBadgeText == "優先")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF));
+                task.PriorityBadgeForeground = Brushes.White;
+                return;
+            }
+
+            if (task.PriorityBadgeText == "次点")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06));
+                task.PriorityBadgeForeground = Brushes.White;
+            }
+        }
+
+        private const int PassingScoreThreshold = 700;
+
+        private void UpdateTotalScoreDisplay(Dictionary<int, List<bool>> results)
+        {
+            if (TotalScorePanel == null || TotalScoreTextBlock == null)
+                return;
+
+            if (PassingRangeBadge != null)
+                PassingRangeBadge.Visibility = Visibility.Collapsed;
+
+            if (!_isVariantMode)
+            {
+                TotalScorePanel.Visibility = Visibility.Collapsed;
+                if (LostPointsTextBlock != null)
+                    LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            TotalScorePanel.Visibility = Visibility.Visible;
+            bool showPracticeTotal = HasAllVariantProjects(results);
+            if (TotalScoreLabel != null)
+                TotalScoreLabel.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+            TotalScoreTextBlock.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+
+            if (showPracticeTotal)
+            {
+                if (PracticeScoreClient.TryCompute(VariantExam.FlattenResults(results), out int total, out string error))
+                {
+                    TotalScoreTextBlock.Text = $"{total}点/1000点";
+                    if (PassingRangeBadge != null && total >= PassingScoreThreshold)
+                        PassingRangeBadge.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    TotalScoreTextBlock.Text = error ?? "総合点を表示できません。";
+                }
+            }
+            else
+            {
+                TotalScoreTextBlock.Text = string.Empty;
+            }
+
+            UpdateLostPointsDisplay(results);
+        }
+
+        /// <summary>全プロジェクト採点時だけ 1000 点満点の総合点を出す（一部採点は未採点を不正解扱いするため）。</summary>
+        private static bool HasAllVariantProjects(Dictionary<int, List<bool>> results)
+        {
+            var expected = VariantProblemWorkbook.GetProjectIds();
+            if (expected == null || expected.Count == 0 || results == null)
+                return false;
+
+            foreach (int projectId in expected)
+            {
+                if (!results.ContainsKey(projectId))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private void UpdateLostPointsDisplay(Dictionary<int, List<bool>> results)
+        {
+            if (LostPointsTextBlock == null)
+                return;
+
+            if (!TaskReviewState.ShowLostPoints(_isVariantMode))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            int completedWrongCount = TaskReviewState.CountCompletedWrong(results, _completedStates);
+            string message = TaskReviewState.FormatLostPointsMessage(completedWrongCount);
+            if (string.IsNullOrEmpty(message))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            LostPointsTextBlock.Text = message;
+            LostPointsTextBlock.Visibility = Visibility.Visible;
+        }
+
+        private string FailReasonFor(int projectId, int taskId)
+        {
+            if (_isVariantMode)
+                return "";
+            return MOSExcelMogiApp.Models.ExamResultStorage.GetFailReason(_resultScope, projectId, taskId);
         }
 
         private void FailReason_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -997,7 +1102,7 @@ namespace MOSExcelMogiApp.Views
             Dictionary<int, List<bool>> results = _allProjectResults;
             if (!_fromScoringLog)
             {
-                var stored = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults();
+                var stored = MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
                 if (stored != null && stored.Count > 0)
                     results = stored;
             }
@@ -1027,6 +1132,14 @@ namespace MOSExcelMogiApp.Views
         public string FailReason { get; set; }
         public bool HasFailReason => !string.IsNullOrEmpty(FailReason);
         public Brush ResultColor { get; set; }
+        public string PriorityBadgeText { get; set; }
+        public bool HasPriorityBadge => !string.IsNullOrEmpty(PriorityBadgeText);
+        public Brush PriorityBadgeBackground { get; set; }
+        public Brush PriorityBadgeForeground { get; set; }
+        public bool ShowDispositionColumns { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool IsFlagged { get; set; }
+        public bool IsCompletedAndWrong { get; set; }
     }
 
     // JSON デシリアライズ用のクラス

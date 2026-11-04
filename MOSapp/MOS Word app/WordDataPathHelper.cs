@@ -93,6 +93,26 @@ namespace MOS_Word_app
             return FindFirstExisting(folder, GetVariantFileNames(projectId, variantSetNo));
         }
 
+        /// <summary>類題リセット用。既存作業ファイルがあればそれを、なければテンプレ拡張子付き similar 名のパスを返す。</summary>
+        public static string ResolveVariantWorkingFilePath(
+            int groupId,
+            int projectId,
+            int variantSetNo,
+            string templatePath)
+        {
+            string existing = FindVariantWorkingFile(groupId, projectId, variantSetNo);
+            if (!string.IsNullOrEmpty(existing))
+                return existing;
+
+            string extension = Path.GetExtension(templatePath);
+            if (string.IsNullOrEmpty(extension))
+                extension = ".docx";
+
+            return Path.Combine(
+                GetVariantFolder(groupId, variantSetNo),
+                $"similar{variantSetNo}-{projectId}{extension}");
+        }
+
         public static bool IsVariantFileAvailable(int groupId, int projectId, int variantSetNo = 1)
         {
             string path = FindVariantWorkingFile(groupId, projectId, variantSetNo);

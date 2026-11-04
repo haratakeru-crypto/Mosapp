@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "タイトルバーで互換モードを確認し、［ファイル］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［情報］→［変換］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "アップグレードメッセージを確認し、［OK］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "タイトルバーに互換モードが表示されていないことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：互換モードが解除されている"
+    }
+  ]
+}

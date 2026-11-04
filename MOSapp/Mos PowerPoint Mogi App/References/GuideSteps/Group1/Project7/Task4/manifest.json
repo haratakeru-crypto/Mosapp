@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［挿入］→［ヘッダーとフッター］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ヘッダーとフッター］を確認→［スライド番号］をオン→［フッター］をオン→「rabbitway.jp」と入力→［タイトルスライドに表示しない］を確認→［すべてに適用］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "タイトルスライド以外のスライドを選ぶ→スライド番号とフッターを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：タイトルスライド以外にスライド番号とフッター「rabbitway.jp」"
+    }
+  ]
+}

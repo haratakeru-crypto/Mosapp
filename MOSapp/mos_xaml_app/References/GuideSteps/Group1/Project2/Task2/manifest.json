@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［社員リスト］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［B5:B44］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［インデントを増やす］を2回クリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：氏名列に左インデントが2文字分設定されている"
+    }
+  ]
+}

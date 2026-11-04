@@ -74,6 +74,37 @@ namespace Libraries
     /// </remarks>
     public static class ExcelTaskValidationConfig
     {
+        [ThreadStatic]
+        private static int _activeVariantSetNo;
+
+        /// <summary>
+        /// 類題セット番号を採点中だけ有効にする。0 は教材。
+        /// </summary>
+        public static IDisposable BeginVariantSet(int variantSetNo)
+        {
+            return new VariantSetScope(variantSetNo);
+        }
+
+        private sealed class VariantSetScope : IDisposable
+        {
+            private readonly int _previous;
+            private bool _disposed;
+
+            public VariantSetScope(int variantSetNo)
+            {
+                _previous = _activeVariantSetNo;
+                _activeVariantSetNo = variantSetNo < 0 ? 0 : variantSetNo;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                    return;
+                _activeVariantSetNo = _previous;
+                _disposed = true;
+            }
+        }
+
         #region 免除（カテゴリ対応・タスク別フラグ）
 
         /// <summary>
@@ -139,6 +170,9 @@ namespace Libraries
         /// </summary>
         public static ExcelValidationExemptFlags GetExemptFlags(int projectId, int taskId)
         {
+            if (_activeVariantSetNo == 1)
+                return GetVariantSet1ExemptFlags(projectId, taskId);
+
             switch (projectId)
             {
                 case 1:
@@ -308,6 +342,237 @@ namespace Libraries
 
         #endregion
 
+        #region 類題セット1（PracticeVariant1）免除・対象シート
+
+        /// <summary>
+        /// 2026-10-27 の正答操作ログを正本にする。教材の同番号タスクとは別物。
+        /// </summary>
+        private static ExcelValidationExemptFlags GetVariantSet1ExemptFlags(int projectId, int taskId)
+        {
+            switch (projectId)
+            {
+                case 1:
+                    switch (taskId)
+                    {
+                        case 1: // オートフィル EditCellValue
+                        case 2: // RIGHT EditCellFormula
+                        case 3: // データバー AddConditionalFormat
+                            return ExcelValidationExemptFlags.RangeEdit;
+                        case 4: // 折り返しが SetPageBreak として記録
+                            return ExcelValidationExemptFlags.PrintAndPage;
+                        case 5: // 3-D縦棒 AddChart / InsertShapeOrImage。グラフ挿入で自動改ページが付く
+                            return ExcelValidationExemptFlags.ShapeOrImage | ExcelValidationExemptFlags.PrintAndPage;
+                        case 6: // 印刷向き・印刷範囲 + SortOrFilter + NamedRange
+                            return ExcelValidationExemptFlags.PrintAndPage
+                                | ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.WorkbookProperty;
+                        default:
+                            return ExcelValidationExemptFlags.None;
+                    }
+                case 2:
+                    switch (taskId)
+                    {
+                        case 1: // ルール削除も AddConditionalFormat
+                            return ExcelValidationExemptFlags.RangeEdit;
+                        case 2: // SORT + NamedRange
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.WorkbookProperty;
+                        case 3: // SUM
+                            return ExcelValidationExemptFlags.RangeEdit;
+                        case 4: // 選択範囲から名前
+                            return ExcelValidationExemptFlags.WorkbookProperty;
+                        case 5: // フッター
+                            return ExcelValidationExemptFlags.PrintAndPage;
+                        case 6: // 範囲に変換（正答ログは空。変換副作用を許容）
+                            return ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.CellFormatOnly;
+                        default:
+                            return ExcelValidationExemptFlags.None;
+                    }
+                case 3:
+                    switch (taskId)
+                    {
+                        case 1: // 結合数式 + SortOrFilter + NamedRange
+                            return ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.WorkbookProperty;
+                        case 2: // ウィンドウ枠（正答ログは空。SetFreezePanes は PrintAndPage）
+                            return ExcelValidationExemptFlags.PrintAndPage;
+                        case 3: // 並べ替え（[SortDialog] のみ。SortOrFilter は SheetStructure）
+                            return ExcelValidationExemptFlags.SheetStructure;
+                        case 4: // 所属の編集。貼り付けでテーブルの SortOrFilter が付く
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
+                        case 5: // ハイパーリンク + SortOrFilter + EditCellFormat
+                            return ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.CellFormatOnly;
+                        case 6: // テーブル化が EditCellValue
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
+                        default:
+                            return ExcelValidationExemptFlags.None;
+                    }
+                case 4:
+                    switch (taskId)
+                    {
+                        case 1: // 結合（正答ログは空）
+                        case 2: // 列幅自動調整（正答ログは空）
+                            return ExcelValidationExemptFlags.CellFormatOnly;
+                        case 3: // スタイル4（[Op] なし）。グラフ操作で自動改ページが付く
+                            return ExcelValidationExemptFlags.PrintAndPage;
+                        case 4: // グラフシートへ移動 AddChart + DeleteShapeOrImage
+                            return ExcelValidationExemptFlags.ShapeOrImage | ExcelValidationExemptFlags.PrintAndPage;
+                        case 5: // 明細行の挿入が EditCellValue
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
+                        case 6: // CSV インポート一式
+                            return ExcelValidationExemptFlags.ExternalImport
+                                | ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.CellFormatOnly
+                                | ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.PrintAndPage
+                                | ExcelValidationExemptFlags.WorkbookProperty;
+                        default:
+                            return ExcelValidationExemptFlags.None;
+                    }
+                case 5:
+                    switch (taskId)
+                    {
+                        case 1: // 縞模様 → SortOrFilter
+                            return ExcelValidationExemptFlags.SheetStructure;
+                        case 2:
+                        case 3:
+                            return ExcelValidationExemptFlags.RangeEdit | ExcelValidationExemptFlags.SheetStructure;
+                        case 4: // 最後の列の強調
+                            return ExcelValidationExemptFlags.SheetStructure;
+                        case 5: // 選択範囲内で中央（正答ログは空）
+                            return ExcelValidationExemptFlags.CellFormatOnly;
+                        case 6: // 分類プロパティ
+                            return ExcelValidationExemptFlags.WorkbookProperty;
+                        default:
+                            return ExcelValidationExemptFlags.None;
+                    }
+                case 6:
+                    switch (taskId)
+                    {
+                        case 1: // 行列入れ替え貼付
+                            return ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.CellFormatOnly;
+                        case 2: // 系列範囲（[Op] なし）。グラフ範囲変更で自動改ページが付く
+                            return ExcelValidationExemptFlags.PrintAndPage;
+                        case 3: // 代替テキスト → SetPageBreak
+                            return ExcelValidationExemptFlags.PrintAndPage;
+                        case 4: // SEQUENCE スピル
+                            return ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.PrintAndPage
+                                | ExcelValidationExemptFlags.WorkbookProperty
+                                | ExcelValidationExemptFlags.SheetStructure
+                                | ExcelValidationExemptFlags.CellFormatOnly;
+                        case 5: // 取り消し線（正答ログは空）
+                            return ExcelValidationExemptFlags.CellFormatOnly;
+                        default:
+                            return ExcelValidationExemptFlags.None;
+                    }
+                default:
+                    return ExcelValidationExemptFlags.None;
+            }
+        }
+
+        private static IReadOnlyList<string> GetVariantSet1TargetSheets(int projectId, int taskId)
+        {
+            switch (projectId)
+            {
+                case 1:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                        case 3:
+                        case 4:
+                        case 6:
+                            return new[] { "6月出荷台帳" };
+                        case 5:
+                            return new[] { "担当者集計" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 2:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 3:
+                        case 4:
+                        case 5:
+                            return new[] { "収支計算書" };
+                        case 2:
+                        case 6:
+                            return new[] { "収支分析" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 3:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                        case 3:
+                        case 4:
+                        case 5:
+                            return new[] { "申込名簿" };
+                        case 6:
+                            return new[] { "会場一覧" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 4:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                        case 3:
+                        case 4:
+                            return new[] { "月次利用" };
+                        case 5:
+                            return new[] { "拠点別利用" };
+                        case 6:
+                            return new[] { "拠点稼働記録" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 5:
+                    switch (taskId)
+                    {
+                        case 1:
+                        case 2:
+                        case 3:
+                        case 4:
+                            return new[] { "出席名簿" };
+                        case 5:
+                            return new[] { "日程表" };
+                        case 6:
+                            return Array.Empty<string>();
+                        default:
+                            return Array.Empty<string>();
+                    }
+                case 6:
+                    switch (taskId)
+                    {
+                        case 1:
+                            return new[] { "価格対照" };
+                        case 2:
+                        case 3:
+                        case 4:
+                        case 5:
+                            return new[] { "受注実績" };
+                        default:
+                            return Array.Empty<string>();
+                    }
+                default:
+                    return Array.Empty<string>();
+            }
+        }
+
+        #endregion
+
         #region 対象シート（破壊的操作ログのシート帰属フィルタ）
 
         /// <summary>
@@ -316,6 +581,9 @@ namespace Libraries
         /// </summary>
         public static IReadOnlyList<string> GetTargetSheets(int projectId, int taskId)
         {
+            if (_activeVariantSetNo == 1)
+                return GetVariantSet1TargetSheets(projectId, taskId);
+
             switch (projectId)
             {
                 case 1:
@@ -653,6 +921,8 @@ namespace Libraries
         /// </summary>
         public static bool ShouldDenyOutsideAllowedRanges(int projectId, int taskId)
         {
+            if (_activeVariantSetNo > 0)
+                return false;
             if (GetExemptFlags(projectId, taskId).HasFlag(ExcelValidationExemptFlags.RangeEdit))
                 return false;
             return GetAllowedRanges(projectId, taskId).Count > 0;

@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［業務予定］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［C4］を選択し、数式バーで現在の数式を確認する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "数式バーの関数名［=SEQUENCE］をクリックし、fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "既存の SEQUENCE 関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［目盛り］をクリックし「0.5」と入力し、［OK］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：［開始時間］が 10 時から 30 分おきになっている"
+    }
+  ]
+}

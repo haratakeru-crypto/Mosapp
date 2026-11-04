@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［ファイル］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［名前を付けて保存］→［参照］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "種類は［Wordマクロ有効文書(*.docm)］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［ツール］→［全般オプション］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［読み取りパスワード］に「abc」と入力し［OK］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "パスワードを再入力し［OK］"
+    },
+    {
+      "image": "step07.png",
+      "caption": "［保存］をクリックする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：読み取りパスワード付きのマクロ有効文書として保存されている"
+    }
+  ]
+}

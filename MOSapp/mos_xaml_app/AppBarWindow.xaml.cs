@@ -22,7 +22,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Libraries;
+using MOSExcelMogiApp.Guide;
 using MOSExcelMogiApp.Infrastructure;
+using MOSExcelMogiApp.Models;
 
 namespace MOSExcelMogiApp
 {
@@ -38,8 +40,17 @@ namespace MOSExcelMogiApp
         private int? _pendingTaskId = null;
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
-        private Dictionary<int, bool[]> _projectTaskCompletedStates = new Dictionary<int, bool[]>();
-        private Dictionary<int, bool[]> _projectTaskFlaggedStates = new Dictionary<int, bool[]>();
+        private ExamResultScope CurrentReviewScope()
+        {
+            if (_viewModel?.IsVariantMode == true)
+                return ExamResultScope.Variant(_viewModel.VariantSetNo);
+            return ExamResultScope.Textbook;
+        }
+
+        private Dictionary<int, bool[]> _projectTaskCompletedStates =>
+            TaskReviewStateStore.Completed(CurrentReviewScope());
+        private Dictionary<int, bool[]> _projectTaskFlaggedStates =>
+            TaskReviewStateStore.Flagged(CurrentReviewScope());
         private bool _isPaused = false;
         private bool _fromResultWindow = false; // 結果画面から来たかどうか
         private ResultWindow _resultWindow = null; // 結果画面への参照
@@ -52,6 +63,7 @@ namespace MOSExcelMogiApp
         private int _resultRetryProjectId;
         private int _resultRetryTaskId;
         private bool _resultRetryIsWrong;
+        private AnswerGuideWindow _answerGuideWindow;
 
         // Win32 API
         [DllImport("user32.dll", SetLastError = true)]
@@ -169,7 +181,8 @@ namespace MOSExcelMogiApp
             // シェル起動後の共有 Excel 接続完了時に Excel ウィンドウを再配置（起動直後のずれを解消）
             _viewModel.SharedExcelApplicationAttached += OnSharedExcelApplicationAttached;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-            ApplyScoreResultActionState();
+            _viewModel.CloseAnswerGuideRequested += OnCloseAnswerGuideRequested;
+            ApplyNavigationLockState();
 
             this.Activated += (s, e) =>
             {
@@ -284,6 +297,7 @@ namespace MOSExcelMogiApp
                 delayTimer.Stop();
                 // ユーザー明示操作なので Excel も前面へ戻す
                 SetWindowPosition(bringExcelToForeground: true);
+                ClampAnswerGuideToScreen();
             };
             delayTimer.Start();
         }
@@ -529,6 +543,7 @@ namespace MOSExcelMogiApp
             {
                 _timer.Stop();
                 UpdateTimerDisplay();
+                CloseAnswerGuide();
                 if (_viewModel != null && _viewModel.IsScoreResultOpen)
                 {
                     _viewModel.RequestEndExamAfterScoreResult();
@@ -1274,14 +1289,14 @@ namespace MOSExcelMogiApp
         private void PreviousTask_Click(object sender, RoutedEventArgs e)
         {
             if (TryMoveToAdjacentTask(-1))
-                UpdateTaskDisplay();
+                SetCurrentTask(_currentTaskId, notifyGuide: true);
             ScoringResultDialog.TryBringOpenToFront();
         }
 
         private void NextTask_Click(object sender, RoutedEventArgs e)
         {
             if (TryMoveToAdjacentTask(1))
-                UpdateTaskDisplay();
+                SetCurrentTask(_currentTaskId, notifyGuide: true);
             ScoringResultDialog.TryBringOpenToFront();
         }
 
@@ -1343,12 +1358,26 @@ namespace MOSExcelMogiApp
             {
                 int taskId = int.Parse(button.Tag.ToString());
                 if (taskId >= 1 && taskId <= _tasks.Count)
-                {
-                    _currentTaskId = taskId;
-                    UpdateTaskDisplay();
-                }
+                    SetCurrentTask(taskId, notifyGuide: true);
             }
             ScoringResultDialog.TryBringOpenToFront();
+        }
+
+        /// <summary>
+        /// AppBar の現在タスクを更新する。
+        /// notifyGuide は互換のため残すが、手順ガイドへの追従確認は行わない
+        /// （手順側でタスク一覧選択時に不一致を案内する）。
+        /// </summary>
+        private void SetCurrentTask(int taskId, bool notifyGuide, bool writeCurrentTaskFile = true)
+        {
+            if (taskId <= 0)
+                return;
+
+            _currentTaskId = taskId;
+            UpdateTaskDisplay();
+            if (writeCurrentTaskFile)
+                WriteCurrentTaskFile();
+            _ = notifyGuide;
         }
 
         private void PauseButton_Click(object sender, RoutedEventArgs e)
@@ -1416,6 +1445,8 @@ namespace MOSExcelMogiApp
             System.Diagnostics.Debug.WriteLine("========================================");
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] ProjectResetButton_Click called");
             System.Diagnostics.Debug.WriteLine("========================================");
+            if (_viewModel != null && _viewModel.IsNavigationLocked)
+                return;
             try
             {
                 if (_viewModel?.CurrentProject != null)
@@ -1507,9 +1538,7 @@ namespace MOSExcelMogiApp
                         }
                         else
                         {
-                            _currentTaskId = 1;
-                            UpdateTaskDisplay();
-                            WriteCurrentTaskFile();
+                            SetCurrentTask(1, notifyGuide: false);
 
                             string doneMessage = isVariantMode
                                 ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。"
@@ -1543,7 +1572,7 @@ namespace MOSExcelMogiApp
         
         private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel != null && _viewModel.IsScoreResultOpen)
+            if (_viewModel != null && _viewModel.IsNavigationLocked)
                 return;
             if (_isOpeningReviewPage)
                 return;
@@ -1583,11 +1612,13 @@ namespace MOSExcelMogiApp
                     isVariantMode,
                     variantSetNo);
                 reviewWindow.OnNavigateToTask = (g, p, t) => NavigateToTask(p, t, g);
-                reviewWindow.Closed += (s, args) => 
+                reviewWindow.Closed += (s, args) =>
                 {
                     _isOpeningReviewPage = false;
-                    // レビューページが閉じられたらメインウィンドウを再表示
-                    this.Show();
+                    // 採点中に AppBar を Close 済みなら Show しない（閉じた Window への Show 例外を防ぐ）
+                    if (!IsLoaded)
+                        return;
+                    Show();
                 };
                 
                 // ShowDialog()ではなくShow()を使用
@@ -1598,8 +1629,8 @@ namespace MOSExcelMogiApp
                 _isOpeningReviewPage = false;
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                // エラーが発生した場合はメインウィンドウを再表示
-                this.Show();
+                if (IsLoaded)
+                    Show();
             }
         }
 
@@ -1864,7 +1895,7 @@ namespace MOSExcelMogiApp
                 
                 // タスク表示を更新（問題文とボタンの選択状態を含む）
                 ConsumeResultRetry(projectId, taskId);
-                UpdateTaskDisplay();
+                SetCurrentTask(_currentTaskId, notifyGuide: true);
                 
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Task display updated: Project={_currentProjectId}, Task={_currentTaskId}");
             }
@@ -1890,6 +1921,11 @@ namespace MOSExcelMogiApp
             }
         }
 
+        private int CurrentReviewStateCapacity()
+        {
+            return Math.Max(_tasks?.Count ?? 8, Math.Max(8, _currentTaskId));
+        }
+
         private void FlagButton_Click(object sender, RoutedEventArgs e)
         {
             if (_viewModel != null && _viewModel.IsVocabularyMode)
@@ -1897,50 +1933,14 @@ namespace MOSExcelMogiApp
                 _viewModel.VocabularyMarkReviewLater();
                 return;
             }
-            System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Current TaskId={_currentTaskId}, ProjectId={_currentProjectId}");
-            
-            // 現在のプロジェクトの状態を取得または初期化
-            if (!_projectTaskFlaggedStates.ContainsKey(_currentProjectId))
-            {
-                _projectTaskFlaggedStates[_currentProjectId] = new bool[8];
-            }
 
-            bool[] flaggedStates = _projectTaskFlaggedStates[_currentProjectId];
-
-            // TaskIdは1始まり、配列は0始まりなので -1
-            int index = _currentTaskId - 1;
-            System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Calculated array index={index} (TaskId {_currentTaskId} - 1)");
-            
-            if (index >= 0 && index < flaggedStates.Length)
-            {
-                if (!flaggedStates[index])
-                {
-                    // フラグを設定
-                    flaggedStates[index] = true;
-                    System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Set flaggedStates[{index}] = true for TaskId {_currentTaskId}");
-                }
-                else
-                {
-                    // フラグを解除
-                    flaggedStates[index] = false;
-                    System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Set flaggedStates[{index}] = false for TaskId {_currentTaskId}");
-                }
-                
-                // デバッグ: 現在の配列状態を表示
-                for (int i = 0; i < flaggedStates.Length; i++)
-                {
-                    if (flaggedStates[i])
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] Array state: flaggedStates[{i}] = true (corresponds to TaskId {i + 1})");
-                    }
-                }
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"[FlagButton_Click] ERROR: Index {index} is out of range (0-{flaggedStates.Length - 1})");
-            }
-
-            // UIを更新
+            TaskReviewState.ToggleReviewLater(
+                _projectTaskCompletedStates,
+                _projectTaskFlaggedStates,
+                _currentProjectId,
+                _currentTaskId,
+                CurrentReviewStateCapacity());
+            TaskReviewStateStore.Persist();
             UpdateTaskDisplay();
         }
 
@@ -1951,56 +1951,20 @@ namespace MOSExcelMogiApp
                 _viewModel.VocabularyMarkAnswered();
                 return;
             }
-            System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Current TaskId={_currentTaskId}, ProjectId={_currentProjectId}");
-            
-            // 現在のプロジェクトの状態を取得または初期化
-            if (!_projectTaskCompletedStates.ContainsKey(_currentProjectId))
-            {
-                _projectTaskCompletedStates[_currentProjectId] = new bool[8];
-            }
 
-            bool[] completedStates = _projectTaskCompletedStates[_currentProjectId];
-
-            // TaskIdは1始まり、配列は0始まりなので -1
-            int index = _currentTaskId - 1;
-            System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Calculated array index={index} (TaskId {_currentTaskId} - 1)");
-            
-            if (index >= 0 && index < completedStates.Length)
-            {
-                if (!completedStates[index])
-                {
-                    // チェックマークを設定
-                    completedStates[index] = true;
-                    System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Set completedStates[{index}] = true for TaskId {_currentTaskId}");
-                }
-                else
-                {
-                    // チェックマークを解除
-                    completedStates[index] = false;
-                    System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Set completedStates[{index}] = false for TaskId {_currentTaskId}");
-                }
-                
-                // デバッグ: 現在の配列状態を表示
-                for (int i = 0; i < completedStates.Length; i++)
-                {
-                    if (completedStates[i])
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] Array state: completedStates[{i}] = true (corresponds to TaskId {i + 1})");
-                    }
-                }
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"[CompleteButton_Click] ERROR: Index {index} is out of range (0-{completedStates.Length - 1})");
-            }
-
-            // UIを更新
+            TaskReviewState.ToggleCompleted(
+                _projectTaskCompletedStates,
+                _projectTaskFlaggedStates,
+                _currentProjectId,
+                _currentTaskId,
+                CurrentReviewStateCapacity());
+            TaskReviewStateStore.Persist();
             UpdateTaskDisplay();
         }
 
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel != null && _viewModel.IsScoreResultOpen)
+            if (_viewModel != null && _viewModel.IsNavigationLocked)
                 return;
             // モーダル確認中も DispatcherTimer は進むため、先に止めないと Timer_Tick から試験終了が走り Excel が先に閉じることがある
             bool timerWasEnabled = _timer != null && _timer.IsEnabled;
@@ -2010,6 +1974,7 @@ namespace MOSExcelMogiApp
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
             {
+                CloseAnswerGuide();
                 _viewModel.EndExamCommand.Execute(null);
                 return;
             }
@@ -2020,8 +1985,193 @@ namespace MOSExcelMogiApp
 
         private void OnExamEnded(object sender, EventArgs e)
         {
+            CloseAnswerGuide();
             // アプリバーを閉じる
             this.Close();
+        }
+
+        private void OnCloseAnswerGuideRequested(object sender, EventArgs e)
+        {
+            CloseAnswerGuide();
+        }
+
+        private void AnswerGuideButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen))
+                return;
+
+            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
+                return;
+
+            if (_viewModel.IsVariantMode)
+            {
+                OpenVariantAnswerSteps();
+                return;
+            }
+
+            if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+            {
+                _answerGuideWindow.BringToFrontPassive();
+                return;
+            }
+
+            OpenAnswerGuide();
+        }
+
+        private void OpenVariantAnswerSteps()
+        {
+            int projectId = _currentProjectId;
+            int taskId = _currentTaskId;
+            int setNo = _viewModel?.VariantSetNo ?? 1;
+            string steps = string.Empty;
+            try
+            {
+                VariantTaskText task = VariantProblemWorkbook.GetTasks(projectId)
+                    .FirstOrDefault(item => item.TaskId == taskId);
+                steps = task?.AnswerSteps ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OpenVariantAnswerSteps] {ex.Message}");
+            }
+
+            if (string.IsNullOrWhiteSpace(steps))
+                steps = "手順未登録";
+
+            var window = new AnswerStepsWindow($"類題{setNo} プロジェクト {projectId} タスク {taskId} 解答手順", steps)
+            {
+                Owner = this,
+                Topmost = true
+            };
+            window.ShowDialog();
+        }
+
+        private void OpenAnswerGuide()
+        {
+            int groupId = 1;
+            int projectId = _currentProjectId;
+            if (_viewModel?.CurrentProject != null)
+            {
+                string groupStr = _viewModel.CurrentProject.Group.Replace("Group ", "");
+                int.TryParse(groupStr, out groupId);
+                projectId = _viewModel.CurrentProject.ProjectNumber;
+            }
+
+            var tasks = GuideStepsRepository.LoadProjectTasks(groupId, projectId);
+            CloseAnswerGuide();
+
+            _answerGuideWindow = new AnswerGuideWindow(groupId, projectId, tasks, () => _currentTaskId)
+            {
+                Owner = this
+            };
+            _answerGuideWindow.Closed += AnswerGuideWindow_Closed;
+            _answerGuideWindow.ApplyInitialPlacement(GetAnswerGuidePreferredBoundsDip());
+            _answerGuideWindow.Show();
+            _answerGuideWindow.OpenForAppBarTask(_currentTaskId);
+            _viewModel?.SetAnswerGuideOpen(true);
+            ApplyNavigationLockState();
+        }
+
+        private void AnswerGuideWindow_Closed(object sender, EventArgs e)
+        {
+            if (sender is AnswerGuideWindow window)
+                window.Closed -= AnswerGuideWindow_Closed;
+
+            if (ReferenceEquals(_answerGuideWindow, sender))
+                _answerGuideWindow = null;
+
+            _viewModel?.SetAnswerGuideOpen(false);
+            ApplyNavigationLockState();
+        }
+
+        private void CloseAnswerGuide()
+        {
+            if (_answerGuideWindow == null)
+            {
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+                return;
+            }
+
+            try
+            {
+                _answerGuideWindow.Closed -= AnswerGuideWindow_Closed;
+                if (_answerGuideWindow.IsVisible)
+                    _answerGuideWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] CloseAnswerGuide: {ex.Message}");
+            }
+            finally
+            {
+                _answerGuideWindow = null;
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+            }
+        }
+
+        private Rect GetAnswerGuidePreferredBoundsDip()
+        {
+            double width = 720;
+            double height = 640;
+            double left = SystemParameters.WorkArea.Right - width - 24;
+            double top = SystemParameters.WorkArea.Top + 24;
+
+            try
+            {
+                IntPtr excelHwnd = TryGetExcelMainHwnd();
+                if (excelHwnd != IntPtr.Zero && GetWindowRect(excelHwnd, out RECT excelRect))
+                {
+                    var source = PresentationSource.FromVisual(this);
+                    Matrix transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+                    var topLeft = transform.Transform(new Point(excelRect.left, excelRect.top));
+                    var bottomRight = transform.Transform(new Point(excelRect.right, excelRect.bottom));
+                    double excelWidth = Math.Max(0, bottomRight.X - topLeft.X);
+                    left = topLeft.X + Math.Max(24, excelWidth - width - 24);
+                    top = topLeft.Y + 24;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] GetAnswerGuidePreferredBoundsDip: {ex.Message}");
+            }
+
+            return new Rect(left, top, width, height);
+        }
+
+        private IntPtr TryGetExcelMainHwnd()
+        {
+            try
+            {
+                var sharedExcel = _viewModel?.TryGetSharedExcelApplication();
+                if (sharedExcel != null)
+                {
+                    int hwnd = 0;
+                    try { hwnd = sharedExcel.Hwnd; } catch { hwnd = 0; }
+                    if (hwnd != 0)
+                        return new IntPtr(hwnd);
+                }
+            }
+            catch
+            {
+                /* ignore */
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private void ClampAnswerGuideToScreen()
+        {
+            try
+            {
+                if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+                    _answerGuideWindow.ClampToScreen();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] ClampAnswerGuideToScreen: {ex.Message}");
+            }
         }
 
         private void OnCurrentProjectChanged(object sender, EventArgs e)
@@ -2035,20 +2185,18 @@ namespace MOSExcelMogiApp
                 // プロジェクトが変更された場合のみ、タスクIDをリセット
                 if (newProjectId != _currentProjectId)
                 {
+                    CloseAnswerGuide();
                     _currentProjectId = newProjectId;
                     System.Diagnostics.Debug.WriteLine($"[OnCurrentProjectChanged] Loading tasks for project {_currentProjectId}");
                     LoadTasks();
                     // 結果画面などからの遷移でタスク指定がある場合はそれを優先し、無ければ 1 にリセット
+                    int nextTaskId = 1;
                     if (_pendingTaskId.HasValue)
                     {
-                        _currentTaskId = _pendingTaskId.Value;
+                        nextTaskId = _pendingTaskId.Value;
                         _pendingTaskId = null;
                     }
-                    else
-                    {
-                        _currentTaskId = 1; // 最初のタスクにリセット
-                    }
-                    UpdateTaskDisplay();
+                    SetCurrentTask(nextTaskId, notifyGuide: false);
 
                     StartExcelPositionRetryTimer();
                 }
@@ -2064,10 +2212,14 @@ namespace MOSExcelMogiApp
                     // 同一プロジェクト内のタスク指定がある場合はそれを優先
                     if (_pendingTaskId.HasValue)
                     {
-                        _currentTaskId = _pendingTaskId.Value;
+                        int pending = _pendingTaskId.Value;
                         _pendingTaskId = null;
+                        SetCurrentTask(pending, notifyGuide: true);
                     }
-                    UpdateTaskDisplay();
+                    else
+                    {
+                        UpdateTaskDisplay();
+                    }
                 }
             }
         }
@@ -2075,10 +2227,9 @@ namespace MOSExcelMogiApp
         private void OnVariantModeChanged(object sender, EventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] OnVariantModeChanged: reloading tasks");
+            CloseAnswerGuide();
             LoadTasks();
-            _currentTaskId = 1;
-            UpdateTaskDisplay();
-            WriteCurrentTaskFile();
+            SetCurrentTask(1, notifyGuide: false);
         }
 
         private void OnOpenReviewPageRequested(object sender, EventArgs e)
@@ -2105,6 +2256,7 @@ namespace MOSExcelMogiApp
 
         protected override void OnClosed(EventArgs e)
         {
+            CloseAnswerGuide();
             ClearCurrentTaskFile();
             StopExcelPositionRetryTimer();
             _ratioRestoreTimer?.Stop();
@@ -2119,21 +2271,54 @@ namespace MOSExcelMogiApp
                 _viewModel.OpenReviewPageRequested -= OnOpenReviewPageRequested;
                 _viewModel.SharedExcelApplicationAttached -= OnSharedExcelApplicationAttached;
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+                _viewModel.CloseAnswerGuideRequested -= OnCloseAnswerGuideRequested;
             }
             base.OnClosed(e);
         }
 
         private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(MainViewModel.IsScoreResultOpen))
-                ApplyScoreResultActionState();
+            if (e.PropertyName == nameof(MainViewModel.IsScoreResultOpen) ||
+                e.PropertyName == nameof(MainViewModel.IsAnswerGuideOpen) ||
+                e.PropertyName == nameof(MainViewModel.IsScoring) ||
+                e.PropertyName == nameof(MainViewModel.IsNavigationLocked) ||
+                e.PropertyName == nameof(MainViewModel.ShowAnswerGuideEffective))
+            {
+                ApplyNavigationLockState();
+            }
         }
 
-        private void ApplyScoreResultActionState()
+        private void ApplyNavigationLockState()
         {
-            bool enabled = _viewModel == null || !_viewModel.IsScoreResultOpen;
+            bool navigationEnabled = _viewModel == null || !_viewModel.IsNavigationLocked;
+            bool scoringBusy = _viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen);
+
             if (ReviewPageButton != null)
-                ReviewPageButton.IsEnabled = enabled;
+                ReviewPageButton.IsEnabled = navigationEnabled;
+            if (ProjectResetButton != null)
+                ProjectResetButton.IsEnabled = navigationEnabled;
+            if (EndButton != null)
+                EndButton.IsEnabled = navigationEnabled;
+            if (AnswerGuideButton != null)
+                AnswerGuideButton.IsEnabled = !scoringBusy;
+
+            // Command 付きボタンはロック中のみ強制無効。解除後は CanExecute に委ねる。
+            if (NextProjectButton != null)
+                NextProjectButton.IsEnabled = navigationEnabled
+                    && (_viewModel?.NextProjectCommand?.CanExecute(null) ?? true);
+            if (GoToTextbookButton != null)
+                GoToTextbookButton.IsEnabled = navigationEnabled
+                    && (_viewModel?.GoToTextbookCommand?.CanExecute(null) ?? false);
+            if (GoToVariantButton != null)
+                GoToVariantButton.IsEnabled = navigationEnabled
+                    && (_viewModel?.GoToVariantCommand?.CanExecute(null) ?? false);
+
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private int GetCurrentVariantSetNo()
+        {
+            return (_viewModel != null && _viewModel.IsVariantMode) ? _viewModel.VariantSetNo : 0;
         }
 
         private void WriteCurrentTaskFile()
@@ -2141,9 +2326,10 @@ namespace MOSExcelMogiApp
             try
             {
                 if (_currentProjectId <= 0 || _currentTaskId <= 0) return;
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
-                string content = $"{_currentProjectId},{_currentTaskId},{attemptNo}";
-                File.WriteAllText(ExcelLogReader.GetCurrentTaskFilePath(), content, Encoding.UTF8);
+                int variantSetNo = GetCurrentVariantSetNo();
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId, variantSetNo);
+                var context = TaskLogContext.Create(_currentProjectId, _currentTaskId, attemptNo, variantSetNo);
+                File.WriteAllText(ExcelLogReader.GetCurrentTaskFilePath(), context.FormatCurrentTaskLine(), Encoding.UTF8);
             }
             catch (Exception ex)
             {
@@ -2169,7 +2355,7 @@ namespace MOSExcelMogiApp
             _pendingResultRetry = false;
             if (!_resultRetryIsWrong)
                 return;
-            int attemptNo = ExcelTaskAttemptRegistry.Increment(projectId, taskId);
+            int attemptNo = ExcelTaskAttemptRegistry.Increment(projectId, taskId, GetCurrentVariantSetNo());
             System.Diagnostics.Debug.WriteLine($"[ResultRetry] P{projectId} T{taskId} attempt={attemptNo}");
         }
 

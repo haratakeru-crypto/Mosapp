@@ -1,0 +1,43 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［担当者リスト］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "問題文のメールアドレスの文字列「@rabbit.ac.jp」をコピーする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "セル［H5］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "「=con」と入力し、一覧から［CONCAT］をダブルクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "CONCAT関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "セル［G5］を選択し、［テキスト2］に貼り付けて［OK］をクリックする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "セル［H5］のフィルハンドルを［H19］までドラッグする"
+    },
+    {
+      "image": "step09.png",
+      "caption": "完成：［メールアドレス］に結合結果が表示されている"
+    }
+  ]
+}

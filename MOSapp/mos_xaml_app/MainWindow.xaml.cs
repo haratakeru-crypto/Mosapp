@@ -22,6 +22,8 @@ using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 using ExcelWorkbook = Microsoft.Office.Interop.Excel.Workbook;
 using Libraries;
 using MOSExcelMogiApp.Infrastructure;
+using MOSExcelMogiApp.Models;
+using MOSExcelMogiApp.Views;
 
 namespace MOSExcelMogiApp
 {
@@ -39,6 +41,7 @@ namespace MOSExcelMogiApp
         {
             // アプリ起動時にアドインの診断ログをクリアして肥大化を防ぐ
             ExcelLogReader.ClearDiagnosticLog();
+            ExcelLogReader.EnsureLogSchemaV2();
 
             InitializeComponent();
             
@@ -56,6 +59,7 @@ namespace MOSExcelMogiApp
             _viewModel.ExamEnded += OnExamEnded;
 
             ApplyExamineeTabState();
+            MosPracticeClient.ExamineeStore.EnsureSessionWatch();
             Closing += MainWindow_Closing;
         }
 
@@ -94,7 +98,14 @@ namespace MOSExcelMogiApp
         private void ScoringLog_EntryClicked(object sender, MosPracticeClient.ScoringLogEntry entry)
         {
             if (entry == null) return;
-            var window = new Views.ResultWindow(entry.ProjectResults, entry.GroupId, fromScoringLog: true);
+            var window = new Views.ResultWindow(
+                entry.ProjectResults,
+                entry.GroupId,
+                fromScoringLog: true,
+                isVariantMode: entry.IsVariantMode,
+                variantSetNo: entry.VariantSetNo,
+                completedStates: entry.GetCompletedStates(),
+                flaggedStates: entry.GetFlaggedStates());
             window.Owner = this;
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             window.Show();
@@ -118,8 +129,9 @@ namespace MOSExcelMogiApp
                 // 終了処理中にカーソルを待機状態にする
                 this.Cursor = Cursors.Wait;
 
-                // AppBar が残ると OnLastWindowClose でプロセスが残ることがある
+                // AppBar / 隠れた Review が残るとプロセスが残ることがある
                 CloseAppBarForExit();
+                CloseLeftoverReviewPages();
 
                 // 試験終了スレッドが動いていれば、Kill 完了まで短時間待つ（即アプリ落とし対策）
                 try
@@ -153,6 +165,14 @@ namespace MOSExcelMogiApp
                 return;
             try { bar.Closed -= OnAppBarWindowClosed; } catch { /* ignore */ }
             try { bar.Close(); } catch { /* ignore */ }
+        }
+
+        private static void CloseLeftoverReviewPages()
+        {
+            foreach (var review in Application.Current.Windows.OfType<Views.ReviewPageWindow>().ToList())
+            {
+                try { review.Close(); } catch { /* ignore */ }
+            }
         }
         
         private void OnShowAppBarRequested(object sender, EventArgs e)
@@ -218,166 +238,176 @@ namespace MOSExcelMogiApp
             System.Diagnostics.Debug.WriteLine("[ResetProject] ProjectResetButton_Click called");
             try
             {
-                // 演習(Group1)のプロジェクトをリセット
-                const int groupId = 1;
-                const int selectedTabIndex = 0;
-                const string tabName = "演習";
-                
-                // 選択されているタブのプロジェクトをリセットするか確認
-                var result = MessageBox.Show(
-                    $"{tabName}のすべてのプロジェクトをリセットしますか？\n（すべての編集内容は失われます）", 
-                    "確認", 
-                    MessageBoxButton.YesNo, 
-                    MessageBoxImage.Warning);
-                
-                System.Diagnostics.Debug.WriteLine($"[ResetProject] User response: {result}, GroupId: {groupId}");
-                
-                if (result == MessageBoxResult.Yes)
+                if (_viewModel != null && _viewModel.IsBulkResetInProgress)
+                    return;
+
+                var dialog = new BulkResetScopeDialog
                 {
-                    // 待機メッセージを表示するウィンドウを作成
-                    var waitWindow = new Window
-                    {
-                        Title = "リセット中",
-                        Width = 300,
-                        Height = 150,
-                        WindowStyle = WindowStyle.ToolWindow,
-                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                        Owner = this,
-                        ShowInTaskbar = false,
-                        ResizeMode = ResizeMode.NoResize
-                    };
-                    
-                    var stackPanel = new StackPanel
-                    {
-                        Margin = new Thickness(20),
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center
-                    };
-                    
-                    var textBlock = new TextBlock
-                    {
-                        Text = "リセット中です...",
-                        FontSize = 16,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Margin = new Thickness(0, 0, 0, 10)
-                    };
-                    
-                    var progressBar = new ProgressBar
-                    {
-                        IsIndeterminate = true,
-                        Height = 20,
-                        Width = 250
-                    };
-                    
-                    stackPanel.Children.Add(textBlock);
-                    stackPanel.Children.Add(progressBar);
-                    waitWindow.Content = stackPanel;
-                    
-                    // 非同期でリセット処理を実行
-                    System.Threading.Tasks.Task.Run(() =>
-                    {
-                        try
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Starting reset process for Group{groupId} projects...");
-                            
-                            // 選択されているタブのプロジェクトグループを取得
-                            if (_viewModel?.ProjectGroups != null && selectedTabIndex < _viewModel.ProjectGroups.Count)
-                            {
-                                var selectedGroup = _viewModel.ProjectGroups[selectedTabIndex];
-                                int successCount = 0;
-                                int failCount = 0;
-                                var failedProjects = new List<string>();
-                                
-                                // 選択されているタブのプロジェクトのみをリセット
-                                foreach (var project in selectedGroup.Projects)
-                                {
-                                    try
-                                    {
-                                        // UIスレッドで待機ウィンドウのテキストを更新
-                                        Dispatcher.Invoke(() =>
-                                        {
-                                            textBlock.Text = $"リセット中です...\nプロジェクト{project.ProjectId}をリセット中";
-                                        });
-                                        
-                                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Resetting Group{selectedGroup.GroupId}, Project{project.ProjectId}");
-                                        ResetProject(selectedGroup.GroupId, project.ProjectId, showMessage: false);
-                                        successCount++;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        failCount++;
-                                        string projectName = $"プロジェクト{project.ProjectId}";
-                                        failedProjects.Add(projectName);
-                                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Error resetting {projectName}: {ex.Message}");
-                                    }
-                                }
-                                
-                                // UIスレッドで待機ウィンドウを閉じて結果を表示
-                                Dispatcher.Invoke(() =>
-                                {
-                                    waitWindow.Close();
-                                    
-                                    // すべてのリセットが終わったら1回だけメッセージを表示
-                                    if (failCount == 0)
-                                    {
-                                        MessageBox.Show("すべてリセットしました", 
-                                            "完了", 
-                                            MessageBoxButton.OK, 
-                                            MessageBoxImage.Information);
-                                    }
-                                    else
-                                    {
-                                        string message = $"リセットが完了しました。\n\n";
-                                        message += $"成功: {successCount} プロジェクト\n";
-                                        message += $"失敗: {failCount} プロジェクト\n";
-                                        if (failedProjects.Count > 0)
-                                        {
-                                            message += $"失敗したプロジェクト: {string.Join(", ", failedProjects)}";
-                                        }
-                                        
-                                        MessageBox.Show(message, 
-                                            "完了", 
-                                            MessageBoxButton.OK, 
-                                            MessageBoxImage.Warning);
-                                    }
-                                });
-                            }
-                            else
-                            {
-                                Dispatcher.Invoke(() =>
-                                {
-                                    waitWindow.Close();
-                                    MessageBox.Show("プロジェクト情報を取得できませんでした。", 
-                                        "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                                });
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Dispatcher.Invoke(() =>
-                            {
-                                waitWindow.Close();
-                                System.Diagnostics.Debug.WriteLine($"[ResetProject] Error in reset process: {ex.Message}\n{ex.StackTrace}");
-                                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}", 
-                                    "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                            });
-                        }
-                    });
-                    
-                    // 待機ウィンドウを表示
-                    waitWindow.ShowDialog();
-                }
-                else
+                    Owner = this
+                };
+                if (dialog.ShowDialog() != true)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Reset cancelled by user");
+                    System.Diagnostics.Debug.WriteLine("[ResetProject] Reset cancelled by user");
+                    return;
                 }
+
+                ExcelBulkResetScope scope = dialog.SelectedScope;
+                var targets = _viewModel.GetBulkResetTargets(scope);
+                if (targets.Count == 0)
+                {
+                    MessageBox.Show("リセット対象のプロジェクトが見つかりませんでした。",
+                        "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                RunBulkReset(scope, targets);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Error in ProjectResetButton_Click: {ex.Message}\n{ex.StackTrace}");
-                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}", 
+                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
                     "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void RunBulkReset(ExcelBulkResetScope scope, List<ExcelResetTarget> targets)
+        {
+            var waitWindow = new Window
+            {
+                Title = "リセット中",
+                Width = 320,
+                Height = 160,
+                WindowStyle = WindowStyle.ToolWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var stackPanel = new StackPanel
+            {
+                Margin = new Thickness(20),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var textBlock = new TextBlock
+            {
+                Text = "リセット中です...",
+                FontSize = 16,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            var progressBar = new ProgressBar
+            {
+                IsIndeterminate = true,
+                Height = 20,
+                Width = 250
+            };
+            stackPanel.Children.Add(textBlock);
+            stackPanel.Children.Add(progressBar);
+            waitWindow.Content = stackPanel;
+
+            _viewModel.SetBulkResetInProgress(true);
+            if (ProjectResetButton != null)
+                ProjectResetButton.IsEnabled = false;
+            waitWindow.Show();
+            try
+            {
+                ExcelResetTarget currentOpen = _viewModel.TryGetCurrentOpenResetTarget(targets);
+                string reopenPath = null;
+                int reopenProjectId = 0;
+                if (_viewModel.TryGetCurrentGroupProjectId(out int currentGroupId, out int currentProjectId))
+                {
+                    reopenPath = _viewModel.GetActiveProjectFilePath(currentGroupId, currentProjectId);
+                    reopenProjectId = currentProjectId;
+                }
+
+                string closeProbePath = currentOpen?.WorkingPath ?? reopenPath ?? targets[0].WorkingPath;
+                var closeSw = new System.Diagnostics.Stopwatch();
+                bool keepExcel = CloseExcelForReset(closeProbePath, closeSw, out _, out _);
+
+                ExcelBulkResetResult result = ExcelBulkResetCoordinator.CopyTargets(
+                    targets,
+                    currentOpen,
+                    progress =>
+                    {
+                        textBlock.Text = "リセット中です...\n" + progress;
+                        Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+                    });
+
+                if (scope == ExcelBulkResetScope.Textbook || scope == ExcelBulkResetScope.All)
+                    TaskReviewStateStore.Clear(ExamResultScope.Textbook);
+                if (scope == ExcelBulkResetScope.Variant || scope == ExcelBulkResetScope.All)
+                    TaskReviewStateStore.Clear(ExamResultScope.Variant(ExcelBulkResetCoordinator.DefaultVariantSetNo));
+
+                if (result.ReopenTarget != null)
+                {
+                    reopenPath = result.ReopenTarget.WorkingPath;
+                    reopenProjectId = result.ReopenTarget.ProjectId;
+                }
+                else if (currentOpen != null)
+                {
+                    reopenPath = null;
+                }
+
+                if (!string.IsNullOrEmpty(reopenPath) && File.Exists(reopenPath))
+                {
+                    bool reopenLogged = false;
+                    ReopenExcelAfterReset(
+                        reopenPath,
+                        reopenProjectId,
+                        keepExcel,
+                        logResetPerf: false,
+                        detailSuffix: " bulk",
+                        ref reopenLogged);
+                }
+
+                waitWindow.Close();
+                ShowBulkResetResult(scope, result);
+            }
+            catch (Exception ex)
+            {
+                try { waitWindow.Close(); } catch { }
+                System.Diagnostics.Debug.WriteLine($"[ResetProject] Error in bulk reset: {ex.Message}\n{ex.StackTrace}");
+                MessageBox.Show($"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
+                    "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _viewModel.SetBulkResetInProgress(false);
+                if (ProjectResetButton != null)
+                    ProjectResetButton.IsEnabled = true;
+            }
+        }
+
+        private static void ShowBulkResetResult(ExcelBulkResetScope scope, ExcelBulkResetResult result)
+        {
+            if (result.TotalFail == 0)
+            {
+                MessageBox.Show("すべてリセットしました", "完了", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var message = new StringBuilder();
+            message.AppendLine("リセットが完了しました。");
+            message.AppendLine();
+            if (scope == ExcelBulkResetScope.Textbook || scope == ExcelBulkResetScope.All)
+            {
+                message.AppendLine($"演習 成功: {result.TextbookSuccess} / 失敗: {result.TextbookFail}");
+            }
+            if (scope == ExcelBulkResetScope.Variant || scope == ExcelBulkResetScope.All)
+            {
+                message.AppendLine($"類題 成功: {result.VariantSuccess} / 失敗: {result.VariantFail}");
+            }
+            if (result.FailedProjects.Count > 0)
+            {
+                message.AppendLine();
+                message.Append("失敗したプロジェクト: ");
+                message.Append(string.Join(", ", result.FailedProjects));
+            }
+
+            MessageBox.Show(message.ToString(), "完了", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         
         public void ResetProject(int groupId, int projectId, bool showMessage = true, bool logResetPerf = false)
@@ -391,11 +421,6 @@ namespace MOSExcelMogiApp
             var copySw = new System.Diagnostics.Stopwatch();
             try
             {
-                ExcelLogReader.ClearOperationLogForProject(projectId);
-                ExcelLogReader.ClearDestructiveLogForProject(projectId);
-                ExcelLogReader.ClearDiagnosticLog();
-                ExcelTaskAttemptRegistry.ClearProject(projectId);
-
                 // 正規作業ファイルを最優先し、旧 config/Initial 配置は移行元に限定する。
                 string projectFilePath = _viewModel?.GetProjectFilePath(groupId, projectId)
                     ?? DataPathHelper.ResolveWorkingFilePath(groupId, projectId);
@@ -438,12 +463,7 @@ namespace MOSExcelMogiApp
                 }
                 
                 System.Diagnostics.Debug.WriteLine($"Template file found: {templatePath}");
-                
-                // テンプレートが旧版で読み取り専用化されている場合は明示的に解除する。
-                DataPathHelper.ClearReadOnly(templatePath);
-                // テンプレートファイル自体の Zone.Identifier を削除（存在する場合）
-                RemoveZoneIdentifier(templatePath);
-                
+
                 System.Diagnostics.Debug.WriteLine($"[ResetProject] Closing workbooks without quitting Excel");
                 bool keepExcel = CloseExcelForReset(projectFilePath, closeSw, out string closePath, out string closeDetail);
                 if (logResetPerf)
@@ -451,150 +471,30 @@ namespace MOSExcelMogiApp
                     ResetPerfLog.Write("excel", projectId, "close", closeSw.ElapsedMilliseconds, closePath, closeDetail);
                     closeLogged = true;
                 }
-                
-                // ファイルがロックされているか確認してからコピー
-                copySw.Start();
-                int retryCount = 0;
-                while (retryCount < 10 && IsFileLocked(projectFilePath))
-                {
-                    System.Threading.Thread.Sleep(500);
-                    retryCount++;
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] File still locked, retry {retryCount}/10");
-                }
-                
-                // テンプレートファイルをプロジェクトファイルにコピー
+
                 try
                 {
-                    // プロジェクトファイルが存在する場合、読み取り専用属性を解除
-                    if (File.Exists(projectFilePath))
-                    {
-                        FileInfo projectFileInfo = new FileInfo(projectFilePath);
-                        if (projectFileInfo.IsReadOnly)
-                        {
-                            projectFileInfo.IsReadOnly = false;
-                        }
-                    }
-                    
-                    // テンプレートファイルをプロジェクトファイルにコピー
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Copying template file...");
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject]   From: {templatePath}");
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject]   To: {projectFilePath}");
-                    
-                    // コピー前にディレクトリが存在することを確認
-                    string projectDirectory = System.IO.Path.GetDirectoryName(projectFilePath);
-                    if (!Directory.Exists(projectDirectory))
-                    {
-                        Directory.CreateDirectory(projectDirectory);
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Created directory: {projectDirectory}");
-                    }
-                    
-                    // テンプレートファイルをプロジェクトファイルにコピー
-                    // 読み取り専用ファイルからでもコピー可能
-                    File.Copy(templatePath, projectFilePath, overwrite: true);
-                    // File.Copy は Zone.Identifier ADS も引き継ぐため、コピー直後に削除して保護ビューを防ぐ
-                    RemoveZoneIdentifier(projectFilePath);
-
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Project file reset successfully: {projectFilePath}");
-                    
-                    // ファイルサイズを確認
-                    FileInfo newProjectFile = new FileInfo(projectFilePath);
-                    FileInfo templateFile = new FileInfo(templatePath);
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Template file size: {templateFile.Length} bytes");
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Project file size: {newProjectFile.Length} bytes");
-                    
-                    // コピー後、すぐに読み取り専用属性を解除
-                    if (newProjectFile.IsReadOnly)
-                    {
-                        newProjectFile.IsReadOnly = false;
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from project file after copy");
-                    }
-                    
-                    // Initialフォルダのパスを生成
+                    copySw.Start();
                     string initialFilePath = DataPathHelper.GetInitialFilePath(groupId, projectId);
-                    string initialFolderPath = System.IO.Path.GetDirectoryName(initialFilePath);
-                    
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Initial folder path: {initialFolderPath}");
-                    System.Diagnostics.Debug.WriteLine($"[ResetProject] Initial file path: {initialFilePath}");
-                    
-                    // ディレクトリが存在しない場合は作成
-                    if (!Directory.Exists(initialFolderPath))
-                    {
-                        Directory.CreateDirectory(initialFolderPath);
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Created directory: {initialFolderPath}");
-                    }
-                    
-                    // Initialフォルダのファイルが存在する場合、読み取り専用属性を解除
-                    if (File.Exists(initialFilePath))
-                    {
-                        FileInfo initialFileInfo = new FileInfo(initialFilePath);
-                        if (initialFileInfo.IsReadOnly)
-                        {
-                            initialFileInfo.IsReadOnly = false;
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from Initial folder file");
-                        }
-                    }
-                    
-                    // リセットしたプロジェクトファイルをInitialフォルダにもコピー
-                    try
-                    {
-                        File.Copy(projectFilePath, initialFilePath, overwrite: true);
-                        // ADS の引き継ぎを防ぐため、Initialフォルダのファイルも Zone.Identifier を削除
-                        RemoveZoneIdentifier(initialFilePath);
-
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Copied project file to Initial folder: {initialFilePath}");
-                        
-                        // Initialフォルダのファイルの読み取り専用属性を解除
-                        FileInfo initialFileInfo = new FileInfo(initialFilePath);
-                        if (initialFileInfo.IsReadOnly)
-                        {
-                            initialFileInfo.IsReadOnly = false;
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from Initial folder file after copy");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResetProject] Error copying to Initial folder: {ex.Message}");
-                        throw new IOException(
-                            $"採点用Initialファイルの更新に失敗しました: {initialFilePath}", ex);
-                    }
-
+                    int retryCount = ExcelProjectResetHelper.RestoreFromTemplate(templatePath, projectFilePath, initialFilePath);
                     copySw.Stop();
+                    ExcelProjectResetHelper.ClearLogsAfterSuccessfulCopy(projectId, 0);
+                    TaskReviewStateStore.ClearProject(ExamResultScope.Textbook, projectId);
                     if (logResetPerf)
                     {
                         ResetPerfLog.Write("excel", projectId, "copy", copySw.ElapsedMilliseconds, "main", "lockRetries=" + retryCount);
                         copyLogged = true;
                     }
-                    
-                    // リセット後、現在のプロジェクトなら Excel でブックを開き直す（シェル起動）
+
                     if (_viewModel?.CurrentProject != null)
                     {
                         var currentProject = _viewModel.CurrentProject;
                         int currentGroupId = int.Parse(currentProject.Group.Replace("Group ", ""));
                         int currentProjectId = currentProject.ProjectNumber;
-                        
-                        if (currentGroupId == groupId && currentProjectId == projectId)
+
+                        if (currentGroupId == groupId && currentProjectId == projectId && !_viewModel.IsVariantMode)
                         {
                             System.Diagnostics.Debug.WriteLine($"[ResetProject] Processing Excel file after reset: {projectFilePath}");
-                            
-                            // Initialフォルダのパスは既に外側で定義されているので、そのまま使用
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Initial folder path: {initialFolderPath}");
-                            System.Diagnostics.Debug.WriteLine($"[ResetProject] Initial file path: {initialFilePath}");
-                            
-                            // ディレクトリが存在しない場合は作成（既に外側で作成済みの可能性があるが、念のため確認）
-                            if (!Directory.Exists(initialFolderPath))
-                            {
-                                Directory.CreateDirectory(initialFolderPath);
-                                System.Diagnostics.Debug.WriteLine($"[ResetProject] Created directory: {initialFolderPath}");
-                            }
-                            
-                            // テンプレートコピー済み。COM で空 Excel を先に立てず、シェルで開き直す（アプリバーからのリセットでスタート画面が残るのを防ぐ）
-                            FileInfo projectFileInfo = new FileInfo(projectFilePath);
-                            if (projectFileInfo.IsReadOnly)
-                            {
-                                projectFileInfo.IsReadOnly = false;
-                                System.Diagnostics.Debug.WriteLine($"[ResetProject] Removed read-only attribute from project file before opening Excel");
-                            }
-
                             ReopenExcelAfterReset(projectFilePath, projectId, keepExcel, logResetPerf, null, ref reopenLogged);
                             System.Diagnostics.Debug.WriteLine($"[ResetProject] Reopened workbook: {projectFilePath}");
                         }
@@ -764,11 +664,6 @@ namespace MOSExcelMogiApp
             var copySw = new System.Diagnostics.Stopwatch();
             try
             {
-                ExcelLogReader.ClearOperationLogForProject(projectId);
-                ExcelLogReader.ClearDestructiveLogForProject(projectId);
-                ExcelLogReader.ClearDiagnosticLog();
-                ExcelTaskAttemptRegistry.ClearProject(projectId);
-
                 string projectFilePath = _viewModel?.GetVariantWorkingFilePath(groupId, projectId, variantSetNo);
                 if (string.IsNullOrEmpty(projectFilePath) && _viewModel?.CurrentProject != null)
                     projectFilePath = _viewModel.CurrentProject.FilePath;
@@ -793,9 +688,6 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Template: {templatePath}");
                 System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Working file: {projectFilePath}");
 
-                DataPathHelper.ClearReadOnly(templatePath);
-                RemoveZoneIdentifier(templatePath);
-
                 System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Closing workbooks without quitting Excel");
                 bool keepExcel = CloseExcelForReset(projectFilePath, closeSw, out string closePath, out string closeDetail);
                 if (logResetPerf)
@@ -810,40 +702,13 @@ namespace MOSExcelMogiApp
                     closeLogged = true;
                 }
 
-                copySw.Start();
-                int retryCount = 0;
-                while (retryCount < 10 && IsFileLocked(projectFilePath))
-                {
-                    System.Threading.Thread.Sleep(500);
-                    retryCount++;
-                    System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] File still locked, retry {retryCount}/10");
-                }
-
                 try
                 {
-                    if (File.Exists(projectFilePath))
-                    {
-                        FileInfo projectFileInfo = new FileInfo(projectFilePath);
-                        if (projectFileInfo.IsReadOnly)
-                            projectFileInfo.IsReadOnly = false;
-                    }
-
-                    string projectDirectory = System.IO.Path.GetDirectoryName(projectFilePath);
-                    if (!string.IsNullOrEmpty(projectDirectory) && !Directory.Exists(projectDirectory))
-                    {
-                        Directory.CreateDirectory(projectDirectory);
-                        System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Created directory: {projectDirectory}");
-                    }
-
-                    File.Copy(templatePath, projectFilePath, overwrite: true);
-                    RemoveZoneIdentifier(projectFilePath);
-
-                    FileInfo newProjectFile = new FileInfo(projectFilePath);
-                    if (newProjectFile.IsReadOnly)
-                        newProjectFile.IsReadOnly = false;
-
-                    System.Diagnostics.Debug.WriteLine($"[ResetVariantProject] Variant file reset successfully: {projectFilePath}");
+                    copySw.Start();
+                    int retryCount = ExcelProjectResetHelper.RestoreFromTemplate(templatePath, projectFilePath);
                     copySw.Stop();
+                    ExcelProjectResetHelper.ClearLogsAfterSuccessfulCopy(projectId, variantSetNo);
+                    TaskReviewStateStore.ClearProject(ExamResultScope.Variant(variantSetNo), projectId);
                     if (logResetPerf)
                     {
                         ResetPerfLog.Write("excel", projectId, "copy", copySw.ElapsedMilliseconds, "main", "variant=" + variantSetNo + " lockRetries=" + retryCount);
@@ -856,7 +721,7 @@ namespace MOSExcelMogiApp
                         int currentGroupId = int.Parse(currentProject.Group.Replace("Group ", ""));
                         int currentProjectId = currentProject.ProjectNumber;
 
-                        if (currentGroupId == groupId && currentProjectId == projectId)
+                        if (currentGroupId == groupId && currentProjectId == projectId && _viewModel.IsVariantMode)
                         {
                             ReopenExcelAfterReset(
                                 projectFilePath,
@@ -910,55 +775,14 @@ namespace MOSExcelMogiApp
             }
         }
         
-        // Zone.Identifier ADS を削除して保護ビューを防ぐ
-        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-        private static extern bool DeleteFileW(string lpFileName);
-
-        /// <summary>
-        /// ファイルの Zone.Identifier ADS（NTFS 代替データストリーム）を削除する。
-        /// File.Copy は ADS も引き継ぐため、コピー直後にこのメソッドを呼ぶことで保護ビューを防ぐ。
-        /// 読み取り専用ファイルの場合は一時的に属性を外してから削除を試みる。
-        /// </summary>
         private static void RemoveZoneIdentifier(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
-            try
-            {
-                // 読み取り専用だと ADS 削除が失敗する場合があるため、一時的に属性を外す
-                FileInfo fi = new FileInfo(filePath);
-                if (fi.IsReadOnly)
-                {
-                    try { fi.IsReadOnly = false; } catch { }
-                }
-
-                DeleteFileW(filePath + ":Zone.Identifier");
-            }
-            catch { }
+            ExcelProjectResetHelper.RemoveZoneIdentifier(filePath);
         }
 
-        // ファイルがロックされているか確認するメソッド
         private bool IsFileLocked(string filePath)
         {
-            if (!File.Exists(filePath))
-            {
-                return false;
-            }
-            
-            try
-            {
-                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-                {
-                    return false;
-                }
-            }
-            catch (IOException)
-            {
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return ExcelProjectResetHelper.IsFileLocked(filePath);
         }
         
         // 特定のプロジェクトのExcelファイルを閉じるメソッド

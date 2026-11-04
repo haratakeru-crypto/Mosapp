@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド1を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［挿入］→［コメント］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［コメント］作業ウィンドウを確認→「情報発信の責任を考える」と入力→［コメントを投稿する］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［閉じる］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "スライド1のサムネイルにコメント件数が表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：スライド1にコメント「情報発信の責任を考える」"
+    }
+  ]
+}

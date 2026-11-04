@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 8,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド1を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［挿入］→［ズーム］→［サマリーズーム］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［1.教育理念］と［4.募集要項］をオン、スライド1と8をオフにして［挿入］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "スライド2にサマリーズームが挿入されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "タイトルに「ご提案のポイント」と入力する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "プレースホルダー以外をクリックし、選択を解除する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スライド1の後ろにサマリーズームがあり、タイトルが「ご提案のポイント」になっている"
+    }
+  ]
+}

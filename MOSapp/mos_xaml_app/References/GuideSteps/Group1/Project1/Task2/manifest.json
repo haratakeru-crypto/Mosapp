@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［試験結果］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "テーブル内の任意のセルを選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［テーブルデザイン］タブで［最後の列］をオンにする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：最後の列（合計点）が強調されている"
+    }
+  ]
+}

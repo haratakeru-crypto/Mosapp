@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［G4］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［校閲］タブ→［メモ］→［新しいメモ］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "「最新の商品情報」と入力し、任意のセルをクリックしてメモの選択を解除する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：セル［G4］にメモが挿入されている"
+    }
+  ]
+}

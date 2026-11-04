@@ -36,10 +36,18 @@ namespace Libraries
         private static CachedLines DestructiveFileCache;
 
         /// <summary>
-        /// 採点用1行: [timestamp] [ProjectN] [TaskN-M] [CommandId] Executed。Task の N は Project と一致すること。
+        /// 教材の採点用1行: [timestamp] [ProjectN] [TaskN-M] [CommandId] Executed。
+        /// 類題は [ProjectVn-N] [TaskVn-N-M] のためこの正規表現に一致せず、教材証跡と混ざらない。
         /// </summary>
         private static readonly Regex ScoringLineRegex = new Regex(
             @"^\[(?<ts>[^\]]+)\]\s+\[Project(?<proj>\d+)\]\s+\[Task(?<tproj>\d+)-(?<task>\d+)\]\s+\[(?<cmd>[^\]]+)\]\s+Executed\s*$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// 類題の採点用1行: [timestamp] [ProjectVn-N] [TaskVn-N-M] [CommandId] Executed。
+        /// </summary>
+        private static readonly Regex VariantScoringLineRegex = new Regex(
+            @"^\[(?<ts>[^\]]+)\]\s+\[ProjectV(?<vset>\d+)-(?<proj>\d+)\]\s+\[TaskV(?<vtset>\d+)-(?<tproj>\d+)-(?<task>\d+)\]\s+\[(?<cmd>[^\]]+)\]\s+Executed\s*$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         public static string GetLogFilePath()
@@ -165,6 +173,12 @@ namespace Libraries
         /// </summary>
         public static void ClearTaskEvidenceForProject(int projectId)
         {
+            ClearOperationLogForProject(projectId, 0);
+        }
+
+        /// <summary>教材 / 類題 scope ごとに操作ログから当該プロジェクト行を削除する。</summary>
+        public static void ClearOperationLogForProject(int projectId, int variantSetNo)
+        {
             string path = GetLogFilePath();
             if (!File.Exists(path))
                 return;
@@ -172,22 +186,48 @@ namespace Libraries
             try
             {
                 var lines = File.ReadAllLines(path, Encoding.UTF8);
-                var kept = lines.Where(l => !IsLogLineOwnedByProject(l, projectId)).ToArray();
+                var kept = new List<string>(lines.Length);
+                WordTaskLogContext currentLineContext = default;
+                bool currentLineValid = false;
 
-                if (kept.Length == lines.Length)
-                    return;
-
-                if (kept.Length == 0 || kept.All(string.IsNullOrWhiteSpace))
+                foreach (string line in lines)
                 {
-                    File.Delete(path);
-                    return;
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        kept.Add(line);
+                        continue;
+                    }
+
+                    if (IsScoringLineOwnedByProjectScope(line, projectId, variantSetNo))
+                        continue;
+
+                    if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        currentLineValid = WordTaskLogFormat.TryParseTaskStartLine(line, out currentLineContext);
+                        if (currentLineValid && currentLineContext.MatchesProjectScope(projectId, variantSetNo))
+                            continue;
+                        kept.Add(line);
+                        continue;
+                    }
+
+                    if (WordTaskLogFormat.TryParseExplicitTaskPrefix(line, out WordTaskLogContext explicitContext)
+                        && explicitContext.IsValid
+                        && explicitContext.MatchesProjectScope(projectId, variantSetNo))
+                    {
+                        continue;
+                    }
+
+                    if (currentLineValid && currentLineContext.MatchesProjectScope(projectId, variantSetNo))
+                        continue;
+
+                    kept.Add(line);
                 }
 
-                File.WriteAllLines(path, kept, new UTF8Encoding(false));
+                WriteLogLinesOrDelete(path, kept);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearTaskEvidenceForProject: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearOperationLogForProject: {ex.Message}");
             }
             finally
             {
@@ -198,28 +238,42 @@ namespace Libraries
         /// <summary>個別リセット: 対象プロジェクトの破壊検知エラー行のみ削除する。</summary>
         public static void ClearDestructiveLogForProject(int projectId)
         {
+            ClearDestructiveLogForProject(projectId, 0);
+        }
+
+        /// <summary>教材 / 類題 scope ごとに破壊ログ行を削除する。</summary>
+        public static void ClearDestructiveLogForProject(int projectId, int variantSetNo)
+        {
             string path = GetDestructiveErrorLogPath();
             if (!File.Exists(path))
                 return;
 
-            string prefix = projectId.ToString() + ",";
             try
             {
                 var lines = File.ReadAllLines(path, Encoding.UTF8);
-                var kept = lines.Where(l =>
-                    string.IsNullOrWhiteSpace(l)
-                    || !l.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
-
-                if (kept.Length == lines.Length)
-                    return;
-
-                if (kept.Length == 0 || kept.All(string.IsNullOrWhiteSpace))
+                var kept = new List<string>(lines.Length);
+                foreach (string line in lines)
                 {
-                    File.Delete(path);
-                    return;
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    if (WordTaskLogFormat.TryParseDestructiveLinePrefix(line, out WordTaskLogContext context)
+                        && context.IsValid
+                        && context.MatchesProjectScope(projectId, variantSetNo))
+                    {
+                        continue;
+                    }
+
+                    if (variantSetNo == 0
+                        && line.StartsWith(projectId.ToString() + ",", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    kept.Add(line);
                 }
 
-                File.WriteAllLines(path, kept, new UTF8Encoding(false));
+                WriteLogLinesOrDelete(path, kept);
             }
             catch (Exception ex)
             {
@@ -231,6 +285,63 @@ namespace Libraries
             }
         }
 
+        /// <summary>演習 / 類題の個別リセット後に、当該プロジェクト scope のログと attempt を消す。</summary>
+        public static void ClearLogsForProjectScope(int projectId, int variantSetNo)
+        {
+            ClearOperationLogForProject(projectId, variantSetNo);
+            ClearDestructiveLogForProject(projectId, variantSetNo);
+            WordTaskAttemptRegistry.ClearProject(projectId, variantSetNo);
+            ClearCurrentTaskFileIfMatches(projectId, variantSetNo);
+            ClearSnapshotIfMatches(projectId, variantSetNo);
+        }
+
+        public static void ClearCurrentTaskFileIfMatches(int projectId, int variantSetNo)
+        {
+            try
+            {
+                string path = GetCurrentTaskFilePath();
+                if (!File.Exists(path))
+                    return;
+
+                string text = File.ReadAllText(path, Encoding.UTF8);
+                if (WordTaskLogFormat.TryParseCurrentTaskLine(text, out WordTaskLogContext context)
+                    && context.IsValid
+                    && context.MatchesProjectScope(projectId, variantSetNo))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearCurrentTaskFileIfMatches: {ex.Message}");
+            }
+        }
+
+        private static bool IsScoringLineOwnedByProjectScope(string line, int projectId, int variantSetNo)
+        {
+            if (variantSetNo > 0)
+            {
+                if (!TryParseVariantScoringLine(line, out ScoringLogFields variantFields) || !variantFields.IsValid)
+                    return false;
+                return variantFields.ProjectId == projectId && variantFields.VariantSetNo == variantSetNo;
+            }
+
+            if (!TryParseScoringLine(line, out ScoringLogFields fields) || !fields.IsValid)
+                return false;
+            return fields.ProjectId == projectId;
+        }
+
+        private static void WriteLogLinesOrDelete(string path, List<string> kept)
+        {
+            if (kept.Count == 0 || kept.All(string.IsNullOrWhiteSpace))
+            {
+                File.Delete(path);
+                return;
+            }
+
+            File.WriteAllLines(path, kept, new UTF8Encoding(false));
+        }
+
         private static bool IsLogLineOwnedByProject(string line, int projectId)
         {
             if (string.IsNullOrWhiteSpace(line))
@@ -239,15 +350,11 @@ namespace Libraries
             if (TryParseScoringLine(line, out var e) && e.IsValid && e.ProjectId == projectId)
                 return true;
 
-            if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                ParseTaskStart(line, out int p, out _, out _);
-                return p == projectId;
-            }
+            if (WordTaskLogFormat.TryParseTaskStartLine(line, out var start) && start.IsValid)
+                return !start.IsVariant && start.ProjectId == projectId;
 
-            string taskMarker = "[Task " + projectId + "-";
-            if (line.IndexOf(taskMarker, StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
+            if (WordTaskLogFormat.TryParseExplicitTaskPrefix(line, out var op) && op.IsValid)
+                return !op.IsVariant && op.ProjectId == projectId;
 
             return false;
         }
@@ -280,9 +387,22 @@ namespace Libraries
             return CountTaskEvidence(projectId, taskId, commandId) > 0;
         }
 
+        /// <summary>類題 Vn の Executed 証跡。教材の HasTaskEvidence とは混ざらない。</summary>
+        public static bool HasVariantTaskEvidence(int variantSetNo, int projectId, int taskId, string commandId)
+        {
+            return CountVariantTaskEvidence(variantSetNo, projectId, taskId, commandId) > 0;
+        }
+
         public static bool HasTaskEvidenceAtLeast(int projectId, int taskId, string commandId, int minCount)
         {
             return CountTaskEvidence(projectId, taskId, commandId) >= minCount;
+        }
+
+        /// <summary>類題 Vn の Executed 証跡が minCount 以上。教材の HasTaskEvidenceAtLeast とは混ざらない。</summary>
+        public static bool HasVariantTaskEvidenceAtLeast(
+            int variantSetNo, int projectId, int taskId, string commandId, int minCount)
+        {
+            return CountVariantTaskEvidence(variantSetNo, projectId, taskId, commandId) >= minCount;
         }
 
         /// <summary>
@@ -329,6 +449,58 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] IsLatestShowAllFinalOn: {ex.Message}");
+                return false;
+            }
+
+            return string.Equals(bestCmd, "ShowAllFinalOn", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 類題用: ShowAllFinalOn / ShowAllFinalOff の時系列 last-wins。教材行とは混ざらない。
+        /// </summary>
+        public static bool IsLatestVariantShowAllFinalOn(int variantSetNo, int projectId, int taskId)
+        {
+            if (variantSetNo < 1)
+                return false;
+
+            string path = GetLogFilePath();
+            if (!File.Exists(path))
+                return false;
+
+            DateTime? bestTs = null;
+            string bestCmd = null;
+            int bestOrder = -1;
+            int order = 0;
+            try
+            {
+                foreach (string line in ReadCachedLines(path))
+                {
+                    order++;
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+                    if (!TryParseVariantScoringLine(line, out var e) || !e.IsValid)
+                        continue;
+                    if (e.VariantSetNo != variantSetNo || e.ProjectId != projectId || e.TaskId != taskId)
+                        continue;
+
+                    bool isOn = string.Equals(e.CommandId, "ShowAllFinalOn", StringComparison.OrdinalIgnoreCase);
+                    bool isOff = string.Equals(e.CommandId, "ShowAllFinalOff", StringComparison.OrdinalIgnoreCase);
+                    if (!isOn && !isOff)
+                        continue;
+
+                    if (!bestTs.HasValue
+                        || e.Timestamp > bestTs.Value
+                        || (e.Timestamp == bestTs.Value && order > bestOrder))
+                    {
+                        bestTs = e.Timestamp;
+                        bestCmd = e.CommandId;
+                        bestOrder = order;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] IsLatestVariantShowAllFinalOn: {ex.Message}");
                 return false;
             }
 
@@ -399,6 +571,38 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LogReader] CountTaskEvidence: {ex.Message}");
+            }
+
+            return count;
+        }
+
+        private static int CountVariantTaskEvidence(int variantSetNo, int projectId, int taskId, string commandId)
+        {
+            if (variantSetNo < 1 || string.IsNullOrWhiteSpace(commandId))
+                return 0;
+
+            string path = GetLogFilePath();
+            if (!File.Exists(path))
+                return 0;
+
+            int count = 0;
+            try
+            {
+                foreach (string line in ReadCachedLines(path))
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+                    if (!TryParseVariantScoringLine(line, out var e) || !e.IsValid)
+                        continue;
+                    if (e.VariantSetNo != variantSetNo || e.ProjectId != projectId || e.TaskId != taskId)
+                        continue;
+                    if (string.Equals(e.CommandId, commandId, StringComparison.OrdinalIgnoreCase))
+                        count++;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] CountVariantTaskEvidence: {ex.Message}");
             }
 
             return count;
@@ -483,6 +687,47 @@ namespace Libraries
                 ProjectId = proj,
                 TaskId = taskNum,
                 CommandId = cmd,
+                VariantSetNo = 0,
+                IsValid = coherent
+            };
+            return true;
+        }
+
+        private static bool TryParseVariantScoringLine(string line, out ScoringLogFields fields)
+        {
+            fields = default;
+            if (string.IsNullOrWhiteSpace(line))
+                return false;
+
+            Match m = VariantScoringLineRegex.Match(line);
+            if (!m.Success)
+                return false;
+
+            if (!DateTime.TryParse(m.Groups["ts"].Value, out DateTime ts))
+                return false;
+            if (!int.TryParse(m.Groups["vset"].Value, out int variantSetNo) || variantSetNo < 1)
+                return false;
+            if (!int.TryParse(m.Groups["proj"].Value, out int proj) || proj <= 0)
+                return false;
+            if (!int.TryParse(m.Groups["vtset"].Value, out int taskVariantSetNo) || taskVariantSetNo != variantSetNo)
+                return false;
+            if (!int.TryParse(m.Groups["tproj"].Value, out int tproj))
+                return false;
+            if (!int.TryParse(m.Groups["task"].Value, out int taskNum) || taskNum <= 0)
+                return false;
+
+            string cmd = m.Groups["cmd"].Value;
+            if (string.IsNullOrWhiteSpace(cmd))
+                return false;
+
+            bool coherent = proj == tproj && variantSetNo == taskVariantSetNo;
+            fields = new ScoringLogFields
+            {
+                Timestamp = ts,
+                ProjectId = proj,
+                TaskId = taskNum,
+                CommandId = cmd,
+                VariantSetNo = variantSetNo,
                 IsValid = coherent
             };
             return true;
@@ -494,6 +739,7 @@ namespace Libraries
             public int ProjectId;
             public int TaskId;
             public string CommandId;
+            public int VariantSetNo;
             public bool IsValid;
         }
 
@@ -722,13 +968,50 @@ namespace Libraries
             }
         }
 
-        /// <summary>アプリ側がタスク表示時に記録（記録主体は試験アプリ）。</summary>
-        public static void LogTaskStart(int projectId, int taskId, int attemptNo)
+        /// <summary>スナップショットが指定 scope（教材 / 類題）に属するときだけ削除する。</summary>
+        public static void ClearSnapshotIfMatches(int projectId, int variantSetNo)
+        {
+            string path = GetSnapshotFilePath();
+            if (!File.Exists(path))
+                return;
+
+            try
+            {
+                int snapProjectId = 0;
+                int snapVariantSetNo = 0;
+                foreach (string line in File.ReadAllLines(path, Encoding.UTF8))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+                        continue;
+                    int eq = line.IndexOf('=');
+                    if (eq <= 0)
+                        continue;
+                    string key = line.Substring(0, eq).Trim();
+                    string val = line.Substring(eq + 1).Trim();
+                    if (key == "ProjectId")
+                        int.TryParse(val, out snapProjectId);
+                    else if (key == "VariantSetNo")
+                        int.TryParse(val, out snapVariantSetNo);
+                }
+
+                int expectedVariant = variantSetNo < 0 ? 0 : variantSetNo;
+                if (snapProjectId == projectId && snapVariantSetNo == expectedVariant)
+                    ClearSnapshot();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] ClearSnapshotIfMatches: {ex.Message}");
+            }
+        }
+
+        /// <summary>アプリ側がタスク表示時に記録（記録主体は試験アプリ）。類題は Vn-p-t-a。</summary>
+        public static void LogTaskStart(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             try
             {
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                string line = $"[{timestamp}] [TaskStart] {projectId}-{taskId}-{attemptNo}";
+                var context = WordTaskLogContext.Create(projectId, taskId, attemptNo, variantSetNo);
+                string line = $"[{timestamp}] [TaskStart] {context.FormatTaskToken()}";
                 File.AppendAllText(GetLogFilePath(), line + Environment.NewLine, new UTF8Encoding(false));
             }
             catch (Exception ex)
@@ -741,36 +1024,51 @@ namespace Libraries
             }
         }
 
-        public static List<string> GetOperationsForTask(int projectId, int taskId, int attemptNo)
+        public static List<string> GetOperationsForTask(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             var result = new List<string>();
             string path = GetLogFilePath();
             if (!File.Exists(path))
                 return result;
 
+            int expectedVariant = variantSetNo < 0 ? 0 : variantSetNo;
             try
             {
                 string[] lines = ReadCachedLines(path);
-                int curP = -1, curT = -1, curA = 0;
+                int curP = -1, curT = -1, curA = 0, curV = 0;
                 foreach (string line in lines)
                 {
                     if (string.IsNullOrWhiteSpace(line))
                         continue;
                     if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        ParseTaskStart(line, out curP, out curT, out curA);
+                        if (WordTaskLogFormat.TryParseTaskStartLine(line, out var start) && start.IsValid)
+                        {
+                            curP = start.ProjectId;
+                            curT = start.TaskId;
+                            curA = start.AttemptNo;
+                            curV = start.VariantSetNo;
+                        }
+                        else
+                        {
+                            curP = -1;
+                            curT = -1;
+                            curA = 0;
+                            curV = 0;
+                        }
                         continue;
                     }
                     int opIdx = line.IndexOf("[Op]", StringComparison.OrdinalIgnoreCase);
                     if (opIdx < 0)
                         continue;
-                    // 行に [Task P-T-A] があれば VSTO 記録時のタスクを優先（TaskStart より後に並んでも誤帰属しない）
-                    if (TryParseExplicitOpTask(line, opIdx, out int opP, out int opT, out int opA))
+                    // 行に [Task P-T-A] / [Task Vn-P-T-A] があれば VSTO 記録時のタスクを優先
+                    if (TryParseExplicitOpTask(line, opIdx, out var opCtx))
                     {
-                        if (opP != projectId || opT != taskId || opA != attemptNo)
+                        if (opCtx.ProjectId != projectId || opCtx.TaskId != taskId
+                            || opCtx.AttemptNo != attemptNo || opCtx.VariantSetNo != expectedVariant)
                             continue;
                     }
-                    else if (curP != projectId || curT != taskId || curA != attemptNo)
+                    else if (curP != projectId || curT != taskId || curA != attemptNo || curV != expectedVariant)
                     {
                         continue;
                     }
@@ -788,33 +1086,45 @@ namespace Libraries
             return result;
         }
 
-        public static bool HasDisallowedOperations(int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes)
+        public static bool HasDisallowedOperations(
+            int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes, int variantSetNo = 0)
         {
-            if (allowedOperationTypes == null)
-                return false;
-            var ops = GetOperationsForTask(projectId, taskId, attemptNo);
-            if (ops.Count == 0)
-                return false;
+            return CollectDisallowedOperationTypes(projectId, taskId, attemptNo, allowedOperationTypes, variantSetNo).Count > 0;
+        }
 
+        /// <summary>許可外 [Op] 種別を出現順・重複なしで返す。</summary>
+        public static List<string> CollectDisallowedOperationTypes(
+            int projectId, int taskId, int attemptNo, HashSet<string> allowedOperationTypes, int variantSetNo = 0)
+        {
+            var result = new List<string>();
+            if (allowedOperationTypes == null)
+                return result;
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo, variantSetNo);
+            if (ops.Count == 0)
+                return result;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string opLine in ops)
             {
                 string type = GetOperationType(opLine);
                 if (string.IsNullOrEmpty(type))
                     continue;
-                if (!allowedOperationTypes.Contains(type))
-                    return true;
+                if (allowedOperationTypes.Contains(type))
+                    continue;
+                if (seen.Add(type))
+                    result.Add(type);
             }
-            return false;
+            return result;
         }
 
-        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
+        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             try
             {
                 string path = GetDestructiveErrorLogPath();
                 if (!File.Exists(path))
                     return false;
-                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                string prefix = DestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
                 foreach (string line in ReadCachedLines(path))
                 {
                     if (line != null && line.StartsWith(prefix, StringComparison.Ordinal))
@@ -828,13 +1138,52 @@ namespace Libraries
             return false;
         }
 
-        public static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, IList<string> errors)
+        /// <summary>
+        /// mos_word_destructive_errors.log の当該行から差分トークンを取り出す（" | " 区切り、重複なし）。
+        /// </summary>
+        public static List<string> GetLoggedDestructiveErrorTokens(
+            int projectId, int taskId, int attemptNo, int variantSetNo = 0)
+        {
+            var result = new List<string>();
+            try
+            {
+                string path = GetDestructiveErrorLogPath();
+                if (!File.Exists(path))
+                    return result;
+                string prefix = DestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string line in ReadCachedLines(path))
+                {
+                    if (line == null || !line.StartsWith(prefix, StringComparison.Ordinal))
+                        continue;
+                    string body = line.Substring(prefix.Length).Trim();
+                    if (string.IsNullOrEmpty(body))
+                        continue;
+                    foreach (string part in body.Split(new[] { " | " }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        string token = part.Trim();
+                        if (token.Length == 0)
+                            continue;
+                        if (seen.Add(token))
+                            result.Add(token);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LogReader] GetLoggedDestructiveErrorTokens: {ex.Message}");
+            }
+            return result;
+        }
+
+        public static void AppendDestructiveErrors(
+            int projectId, int taskId, int attemptNo, IList<string> errors, int variantSetNo = 0)
         {
             if (errors == null || errors.Count == 0)
                 return;
             try
             {
-                string key = $"{projectId},{taskId},{attemptNo}:";
+                string key = DestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
                 string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
                 File.AppendAllText(GetDestructiveErrorLogPath(), key + body + Environment.NewLine, new UTF8Encoding(false));
             }
@@ -848,12 +1197,15 @@ namespace Libraries
             }
         }
 
-        /// <summary>VSTO の [Op] 行に付く [Task P-T-A] を解析（[Op] より前にある場合のみ）。</summary>
-        private static bool TryParseExplicitOpTask(string line, int opIdx, out int projectId, out int taskId, out int attemptNo)
+        private static string DestructivePrefix(int projectId, int taskId, int attemptNo, int variantSetNo)
         {
-            projectId = -1;
-            taskId = -1;
-            attemptNo = 0;
+            return WordTaskLogContext.Create(projectId, taskId, attemptNo, variantSetNo).FormatDestructivePrefix();
+        }
+
+        /// <summary>VSTO の [Op] 行に付く [Task P-T-A] / [Task Vn-P-T-A] を解析（[Op] より前にある場合のみ）。</summary>
+        private static bool TryParseExplicitOpTask(string line, int opIdx, out WordTaskLogContext context)
+        {
+            context = default(WordTaskLogContext);
             int taskIdx = line.IndexOf("[Task ", StringComparison.OrdinalIgnoreCase);
             if (taskIdx < 0 || taskIdx >= opIdx)
                 return false;
@@ -861,33 +1213,7 @@ namespace Libraries
             if (closeIdx < 0 || closeIdx > opIdx)
                 return false;
             string inner = line.Substring(taskIdx + 6, closeIdx - taskIdx - 6).Trim();
-            var tokens = inner.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Length < 2
-                || !int.TryParse(tokens[0].Trim(), out projectId)
-                || !int.TryParse(tokens[1].Trim(), out taskId))
-                return false;
-            if (tokens.Length >= 3)
-                int.TryParse(tokens[2].Trim(), out attemptNo);
-            return projectId > 0 && taskId > 0;
-        }
-
-        private static void ParseTaskStart(string line, out int projectId, out int taskId, out int attemptNo)
-        {
-            projectId = -1;
-            taskId = -1;
-            attemptNo = 0;
-            int startIdx = line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase);
-            if (startIdx < 0)
-                return;
-            string part = line.Substring(startIdx + 11).Trim();
-            var tokens = part.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Length >= 2
-                && int.TryParse(tokens[0].Trim(), out projectId)
-                && int.TryParse(tokens[1].Trim(), out taskId))
-            {
-                if (tokens.Length >= 3)
-                    int.TryParse(tokens[2].Trim(), out attemptNo);
-            }
+            return WordTaskLogFormat.TryParseTaskToken(inner, out context) && context.IsValid;
         }
 
         private static string GetOperationType(string opLine)
@@ -1016,30 +1342,38 @@ namespace Libraries
         }
     }
 
-    /// <summary>タスク単位の attempt 番号（通常 0、結果画面からの再採点は 1 以上）。</summary>
+    /// <summary>
+    /// タスク単位の attempt 番号（通常 0、結果画面からの再採点は 1 以上）。
+    /// 教材は `{project}-{task}`、類題は `V{set}-{project}-{task}`。
+    /// </summary>
     public static class WordTaskAttemptRegistry
     {
         private static readonly object Sync = new object();
         private static readonly Dictionary<string, int> Attempts = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        private static string Key(int projectId, int taskId) => $"{projectId}-{taskId}";
+        private static string Key(int projectId, int taskId, int variantSetNo)
+        {
+            if (variantSetNo > 0)
+                return "V" + variantSetNo + "-" + projectId + "-" + taskId;
+            return projectId + "-" + taskId;
+        }
 
-        public static int GetAttempt(int projectId, int taskId)
+        public static int GetAttempt(int projectId, int taskId, int variantSetNo = 0)
         {
             lock (Sync)
             {
-                if (Attempts.TryGetValue(Key(projectId, taskId), out int v))
+                if (Attempts.TryGetValue(Key(projectId, taskId, variantSetNo), out int v))
                     return Math.Max(0, v);
                 return 0;
             }
         }
 
-        public static void SetAttempt(int projectId, int taskId, int attemptNo)
+        public static void SetAttempt(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             if (attemptNo < 0) attemptNo = 0;
             lock (Sync)
             {
-                Attempts[Key(projectId, taskId)] = attemptNo;
+                Attempts[Key(projectId, taskId, variantSetNo)] = attemptNo;
             }
         }
 
@@ -1051,17 +1385,33 @@ namespace Libraries
             }
         }
 
-        public static void ClearProject(int projectId)
+        public static void ClearProject(int projectId, int variantSetNo = 0)
         {
-            string prefix = projectId + "-";
             lock (Sync)
             {
                 var keys = new List<string>();
-                foreach (var k in Attempts.Keys)
+                if (variantSetNo > 0)
                 {
-                    if (k.StartsWith(prefix, StringComparison.Ordinal))
-                        keys.Add(k);
+                    string prefix = "V" + variantSetNo + "-" + projectId + "-";
+                    foreach (var k in Attempts.Keys)
+                    {
+                        if (k.StartsWith(prefix, StringComparison.Ordinal))
+                            keys.Add(k);
+                    }
                 }
+                else
+                {
+                    string prefix = projectId + "-";
+                    foreach (var k in Attempts.Keys)
+                    {
+                        // 類題キー Vn-P-T は除外
+                        if (k.Length > 0 && (k[0] == 'V' || k[0] == 'v'))
+                            continue;
+                        if (k.StartsWith(prefix, StringComparison.Ordinal))
+                            keys.Add(k);
+                    }
+                }
+
                 foreach (var k in keys)
                     Attempts.Remove(k);
             }

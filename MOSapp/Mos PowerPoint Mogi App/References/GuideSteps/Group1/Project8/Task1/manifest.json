@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド2を選ぶ→表を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［テーブルデザイン］→［テーブルスタイル］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「中間スタイル4-アクセント4」を選ぶ"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［縞模様（行）］のチェックをオフにする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "表以外をクリックして選択解除"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：表が「中間スタイル4-アクセント4」で行の縞模様なし"
+    }
+  ]
+}

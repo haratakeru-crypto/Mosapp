@@ -8,8 +8,8 @@ using System.Text;
 namespace Libraries
 {
     /// <summary>
-    /// Excel一括採点のパフォーマンス計測。処理中はメモリへ蓄積し、
-    /// 一括採点の記録は %TEMP%\mos_excel_grading_perf.log に直近1回だけ残す。
+    /// Excel一括採点のパフォーマンス計測。Debug、または %TEMP%\mos_excel_diag.on があるときだけ、
+    /// 一括採点の記録を %TEMP%\mos_excel_grading_perf.log に直近1回だけ残す。
     /// </summary>
     public static class ExcelGradingPerf
     {
@@ -20,7 +20,7 @@ namespace Libraries
         private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "mos_excel_grading_perf.log");
         private static bool _sessionOpen;
 
-        public static bool Enabled { get; set; } = true;
+        public static bool Enabled => ExcelDiagFlags.IsVerbose;
 
         public static void BeginSession(string name)
         {

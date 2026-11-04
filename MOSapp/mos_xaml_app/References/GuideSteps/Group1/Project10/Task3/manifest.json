@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［G4］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=if」と入力し、一覧から［IF］をダブルクリックして fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "IF関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "セル［F4］をクリックし、「F4」に続けて「<=13%」と入力する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "［値が真の場合］に「在庫を補充」、［値が偽の場合］に「\"\"」と入力し、［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "オートフィル機能を使って、セル［G4］の数式をセル［G99］までコピーする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：［補充の有無］列に IF の結果（在庫を補充／空白）が表示されている"
+    }
+  ]
+}

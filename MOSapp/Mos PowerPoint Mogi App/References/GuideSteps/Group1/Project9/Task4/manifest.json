@@ -1,0 +1,47 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド2を選ぶ→［グラフの挿入］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［グラフの挿入］を確認→［縦棒］→［集合縦棒］→［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "サンプルデータを確認→ワークシートを広げる"
+    },
+    {
+      "image": "step04.png",
+      "caption": "スライドの表を選ぶ→［Ctrl］＋［C］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "ワークシートのセル［A1］をクリック→［Ctrl］＋［V］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "［貼り付けのオプション］→［貼り付け先の書式に合わせる］"
+    },
+    {
+      "image": "step07.png",
+      "caption": "列C〜Dを選ぶ→右クリック→［削除］"
+    },
+    {
+      "image": "step08.png",
+      "caption": "削除を確認→［閉じる］"
+    },
+    {
+      "image": "step09.png",
+      "caption": "表以外をクリックして選択解除"
+    },
+    {
+      "image": "step10.png",
+      "caption": "完成：スライド2に集合縦棒グラフ"
+    }
+  ]
+}

@@ -5,7 +5,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,6 +22,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ExcelApp = Microsoft.Office.Interop.Excel.Application;
 using ExcelWorkbook = Microsoft.Office.Interop.Excel.Workbook;
+using MOSExcelMogiApp.Models;
 using MOSExcelMogiApp.Vocabulary;
 using MosPracticeClient;
 
@@ -95,8 +95,10 @@ namespace Ui.ViewModels
         private string _resultMessage;
         private bool _isExcelOverlayVisible;
         private bool _isShutdownWaitOverlayVisible;
-        private bool _showScoreButton;
+        private bool _showScoreButton = true;
         private bool _showVariantButton;
+        private bool _showAnswerGuide = true;
+        private bool _isAnswerGuideOpen;
         private int _variantSetNo = 1;
         private bool _isVariantMode;
         private bool _isInstantScoring;
@@ -243,11 +245,15 @@ namespace Ui.ViewModels
         /// <summary>教材↔類題の切替完了時に発火。AppBar が問題文を再読込する。</summary>
         public event EventHandler VariantModeChanged;
 
+        /// <summary>解答手順ガイドを閉じる要求（採点開始・タイマー満了・モード切替など）。</summary>
+        public event EventHandler CloseAnswerGuideRequested;
+
         private DispatcherTimer _attachRetryTimer;
         private DispatcherTimer _examExcelWindowWatchTimer;
         private int _examExcelPid;
         private bool _examExcelWindowSeen;
         private bool _isOpeningProject;
+        private bool _isBulkResetInProgress;
         private bool _isScoreResultOpen;
         private bool _endExamPendingAfterScoreResult;
         private int _attachRetryAttempts;
@@ -258,15 +264,15 @@ namespace Ui.ViewModels
             _excelCheckerService = excelCheckerService;
             LoadProjects();
             CheckCommand = new RelayCommand(ExecuteCheck);
-            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: false), _ => !_isOpeningProject);
+            OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: false), _ => !_isOpeningProject && !_isBulkResetInProgress);
             OpenVariantProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant1: true), CanOpenVariantProject);
             ScoreCommand = new RelayCommand(p => ExecuteScoreAsync(p), _ => !_isInstantScoring && !_isScoreResultOpen);
-            EndExamCommand = new RelayCommand(ExecuteEndExam, _ => !_isScoreResultOpen);
+            EndExamCommand = new RelayCommand(ExecuteEndExam, _ => !IsNavigationLocked);
             PauseExamCommand = new RelayCommand(ExecutePauseExam);
-            ResetExamCommand = new RelayCommand(ExecuteResetExam);
-            NextProjectCommand = new RelayCommand(ExecuteNextProject, _ => !_isScoreResultOpen);
-            GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode);
-            GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant);
+            ResetExamCommand = new RelayCommand(ExecuteResetExam, _ => !IsNavigationLocked);
+            NextProjectCommand = new RelayCommand(ExecuteNextProject, _ => !IsNavigationLocked);
+            GoToTextbookCommand = new RelayCommand(ExecuteGoToTextbook, _ => IsVariantMode && !IsNavigationLocked);
+            GoToVariantCommand = new RelayCommand(ExecuteGoToVariant, _ => CanGoToVariant && !IsNavigationLocked);
     }
 
         public bool IsVocabularyMode
@@ -281,6 +287,9 @@ namespace Ui.ViewModels
                 OnPropertyChanged(nameof(NextProjectButtonLabel));
                 OnPropertyChanged(nameof(ShowScoreButtonEffective));
                 OnPropertyChanged(nameof(ShowVocabularyChrome));
+                NotifyAnswerGuideStateChanged();
+                if (value)
+                    RequestCloseAnswerGuide();
             }
         }
 
@@ -325,6 +334,23 @@ namespace Ui.ViewModels
 
         /// <summary>単語帳中は採点ボタンを出さない。</summary>
         public bool ShowScoreButtonEffective => ShowScoreButton && !IsVocabularyMode;
+
+        /// <summary>通常教材は紙芝居手順、類題第1回はテキスト手順を出す。</summary>
+        public bool ShowAnswerGuideEffective
+        {
+            get
+            {
+                if (IsVocabularyMode)
+                    return false;
+                if (IsVariantMode)
+                    return VariantSetNo == 1;
+                if (!ShowAnswerGuide)
+                    return false;
+                if (!TryGetCurrentGroupProjectId(out int groupId, out _))
+                    return false;
+                return groupId == 1;
+            }
+        }
 
         private VocabularyCategory _pendingVocabularyCategory;
         private bool _pendingVocabularySettings;
@@ -944,18 +970,32 @@ namespace Ui.ViewModels
             get => _currentProject;
             set
             {
+                bool projectIdentityChanged = !IsSameProjectIdentity(_currentProject, value);
                 _currentProject = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CurrentProjectName));
                 OnPropertyChanged(nameof(IsNextProjectVisible));
                 NotifyVariantButtonStateChanged();
+                NotifyAnswerGuideStateChanged();
+                if (projectIdentityChanged)
+                    RequestCloseAnswerGuide();
                 CurrentProjectChanged?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        private static bool IsSameProjectIdentity(ProjectInfo left, ProjectInfo right)
+        {
+            if (ReferenceEquals(left, right))
+                return true;
+            if (left == null || right == null)
+                return false;
+            return string.Equals(left.Group, right.Group, StringComparison.Ordinal)
+                   && left.ProjectNumber == right.ProjectNumber;
         }
         
         public string CurrentProjectName => CurrentProject?.Name ?? "プロジェクトが選択されていません";
 
-        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは表示。</summary>
         public bool ShowScoreButton
         {
             get => _showScoreButton;
@@ -972,6 +1012,21 @@ namespace Ui.ViewModels
                 _showVariantButton = value;
                 OnPropertyChanged(nameof(ShowVariantButton));
                 NotifyVariantButtonStateChanged();
+            }
+        }
+
+        /// <summary>解答手順ガイドの表示。デフォルトは表示。</summary>
+        public bool ShowAnswerGuide
+        {
+            get => _showAnswerGuide;
+            set
+            {
+                if (_showAnswerGuide == value) return;
+                _showAnswerGuide = value;
+                OnPropertyChanged(nameof(ShowAnswerGuide));
+                NotifyAnswerGuideStateChanged();
+                if (!value)
+                    RequestCloseAnswerGuide();
             }
         }
 
@@ -1008,6 +1063,9 @@ namespace Ui.ViewModels
                 OnPropertyChanged(nameof(IsVariantMode));
                 OnPropertyChanged(nameof(CanSelectVariantSet));
                 NotifyVariantButtonStateChanged();
+                NotifyAnswerGuideStateChanged();
+                if (value)
+                    RequestCloseAnswerGuide();
             }
         }
 
@@ -1084,7 +1142,7 @@ namespace Ui.ViewModels
             return 0;
         }
 
-        private bool TryGetCurrentGroupProjectId(out int groupId, out int projectId)
+        public bool TryGetCurrentGroupProjectId(out int groupId, out int projectId)
         {
             groupId = 0;
             projectId = 0;
@@ -1104,6 +1162,71 @@ namespace Ui.ViewModels
             return !string.IsNullOrEmpty(path) && File.Exists(path);
         }
 
+        public List<ExcelResetTarget> GetBulkResetTargets(ExcelBulkResetScope scope)
+        {
+            var targets = new List<ExcelResetTarget>();
+            if (scope == ExcelBulkResetScope.Textbook || scope == ExcelBulkResetScope.All)
+            {
+                if (ProjectGroups != null && ProjectGroups.Count > 0)
+                {
+                    var group = ProjectGroups[0];
+                    foreach (var project in group.Projects)
+                    {
+                        targets.Add(new ExcelResetTarget
+                        {
+                            GroupId = group.GroupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = 0,
+                            Label = "演習 プロジェクト" + project.ProjectId,
+                            WorkingPath = GetProjectFilePath(group.GroupId, project.ProjectId),
+                            TemplatePath = DataPathHelper.ResolveTemplateFilePath(group.GroupId, project.ProjectId),
+                            InitialPath = DataPathHelper.GetInitialFilePath(group.GroupId, project.ProjectId)
+                        });
+                    }
+                }
+            }
+
+            if (scope == ExcelBulkResetScope.Variant || scope == ExcelBulkResetScope.All)
+            {
+                if (VariantLaunchProjects != null)
+                {
+                    int variantSetNo = ExcelBulkResetCoordinator.DefaultVariantSetNo;
+                    foreach (var project in VariantLaunchProjects)
+                    {
+                        string templatePath = GetVariantTemplateFilePath(project.GroupId, project.ProjectId, variantSetNo);
+                        if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+                            continue;
+                        targets.Add(new ExcelResetTarget
+                        {
+                            GroupId = project.GroupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = variantSetNo,
+                            Label = "類題 プロジェクト" + project.ProjectId,
+                            WorkingPath = GetVariantWorkingFilePath(project.GroupId, project.ProjectId, variantSetNo),
+                            TemplatePath = templatePath
+                        });
+                    }
+                }
+            }
+
+            return targets;
+        }
+
+        public ExcelResetTarget TryGetCurrentOpenResetTarget(IList<ExcelResetTarget> targets)
+        {
+            if (targets == null || !TryGetCurrentGroupProjectId(out int groupId, out int projectId))
+                return null;
+
+            int variantSetNo = IsVariantMode ? VariantSetNo : 0;
+            foreach (ExcelResetTarget target in targets)
+            {
+                if (target.GroupId == groupId && target.ProjectId == projectId && target.VariantSetNo == variantSetNo)
+                    return target;
+            }
+
+            return null;
+        }
+
         private void NotifyVariantButtonStateChanged()
         {
             OnPropertyChanged(nameof(HasVariantSupportForCurrentProject));
@@ -1114,6 +1237,18 @@ namespace Ui.ViewModels
             OnPropertyChanged(nameof(CanGoToVariant));
             OnPropertyChanged(nameof(IsNextProjectVisible));
             CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void NotifyAnswerGuideStateChanged()
+        {
+            OnPropertyChanged(nameof(ShowAnswerGuideEffective));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        public void RequestCloseAnswerGuide()
+        {
+            CloseAnswerGuideRequested?.Invoke(this, EventArgs.Empty);
         }
         
         public bool IsNextProjectVisible
@@ -1171,12 +1306,45 @@ namespace Ui.ViewModels
 
         public bool IsScoreResultOpen => _isScoreResultOpen;
 
+        /// <summary>採点処理中（結果ダイアログ表示前を含む）。</summary>
+        public bool IsScoring => _isInstantScoring;
+
+        /// <summary>解答手順ガイド表示中。</summary>
+        public bool IsAnswerGuideOpen => _isAnswerGuideOpen;
+
+        /// <summary>終了・リセット・レビュー・次プロ・教材類題切替を抑止する統合ロック。</summary>
+        public bool IsBulkResetInProgress => _isBulkResetInProgress;
+
+        public bool IsNavigationLocked =>
+            _isAnswerGuideOpen || _isInstantScoring || _isScoreResultOpen || _isBulkResetInProgress;
+
+        public void SetBulkResetInProgress(bool value)
+        {
+            if (_isBulkResetInProgress == value)
+                return;
+            _isBulkResetInProgress = value;
+            OnPropertyChanged(nameof(IsBulkResetInProgress));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        public void SetAnswerGuideOpen(bool open)
+        {
+            if (_isAnswerGuideOpen == open)
+                return;
+            _isAnswerGuideOpen = open;
+            OnPropertyChanged(nameof(IsAnswerGuideOpen));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
         public void SetScoreResultOpen(bool open)
         {
             if (_isScoreResultOpen == open)
                 return;
             _isScoreResultOpen = open;
             OnPropertyChanged(nameof(IsScoreResultOpen));
+            OnPropertyChanged(nameof(IsNavigationLocked));
             CommandManager.InvalidateRequerySuggested();
             if (!open && _endExamPendingAfterScoreResult)
             {
@@ -1257,7 +1425,7 @@ namespace Ui.ViewModels
 
         private bool CanOpenVariantProject(object parameter)
         {
-            if (_isOpeningProject)
+            if (_isOpeningProject || _isBulkResetInProgress)
                 return false;
             // ボタン生成直後は CommandParameter がまだ無く、ここで false にすると押せないままになる。
             if (!(parameter is ProjectViewModel project))
@@ -1267,6 +1435,8 @@ namespace Ui.ViewModels
 
         private void ExecuteOpenProject(object parameter, bool openAsVariant1)
         {
+            if (_isBulkResetInProgress)
+                return;
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
 
@@ -2141,11 +2311,15 @@ namespace Ui.ViewModels
 
         private void ExecuteGoToTextbook(object parameter)
         {
+            if (IsNavigationLocked)
+                return;
             SwitchToVariantOrTextbook(targetVariantMode: false, targetSetNo: VariantSetNo);
         }
 
         private void ExecuteGoToVariant(object parameter)
         {
+            if (IsNavigationLocked)
+                return;
             if (!TryGetCurrentGroupProjectId(out int groupId, out int projectId))
                 return;
 
@@ -2235,7 +2409,10 @@ namespace Ui.ViewModels
             if (_isInstantScoring)
                 return;
             _isInstantScoring = true;
+            OnPropertyChanged(nameof(IsScoring));
+            OnPropertyChanged(nameof(IsNavigationLocked));
             CommandManager.InvalidateRequerySuggested();
+            RequestCloseAnswerGuide();
             try
             {
             if (CurrentProject == null)
@@ -2258,27 +2435,25 @@ namespace Ui.ViewModels
             if (IsVariantMode && VariantSetNo == 1)
                 taskCount = VariantProblemWorkbook.GetTaskCount(projectId);
 
+            string libraryName = GetScoringLibraryName(config, groupId, projectId);
+            ExamResultScope resultScope = IsVariantMode
+                ? ExamResultScope.Variant(VariantSetNo)
+                : ExamResultScope.Textbook;
+
+#if DEBUG
             if (IsVariantMode)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                var missingTasks = ExcelScoreProject.ListMissingTasks(libraryName, taskCount);
+                if (missingTasks.Count > 0)
                 {
-                    try
-                    {
-                        var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
-                            ?? Application.Current.MainWindow;
-                        ShowScoreResultDialog(() =>
-                            ScoringResultDialog.ShowVariantResults(owner, taskCount, groupId, projectId, VariantSetNo));
-                        ResultMessage = $"類題{VariantSetNo}: {taskCount}問の解答手順を表示できます";
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"結果の表示中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                });
-                return;
+                    MessageBox.Show(
+                        $"類題チェッカー {libraryName} に未実装のタスクがあります: {string.Join(", ", missingTasks)}",
+                        "採点",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
             }
-
-            string libraryName = GetScoringLibraryName(config, groupId, projectId);
+#endif
 
             // 採点はすぐ始める。300ms を超えたときだけ「採点中です」を出す。
             const int scoringNoticeDelayMs = 300;
@@ -2331,35 +2506,25 @@ namespace Ui.ViewModels
 
             List<bool> results = null;
             List<string> failReasons = null;
-            var checkerReasons = new List<string>();
             try
             {
-                results = await Task.Run(() =>
+                // 一括と同じ ExcelScoreProject（filePath null = ActiveWorkbook の公開 CheckTask + Apply）。
+                // flush は呼び出し側。二重の破壊検知は核内 Apply に一本化。
+                var scored = await Task.Run(() =>
                 {
-                    ExcelLogReader.RequestOpenTaskBoundaryFlush(projectId);
-                    return ExecuteScoringDirect(libraryName, taskCount, checkerReasons);
+                    ExcelLogReader.RequestOpenTaskBoundaryFlush(projectId, variantSetNo: IsVariantMode ? VariantSetNo : 0);
+                    List<bool> projectResults = ExcelScoreProject.ScoreProject(
+                        libraryName,
+                        taskCount,
+                        expectedFilePath: null,
+                        slotProjectId: projectId,
+                        out List<string> reasons,
+                        skipDestructiveValidation: IsVariantMode && VariantSetNo != 1,
+                        variantSetNo: IsVariantMode ? VariantSetNo : 0);
+                    return Tuple.Create(projectResults, reasons);
                 });
-                if (results != null && results.Count == taskCount)
-                {
-                    failReasons = new List<string>(taskCount);
-                    for (int taskIndex = 1; taskIndex <= taskCount; taskIndex++)
-                    {
-                        string checkerReason = taskIndex - 1 < checkerReasons.Count
-                            ? checkerReasons[taskIndex - 1]
-                            : null;
-                        results[taskIndex - 1] = ExcelScoreExplanation.Apply(
-                            projectId,
-                            taskIndex,
-                            results[taskIndex - 1],
-                            checkerReason,
-                            out string reason);
-                        results[taskIndex - 1] = ApplyDestructiveValidationForTask(
-                            projectId,
-                            taskIndex,
-                            results[taskIndex - 1]);
-                        failReasons.Add(results[taskIndex - 1] ? "" : (reason ?? ExcelScoreExplanation.RequirementMissText));
-                    }
-                }
+                results = scored.Item1;
+                failReasons = scored.Item2;
             }
             catch (Exception ex)
             {
@@ -2388,11 +2553,12 @@ namespace Ui.ViewModels
             {
                 try
                 {
-                    MOSExcelMogiApp.Models.ExamResultStorage.SaveProjectResult(projectId, results, failReasons);
+                    ExamResultStorage.SaveProjectResult(resultScope, projectId, results, failReasons);
                     var owner = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault(w => w.IsVisible)
                         ?? Application.Current.MainWindow;
                     ShowScoreResultDialog(() =>
-                        ScoringResultDialog.ShowResults(owner, taskCount, results, groupId, projectId, failReasons));
+                        ScoringResultDialog.ShowResults(
+                            owner, taskCount, results, groupId, projectId, failReasons, hideDetails: IsVariantMode));
                     ResultMessage = $"採点完了: {taskCount}問のタスクを採点しました";
                 }
                 catch (Exception ex)
@@ -2404,6 +2570,8 @@ namespace Ui.ViewModels
             finally
             {
                 _isInstantScoring = false;
+                OnPropertyChanged(nameof(IsScoring));
+                OnPropertyChanged(nameof(IsNavigationLocked));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -2419,461 +2587,6 @@ namespace Ui.ViewModels
         {
             return config["tabs"]?[groupId.ToString()]?["projects"]?[projectId.ToString()];
         }
-        
-        private List<bool> ExecuteScoring(string libraryName, int taskCount)
-        {
-            var results = new List<bool>();
-            
-            try
-            {
-                // Load the DLL
-                Console.WriteLine($"[DEBUG] ExecuteScoring called with libraryName: {libraryName}, taskCount: {taskCount}");
-                
-                // Try multiple DLL paths in order of preference
-                string[] dllPaths = {
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "Debug", "Libraries", $"Group{libraryName.Last()}", $"{libraryName}.dll"),
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Libraries", $"Group{libraryName.Last()}", $"{libraryName}.dll"),
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Libraries", "bin", "Debug", "net48", $"{libraryName}.dll")
-                };
-                
-                string dllPath = null;
-                foreach (string path in dllPaths)
-                {
-                    Console.WriteLine($"[DEBUG] Trying DLL path: {path}");
-                    if (File.Exists(path))
-                    {
-                        dllPath = path;
-                        Console.WriteLine($"[DEBUG] Found DLL at: {dllPath}");
-                        break;
-                    }
-                }
-                
-                if (dllPath == null)
-                {
-                    Console.WriteLine($"[DEBUG] DLL not found, falling back to source: {dllPath}");
-                    // If DLL doesn't exist, try to use the compiled class directly
-                    return ExecuteScoringFromSource(libraryName, taskCount);
-                }
-                
-                Console.WriteLine($"[DEBUG] Loading DLL from: {dllPath}");
-                Assembly assembly = Assembly.LoadFrom(dllPath);
-                Type checkerType = assembly.GetTypes().FirstOrDefault(t => t.Name == libraryName);
-                Console.WriteLine($"[DEBUG] Found type: {checkerType?.Name ?? "null"}");
-                
-                if (checkerType != null)
-                {
-                    object checkerInstance = Activator.CreateInstance(checkerType);
-                    
-                    for (int i = 1; i <= taskCount; i++)
-                    {
-                        string methodName = $"CheckTask_{libraryName.Replace("ExcelChecker", "")}_0{i}";
-                        MethodInfo method = checkerType.GetMethod(methodName);
-                        
-                        if (method != null)
-                        {
-                            bool result = (bool)method.Invoke(checkerInstance, null);
-                            results.Add(result);
-                        }
-                        else
-                        {
-                            results.Add(false); // Method not found
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"DLL loading error: {ex.Message}");
-                // Fallback to source-based execution
-                return ExecuteScoringFromSource(libraryName, taskCount);
-            }
-            
-            return results;
-        }
-        
-        private List<bool> ExecuteScoringFromSource(string libraryName, int taskCount)
-        {
-            var results = new List<bool>();
-            
-            try
-            {
-                // Use reflection to load and execute CheckTask methods from DLL
-                string dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Libraries", GetGroupFolder(libraryName), $"{libraryName}.dll");
-                
-                if (File.Exists(dllPath))
-                {
-                    Assembly assembly = Assembly.LoadFrom(dllPath);
-                    Type checkerType = assembly.GetType(libraryName);
-                    
-                    if (checkerType != null)
-                    {
-                        object checkerInstance = Activator.CreateInstance(checkerType);
-                        
-                        for (int i = 1; i <= taskCount; i++)
-                        {
-                            string methodName = GetCheckTaskMethodName(libraryName, i);
-                            MethodInfo method = checkerType.GetMethod(methodName);
-                            
-                            if (method != null)
-                            {
-                                bool result = (bool)method.Invoke(checkerInstance, null);
-                                results.Add(result);
-                            }
-                            else
-                            {
-                                results.Add(false);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    // DLL not found, try to find in loaded assemblies
-                    string namespaceName = $"Libraries.Group{libraryName.Last()}";
-                    string fullTypeName = $"{namespaceName}.{libraryName}";
-                    
-                    Type checkerType = Type.GetType(fullTypeName);
-                    if (checkerType == null)
-                    {
-                        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                        {
-                            checkerType = assembly.GetType(fullTypeName);
-                            if (checkerType != null) break;
-                        }
-                    }
-                    
-                    if (checkerType != null)
-                    {
-                        object checkerInstance = Activator.CreateInstance(checkerType);
-                        
-                        for (int i = 1; i <= taskCount; i++)
-                        {
-                            string methodName = $"CheckTask_{libraryName.Replace("ExcelChecker", "")}_0{i}";
-                            MethodInfo method = checkerType.GetMethod(methodName);
-                            
-                            if (method != null)
-                            {
-                                bool result = (bool)method.Invoke(checkerInstance, null);
-                                results.Add(result);
-                            }
-                            else
-                            {
-                                results.Add(false);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // If type not found, return all false
-                        for (int i = 0; i < taskCount; i++)
-                        {
-                            results.Add(false);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Source execution error: {ex.Message}");
-                MessageBox.Show($"採点中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                // Return all false on error
-                for (int i = 0; i < taskCount; i++)
-                {
-                    results.Add(false);
-                }
-            }
-            
-            return results;
-        }
-        
-        private string GetGroupFolder(string libraryName)
-        {
-            if (libraryName.StartsWith("ExcelChecker1_")) return "Group1";
-            if (libraryName.StartsWith("ExcelChecker2_")) return "Group2";
-            if (libraryName.StartsWith("ExcelChecker3_")) return "Group3";
-            return "Group1";
-        }
-        
-        private string GetCheckTaskMethodName(string libraryName, int taskNumber)
-        {
-            // Extract group and project numbers from library name
-            var parts = libraryName.Replace("ExcelChecker", "").Split('_');
-            if (parts.Length == 2)
-            {
-                string groupId = parts[0];
-                string projectId = parts[1];
-                return $"CheckTask_{groupId}_{projectId}_{taskNumber:D2}";
-            }
-            return $"CheckTask_{taskNumber:D2}";
-        }
-        
-        private List<bool> ExecuteScoringDirect(string libraryName, int taskCount, List<string> checkerReasons)
-        {
-            var results = new List<bool>();
-            if (checkerReasons == null)
-                checkerReasons = new List<string>();
-            void AddResult(bool passed, string checkerReason)
-            {
-                results.Add(passed);
-                checkerReasons.Add(passed ? "" : (checkerReason ?? ""));
-            }
-            
-            try
-            {
-                Console.WriteLine($"[DEBUG] ExecuteScoringDirect called with libraryName: {libraryName}, taskCount: {taskCount}");
-                
-                // Extract group and project numbers from library name
-                var parts = libraryName.Replace("ExcelChecker", "").Split('_');
-                if (parts.Length >= 2)
-                {
-                    string groupId = parts[0];
-                    string projectId = parts[1];
-                    
-                    // Create namespace and type name
-                    string namespaceName = $"Libraries.Group{groupId}";
-                    string fullTypeName = $"{namespaceName}.{libraryName}";
-                    
-                    Console.WriteLine($"[DEBUG] Looking for type: {fullTypeName}");
-                    
-                    // すべてのアセンブリから型を検索（改善版）
-                    Type checkerType = null;
-                    
-                    // 最初にMOSExcelMogiAppアセンブリを優先的にチェック
-                    var mainAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                        .FirstOrDefault(a => a.GetName().Name == "MOSExcelMogiApp");
-                    
-                    if (mainAssembly != null)
-                    {
-                        Console.WriteLine($"[DEBUG] Checking main assembly: MOSExcelMogiApp");
-                        
-                        try
-                        {
-                            checkerType = mainAssembly.GetType(fullTypeName);
-                            if (checkerType != null)
-                            {
-                                Console.WriteLine($"[DEBUG] Type found in main assembly!");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[DEBUG] Error getting type from main assembly: {ex.Message}");
-                        }
-                        
-                        // 見つからない場合は、名前で検索
-                        if (checkerType == null)
-                        {
-                            try
-                            {
-                                var types = mainAssembly.GetTypes();
-                                Console.WriteLine($"[DEBUG] Main assembly has {types.Length} types");
-                                
-                                foreach (var type in types)
-                                {
-                                    if (type.Name == libraryName)
-                                    {
-                                        Console.WriteLine($"[DEBUG] Found type by name: {type.FullName}");
-                                        checkerType = type;
-                                        break;
-                                    }
-                                }
-                            }
-                            catch (ReflectionTypeLoadException ex)
-                            {
-                                Console.WriteLine($"[DEBUG] ReflectionTypeLoadException: {ex.Message}");
-                                // LoaderExceptionsを確認
-                                if (ex.LoaderExceptions != null)
-                                {
-                                    foreach (var loaderEx in ex.LoaderExceptions)
-                                    {
-                                        Console.WriteLine($"[DEBUG] Loader exception: {loaderEx?.Message}");
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[DEBUG] Error loading types: {ex.Message}");
-                            }
-                        }
-                    }
-                    
-                    // まだ見つからない場合は、他のアセンブリもチェック
-                    if (checkerType == null)
-                    {
-                        Console.WriteLine($"[DEBUG] Type not found in main assembly, checking all assemblies...");
-                        
-                        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                        {
-                            if (assembly == mainAssembly) continue; // 既にチェック済み
-                            
-                            try
-                            {
-                                Console.WriteLine($"[DEBUG] Checking assembly: {assembly.GetName().Name}");
-                                
-                                checkerType = assembly.GetType(fullTypeName);
-                                if (checkerType != null)
-                                {
-                                    Console.WriteLine($"[DEBUG] Type found in assembly: {assembly.GetName().Name}");
-                                    break;
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[DEBUG] Error checking assembly {assembly.GetName().Name}: {ex.Message}");
-                            }
-                        }
-                    }
-                    
-                    // If type not found, try to load from DLL
-                    if (checkerType == null)
-                    {
-                        Console.WriteLine($"[DEBUG] Type not found in loaded assemblies, trying to load DLL");
-                        
-                        // Try multiple DLL paths in order of preference
-                        string[] dllPaths = {
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bin", "Debug", "Libraries", $"Group{groupId}", $"{libraryName}.dll"),
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Libraries", $"Group{groupId}", $"{libraryName}.dll"),
-                            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Libraries", "bin", "Debug", "net48", $"{libraryName}.dll")
-                        };
-                        
-                        string dllPath = null;
-                        foreach (string path in dllPaths)
-                        {
-                            Console.WriteLine($"[DEBUG] Trying DLL path: {path}");
-                            if (File.Exists(path))
-                            {
-                                dllPath = path;
-                                Console.WriteLine($"[DEBUG] Found DLL at: {dllPath}");
-                                break;
-                            }
-                        }
-                        
-                        if (dllPath != null)
-                        {
-                            try
-                            {
-                                Console.WriteLine($"[DEBUG] Loading DLL from: {dllPath}");
-                                Assembly assembly = Assembly.LoadFrom(dllPath);
-                                checkerType = assembly.GetTypes().FirstOrDefault(t => t.Name == libraryName);
-                                Console.WriteLine($"[DEBUG] Found type from DLL: {checkerType?.Name ?? "null"}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[DEBUG] Error loading DLL: {ex.Message}");
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[DEBUG] DLL not found in any of the searched paths");
-                        }
-                    }
-                    
-                    if (checkerType != null)
-                    {
-                        Console.WriteLine($"[DEBUG] Type found: {checkerType.Name}");
-                        
-                        // デバッグ: 利用可能なメソッドをすべて表示
-                        Console.WriteLine($"[DEBUG] Available methods in {checkerType.Name}:");
-                        foreach (var method in checkerType.GetMethods())
-                        {
-                            if (method.Name.StartsWith("CheckTask"))
-                            {
-                                Console.WriteLine($"[DEBUG] - {method.Name}");
-                            }
-                        }
-                        
-                        object checkerInstance = Activator.CreateInstance(checkerType);
-                        
-                        for (int i = 1; i <= taskCount; i++)
-                        {
-                            // 正しいメソッド名の形式を試す
-                            // Group1の場合は CheckTask_1_{projectId}_{taskNumber:D2} の形式を優先
-                            string[] methodNames;
-                            if (groupId == "1")
-                            {
-                                methodNames = new string[] {
-                                    $"CheckTask_1_{projectId}_{i:D2}",          // CheckTask_1_1_01 (優先)
-                                    $"CheckTask_1_{projectId}_0{i}",            // CheckTask_1_1_01 (優先)
-                                    $"CheckTask_{groupId}_{projectId}_{i:D2}",  // CheckTask_1_1_01 (fallback)
-                                    $"CheckTask_{groupId}_{projectId}_0{i}"     // CheckTask_1_1_01 (fallback)
-                                };
-                            }
-                            else
-                            {
-                                methodNames = new string[] {
-                                    $"CheckTask_{groupId}_{projectId}_{i:D2}",  // CheckTask_2_1_01
-                                    $"CheckTask_{groupId}_{projectId}_0{i}",    // CheckTask_2_1_01
-                                    $"CheckTask_1_{projectId}_{i:D2}",          // CheckTask_1_1_01 (fallback)
-                                    $"CheckTask_1_{projectId}_0{i}"             // CheckTask_1_1_01 (fallback)
-                                };
-                            }
-                            
-                            bool methodFound = false;
-                            foreach (string methodName in methodNames)
-                            {
-                                Console.WriteLine($"[DEBUG] Looking for method: {methodName}");
-                                MethodInfo method = checkerType.GetMethod(methodName);
-                                
-                                if (method != null)
-                                {
-                                    Console.WriteLine($"[DEBUG] Method found: {methodName}");
-                                    ExcelScoreExplanation.ClearCheckerReason();
-                                    bool result = (bool)method.Invoke(checkerInstance, null);
-                                    string checkerReason = ExcelScoreExplanation.TakeCheckerReason();
-                                    Console.WriteLine($"[DEBUG] Method {methodName} result: {result}");
-                                    AddResult(result, checkerReason);
-                                    methodFound = true;
-                                    break;
-                                }
-                                else
-                                {
-                                    Console.WriteLine($"[DEBUG] Method not found: {methodName}");
-                                }
-                            }
-                            
-                            if (!methodFound)
-                            {
-                                Console.WriteLine($"[DEBUG] No method found for task {i}, returning false");
-                                AddResult(false, ExcelScoreExplanation.UnavailableText);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"[DEBUG] Type not found: {fullTypeName}");
-                        // Fill with false results if type not found
-                        for (int i = 0; i < taskCount; i++)
-                        {
-                            AddResult(false, ExcelScoreExplanation.UnavailableText);
-                        }
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"[DEBUG] Invalid library name format: {libraryName}");
-                    // Fill with false results if invalid format
-                    for (int i = 0; i < taskCount; i++)
-                    {
-                        AddResult(false, ExcelScoreExplanation.UnavailableText);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DEBUG] Direct execution error: {ex.Message}");
-                Console.WriteLine($"[DEBUG] Stack trace: {ex.StackTrace}");
-                System.Diagnostics.Debug.WriteLine($"Direct execution error: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                MessageBox.Show($"採点中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                ExcelScoreExplanation.ClearCheckerReason();
-                // Fill with false results in case of error
-                for (int i = 0; i < taskCount; i++)
-                {
-                    AddResult(false, ExcelScoreExplanation.UnavailableText);
-                }
-            }
-            
-            return results;
-        }
 
         private void ShowAppBar()
         {
@@ -2881,44 +2594,6 @@ namespace Ui.ViewModels
             HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
             ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
         }
-        
-        /// <summary>
-        /// 破壊的操作検知（一括採点と同じロジック）。<paramref name="projectId"/> は画面上のスロット番号。
-        /// </summary>
-        private static bool ApplyDestructiveValidationForTask(int projectId, int taskId, bool checkerResult)
-        {
-            if (!checkerResult)
-                return false;
-            if (projectId <= 0 || taskId <= 0)
-                return checkerResult;
-
-            try
-            {
-                ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
-
-                if (ExcelLogReader.TryGetFirstNonExemptViolation(
-                        projectId,
-                        taskId,
-                        1,
-                        exemptFlags,
-                        out string violationMsg))
-                {
-                    string line = $"P{projectId}-T{taskId} {violationMsg}";
-                    System.Diagnostics.Debug.WriteLine($"[MainViewModel] Destructive validation failed: {line}");
-                    ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, line);
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainViewModel] ApplyDestructiveValidationForTask error: {ex.Message}");
-                ExcelLogReader.AppendDestructiveError(projectId, taskId, 1, $"P{projectId}-T{taskId} 例外: {ex.Message}");
-                return false;
-            }
-
-            return true;
-        }
-
 
         public void CloseExcelApplication()
         {
@@ -4003,6 +3678,9 @@ namespace Ui.ViewModels
 
         private async void ExecuteNextProject(object parameter)
         {
+            if (IsNavigationLocked)
+                return;
+
             if (IsVocabularyMode)
             {
                 _vocabularySession?.GoNext();

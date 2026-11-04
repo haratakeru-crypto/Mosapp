@@ -400,14 +400,20 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 1-1 離脱時: 滞在中にトグル実績があるとき、いまの表示状態を FinalOn / FinalOff で補記する。
+        /// 教材1-1 / 類題8-5 離脱時: 滞在中にトグル実績があるとき、いまの表示状態を FinalOn / FinalOff で補記する。
         /// 初期ONのまま無操作で離脱しても補記しない（偽○防止）。常時ポーリングは増やさない。
         /// </summary>
-        internal void EnsureTask11ShowAllFinalOnBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
+        internal void EnsureTask11ShowAllFinalOnBeforeLeave(
+            int previousProjectId,
+            int previousTaskId,
+            int previousVariantSetNo,
+            int nextProjectId,
+            int nextTaskId,
+            int nextVariantSetNo)
         {
-            if (previousProjectId != 1 || previousTaskId != 1)
+            if (!IsShowAllEvidenceTask(previousProjectId, previousTaskId, previousVariantSetNo))
                 return;
-            if (nextProjectId == 1 && nextTaskId == 1)
+            if (IsShowAllEvidenceTask(nextProjectId, nextTaskId, nextVariantSetNo))
                 return;
 
             try
@@ -434,7 +440,7 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
-        /// <summary>1-1 再入場時にトグル実績フラグをリセットする。</summary>
+        /// <summary>教材1-1 / 類題8-5 再入場時にトグル実績フラグをリセットする。</summary>
         internal void ResetTask11ShowAllVisit()
         {
             _showAllToggledThisVisit = false;
@@ -666,13 +672,23 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
-        internal static bool IsProjectDocumentName(string fullName, int projectId)
+        internal static bool IsProjectDocumentName(string fullName, int projectId, int variantSetNo = 0)
         {
             string name = Path.GetFileNameWithoutExtension(fullName ?? "");
+            if (variantSetNo > 0)
+            {
+                return string.Equals(
+                        name,
+                        "similar" + variantSetNo + "-" + projectId,
+                        StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(name, "Project" + projectId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(name, "project" + projectId, StringComparison.OrdinalIgnoreCase);
+            }
+
             return string.Equals(name, "Project" + projectId, StringComparison.OrdinalIgnoreCase);
         }
 
-        internal Word.Document TryGetProjectDocument(int projectId)
+        internal Word.Document TryGetProjectDocument(int projectId, int variantSetNo = 0)
         {
             try
             {
@@ -682,7 +698,7 @@ namespace New_MOSWordVSTOAddIn
                 for (int i = app.Documents.Count; i >= 1; i--)
                 {
                     Word.Document doc = app.Documents[i];
-                    if (IsProjectDocumentName(doc.FullName, projectId))
+                    if (IsProjectDocumentName(doc.FullName, projectId, variantSetNo))
                         return doc;
                 }
 
@@ -1333,7 +1349,7 @@ namespace New_MOSWordVSTOAddIn
             ProcessEvidenceFlushRequest();
             ProcessCloseNavigationRequest();
 
-            // 1-1 編集記号のみ View.ShowAll が必要。他タスクでは一切 COM しない。
+            // 教材1-1 / 類題8-5 の編集記号のみ View.ShowAll が必要。他タスクでは一切 COM しない。
             if (!IsShowAllEvidenceTaskActive())
                 return;
 
@@ -1347,11 +1363,21 @@ namespace New_MOSWordVSTOAddIn
             catch { /* ignore */ }
         }
 
-        /// <summary>1-1 のときだけ ShowAll ポーリング（current_task ファイルのみ・Word COM なし）。</summary>
+        /// <summary>教材1-1 または類題8-5 のときだけ ShowAll ポーリング（current_task ファイルのみ・Word COM なし）。</summary>
         private static bool IsShowAllEvidenceTaskActive()
         {
-            return TryGetActiveExamTask(out int projectId, out int taskId)
-                && projectId == 1 && taskId == 1;
+            return TryReadExamTask(out int projectId, out int taskId, out int variantSetNo)
+                && IsShowAllEvidenceTask(projectId, taskId, variantSetNo);
+        }
+
+        /// <summary>
+        /// 編集記号のトグル証跡が必要なタスク。教材8-5（SmartArt）とは別で、類題8-5 のみ対象。
+        /// </summary>
+        private static bool IsShowAllEvidenceTask(int projectId, int taskId, int variantSetNo)
+        {
+            if (variantSetNo > 0)
+                return projectId == 8 && taskId == 5;
+            return projectId == 1 && taskId == 1;
         }
 
         /// <summary>採点アプリが mos_word_flush_evidence.txt を置いたとき、ShowAll と 7-2 Company を即同期してログに反映する。</summary>
@@ -2064,36 +2090,45 @@ namespace New_MOSWordVSTOAddIn
                 }
         }
 
-        /// <summary>試験アプリが書いた mos_word_current_task.txt（または Logger 文脈）から現在の Project/Task を取得。</summary>
+        /// <summary>
+        /// 教材の現在 Project/Task。類題（V1）中は false を返し、教材専用の証跡フックを動かさない。
+        /// </summary>
         private static bool TryGetActiveExamTask(out int projectId, out int taskId)
+        {
+            if (TryReadExamTask(out projectId, out taskId, out int variantSetNo) && variantSetNo == 0)
+                return true;
+
+            projectId = -1;
+            taskId = -1;
+            return false;
+        }
+
+        /// <summary>current_task を優先し、無ければ Logger。類題も含む（variantSetNo &gt; 0）。</summary>
+        private static bool TryReadExamTask(out int projectId, out int taskId, out int variantSetNo)
         {
             projectId = -1;
             taskId = -1;
-            if (Logger.TryGetCurrentTaskContext(out projectId, out taskId) && projectId > 0 && taskId > 0)
-                return true;
-
+            variantSetNo = 0;
             try
             {
                 string path = Path.Combine(Path.GetTempPath(), "mos_word_current_task.txt");
-                if (!File.Exists(path))
-                    return false;
-                var parts = File.ReadAllText(path).Trim().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 2)
-                    return false;
-                if (!int.TryParse(parts[0].Trim(), out projectId) || !int.TryParse(parts[1].Trim(), out taskId))
+                if (File.Exists(path)
+                    && WordTaskLogFormat.TryParseCurrentTaskLine(File.ReadAllText(path), out var context)
+                    && context.IsValid)
                 {
-                    projectId = -1;
-                    taskId = -1;
-                    return false;
+                    projectId = context.ProjectId;
+                    taskId = context.TaskId;
+                    variantSetNo = context.VariantSetNo;
+                    return true;
                 }
-                return projectId > 0 && taskId > 0;
             }
             catch
             {
-                projectId = -1;
-                taskId = -1;
-                return false;
+                // fall through to Logger
             }
+
+            return Logger.TryGetCurrentTaskContext(out projectId, out taskId, out variantSetNo)
+                && projectId > 0 && taskId > 0;
         }
 
         /// <summary>採点直前: 開いている Project7 を複数回ポーリングし Company 確定と証跡を取りこぼさない。</summary>
@@ -3035,11 +3070,13 @@ namespace New_MOSWordVSTOAddIn
             private int _projectId = -1;
             private int _taskId = -1;
             private int _attemptNo;
+            private int _variantSetNo;
             private int _exemptFlags;
             private int _pendingLeaveProjectId = -1;
             private int _pendingLeaveTaskId = -1;
             private int _pendingLeaveAttemptNo;
             private int _pendingLeaveExemptFlags;
+            private int _pendingLeaveVariantSetNo;
             private bool _pendingBaselineSync;
 
             public WordDestructiveMonitor(ThisAddIn addIn)
@@ -3065,27 +3102,33 @@ namespace New_MOSWordVSTOAddIn
             {
                 try
                 {
-                    if (!TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo, out int exemptFlags))
+                    if (!TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo, out int exemptFlags, out int variantSetNo))
                     {
                         ResetTaskContext();
                         return;
                     }
 
-                    bool contextChanged = projectId != _projectId || taskId != _taskId || attemptNo != _attemptNo;
-                    bool snapshotValid = SnapshotMatchesTask(projectId, taskId, attemptNo);
+                    bool contextChanged = projectId != _projectId || taskId != _taskId
+                        || attemptNo != _attemptNo || variantSetNo != _variantSetNo;
+
+                    bool snapshotValid = SnapshotMatchesTask(projectId, taskId, attemptNo, variantSetNo);
                     if (!contextChanged && snapshotValid && _pendingLeaveProjectId < 0 && !_pendingBaselineSync)
                         return;
 
-                    Word.Document doc = _addIn.TryGetProjectDocument(projectId);
-                    bool documentReady = doc != null && ThisAddIn.IsProjectDocumentName(doc.FullName, projectId);
+                    Word.Document doc = _addIn.TryGetProjectDocument(projectId, variantSetNo);
+                    bool documentReady = doc != null
+                        && ThisAddIn.IsProjectDocumentName(doc.FullName, projectId, variantSetNo);
                     if (contextChanged)
-                        BeginTaskContext(projectId, taskId, attemptNo, exemptFlags, documentReady ? doc : null);
+                        BeginTaskContext(projectId, taskId, attemptNo, exemptFlags, variantSetNo, documentReady ? doc : null);
 
                     if (!documentReady)
                         return;
 
-                    if (_pendingBaselineSync)
+                    // 教材専用の証跡ベースライン再同期（類題はスナップショット比較のみ）
+                    if (_pendingBaselineSync && variantSetNo == 0)
                         SyncTaskBaselines(projectId, taskId, doc);
+                    else if (_pendingBaselineSync)
+                        _pendingBaselineSync = false;
 
                     SnapshotData captured = null;
                     if (_pendingLeaveProjectId >= 0 || !snapshotValid)
@@ -3096,7 +3139,8 @@ namespace New_MOSWordVSTOAddIn
                             int capProject = _pendingLeaveProjectId >= 0 ? _pendingLeaveProjectId : projectId;
                             int capTask = _pendingLeaveProjectId >= 0 ? _pendingLeaveTaskId : taskId;
                             int capAttempt = _pendingLeaveProjectId >= 0 ? _pendingLeaveAttemptNo : attemptNo;
-                            captured = Capture(doc, capProject, capTask, capAttempt, openXml);
+                            int capVariant = _pendingLeaveProjectId >= 0 ? _pendingLeaveVariantSetNo : variantSetNo;
+                            captured = Capture(doc, capProject, capTask, capAttempt, capVariant, openXml);
                         }
                         catch (Exception ex)
                         {
@@ -3106,16 +3150,29 @@ namespace New_MOSWordVSTOAddIn
 
                     if (_pendingLeaveProjectId >= 0)
                     {
-                        if (_pendingLeaveProjectId == projectId && captured != null)
-                            CompareAndLogDestructive(_pendingLeaveProjectId, _pendingLeaveTaskId, _pendingLeaveAttemptNo, _pendingLeaveExemptFlags, captured);
+                        if (_pendingLeaveProjectId == projectId
+                            && _pendingLeaveVariantSetNo == variantSetNo
+                            && captured != null)
+                        {
+                            CompareAndLogDestructive(
+                                _pendingLeaveProjectId,
+                                _pendingLeaveTaskId,
+                                _pendingLeaveAttemptNo,
+                                _pendingLeaveExemptFlags,
+                                _pendingLeaveVariantSetNo,
+                                captured);
+                        }
                         _pendingLeaveProjectId = -1;
                     }
 
-                    if (!snapshotValid && captured != null && ThisAddIn.IsProjectDocumentName(captured.FullName, projectId))
+                    if (!snapshotValid
+                        && captured != null
+                        && ThisAddIn.IsProjectDocumentName(captured.FullName, projectId, variantSetNo))
                     {
                         captured.ProjectId = projectId;
                         captured.TaskId = taskId;
                         captured.AttemptNo = attemptNo;
+                        captured.VariantSetNo = variantSetNo;
                         try { SaveSnapshot(captured); }
                         catch (Exception ex)
                         {
@@ -3133,96 +3190,110 @@ namespace New_MOSWordVSTOAddIn
             {
                 _projectId = -1;
                 _taskId = -1;
+                _variantSetNo = 0;
                 _pendingLeaveProjectId = -1;
                 _pendingBaselineSync = false;
             }
 
-            private bool TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo, out int exemptFlags)
+            private bool TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo, out int exemptFlags, out int variantSetNo)
             {
                 projectId = 0;
                 taskId = 0;
                 attemptNo = 0;
                 exemptFlags = 0;
+                variantSetNo = 0;
                 if (!File.Exists(CurrentTaskFilePath))
                     return false;
 
                 string line = File.ReadAllText(CurrentTaskFilePath).Trim();
-                if (string.IsNullOrEmpty(line))
+                if (string.IsNullOrEmpty(line) || !WordTaskLogFormat.TryParseCurrentTaskLine(line, out var context))
                     return false;
 
-                var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 2)
-                    return false;
-                if (!int.TryParse(parts[0].Trim(), out projectId) || !int.TryParse(parts[1].Trim(), out taskId))
-                    return false;
-                if (parts.Length >= 3)
-                    int.TryParse(parts[2].Trim(), out exemptFlags);
-                if (parts.Length >= 4)
-                    int.TryParse(parts[3].Trim(), out attemptNo);
-                return true;
+                projectId = context.ProjectId;
+                taskId = context.TaskId;
+                attemptNo = context.AttemptNo;
+                exemptFlags = context.ExemptFlags;
+                variantSetNo = context.VariantSetNo;
+                return context.IsValid;
             }
 
-            private bool SnapshotMatchesTask(int projectId, int taskId, int attemptNo)
+            private bool SnapshotMatchesTask(int projectId, int taskId, int attemptNo, int variantSetNo)
             {
                 SnapshotData snapshot = LoadSnapshot();
                 return snapshot != null
                     && snapshot.ProjectId == projectId
                     && snapshot.TaskId == taskId
                     && snapshot.AttemptNo == attemptNo
-                    && ThisAddIn.IsProjectDocumentName(snapshot.FullName, projectId);
+                    && snapshot.VariantSetNo == variantSetNo
+                    && ThisAddIn.IsProjectDocumentName(snapshot.FullName, projectId, variantSetNo);
             }
 
-            private void BeginTaskContext(int projectId, int taskId, int attemptNo, int exemptFlags, Word.Document doc)
+            private void BeginTaskContext(int projectId, int taskId, int attemptNo, int exemptFlags, int variantSetNo, Word.Document doc)
             {
-                string normalizedXml = null;
-                if (doc != null && _projectId == 4 && projectId == 4)
+                bool leavingTextbook = _variantSetNo == 0 && _projectId >= 0 && _taskId >= 0;
+                if (leavingTextbook)
                 {
-                    try
+                    string normalizedXml = null;
+                    if (doc != null && _projectId == 4 && projectId == 4 && variantSetNo == 0)
                     {
-                        string openXml = doc.WordOpenXML;
-                        if (!string.IsNullOrEmpty(openXml))
-                            normalizedXml = WordWatermarkInspection.NormalizeXml(openXml);
+                        try
+                        {
+                            string openXml = doc.WordOpenXML;
+                            if (!string.IsNullOrEmpty(openXml))
+                                normalizedXml = WordWatermarkInspection.NormalizeXml(openXml);
+                        }
+                        catch
+                        {
+                            normalizedXml = null;
+                        }
                     }
-                    catch
-                    {
-                        normalizedXml = null;
-                    }
+
+                    _addIn.EnsureTask45WatermarkEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId, normalizedXml);
+                    _addIn.EnsureTask51WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.EnsureTask52WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.EnsureTask61TableConvertEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.EnsureTask33OrientationEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.EnsureTask95AcceptAllEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.EnsureTask43CommentEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.EnsureTask74FileSaveAsEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.EnsureTask75FileSaveAsEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
+                    _addIn.ObserveTask46PageBorderBeforeLeave(_projectId, _taskId);
                 }
 
-                bool sameProject = _projectId >= 0 && projectId == _projectId;
-                _addIn.EnsureTask45WatermarkEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId, normalizedXml);
-                _addIn.EnsureTask51WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask52WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask61TableConvertEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask33OrientationEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask11ShowAllFinalOnBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask95AcceptAllEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask43CommentEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask74FileSaveAsEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.EnsureTask75FileSaveAsEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                _addIn.ObserveTask46PageBorderBeforeLeave(_projectId, _taskId);
+                if (_projectId >= 0 && _taskId >= 0)
+                {
+                    _addIn.EnsureTask11ShowAllFinalOnBeforeLeave(
+                        _projectId, _taskId, _variantSetNo, projectId, taskId, variantSetNo);
+                }
 
-                if (sameProject && _taskId >= 0)
+                // 同一プロジェクト内のタスク切替（教材 / 類題とも）で離脱時差分を記録
+                bool sameScopeLeave = _projectId >= 0 && _taskId >= 0
+                    && _variantSetNo == variantSetNo
+                    && projectId == _projectId;
+                if (sameScopeLeave)
                 {
                     _pendingLeaveProjectId = _projectId;
                     _pendingLeaveTaskId = _taskId;
                     _pendingLeaveAttemptNo = _attemptNo;
                     _pendingLeaveExemptFlags = _exemptFlags;
+                    _pendingLeaveVariantSetNo = _variantSetNo;
                 }
                 else
                 {
                     _pendingLeaveProjectId = -1;
+                    _pendingLeaveVariantSetNo = 0;
                 }
 
                 _projectId = projectId;
                 _taskId = taskId;
                 _attemptNo = attemptNo;
+                _variantSetNo = variantSetNo;
                 _exemptFlags = exemptFlags;
                 _pendingBaselineSync = true;
 
-                if (projectId == 1 && taskId == 1)
+                if (IsShowAllEvidenceTask(projectId, taskId, variantSetNo))
                     _addIn.ResetTask11ShowAllVisit();
-                Logger.SetCurrentTaskContext(projectId, taskId, attemptNo);
+                Logger.SetCurrentTaskContext(projectId, taskId, attemptNo, variantSetNo);
             }
 
             private void SyncTaskBaselines(int projectId, int taskId, Word.Document doc)
@@ -3250,16 +3321,21 @@ namespace New_MOSWordVSTOAddIn
                 _pendingBaselineSync = false;
             }
 
-            private void CompareAndLogDestructive(int projectId, int taskId, int attemptNo, int exemptFlagsInt, SnapshotData current)
+            private void CompareAndLogDestructive(
+                int projectId, int taskId, int attemptNo, int exemptFlagsInt, int variantSetNo, SnapshotData current)
             {
                 if (current == null)
                     return;
 
                 var baseline = LoadSnapshot();
-                if (baseline == null || baseline.ProjectId != projectId || baseline.TaskId != taskId || baseline.AttemptNo != attemptNo)
+                if (baseline == null
+                    || baseline.ProjectId != projectId
+                    || baseline.TaskId != taskId
+                    || baseline.AttemptNo != attemptNo
+                    || baseline.VariantSetNo != variantSetNo)
                     return;
-                if (!ThisAddIn.IsProjectDocumentName(baseline.FullName, projectId)
-                    || !ThisAddIn.IsProjectDocumentName(current.FullName, projectId))
+                if (!ThisAddIn.IsProjectDocumentName(baseline.FullName, projectId, variantSetNo)
+                    || !ThisAddIn.IsProjectDocumentName(current.FullName, projectId, variantSetNo))
                     return;
 
                 var errors = Compare(baseline, current, exemptFlagsInt);
@@ -3268,7 +3344,8 @@ namespace New_MOSWordVSTOAddIn
 
                 try
                 {
-                    string key = $"{projectId},{taskId},{attemptNo}:";
+                    var context = WordTaskLogContext.Create(projectId, taskId, attemptNo, variantSetNo);
+                    string key = context.FormatDestructivePrefix();
                     string body = string.Join(" | ", errors);
                     File.AppendAllText(DestructiveLogPath, key + body + Environment.NewLine, Encoding.UTF8);
                 }
@@ -3314,13 +3391,15 @@ namespace New_MOSWordVSTOAddIn
 
             private static bool HasFlag(int flags, int bit) => (flags & bit) != 0;
 
-            private static SnapshotData Capture(Word.Document doc, int projectId, int taskId, int attemptNo, string openXml = null)
+            private static SnapshotData Capture(
+                Word.Document doc, int projectId, int taskId, int attemptNo, int variantSetNo, string openXml = null)
             {
                 var d = new SnapshotData
                 {
                     ProjectId = projectId,
                     TaskId = taskId,
                     AttemptNo = attemptNo,
+                    VariantSetNo = variantSetNo,
                     FullName = doc.FullName ?? ""
                 };
                 try { d.Sections = doc.Sections.Count; } catch { }
@@ -3378,6 +3457,7 @@ namespace New_MOSWordVSTOAddIn
                 sb.AppendLine($"ProjectId={d.ProjectId}");
                 sb.AppendLine($"TaskId={d.TaskId}");
                 sb.AppendLine($"AttemptNo={d.AttemptNo}");
+                sb.AppendLine($"VariantSetNo={d.VariantSetNo}");
                 sb.AppendLine($"FullName={d.FullName}");
                 sb.AppendLine($"Sections={d.Sections}");
                 sb.AppendLine($"BodyTextLength={d.BodyTextLength}");
@@ -3412,6 +3492,7 @@ namespace New_MOSWordVSTOAddIn
                         case "ProjectId": int.TryParse(val, out int p); d.ProjectId = p; break;
                         case "TaskId": int.TryParse(val, out int t); d.TaskId = t; break;
                         case "AttemptNo": int.TryParse(val, out int a); d.AttemptNo = a; break;
+                        case "VariantSetNo": int.TryParse(val, out int v); d.VariantSetNo = v; break;
                         case "FullName": d.FullName = val; break;
                         case "Sections": int.TryParse(val, out int s); d.Sections = s; break;
                         case "BodyTextLength": int.TryParse(val, out int bl); d.BodyTextLength = bl; break;
@@ -3437,6 +3518,7 @@ namespace New_MOSWordVSTOAddIn
                 public int ProjectId;
                 public int TaskId;
                 public int AttemptNo;
+                public int VariantSetNo;
                 public string FullName;
                 public int Sections;
                 public int BodyTextLength;

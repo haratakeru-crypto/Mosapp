@@ -4,12 +4,12 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows;
 
-[assembly: AssemblyTitle("MOS PowerPoint App")]
+[assembly: AssemblyTitle("前田式PowerPoint演習システム")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("WORKGROUP")]
-[assembly: AssemblyProduct("MOS PowerPoint App")]
-[assembly: AssemblyCopyright("Copyright © WORKGROUP 2025")]
+[assembly: AssemblyCompany("Rabbit")]
+[assembly: AssemblyProduct("前田式PowerPoint演習システム")]
+[assembly: AssemblyCopyright("Copyright © Rabbit 2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

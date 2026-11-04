@@ -21,6 +21,7 @@ using WordApp = Microsoft.Office.Interop.Word.Application;
 using WordDoc = Microsoft.Office.Interop.Word.Document;
 using WordWindow = Microsoft.Office.Interop.Word.Window;
 using Libraries;
+using MOS_Word_app.Guide;
 
 namespace MOS_Word_app.Views
 {
@@ -91,13 +92,18 @@ namespace MOS_Word_app.Views
         private int _groupId = 1; // グループIDを保存
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
-        private Dictionary<int, bool[]> _projectTaskCompletedStates = new Dictionary<int, bool[]>(); // プロジェクトごとの解答済み状態
-        private Dictionary<int, bool[]> _projectTaskFlaggedStates = new Dictionary<int, bool[]>(); // プロジェクトごとのフラグ状態
+        private readonly Dictionary<int, bool[]> _localCompletedStates = new Dictionary<int, bool[]>();
+        private readonly Dictionary<int, bool[]> _localFlaggedStates = new Dictionary<int, bool[]>();
+        private Dictionary<int, bool[]> _projectTaskCompletedStates =>
+            _isVariantMode ? WordTaskReviewStateStore.Completed() : _localCompletedStates;
+        private Dictionary<int, bool[]> _projectTaskFlaggedStates =>
+            _isVariantMode ? WordTaskReviewStateStore.Flagged() : _localFlaggedStates;
         private Dictionary<int, bool[]> _projectTaskViewedStates = new Dictionary<int, bool[]>(); // プロジェクトごとの閲覧状態（未読問題・時間切れ用）
         private DateTime _projectStartTime; // プロジェクト開始時刻
         private DispatcherTimer _projectTimer; // プロジェクト用タイマー（5分制限）
         private Dictionary<int, Dictionary<int, string>> _clipboardTargets = new Dictionary<int, Dictionary<int, string>>(); // クリップボード対象（プロジェクトID → タスクID → 問題文）
         private bool _isScoreResultOpen;
+        private bool _isClosed;
         private bool _nextProjectPendingAfterScoreResult;
         private bool _isPaused = false; // 一時停止状態
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
@@ -111,6 +117,8 @@ namespace MOS_Word_app.Views
         private readonly HashSet<string> _retryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _preparedRetryTaskKeys = new HashSet<string>(StringComparer.Ordinal);
         private string _lastTaskStartKey;
+        private AnswerGuideWindow _answerGuideWindow;
+        private readonly MainViewModel _viewModel;
 
         public int CurrentProjectId => _currentProjectId;
         public int CurrentGroupId => _groupId;
@@ -118,12 +126,19 @@ namespace MOS_Word_app.Views
 
         private readonly bool _isVariantMode;
         
-        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, bool isVariantMode = false)
+        public UiTestAppBarWindow(int projectId = 1, int groupId = 1, bool showScoreButton = false, bool showPauseButton = false, bool isVariantMode = false, MainViewModel viewModel = null)
         {
             InitializeComponent();
             _currentProjectId = projectId;
             _groupId = groupId; // グループIDを保存
             _isVariantMode = isVariantMode;
+            _viewModel = viewModel;
+            if (_viewModel != null)
+            {
+                DataContext = _viewModel;
+                _viewModel.CloseAnswerGuideRequested += OnCloseAnswerGuideRequested;
+                _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            }
             var scoreBtn = FindName("ScoreButton") as System.Windows.Controls.Button;
             if (scoreBtn != null)
                 scoreBtn.Visibility = showScoreButton ? Visibility.Visible : Visibility.Collapsed;
@@ -172,7 +187,11 @@ namespace MOS_Word_app.Views
         private void AdjustScreenButton_Click(object sender, RoutedEventArgs e)
         {
             ScoreResultWindow.TryBringOpenToFront();
-            Dispatcher.BeginInvoke(new Action(SetWindowPosition), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                SetWindowPosition();
+                ClampAnswerGuideToScreen();
+            }), DispatcherPriority.Background);
         }
 
         private void SetWindowPosition()
@@ -263,6 +282,7 @@ namespace MOS_Word_app.Views
             {
                 _timer.Stop();
                 UpdateTimerDisplay();
+                CloseAnswerGuide();
             }
         }
         
@@ -354,6 +374,7 @@ namespace MOS_Word_app.Views
                 return;
             }
 
+            CloseAnswerGuide();
             _isScoring = true;
             var scoreButton = sender as System.Windows.Controls.Button;
             if (scoreButton != null)
@@ -371,7 +392,7 @@ namespace MOS_Word_app.Views
 
                 if (_isVariantMode)
                 {
-                    ShowVariantAnswerSteps(_currentProjectId);
+                    ShowVariantScoreResult();
                     return;
                 }
 
@@ -423,7 +444,8 @@ namespace MOS_Word_app.Views
                     MethodInfo beginOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("Begin");
                     MethodInfo endOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("End");
 
-                    int openAttempt = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                    int openAttempt = WordTaskAttemptRegistry.GetAttempt(
+                        _currentProjectId, _currentTaskId, CurrentVariantSetNo);
                     WordSnapshotChecker.BeginReuseCurrentDocument(_groupId, _currentProjectId);
                     beginOpenXml?.Invoke(null, null);
                     try
@@ -448,19 +470,22 @@ namespace MOS_Word_app.Views
                             try
                             {
                                 WordScoreExplanation.ClearCheckerReason();
-                                int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, taskNum);
-                                if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out string gateReason))
+                                int attemptNo = WordTaskAttemptRegistry.GetAttempt(
+                                    _currentProjectId, taskNum, CurrentVariantSetNo);
+                                if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out List<string> gateActions))
                                 {
                                     string failReason = WordScoreExplanation.ResolveFailReason(
-                                        passed: false, gateFailed: true, gateInternalReason: gateReason);
+                                        passed: false, gateFailed: true, gateStudentActions: gateActions);
                                     taskResults.Add((taskNum, false, failReason));
-                                    ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
+                                    ScoreResultStore.RecordResult(
+                                        _groupId, _currentProjectId, taskNum, false, failReason, CurrentVariantSetNo);
                                     continue;
                                 }
                                 bool taskResult = (bool)method.Invoke(checkerInstance, null);
                                 string reason = WordScoreExplanation.ResolveFailReason(taskResult);
                                 taskResults.Add((taskNum, taskResult, reason));
-                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, taskResult, reason);
+                                ScoreResultStore.RecordResult(
+                                    _groupId, _currentProjectId, taskNum, taskResult, reason, CurrentVariantSetNo);
 
                                 if (taskResult)
                                 {
@@ -475,7 +500,8 @@ namespace MOS_Word_app.Views
                                 string failReason = WordScoreExplanation.ResolveFailReason(
                                     passed: false, unavailable: true);
                                 taskResults.Add((taskNum, false, failReason));
-                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
+                                ScoreResultStore.RecordResult(
+                                    _groupId, _currentProjectId, taskNum, false, failReason, CurrentVariantSetNo);
                                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] タスク{taskNum} エラー: {exTask.Message}");
                             }
                         }
@@ -545,6 +571,7 @@ namespace MOS_Word_app.Views
                 {
                     scoreButton.IsEnabled = true;
                 }
+                ApplyNavigationLockState();
             }
         }
 
@@ -595,6 +622,18 @@ namespace MOS_Word_app.Views
             try { overlay.Close(); } catch { }
         }
 
+        private void ShowVariantScoreResult()
+        {
+            var scoreList = WordVariantScoring.ScoreProject(_groupId, _currentProjectId);
+            if (scoreList.Count == 0)
+            {
+                MessageBox.Show("タスクが見つかりません。", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            ShowScoreResult(scoreList);
+        }
+
         private void ShowScoreResult(IEnumerable<MOS_Word_app.TaskResult> scoreList)
         {
             bool reviewEnabled = ReviewPageButton == null || ReviewPageButton.IsEnabled;
@@ -620,6 +659,7 @@ namespace MOS_Word_app.Views
                     NextProjectButton.IsEnabled = nextEnabled;
                 if (CloseExamButton != null)
                     CloseExamButton.IsEnabled = closeEnabled;
+                ApplyNavigationLockState();
                 if (_nextProjectPendingAfterScoreResult)
                 {
                     _nextProjectPendingAfterScoreResult = false;
@@ -638,6 +678,8 @@ namespace MOS_Word_app.Views
                 NextProjectButton.IsEnabled = enabled;
             if (CloseExamButton != null)
                 CloseExamButton.IsEnabled = enabled;
+            if (AnswerGuideButton != null)
+                AnswerGuideButton.IsEnabled = enabled && !_isScoring;
         }
 
         /// <summary>
@@ -728,6 +770,8 @@ namespace MOS_Word_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             var owner = Application.Current.MainWindow;
             var result = owner != null
                 ? MessageBox.Show(owner, "アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question)
@@ -735,6 +779,7 @@ namespace MOS_Word_app.Views
             if (result != MessageBoxResult.Yes)
                 return;
             MOS_Word_app.Views.WordStartupInputGate.End();
+            CloseAnswerGuide();
             _timer?.Stop();
             SaveAllWordDocumentsAndQuitWord();
             this.Close();
@@ -744,6 +789,9 @@ namespace MOS_Word_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
+            CloseAnswerGuide();
             try
             {
                 // 「結果に戻る」モードの場合は、隠れている ResultWindow を再表示する
@@ -761,9 +809,12 @@ namespace MOS_Word_app.Views
                 // 通常モード: レビューページを開く（編集内容をディスクに保存してから Word を閉じる）
                 LogReader.RequestCloseNavigationPaneIfOpen();
                 WriteCurrentTaskFile();
-                int reviewAttemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
-                WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, reviewAttemptNo);
-                WordBatchScoring.PrepareBeforeClosingDocumentsForBatchScoring(_currentProjectId, _currentTaskId, reviewAttemptNo);
+                int reviewAttemptNo = WordTaskAttemptRegistry.GetAttempt(
+                    _currentProjectId, _currentTaskId, CurrentVariantSetNo);
+                WordSnapshotChecker.LogMatchingBaselineDiffOnce(
+                    _groupId, _currentProjectId, _currentTaskId, reviewAttemptNo, CurrentVariantSetNo);
+                WordBatchScoring.PrepareBeforeClosingDocumentsForBatchScoring(
+                    _currentProjectId, _currentTaskId, reviewAttemptNo);
                 SaveAndCloseAllWordDocuments();
                 this.Hide();
 
@@ -772,8 +823,9 @@ namespace MOS_Word_app.Views
                 reviewWindow.OnNavigateToTask = NavigateToTask;
                 reviewWindow.Closed += (s, args) =>
                 {
-                    // レビューページが閉じられたらメインウィンドウを再表示
-                    this.Show();
+                    if (_isClosed)
+                        return;
+                    Show();
                     ReopenCurrentProjectDocumentIfWordEmpty();
                 };
 
@@ -784,8 +836,8 @@ namespace MOS_Word_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                // エラーが発生した場合はメインウィンドウを再表示
-                this.Show();
+                if (!_isClosed)
+                    Show();
             }
         }
 
@@ -840,14 +892,21 @@ namespace MOS_Word_app.Views
             LogTaskStartIfNeeded();
         }
 
+        private int CurrentVariantSetNo => _isVariantMode ? 1 : 0;
+
         private void WriteCurrentTaskFile()
         {
             try
             {
-                int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
-                var flags = WordTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
-                string content = $"{_currentProjectId},{_currentTaskId},{(int)flags},{attemptNo}";
-                File.WriteAllText(LogReader.GetCurrentTaskFilePath(), content, Encoding.UTF8);
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(
+                    _currentProjectId, _currentTaskId, CurrentVariantSetNo);
+                int flags = CurrentVariantSetNo > 0
+                    ? (int)WordVariantValidationConfig.GetExemptFlags(
+                        CurrentVariantSetNo, _currentProjectId, _currentTaskId)
+                    : (int)WordTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
+                var context = WordTaskLogContext.Create(
+                    _currentProjectId, _currentTaskId, attemptNo, CurrentVariantSetNo, flags);
+                File.WriteAllText(LogReader.GetCurrentTaskFilePath(), context.FormatCurrentTaskLine(), Encoding.UTF8);
             }
             catch (Exception ex)
             {
@@ -857,12 +916,15 @@ namespace MOS_Word_app.Views
 
         private void LogTaskStartIfNeeded()
         {
-            int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
-            string key = $"{_currentProjectId}-{_currentTaskId}-{attemptNo}";
+            int attemptNo = WordTaskAttemptRegistry.GetAttempt(
+                _currentProjectId, _currentTaskId, CurrentVariantSetNo);
+            var context = WordTaskLogContext.Create(
+                _currentProjectId, _currentTaskId, attemptNo, CurrentVariantSetNo);
+            string key = context.FormatTaskToken();
             if (string.Equals(_lastTaskStartKey, key, StringComparison.Ordinal))
                 return;
             _lastTaskStartKey = key;
-            LogReader.LogTaskStart(_currentProjectId, _currentTaskId, attemptNo);
+            LogReader.LogTaskStart(_currentProjectId, _currentTaskId, attemptNo, CurrentVariantSetNo);
         }
 
         private bool EnsureRetryAttemptPrepared(int projectId, int taskId)
@@ -872,10 +934,11 @@ namespace MOS_Word_app.Views
                 return false;
             if (_preparedRetryTaskKeys.Contains(key))
                 return true;
-            int cur = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
-            WordTaskAttemptRegistry.SetAttempt(projectId, taskId, Math.Max(1, cur + 1));
+            int cur = WordTaskAttemptRegistry.GetAttempt(projectId, taskId, CurrentVariantSetNo);
+            WordTaskAttemptRegistry.SetAttempt(projectId, taskId, Math.Max(1, cur + 1), CurrentVariantSetNo);
             _preparedRetryTaskKeys.Add(key);
-            System.Diagnostics.Debug.WriteLine($"[RetryAttempt] P{projectId} T{taskId} attempt={WordTaskAttemptRegistry.GetAttempt(projectId, taskId)}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[RetryAttempt] P{projectId} T{taskId} V{CurrentVariantSetNo} attempt={WordTaskAttemptRegistry.GetAttempt(projectId, taskId, CurrentVariantSetNo)}");
             return true;
         }
 
@@ -914,7 +977,9 @@ namespace MOS_Word_app.Views
                 {
                     if (!TryParseRetryTaskKey(key, out int projectId, out int taskId))
                         continue;
-                    bool? passed = WordBatchScoring.ScoreSingleTask(_groupId, projectId, taskId);
+                    bool? passed = _isVariantMode
+                        ? WordVariantScoring.ScoreSingleTask(_groupId, projectId, taskId)
+                        : WordBatchScoring.ScoreSingleTask(_groupId, projectId, taskId);
                     if (passed.HasValue)
                         _retryTaskKeys.Remove(key);
                 }
@@ -1546,13 +1611,18 @@ namespace MOS_Word_app.Views
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] プロジェクト{_currentProjectId}にタスク{_currentTaskId}が含まれているか: {_clipboardTargets[_currentProjectId].ContainsKey(_currentTaskId)}");
             }
             
-            // 現在のプロジェクト・タスクがクリップボード対象に含まれているかチェック
+            // 現在のプロジェクト・タスクがクリップボード対象に含まれているかチェック（類題は xlsx の問題文を優先）
             string clipboardTargetDescription = null;
-            if (_clipboardTargets.ContainsKey(_currentProjectId) &&
+            if (!_isVariantMode &&
+                _clipboardTargets.ContainsKey(_currentProjectId) &&
                 _clipboardTargets[_currentProjectId].ContainsKey(_currentTaskId))
             {
                 clipboardTargetDescription = _clipboardTargets[_currentProjectId][_currentTaskId];
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] クリップボード対象の問題文を取得: {clipboardTargetDescription.Substring(0, Math.Min(100, clipboardTargetDescription.Length))}...");
+            }
+            else if (_isVariantMode)
+            {
+                System.Diagnostics.Debug.WriteLine("[UpdateTaskDisplay] 類題モードのため xlsx の問題文を使用します");
             }
             else
             {
@@ -1560,9 +1630,15 @@ namespace MOS_Word_app.Views
             }
             
             // コピーできる部分を""で囲んでから表示（「…」と入力 の 「」内をコピー対象に）
-            string descriptionForDisplay = clipboardTargetDescription ?? currentTask.Description;
+            string descriptionForDisplay = _isVariantMode
+                ? currentTask.Description
+                : (clipboardTargetDescription ?? currentTask.Description);
             descriptionForDisplay = WrapCopyablePartInQuotes(descriptionForDisplay);
-            if (clipboardTargetDescription != null)
+            if (_isVariantMode)
+                descriptionForDisplay = WrapVariantCopyablePhrases(_currentProjectId, _currentTaskId, descriptionForDisplay);
+            if (_isVariantMode)
+                System.Diagnostics.Debug.WriteLine("[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（類題 xlsx）");
+            else if (clipboardTargetDescription != null)
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（クリップボード対象）");
             else
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（通常の問題文）");
@@ -1610,6 +1686,35 @@ namespace MOS_Word_app.Views
                 description,
                 @"(?:「([^」]*)」(?:、[^「]*?)?)+と入力",
                 m => Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\""));
+        }
+
+        private static string WrapVariantCopyablePhrases(int projectId, int taskId, string description)
+        {
+            if (string.IsNullOrEmpty(description))
+                return description;
+            if (!WordVariantCopyTargets.TryGetPhrases(projectId, taskId, out string[] phrases))
+                return description;
+
+            foreach (string phrase in phrases)
+            {
+                if (string.IsNullOrEmpty(phrase))
+                    continue;
+
+                string asciiQuoted = "\"" + phrase + "\"";
+                if (description.IndexOf(asciiQuoted, StringComparison.Ordinal) >= 0)
+                    continue;
+
+                string japaneseQuoted = "「" + phrase + "」";
+                int japaneseIndex = description.IndexOf(japaneseQuoted, StringComparison.Ordinal);
+                if (japaneseIndex >= 0)
+                {
+                    description = description.Substring(0, japaneseIndex)
+                        + asciiQuoted
+                        + description.Substring(japaneseIndex + japaneseQuoted.Length);
+                }
+            }
+
+            return description;
         }
 
         /// <summary>
@@ -2085,6 +2190,8 @@ namespace MOS_Word_app.Views
         {
             if (_isScoreResultOpen)
                 return;
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             ScoreResultWindow.TryBringOpenToFront();
             if (TryShowObjectSelectedWarningIfWordObjectSelected())
                 return;
@@ -2146,6 +2253,8 @@ namespace MOS_Word_app.Views
         {
             if (_isMovingToNextProject)
                 return;
+
+            CloseAnswerGuide();
 
             int maxProjectId = _projectData?.Projects?.Max(p => p.ProjectId) ?? 1;
             if (_currentProjectId >= maxProjectId)
@@ -2241,42 +2350,29 @@ namespace MOS_Word_app.Views
                 ApplyExamWindowLayout();
         }
 
-        private static void ShowVariantAnswerSteps(int projectId)
+        private void OpenVariantAnswerSteps()
         {
-            var tasks = VariantProblemWorkbook.GetTasks(projectId);
-            var text = new StringBuilder();
-            if (tasks.Count == 0)
+            int projectId = _currentProjectId;
+            int taskId = _currentTaskId;
+            string steps = string.Empty;
+            try
             {
-                text.Append("解答手順が登録されていません。");
+                VariantTaskText task = VariantProblemWorkbook.GetTasks(projectId)
+                    .FirstOrDefault(item => item.TaskId == taskId);
+                steps = task?.AnswerSteps ?? string.Empty;
             }
-            else
+            catch (Exception ex)
             {
-                foreach (var task in tasks)
-                {
-                    text.AppendLine($"タスク {task.TaskId}");
-                    text.AppendLine(string.IsNullOrWhiteSpace(task.AnswerSteps)
-                        ? "解答手順が登録されていません。"
-                        : task.AnswerSteps);
-                    text.AppendLine();
-                }
+                System.Diagnostics.Debug.WriteLine($"[OpenVariantAnswerSteps] {ex.Message}");
             }
 
-            var window = new Window
+            if (string.IsNullOrWhiteSpace(steps))
+                steps = "手順未登録";
+
+            var window = new AnswerStepsWindow($"類題1 プロジェクト {projectId} タスク {taskId} 解答手順", steps)
             {
-                Title = $"類題 プロジェクト {projectId} 解答手順",
-                Width = 640,
-                Height = 480,
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                Content = new ScrollViewer
-                {
-                    Padding = new Thickness(16),
-                    Content = new TextBlock
-                    {
-                        Text = text.ToString(),
-                        TextWrapping = TextWrapping.Wrap,
-                        FontSize = 14
-                    }
-                }
+                Owner = this,
+                Topmost = true
             };
             window.ShowDialog();
         }
@@ -2346,6 +2442,19 @@ namespace MOS_Word_app.Views
         
         private void FlagButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isVariantMode)
+            {
+                WordTaskReviewState.ToggleReviewLater(
+                    _projectTaskCompletedStates,
+                    _projectTaskFlaggedStates,
+                    _currentProjectId,
+                    _currentTaskId,
+                    CurrentReviewStateCapacity());
+                WordTaskReviewStateStore.Persist();
+                UpdateTaskDisplay();
+                return;
+            }
+
             // 現在のプロジェクトの状態を取得または初期化
             if (!_projectTaskFlaggedStates.ContainsKey(_currentProjectId))
             {
@@ -2381,8 +2490,26 @@ namespace MOS_Word_app.Views
         }
         
         
+        private int CurrentReviewStateCapacity()
+        {
+            return Math.Max(_tasks?.Count ?? 8, Math.Max(8, _currentTaskId));
+        }
+
         private void CompleteButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_isVariantMode)
+            {
+                WordTaskReviewState.ToggleCompleted(
+                    _projectTaskCompletedStates,
+                    _projectTaskFlaggedStates,
+                    _currentProjectId,
+                    _currentTaskId,
+                    CurrentReviewStateCapacity());
+                WordTaskReviewStateStore.Persist();
+                UpdateTaskDisplay();
+                return;
+            }
+
             // 現在のプロジェクトの状態を取得または初期化
             if (!_projectTaskCompletedStates.ContainsKey(_currentProjectId))
             {
@@ -2420,10 +2547,17 @@ namespace MOS_Word_app.Views
         
         private void ResetButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_viewModel?.IsNavigationLocked == true)
+                return;
             try
             {
+                int variantSetNo = CurrentVariantSetNo;
+                string confirmMessage = _isVariantMode
+                    ? $"類題{variantSetNo}（プロジェクト {_groupId}-{_currentProjectId}）をリセットしますか？\n現在の変更内容は失われます。"
+                    : $"プロジェクト{_currentProjectId}をリセットしますか？\n現在の変更内容は失われます。";
+
                 var result = MessageBox.Show(
-                    $"プロジェクト{_currentProjectId}をリセットしますか？\n現在の変更内容は失われます。",
+                    confirmMessage,
                     "リセット確認",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
@@ -2438,13 +2572,16 @@ namespace MOS_Word_app.Views
                     return;
                 }
 
-                MessageBox.Show("プロジェクトをリセットしました。", "リセット完了",
+                string doneMessage = _isVariantMode
+                    ? $"類題{variantSetNo}（プロジェクト {_groupId}-{_currentProjectId}）をリセットしました。"
+                    : "プロジェクトをリセットしました。";
+                MessageBox.Show(doneMessage, "リセット完了",
                     MessageBoxButton.OK, MessageBoxImage.Information);
 
                 string resetFilePath = null;
                 try
                 {
-                    resetFilePath = WordDataPathHelper.FindExistingWorkingFile(_groupId, _currentProjectId);
+                    resetFilePath = ResolveExamFilePath(_groupId, _currentProjectId);
                 }
                 catch (Exception pathEx)
                 {
@@ -2457,10 +2594,17 @@ namespace MOS_Word_app.Views
                 LogWordResetReady(_currentProjectId, resetFilePath);
                 ApplyExamWindowLayout();
 
-                int taskCount = _tasks != null ? _tasks.Count : 0;
-                int arraySize = Math.Max(taskCount, 100);
-                _projectTaskCompletedStates[_currentProjectId] = new bool[arraySize];
-                _projectTaskFlaggedStates[_currentProjectId] = new bool[arraySize];
+                if (_isVariantMode)
+                {
+                    WordTaskReviewStateStore.ClearProject(_currentProjectId);
+                }
+                else
+                {
+                    int taskCount = _tasks != null ? _tasks.Count : 0;
+                    int arraySize = Math.Max(taskCount, 100);
+                    _projectTaskCompletedStates[_currentProjectId] = new bool[arraySize];
+                    _projectTaskFlaggedStates[_currentProjectId] = new bool[arraySize];
+                }
                 UpdateTaskDisplay();
             }
             catch (Exception ex)
@@ -2483,7 +2627,7 @@ namespace MOS_Word_app.Views
                 string workingPath = null;
                 try
                 {
-                    workingPath = WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
+                    workingPath = ResolveExamFilePath(groupId, projectId);
                 }
                 catch (Exception pathEx)
                 {
@@ -2513,8 +2657,22 @@ namespace MOS_Word_app.Views
             var copySw = Stopwatch.StartNew();
             try
             {
-                MOS_Word_app.WordProjectResetHelper.ResetProject(groupId, projectId);
-                ResetPerfLog.Write("word", projectId, "copy", copySw.ElapsedMilliseconds, "main");
+                if (_isVariantMode)
+                {
+                    WordProjectResetHelper.ResetVariantProject(groupId, projectId, CurrentVariantSetNo);
+                    ResetPerfLog.Write(
+                        "word",
+                        projectId,
+                        "copy",
+                        copySw.ElapsedMilliseconds,
+                        "main",
+                        "variant=" + CurrentVariantSetNo);
+                }
+                else
+                {
+                    WordProjectResetHelper.ResetTextbookProject(groupId, projectId);
+                    ResetPerfLog.Write("word", projectId, "copy", copySw.ElapsedMilliseconds, "main");
+                }
             }
             catch
             {
@@ -2601,10 +2759,15 @@ namespace MOS_Word_app.Views
         /// 全プロジェクトの解答済み・フラグ状態をクリアし、表示を更新する。
         /// すべてリセット実行後に MainWindow から呼ばれる。
         /// </summary>
-        public void ClearAllProjectStates()
+        public void ClearAllProjectStates(bool clearTextbook = true, bool clearVariant = true)
         {
-            _projectTaskCompletedStates.Clear();
-            _projectTaskFlaggedStates.Clear();
+            if (clearTextbook)
+            {
+                _localCompletedStates.Clear();
+                _localFlaggedStates.Clear();
+            }
+            if (clearVariant)
+                WordTaskReviewStateStore.Clear();
             UpdateTaskDisplay();
         }
         
@@ -2924,10 +3087,170 @@ namespace MOS_Word_app.Views
             }
         }
         
+        private void OnCloseAnswerGuideRequested(object sender, EventArgs e)
+        {
+            CloseAnswerGuide();
+        }
+
+        private void AnswerGuideButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isScoring || _isScoreResultOpen)
+                return;
+
+            if (_isVariantMode)
+            {
+                OpenVariantAnswerSteps();
+                return;
+            }
+
+            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
+                return;
+
+            if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+            {
+                _answerGuideWindow.BringToFrontPassive();
+                return;
+            }
+
+            OpenAnswerGuide();
+        }
+
+        private void OpenAnswerGuide()
+        {
+            var tasks = GuideStepsRepository.LoadProjectTasks(_groupId, _currentProjectId);
+            CloseAnswerGuide();
+
+            _answerGuideWindow = new AnswerGuideWindow(_groupId, _currentProjectId, tasks, () => _currentTaskId)
+            {
+                Owner = this
+            };
+            _answerGuideWindow.Closed += AnswerGuideWindow_Closed;
+            _answerGuideWindow.ApplyInitialPlacement(GetAnswerGuidePreferredBoundsDip());
+            _answerGuideWindow.Show();
+            _answerGuideWindow.OpenForAppBarTask(_currentTaskId);
+            _viewModel?.SetAnswerGuideOpen(true);
+            ApplyNavigationLockState();
+        }
+
+        private void AnswerGuideWindow_Closed(object sender, EventArgs e)
+        {
+            if (sender is AnswerGuideWindow window)
+                window.Closed -= AnswerGuideWindow_Closed;
+
+            if (ReferenceEquals(_answerGuideWindow, sender))
+                _answerGuideWindow = null;
+
+            _viewModel?.SetAnswerGuideOpen(false);
+            ApplyNavigationLockState();
+        }
+
+        private void CloseAnswerGuide()
+        {
+            if (_answerGuideWindow == null)
+            {
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+                return;
+            }
+
+            try
+            {
+                _answerGuideWindow.Closed -= AnswerGuideWindow_Closed;
+                if (_answerGuideWindow.IsVisible)
+                    _answerGuideWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] CloseAnswerGuide: {ex.Message}");
+            }
+            finally
+            {
+                _answerGuideWindow = null;
+                _viewModel?.SetAnswerGuideOpen(false);
+                ApplyNavigationLockState();
+            }
+        }
+
+        private Rect GetAnswerGuidePreferredBoundsDip()
+        {
+            double width = 720;
+            double height = 640;
+            double left = SystemParameters.WorkArea.Right - width - 24;
+            double top = SystemParameters.WorkArea.Top + 24;
+
+            try
+            {
+                IntPtr wordHwnd = TryGetWordMainWindowHandle();
+                if (wordHwnd != IntPtr.Zero && GetWindowRect(wordHwnd, out RECT wordRect))
+                {
+                    var source = PresentationSource.FromVisual(this);
+                    Matrix transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+                    var topLeft = transform.Transform(new Point(wordRect.left, wordRect.top));
+                    var bottomRight = transform.Transform(new Point(wordRect.right, wordRect.bottom));
+                    double wordWidth = Math.Max(0, bottomRight.X - topLeft.X);
+                    left = topLeft.X + Math.Max(24, wordWidth - width - 24);
+                    top = topLeft.Y + 24;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] GetAnswerGuidePreferredBoundsDip: {ex.Message}");
+            }
+
+            return new Rect(left, top, width, height);
+        }
+
+        private void ClampAnswerGuideToScreen()
+        {
+            try
+            {
+                if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
+                    _answerGuideWindow.ClampToScreen();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] ClampAnswerGuideToScreen: {ex.Message}");
+            }
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsAnswerGuideOpen) ||
+                e.PropertyName == nameof(MainViewModel.IsNavigationLocked) ||
+                e.PropertyName == nameof(MainViewModel.ShowAnswerGuideEffective))
+            {
+                ApplyNavigationLockState();
+            }
+        }
+
+        private void ApplyNavigationLockState()
+        {
+            bool scoringBusy = _isScoring || _isScoreResultOpen;
+            bool navigationEnabled = !scoringBusy && !(_viewModel?.IsNavigationLocked ?? false);
+
+            if (ReviewPageButton != null)
+                ReviewPageButton.IsEnabled = navigationEnabled;
+            if (ResetButton != null)
+                ResetButton.IsEnabled = navigationEnabled;
+            if (NextProjectButton != null)
+                NextProjectButton.IsEnabled = navigationEnabled;
+            if (CloseExamButton != null)
+                CloseExamButton.IsEnabled = navigationEnabled;
+            if (AnswerGuideButton != null)
+                AnswerGuideButton.IsEnabled = !scoringBusy;
+        }
+
         protected override void OnClosed(EventArgs e)
         {
+            _isClosed = true;
+            CloseAnswerGuide();
             _timer?.Stop();
             _projectTimer?.Stop();
+            if (_viewModel != null)
+            {
+                _viewModel.CloseAnswerGuideRequested -= OnCloseAnswerGuideRequested;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            }
             base.OnClosed(e);
         }
     }

@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "問題文のリンク先の URL をコピーする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "スライド1を選ぶ→「情報学習支援」を選ぶ"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［挿入］→［リンク］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［ハイパーリンクの挿入］を確認→［アドレス］を右クリック→［貼り付け］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "URL の貼り付けを確認→［OK］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "プレースホルダー以外をクリックして選択解除"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スライド1の「情報学習支援」にハイパーリンク"
+    }
+  ]
+}

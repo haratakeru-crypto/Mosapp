@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［受注明細］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［挿入］タブをクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ヘッダーとフッター］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "ヘッダー右をクリックし［現在の日付］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "「&[日付]」と表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "任意のセルをクリックし、現在の日付が表示されたことを確認する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "［表示］タブ→［標準］をクリックする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：ヘッダー右に現在の日付が表示されている"
+    }
+  ]
+}

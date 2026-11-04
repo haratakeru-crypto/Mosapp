@@ -6,37 +6,37 @@ using Libraries;
 namespace MOS_Word_app
 {
     /// <summary>
-    /// Word プロジェクトのリセット処理を共通化。MainWindow（すべてリセット）と AppBarWindow（単一リセット）の両方から使用する。
+    /// Word プロジェクトのリセット処理を共通化。演習（Tab1\ProjectN）と類題（PracticeVariant\similar）を分ける。
     /// </summary>
     public static class WordProjectResetHelper
     {
+        public const int DefaultVariantSetNo = 1;
+
         private static readonly string[] WordFileExtensions =
         {
             ".doc", ".docx", ".docm", ".dot", ".dotx", ".dotm", ".rtf", ".txt"
         };
 
+        /// <summary>後方互換。演習プロジェクトのリセット。</summary>
         public static void ResetProject(int groupId, int projectId)
         {
-            // 個別リセット時は対象プロジェクトの採点ログ行のみ削除（他プロジェクトのログを保持）
-            LogReader.ClearTaskEvidenceForProject(projectId);
-            LogReader.ClearDestructiveLogForProject(projectId);
-            LogReader.ClearSnapshot();
-            LogReader.ClearCurrentTaskFile();
-            WordTaskAttemptRegistry.ClearProject(projectId);
+            ResetTextbookProject(groupId, projectId);
+        }
+
+        public static void ResetTextbookProject(int groupId, int projectId)
+        {
+            ClearLogsAfterSuccessfulCopy(projectId, 0);
 
             string workingFolder = WordDataPathHelper.GetWorkingFolder(groupId);
             string templateFolder = WordDataPathHelper.GetTemplateFolder(groupId);
             string initialFolder = WordDataPathHelper.GetInitialFolder(groupId);
             string initialInitialFolder = Path.Combine(initialFolder, "Initial");
 
-            // リセット参照フォルダ内の Word データから Zone.Identifier を削除（保護ビュー防止）
             UnblockWordFilesInFolder(workingFolder);
             UnblockWordFilesInFolder(templateFolder);
             UnblockWordFilesInFolder(initialFolder);
             UnblockWordFilesInFolder(initialInitialFolder);
 
-            // 正規テンプレートを最優先。未配置時は旧 Initial 配置から
-            // 既存ファイルをコピーし、正規テンプレートを作成する。
             string sourceFilePath = WordDataPathHelper.EnsureCanonicalTemplate(groupId, projectId);
             WordDataPathHelper.MakeWritable(sourceFilePath);
             WordDataPathHelper.RemoveZoneIdentifier(sourceFilePath);
@@ -46,15 +46,146 @@ namespace MOS_Word_app
             if (!Directory.Exists(workingFolder))
                 Directory.CreateDirectory(workingFolder);
 
-            if (File.Exists(projectFilePath))
+            string initialFilePath = WordDataPathHelper.GetInitialFilePathForSource(
+                groupId, projectId, sourceFilePath);
+
+            RestoreFromTemplate(sourceFilePath, projectFilePath, initialFilePath);
+
+            if (groupId == 1 && projectId == 7)
+                TryDeleteP7DerivativeOutputs(workingFolder);
+        }
+
+        public static void ResetVariantProject(int groupId, int projectId, int variantSetNo = DefaultVariantSetNo)
+        {
+            if (variantSetNo < 1)
+                variantSetNo = DefaultVariantSetNo;
+
+            ClearLogsAfterSuccessfulCopy(projectId, variantSetNo);
+
+            string templatePath = WordDataPathHelper.FindVariantTemplateFile(groupId, projectId, variantSetNo);
+            if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+            {
+                throw new FileNotFoundException(
+                    $"類題{variantSetNo} プロジェクト{projectId} のテンプレートが見つかりません。",
+                    templatePath ?? string.Empty);
+            }
+
+            string variantFolder = WordDataPathHelper.GetVariantFolder(groupId, variantSetNo);
+            string templatesFolder = Path.Combine(variantFolder, "Templates");
+            UnblockWordFilesInFolder(variantFolder);
+            UnblockWordFilesInFolder(templatesFolder);
+
+            WordDataPathHelper.MakeWritable(templatePath);
+            WordDataPathHelper.RemoveZoneIdentifier(templatePath);
+
+            string workingPath = WordDataPathHelper.ResolveVariantWorkingFilePath(
+                groupId, projectId, variantSetNo, templatePath);
+            string workingDirectory = Path.GetDirectoryName(workingPath);
+            if (!string.IsNullOrEmpty(workingDirectory) && !Directory.Exists(workingDirectory))
+                Directory.CreateDirectory(workingDirectory);
+
+            RestoreFromTemplate(templatePath, workingPath, initialPath: null);
+
+            // 類題1-1: PDF 出力を消し、リセット後に再作成しないと ○ にならないようにする
+            if (groupId == 1 && projectId == 1)
+                TryDeleteVariantP1DerivativeOutputs(workingDirectory);
+        }
+
+        public static void ClearLogsAfterSuccessfulCopy(int projectId, int variantSetNo)
+        {
+            LogReader.ClearLogsForProjectScope(projectId, variantSetNo);
+        }
+
+        /// <summary>演習作業ファイルと Initial をテンプレートから復元（ログクリアは呼び出し側）。</summary>
+        public static void RestoreTextbookProjectFiles(int groupId, int projectId)
+        {
+            string workingFolder = WordDataPathHelper.GetWorkingFolder(groupId);
+            string sourceFilePath = WordDataPathHelper.EnsureCanonicalTemplate(groupId, projectId);
+            WordDataPathHelper.MakeWritable(sourceFilePath);
+            WordDataPathHelper.RemoveZoneIdentifier(sourceFilePath);
+
+            string projectFilePath = WordDataPathHelper.GetWorkingFilePathForSource(
+                groupId, projectId, sourceFilePath);
+            if (!Directory.Exists(workingFolder))
+                Directory.CreateDirectory(workingFolder);
+
+            string initialFilePath = WordDataPathHelper.GetInitialFilePathForSource(
+                groupId, projectId, sourceFilePath);
+
+            RestoreFromTemplate(sourceFilePath, projectFilePath, initialFilePath);
+
+            if (groupId == 1 && projectId == 7)
+                TryDeleteP7DerivativeOutputs(workingFolder);
+        }
+
+        /// <summary>類題作業ファイルを Templates から復元（Initial は更新しない）。</summary>
+        public static void RestoreVariantProjectFiles(int groupId, int projectId, int variantSetNo)
+        {
+            if (variantSetNo < 1)
+                variantSetNo = DefaultVariantSetNo;
+
+            string templatePath = WordDataPathHelper.FindVariantTemplateFile(groupId, projectId, variantSetNo);
+            if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+            {
+                throw new FileNotFoundException(
+                    $"類題{variantSetNo} プロジェクト{projectId} のテンプレートが見つかりません。",
+                    templatePath ?? string.Empty);
+            }
+
+            WordDataPathHelper.MakeWritable(templatePath);
+            WordDataPathHelper.RemoveZoneIdentifier(templatePath);
+
+            string workingPath = WordDataPathHelper.ResolveVariantWorkingFilePath(
+                groupId, projectId, variantSetNo, templatePath);
+            string workingDirectory = Path.GetDirectoryName(workingPath);
+            if (!string.IsNullOrEmpty(workingDirectory) && !Directory.Exists(workingDirectory))
+                Directory.CreateDirectory(workingDirectory);
+
+            RestoreFromTemplate(templatePath, workingPath, initialPath: null);
+
+            if (groupId == 1 && projectId == 1)
+                TryDeleteVariantP1DerivativeOutputs(workingDirectory);
+        }
+
+        public static void UnblockResetReferenceFolders(int groupId, int variantSetNo, bool includeTextbook, bool includeVariant)
+        {
+            if (includeTextbook)
+            {
+                UnblockWordFilesInFolder(WordDataPathHelper.GetWorkingFolder(groupId));
+                UnblockWordFilesInFolder(WordDataPathHelper.GetTemplateFolder(groupId));
+                UnblockWordFilesInFolder(WordDataPathHelper.GetInitialFolder(groupId));
+                UnblockWordFilesInFolder(Path.Combine(WordDataPathHelper.GetInitialFolder(groupId), "Initial"));
+            }
+
+            if (includeVariant)
+            {
+                string variantFolder = WordDataPathHelper.GetVariantFolder(groupId, variantSetNo);
+                UnblockWordFilesInFolder(variantFolder);
+                UnblockWordFilesInFolder(Path.Combine(variantFolder, "Templates"));
+            }
+        }
+
+        /// <summary>テンプレートから作業ファイルへコピー。initialPath 指定時は演習 Initial も更新する。</summary>
+        public static int RestoreFromTemplate(string templatePath, string workingPath, string initialPath = null)
+        {
+            if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+                throw new FileNotFoundException("テンプレートファイルが見つかりません。", templatePath);
+            if (string.IsNullOrEmpty(workingPath))
+                throw new ArgumentException("作業ファイルのパスが空です。", nameof(workingPath));
+
+            WordDataPathHelper.MakeWritable(templatePath);
+            WordDataPathHelper.RemoveZoneIdentifier(templatePath);
+
+            if (File.Exists(workingPath))
             {
                 try
                 {
-                    WordDataPathHelper.MakeWritable(projectFilePath);
+                    WordDataPathHelper.MakeWritable(workingPath);
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] コピー先の読み取り専用解除エラー: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WordProjectResetHelper] コピー先の読み取り専用解除エラー: {ex.Message}");
                 }
             }
 
@@ -64,30 +195,26 @@ namespace MOS_Word_app
             {
                 try
                 {
-                    File.Copy(sourceFilePath, projectFilePath, overwrite: true);
-                    // File.Copy は Zone.Identifier ADS も引き継ぐため、コピー直後に削除して保護ビューを防ぐ
-                    WordDataPathHelper.RemoveZoneIdentifier(projectFilePath);
+                    File.Copy(templatePath, workingPath, overwrite: true);
+                    WordDataPathHelper.RemoveZoneIdentifier(workingPath);
                     try
                     {
-                        WordDataPathHelper.MakeWritable(projectFilePath);
+                        WordDataPathHelper.MakeWritable(workingPath);
                     }
                     catch { }
 
-                    // 3アプリ共通規約: リセット後の作業ファイルを採点用 Initial に反映する。
-                    string initialFilePath = WordDataPathHelper.GetInitialFilePathForSource(
-                        groupId, projectId, sourceFilePath);
-                    string initialDirectory = Path.GetDirectoryName(initialFilePath);
-                    if (!Directory.Exists(initialDirectory))
-                        Directory.CreateDirectory(initialDirectory);
-                    WordDataPathHelper.MakeWritable(initialFilePath);
-                    File.Copy(projectFilePath, initialFilePath, overwrite: true);
-                    WordDataPathHelper.MakeWritable(initialFilePath);
-                    WordDataPathHelper.RemoveZoneIdentifier(initialFilePath);
+                    if (!string.IsNullOrEmpty(initialPath))
+                    {
+                        string initialDirectory = Path.GetDirectoryName(initialPath);
+                        if (!string.IsNullOrEmpty(initialDirectory) && !Directory.Exists(initialDirectory))
+                            Directory.CreateDirectory(initialDirectory);
+                        WordDataPathHelper.MakeWritable(initialPath);
+                        File.Copy(workingPath, initialPath, overwrite: true);
+                        WordDataPathHelper.MakeWritable(initialPath);
+                        WordDataPathHelper.RemoveZoneIdentifier(initialPath);
+                    }
 
-                    if (groupId == 1 && projectId == 7)
-                        TryDeleteP7DerivativeOutputs(workingFolder);
-
-                    return;
+                    return retryCount;
                 }
                 catch (IOException) when (retryCount < maxRetries - 1)
                 {
@@ -100,18 +227,15 @@ namespace MOS_Word_app
                     Thread.Sleep(200);
                 }
             }
+
+            throw new IOException($"ファイルをリセットできませんでした: {workingPath}");
         }
 
-        /// <summary>
-        /// ファイルの Zone.Identifier ADS（NTFS 代替データストリーム）を削除する。
-        /// インターネット由来マークを外し、Word の保護ビューで開かれるのを防ぐ。
-        /// </summary>
         private static void RemoveZoneIdentifier(string filePath)
         {
             WordDataPathHelper.RemoveZoneIdentifier(filePath);
         }
 
-        /// <summary>リセット参照フォルダ内の Word 関連ファイルから Zone.Identifier を一括削除する。</summary>
         private static void UnblockWordFilesInFolder(string folderPath)
         {
             if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
@@ -137,11 +261,11 @@ namespace MOS_Word_app
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] フォルダ一括解除スキップ ({folderPath}): {ex.Message}");
+                System.Diagnostics.Debug.WriteLine(
+                    $"[WordProjectResetHelper] フォルダ一括解除スキップ ({folderPath}): {ex.Message}");
             }
         }
 
-        /// <summary>7-4/7-5 の派生ファイルが残ると 7-2 の状態のみで誤判定し得るため、P7 個別リセット時に削除する。</summary>
         private static void TryDeleteP7DerivativeOutputs(string workingFolder)
         {
             if (string.IsNullOrEmpty(workingFolder) || !Directory.Exists(workingFolder))
@@ -154,8 +278,28 @@ namespace MOS_Word_app
                 try { File.Delete(path); }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[WordProjectResetHelper] 派生ファイル削除スキップ ({name}): {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WordProjectResetHelper] 派生ファイル削除スキップ ({name}): {ex.Message}");
                 }
+            }
+        }
+
+        /// <summary>類題1-1: 作業フォルダの「写真展案内完成.pdf」（教材7-4/7-5の派生削除と同型）。</summary>
+        private static void TryDeleteVariantP1DerivativeOutputs(string workingFolder)
+        {
+            if (string.IsNullOrEmpty(workingFolder) || !Directory.Exists(workingFolder))
+                return;
+
+            const string pdfName = "写真展案内完成.pdf";
+            string path = Path.Combine(workingFolder, pdfName);
+            if (!File.Exists(path))
+                return;
+
+            try { File.Delete(path); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[WordProjectResetHelper] 派生ファイル削除スキップ ({pdfName}): {ex.Message}");
             }
         }
     }

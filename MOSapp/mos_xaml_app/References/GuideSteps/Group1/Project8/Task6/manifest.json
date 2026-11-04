@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［試験結果］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［G7］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=le」と入力し、［LEFT］をダブルクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "LEFT関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "セル［C7］を選択し、［文字列］に「C7」、［文字数］に「2」と入力して［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "セル［G7］のフィルハンドルにマウスポインターを合わせ、［G56］までドラッグする"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：学部学科略称列に略称が表示されている"
+    }
+  ]
+}

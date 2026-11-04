@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［業務予定］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［C5:C11］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［フォントの設定］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［取り消し線］をオンにして［OK］する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：［C5:C11］に取り消し線が設定されている"
+    }
+  ]
+}

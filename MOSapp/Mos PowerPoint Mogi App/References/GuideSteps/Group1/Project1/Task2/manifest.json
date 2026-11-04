@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド4を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［スライドショー］→［非表示スライド］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "サムネイルが淡色になり番号に斜線が付いたことを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド4が非表示になっている"
+    }
+  ]
+}

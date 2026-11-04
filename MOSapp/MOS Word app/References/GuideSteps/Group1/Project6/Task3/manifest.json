@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "1つ目の表の1行2列目をクリックし、［テーブルレイアウト］→［セルの分割］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "列数「3」・行数「1」を確認し、［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "表以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：1つ目の表の1行2列目が3列に分割されている"
+    }
+  ]
+}

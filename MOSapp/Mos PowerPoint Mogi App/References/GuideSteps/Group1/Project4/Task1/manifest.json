@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド1を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "青い図形を選ぶ→「教育者必見」と入力"
+    },
+    {
+      "image": "step03.png",
+      "caption": "図形以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド1の青い図形に「教育者必見」"
+    }
+  ]
+}

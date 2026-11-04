@@ -17,6 +17,7 @@
     <Deterministic>true</Deterministic>
     <UseWPF>true</UseWPF>
     <IsWebBootstrapper>false</IsWebBootstrapper>
+    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -27,11 +28,13 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>11</ApplicationRevision>
+    <ApplicationRevision>13</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <ProductName>前田式PowerPoint演習システム</ProductName>
+    <PublisherName>Rabbit</PublisherName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -187,6 +190,8 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="MainViewModel.cs" />
+    <Compile Include="Guide\AnswerGuideManifest.cs" />
+    <Compile Include="Guide\GuideStepsRepository.cs" />
     <Compile Include="PowerPointDataPathHelper.cs" />
     <Compile Include="VariantProblemWorkbook.cs" />
     <Compile Include="PowerPointProjectResetHelper.cs" />
@@ -198,6 +203,14 @@
     <Compile Include="Views\PowerPointStartupInputGate.cs" />
     <Compile Include="Views\PreparingWindow.xaml.cs">
       <DependentUpon>PreparingWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Page Include="Views\AnswerGuideWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="Views\AnswerGuideWindow.xaml.cs">
+      <DependentUpon>AnswerGuideWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
     <Page Include="Views\UiTestAppBarWindow.xaml">
@@ -279,6 +292,7 @@
     <None Include="Libraries\Group1\PowerPointChecker1_8.csproj" />
     <None Include="Libraries\Group1\PowerPointChecker1_9.csproj" />
     <None Include="Libraries\Group1\PowerPointCheckerCommon.csproj" />
+    <None Include="AppIcon.ico" />
     <None Include="MOS PowerPoint app_TemporaryKey.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
@@ -300,6 +314,15 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\JSON\MOS模擬アプリ問題文一覧_PowerPoint.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\GuideSteps\Group*\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\GuideSteps\Group*\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\GuideSteps\README.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\PowerPoint類題.xlsx">
@@ -331,11 +354,11 @@
     <PreBuildEvent>taskkill /IM "Mos PowerPoint Mogi App.exe" /F 2&gt;nul &amp; exit /b 0</PreBuildEvent>
   </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="StopMosPracticeSessionWatchForCopy" BeforeTargets="CopyMosPracticeSessionWatch" Condition="'$(Configuration)' == 'Debug'">
+    <Exec Command="taskkill /IM MosPracticeSessionWatch.exe /F /T &gt;NUL 2&gt;&amp;1 &amp; ping -n 2 127.0.0.1 &gt;NUL &amp; exit /b 0" />
+  </Target>
   <Target Name="CopyMosPracticeSessionWatch" AfterTargets="Build">
-    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe"
-          DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true"
-          Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
+    <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
   </Target>
   <!-- 発行時に VSTO アドインの出力を publish\PowerPointAddIn1 にコピーする（Import の後に定義して確実に実行されるようにする） -->
   <Target Name="AfterPublish">

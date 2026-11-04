@@ -1,130 +1,158 @@
 using System.Collections.Generic;
-using System.IO;
 
 namespace MOSExcelMogiApp.Models
 {
     /// <summary>
-    /// 試験結果を保存するための静的ストレージクラス
+    /// 試験結果を保存するための静的ストレージクラス。
+    /// 教材と類題セットは別バケットに保存する。
     /// </summary>
     public static class ExamResultStorage
     {
         public delegate void ProjectResultsChangedHandler(int projectId);
+
         /// <summary>
         /// 採点結果が更新されたときに発火（復習採点などでResultWindowを即時更新する用途）
         /// </summary>
         public static event ProjectResultsChangedHandler ResultsChanged;
 
-        // プロジェクトID -> タスクの採点結果（true=正解、false=不正解）
-        private static Dictionary<int, List<bool>> _projectResults = new Dictionary<int, List<bool>>();
-        // プロジェクトID -> タスクごとの×理由（合格は空文字）
-        private static Dictionary<int, List<string>> _projectFailReasons = new Dictionary<int, List<string>>();
-        // 「採点直後」のスナップショット（復習前の正答率計算用）
-        private static Dictionary<int, List<bool>> _initialProjectResults = new Dictionary<int, List<bool>>();
+        private static readonly Dictionary<string, Dictionary<int, List<bool>>> ResultsByScope =
+            new Dictionary<string, Dictionary<int, List<bool>>>();
+        private static readonly Dictionary<string, Dictionary<int, List<string>>> FailReasonsByScope =
+            new Dictionary<string, Dictionary<int, List<string>>>();
+        private static readonly Dictionary<string, Dictionary<int, List<bool>>> InitialResultsByScope =
+            new Dictionary<string, Dictionary<int, List<bool>>>();
 
-        /// <summary>
-        /// プロジェクトの採点結果を保存
-        /// </summary>
         public static void SaveProjectResult(int projectId, List<bool> results)
         {
-            SaveProjectResult(projectId, results, null);
+            SaveProjectResult(ExamResultScope.Textbook, projectId, results, null);
         }
 
-        /// <summary>
-        /// プロジェクトの採点結果と、×の理由を保存する。理由はタスクと同じ順。
-        /// </summary>
         public static void SaveProjectResult(int projectId, List<bool> results, IList<string> failReasons)
         {
-            if (_projectResults == null)
-            {
-                _projectResults = new Dictionary<int, List<bool>>();
-            }
-            if (_projectFailReasons == null)
-            {
-                _projectFailReasons = new Dictionary<int, List<string>>();
-            }
-            
-            _projectResults[projectId] = new List<bool>(results);
+            SaveProjectResult(ExamResultScope.Textbook, projectId, results, failReasons);
+        }
+
+        public static void SaveProjectResult(
+            ExamResultScope scope,
+            int projectId,
+            List<bool> results,
+            IList<string> failReasons)
+        {
+            Dictionary<int, List<bool>> projectResults = Bucket(ResultsByScope, scope);
+            Dictionary<int, List<string>> projectFailReasons = Bucket(FailReasonsByScope, scope);
+
+            projectResults[projectId] = results != null ? new List<bool>(results) : new List<bool>();
             if (failReasons == null)
-                _projectFailReasons.Remove(projectId);
+                projectFailReasons.Remove(projectId);
             else
-                _projectFailReasons[projectId] = new List<string>(failReasons);
+                projectFailReasons[projectId] = new List<string>(failReasons);
+
             try
             {
                 ResultsChanged?.Invoke(projectId);
             }
             catch
             {
-                // UI更新イベントなので例外は握りつぶす
             }
         }
 
-        /// <summary>タスク番号（1始まり）の×理由。無いときは空文字。</summary>
         public static string GetFailReason(int projectId, int taskId)
         {
-            if (_projectFailReasons == null || taskId <= 0)
+            return GetFailReason(ExamResultScope.Textbook, projectId, taskId);
+        }
+
+        public static string GetFailReason(ExamResultScope scope, int projectId, int taskId)
+        {
+            if (taskId <= 0)
                 return "";
-            if (!_projectFailReasons.TryGetValue(projectId, out List<string> reasons) || reasons == null)
+
+            Dictionary<int, List<string>> reasonsByProject = Bucket(FailReasonsByScope, scope);
+            if (!reasonsByProject.TryGetValue(projectId, out List<string> reasons) || reasons == null)
                 return "";
+
             int index = taskId - 1;
             if (index < 0 || index >= reasons.Count || reasons[index] == null)
                 return "";
             return reasons[index];
         }
 
-        /// <summary>
-        /// 採点直後の全プロジェクト結果をスナップショットとして保存する。
-        /// 既にスナップショットが存在する場合は上書きしない（最初の採点結果を保持する）。
-        /// </summary>
         public static void SaveInitialResultsIfEmpty(Dictionary<int, List<bool>> allResults)
         {
-            if (allResults == null || allResults.Count == 0)
-            {
-                return;
-            }
-
-            if (_initialProjectResults != null && _initialProjectResults.Count > 0)
-            {
-                // すでに初回採点結果が保存されている場合は何もしない
-                return;
-            }
-
-            _initialProjectResults = new Dictionary<int, List<bool>>();
-            foreach (var kv in allResults)
-            {
-                _initialProjectResults[kv.Key] = new List<bool>(kv.Value);
-            }
+            SaveInitialResultsIfEmpty(ExamResultScope.Textbook, allResults);
         }
 
-        /// <summary>
-        /// すべてのプロジェクトの採点結果を取得
-        /// </summary>
+        public static void SaveInitialResultsIfEmpty(ExamResultScope scope, Dictionary<int, List<bool>> allResults)
+        {
+            if (allResults == null || allResults.Count == 0)
+                return;
+
+            Dictionary<int, List<bool>> initial = Bucket(InitialResultsByScope, scope);
+            if (initial.Count > 0)
+                return;
+
+            foreach (var kv in allResults)
+                initial[kv.Key] = kv.Value != null ? new List<bool>(kv.Value) : new List<bool>();
+        }
+
         public static Dictionary<int, List<bool>> GetAllResults()
         {
-            return _projectResults ?? new Dictionary<int, List<bool>>();
+            return GetAllResults(ExamResultScope.Textbook);
         }
 
-        /// <summary>
-        /// 採点直後のスナップショット結果を取得する。
-        /// </summary>
+        public static Dictionary<int, List<bool>> GetAllResults(ExamResultScope scope)
+        {
+            return Clone(Bucket(ResultsByScope, scope));
+        }
+
         public static Dictionary<int, List<bool>> GetInitialResults()
         {
-            return _initialProjectResults ?? new Dictionary<int, List<bool>>();
+            return GetInitialResults(ExamResultScope.Textbook);
         }
 
-        /// <summary>
-        /// 採点結果をクリア
-        /// </summary>
+        public static Dictionary<int, List<bool>> GetInitialResults(ExamResultScope scope)
+        {
+            return Clone(Bucket(InitialResultsByScope, scope));
+        }
+
         public static void Clear()
         {
-            _projectResults?.Clear();
-            _projectFailReasons?.Clear();
-            _initialProjectResults?.Clear();
+            Clear(ExamResultScope.Textbook);
+        }
+
+        public static void Clear(ExamResultScope scope)
+        {
+            string key = (scope ?? ExamResultScope.Textbook).Key;
+            if (ResultsByScope.TryGetValue(key, out Dictionary<int, List<bool>> results))
+                results.Clear();
+            if (FailReasonsByScope.TryGetValue(key, out Dictionary<int, List<string>> reasons))
+                reasons.Clear();
+            if (InitialResultsByScope.TryGetValue(key, out Dictionary<int, List<bool>> initial))
+                initial.Clear();
+        }
+
+        private static Dictionary<int, T> Bucket<T>(
+            Dictionary<string, Dictionary<int, T>> store,
+            ExamResultScope scope)
+        {
+            string key = (scope ?? ExamResultScope.Textbook).Key;
+            if (!store.TryGetValue(key, out Dictionary<int, T> bucket) || bucket == null)
+            {
+                bucket = new Dictionary<int, T>();
+                store[key] = bucket;
+            }
+
+            return bucket;
+        }
+
+        private static Dictionary<int, List<bool>> Clone(Dictionary<int, List<bool>> source)
+        {
+            var clone = new Dictionary<int, List<bool>>();
+            if (source == null)
+                return clone;
+
+            foreach (var kv in source)
+                clone[kv.Key] = kv.Value != null ? new List<bool>(kv.Value) : new List<bool>();
+            return clone;
         }
     }
 }
-
-
-
-
-
-

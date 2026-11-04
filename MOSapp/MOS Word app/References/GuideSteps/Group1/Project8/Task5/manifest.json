@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "最後のページの段落をクリックし、［挿入］→［SmartArt］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［集合関係］→［基本ベン図］→［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "SmartArtが挿入され、テキストウィンドウが表示されていることを確認する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "テキストウィンドウに「機密性」「完全性」「可用性」と入力する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "SmartArt以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：最後のページに基本ベン図「機密性」「完全性」「可用性」が挿入されている"
+    }
+  ]
+}

@@ -69,6 +69,10 @@ namespace New_MOSWordVSTOAddIn
                 {
                     loggedCommandId = "ColumnsLeft";
                 }
+                else if (string.Equals(commandId, "IndentClassic", StringComparison.OrdinalIgnoreCase))
+                {
+                    loggedCommandId = "IndentIncrease";
+                }
                 else if (string.Equals(commandId, "PageOrientationPortraitLandscape", StringComparison.OrdinalIgnoreCase))
                 {
                     Globals.ThisAddIn?.RegisterRibbonLoggedPageOrientation();

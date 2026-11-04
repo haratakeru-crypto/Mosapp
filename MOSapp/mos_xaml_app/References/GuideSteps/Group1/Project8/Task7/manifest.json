@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［申込一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［I5］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=un」と入力し、［UNIQUE］をダブルクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "UNIQUE関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "セル範囲［E5:E174］を選択し、［配列］に表示を確認して［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：学部一覧に一意の学部名が表示されている"
+    }
+  ]
+}

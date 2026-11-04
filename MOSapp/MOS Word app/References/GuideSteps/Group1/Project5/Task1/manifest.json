@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「5月21日より5日間の…」の先頭をクリックし、［挿入］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［画像］→［このデバイス］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ノートPC］を選択し、［挿入］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "ノートPCの画像が挿入されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［レイアウトオプション］→［上下］→［閉じる］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "画像以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：段落先頭に「ノートPC」が挿入され、折り返しが「上下」になっている"
+    }
+  ]
+}

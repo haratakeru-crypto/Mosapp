@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# 解答手順ガイドの再分割作業物（PDF・全ページPNG・スクリプト）
+References/GuideSteps/_source/
+
 # User-specific files
 *.rsuser
 *.suo

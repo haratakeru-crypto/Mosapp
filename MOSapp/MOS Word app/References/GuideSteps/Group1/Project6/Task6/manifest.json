@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「2.北海道のうまいもの市場売上」の表の1行目を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［テーブルレイアウト］→［タイトル行の繰り返し］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "表以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：表の1行目が各ページのタイトル行として表示される"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 7,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド2を選ぶ→[?]アイコンを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［グラフィック形式］→［グラフィックの塗りつぶし］→［濃い赤］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "アイコン以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド2の[?]アイコンに濃い赤の塗りつぶし"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「（2）月別催事内容」の表の5行目を選択し、［テーブルレイアウト］→［表の分割］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "完成：表が5行目から2つに分かれている"
+    }
+  ]
+}

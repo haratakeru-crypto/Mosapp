@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［スライドショー］→［スライドショーの設定］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［自動プレゼンテーション］→［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：スライドショーを自動プレゼンテーションに設定"
+    }
+  ]
+}

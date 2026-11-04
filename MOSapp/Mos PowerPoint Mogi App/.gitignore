@@ -1,0 +1,4 @@
+# 解答手順ガイドの再分割作業物（PDF・全ページPNG・スクリプト）
+References/GuideSteps/_source/
+# 誤植修正のバックアップ（stepNN.png の隣に置くがコミットしない）
+References/GuideSteps/**/*_original.png

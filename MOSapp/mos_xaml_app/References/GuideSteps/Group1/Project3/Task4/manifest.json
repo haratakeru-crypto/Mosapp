@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［販売実績］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ページレイアウト］タブ→［余白］→［広い］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：余白が［広い］に設定されている"
+    }
+  ]
+}

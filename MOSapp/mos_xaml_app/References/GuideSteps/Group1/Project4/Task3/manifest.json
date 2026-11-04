@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［下半期売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［A4:A10］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［Ctrl］を押しながらセル範囲［H4:H10］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［挿入］→［円またはドーナツグラフの挿入］→［3-D 円］を選択する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "グラフに凡例が表示されていることを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "グラフエリアをドラッグして表の右側に移動する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "任意のセルをクリックしてグラフの選択を解除する"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：3-D円グラフが表の右側に配置されている"
+    }
+  ]
+}

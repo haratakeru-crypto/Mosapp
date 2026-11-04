@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［挿入］タブをクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［ヘッダー］→［インテグラル］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "ヘッダーを確認し、［ヘッダーとフッターを閉じる］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：「インテグラル」のヘッダーが挿入されている"
+    }
+  ]
+}

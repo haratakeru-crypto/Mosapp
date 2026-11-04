@@ -74,6 +74,7 @@ namespace MOS_Word_app.Views
         private DispatcherTimer _projectTimer; // プロジェクト用タイマー（5分制限）
         private Dictionary<int, Dictionary<int, string>> _clipboardTargets = new Dictionary<int, Dictionary<int, string>>(); // クリップボード対象（プロジェクトID → タスクID → 問題文）
         private bool _isPaused = false; // 一時停止状態
+        private bool _isClosed;
         private DateTime _pauseStartTime; // 一時停止開始時刻（プロジェクトタイマー用）
         private List<System.Windows.Controls.Button> _dynamicTaskButtons = new List<System.Windows.Controls.Button>(); // 動的に生成されたタスクボタン（8番目以降）
         
@@ -350,10 +351,11 @@ namespace MOS_Word_app.Views
                 // 現在のタイマー残り時間と状態情報を渡す（AppBarWindowのインスタンスとgroupIdも渡す）
                 var reviewWindow = new ReviewPageWindow(_remainingTime, _projectTaskCompletedStates, _projectTaskFlaggedStates, null, this, _groupId);
                 reviewWindow.OnNavigateToTask = NavigateToTask;
-                reviewWindow.Closed += (s, args) => 
+                reviewWindow.Closed += (s, args) =>
                 {
-                    // レビューページが閉じられたらメインウィンドウを再表示
-                    this.Show();
+                    if (_isClosed)
+                        return;
+                    Show();
                     ReopenCurrentProjectDocumentIfWordEmpty();
                 };
                 
@@ -364,8 +366,8 @@ namespace MOS_Word_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                // エラーが発生した場合はメインウィンドウを再表示
-                this.Show();
+                if (!_isClosed)
+                    Show();
             }
         }
 
@@ -2104,6 +2106,7 @@ namespace MOS_Word_app.Views
         
         protected override void OnClosed(EventArgs e)
         {
+            _isClosed = true;
             _timer?.Stop();
             _projectTimer?.Stop();
             base.OnClosed(e);

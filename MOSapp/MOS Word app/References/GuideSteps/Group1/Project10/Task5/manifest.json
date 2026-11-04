@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［レイアウト］→［サイズ］→［B5］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "最後のページに移動し、最後の2行を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］→［段落の設定］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［行間］→［倍数］、［間隔］に「1.6」→［OK］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：用紙サイズが B5、最後の2行の行間が 1.6 になっている"
+    }
+  ]
+}

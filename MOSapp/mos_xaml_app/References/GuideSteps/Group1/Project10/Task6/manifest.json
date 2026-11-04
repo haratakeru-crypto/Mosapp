@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上集計］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［D6］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=so」と入力し、一覧から［SORT］をダブルクリックして fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "SORT関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "セル範囲［A6:B14］を選択し、［配列］に「A6:B14」と表示されていることを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "［並べ替えインデックス］に「2」、［並べ替え順序］に「-1」と入力し、［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：［売上順担当者名］が売上合計の降順になっている"
+    }
+  ]
+}

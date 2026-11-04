@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［販売実績］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［表示］タブ→［改ページプレビュー］をクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "青い点線（ページの区切り）をG列の右側までドラッグする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［表示］タブ→［標準］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：6月までが1ページ目、7月以降が2ページ目になるよう改ページが設定されている"
+    }
+  ]
+}

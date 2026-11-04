@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "「朗読を楽しみましょう！」を選び、［ホーム］タブを確認する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［フォントの色］の▼→［青、アクセント 1、黒＋基本色 25%］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：「朗読を楽しみましょう！」が青になっている"
+    }
+  ]
+}

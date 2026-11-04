@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［イベント売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［H5］を選択し、数式バーに「=SUM(D5:G5)」と表示されていることを確認する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "セル［H5］のフィルハンドルにマウスポインターを合わせ、＋の形で［H16］までドラッグする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：4日間合計列に数式がコピーされている"
+    }
+  ]
+}

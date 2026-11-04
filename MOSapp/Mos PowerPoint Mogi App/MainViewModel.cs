@@ -28,7 +28,9 @@ namespace MOS_PowerPoint_app
     {
         private int _selectedTabIndex;
         private string _resultMessage;
-        private bool _showScoreButton;
+        private bool _showScoreButton = true;
+        private bool _showAnswerGuide = true;
+        private bool _isAnswerGuideOpen;
         private ProjectViewModel _currentProject;
         private ObservableCollection<TaskResult> _taskResults;
         private int _totalScore;
@@ -89,11 +91,68 @@ namespace MOS_PowerPoint_app
             }
         }
 
-        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは非表示。</summary>
+        /// <summary>採点ボタンをアプリバーに表示するか。デフォルトは表示。</summary>
         public bool ShowScoreButton
         {
             get => _showScoreButton;
             set { _showScoreButton = value; OnPropertyChanged(nameof(ShowScoreButton)); }
+        }
+
+        /// <summary>解答手順ガイドの表示。デフォルトは表示。</summary>
+        public bool ShowAnswerGuide
+        {
+            get => _showAnswerGuide;
+            set
+            {
+                if (_showAnswerGuide == value)
+                    return;
+                _showAnswerGuide = value;
+                OnPropertyChanged(nameof(ShowAnswerGuide));
+                NotifyAnswerGuideStateChanged();
+                if (!value)
+                    RequestCloseAnswerGuide();
+            }
+        }
+
+        /// <summary>Group1 通常教材かつオプション ON のときだけ手順ボタンを出す。</summary>
+        public bool ShowAnswerGuideEffective
+        {
+            get
+            {
+                if (!ShowAnswerGuide || IsVariantMode)
+                    return false;
+                return CurrentProject == null || CurrentProject.GroupId == 1;
+            }
+        }
+
+        /// <summary>解答手順ガイド表示中。</summary>
+        public bool IsAnswerGuideOpen => _isAnswerGuideOpen;
+
+        /// <summary>リセット・レビュー・次プロ・終了を抑止する統合ロック。</summary>
+        public bool IsNavigationLocked => _isAnswerGuideOpen;
+
+        public event EventHandler CloseAnswerGuideRequested;
+
+        public void SetAnswerGuideOpen(bool open)
+        {
+            if (_isAnswerGuideOpen == open)
+                return;
+            _isAnswerGuideOpen = open;
+            OnPropertyChanged(nameof(IsAnswerGuideOpen));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        public void RequestCloseAnswerGuide()
+        {
+            CloseAnswerGuideRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void NotifyAnswerGuideStateChanged()
+        {
+            OnPropertyChanged(nameof(ShowAnswerGuideEffective));
+            OnPropertyChanged(nameof(IsNavigationLocked));
+            CommandManager.InvalidateRequerySuggested();
         }
 
         public string CurrentProjectName => CurrentProject?.Name ?? "";
@@ -396,6 +455,9 @@ namespace MOS_PowerPoint_app
 
                         IsVariantMode = openAsVariant;
                         CurrentProject = project;
+                        NotifyAnswerGuideStateChanged();
+                        if (openAsVariant)
+                            RequestCloseAnswerGuide();
                         HideMainWindowRequested?.Invoke(this, EventArgs.Empty);
                         ShowAppBarRequested?.Invoke(this, EventArgs.Empty);
                         ResultMessage = $"PowerPointファイルを開きました: {Path.GetFileName(filePath)}";
@@ -519,6 +581,9 @@ namespace MOS_PowerPoint_app
 
                 grader.LogOpenTaskBaselineDiffOnce(CurrentProject.ProjectId);
                 Libraries.PPLogReader.ClearSnapshot();
+
+                // 開いたまま採点するとき、離脱境界を通っていない現在タスクの証跡を先に確定する。
+                Libraries.PPLogReader.RequestOpenTaskEvidenceFlush(CurrentProject.ProjectId);
 
                 int passedCount = 0;
                 foreach (var task in project.Tasks.OrderBy(t => t.TaskId))

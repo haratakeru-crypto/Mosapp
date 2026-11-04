@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド8を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "箇条書きをクリックしてドラッグする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］→［文字の間隔］→［その他の間隔］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［フォント］ダイアログが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［文字幅と間隔］の［幅］に「4」を入力して［OK］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "プレースホルダー以外をクリックし、選択を解除する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スライド8の箇条書きの文字間隔が4ptになっている"
+    }
+  ]
+}

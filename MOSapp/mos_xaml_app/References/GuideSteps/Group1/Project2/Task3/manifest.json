@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［社員リスト］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［A2:F2］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ホーム］タブ→［配置の設定］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［横位置］で［選択範囲内で中央］を選び［OK］する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：［A2］の文字が［A2:F2］の中央に配置されている"
+    }
+  ]
+}

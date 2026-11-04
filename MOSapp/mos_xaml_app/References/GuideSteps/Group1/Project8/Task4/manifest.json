@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 8,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［試験結果］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［J4］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=cou」と入力し、［COUNTBLANK］をダブルクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step05.png",
+      "caption": "COUNTBLANK関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "セル範囲［L7:L56］を選択し、［範囲］に表示を確認して［OK］をクリックする"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：セル［J4］に欠席者数が表示されている"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド3を選ぶ→丸図形4個を［Shift］で選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［図形の書式］→［配置］→［右揃え］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "図形以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド3の丸図形4個の右端を揃える"
+    }
+  ]
+}

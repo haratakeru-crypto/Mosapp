@@ -77,6 +77,7 @@ namespace MOS_Word_app
             var main = new MainWindow();
             MainWindow = main;
             main.Show();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
 
             CloseStartupSplash();
 

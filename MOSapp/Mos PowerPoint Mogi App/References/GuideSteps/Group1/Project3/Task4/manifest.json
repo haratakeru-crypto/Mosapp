@@ -1,0 +1,39 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド1を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［挿入］→［3Dモデル］→［このデバイス］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［虫眼鏡］→［挿入］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "3Dモデルの挿入を確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［3Dモデル］→幅「2.5」"
+    },
+    {
+      "image": "step06.png",
+      "caption": "楕円の中にドラッグ"
+    },
+    {
+      "image": "step07.png",
+      "caption": "3Dモデル以外をクリックして選択解除"
+    },
+    {
+      "image": "step08.png",
+      "caption": "完成：スライド1の楕円内に虫眼鏡（幅2.5）"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド1を選ぶ→オーディオのアイコンを選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［再生］→［スライド切り替え後も再生］をオン→［フェードアウト］に「3」"
+    },
+    {
+      "image": "step03.png",
+      "caption": "オーディオ以外をクリックして選択解除"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：スライド1のオーディオが切り替え後も1回再生・3秒フェードアウト"
+    }
+  ]
+}

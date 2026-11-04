@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 6,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［スライドショー］→［目的別スライドショー］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "ダイアログを確認→［新規作成］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「書式のポイント」と入力"
+    },
+    {
+      "image": "step04.png",
+      "caption": "スライド4・5・6を選ぶ→［追加］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "追加を確認→［OK］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "作成を確認→［閉じる］"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：目的別スライドショー「書式のポイント」"
+    }
+  ]
+}

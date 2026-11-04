@@ -1,0 +1,27 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド7を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "SmartArtを選ぶ→［SmartArtのデザイン］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［色の変更］→［グラデーション循環-アクセント6］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "SmartArt以外をクリックして選択解除"
+    },
+    {
+      "image": "step05.png",
+      "caption": "完成：スライド7のSmartArtがグラデーション循環-アクセント6"
+    }
+  ]
+}

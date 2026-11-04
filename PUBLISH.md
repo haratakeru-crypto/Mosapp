@@ -42,7 +42,7 @@ Merge を実行しないと、他PCで問題文・採点が参照できず動作
 
 発行フォルダ（または `Application Files\MOSapp_1_0_0_*`）に以下があることを確認してください。
 
-- `MOSapp.exe`（表紙）
+- `MOSapp.exe`（表紙。ClickOnce 表示名は「前田式MOS演習システム」、うさぎアイコン）
 - `MOSExcelMogiApp.exe`, `MOS Word app.exe`, `Mos PowerPoint Mogi App.exe`
 - `References\JSON\` 配下の各科目の問題文 JSON
 - `Assets\config.json`（任意）

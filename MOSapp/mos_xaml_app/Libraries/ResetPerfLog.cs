@@ -6,7 +6,8 @@ using System.Text;
 namespace Libraries
 {
     /// <summary>
-    /// アプリバーのリセット所要時間。%TEMP%\mos_reset_perf.log は直近1回だけ残す。
+    /// アプリバーのリセット所要時間。Debug、または %TEMP%\mos_excel_diag.on があるときだけ、
+    /// %TEMP%\mos_reset_perf.log に直近1回だけ残す。
     /// </summary>
     public static class ResetPerfLog
     {
@@ -15,11 +16,15 @@ namespace Libraries
 
         public static void Begin(string app, int projectId)
         {
+            if (!ExcelDiagFlags.IsVerbose)
+                return;
             WriteLine($"===== {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {app} project={projectId} reset =====", replace: true);
         }
 
         public static void Write(string app, int projectId, string stage, long elapsedMs, string path, string detail = null)
         {
+            if (!ExcelDiagFlags.IsVerbose)
+                return;
             string line = string.IsNullOrWhiteSpace(detail)
                 ? $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {app} project={projectId} {stage} {elapsedMs} ms path={path}"
                 : $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {app} project={projectId} {stage} {elapsedMs} ms path={path} {detail}";

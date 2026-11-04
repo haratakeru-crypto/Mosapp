@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 2,
+  "taskId": 6,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "スライド2を選ぶ"
+    },
+    {
+      "image": "step02.png",
+      "caption": "男の子の図を選ぶ→［Shift］＋？マーク"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［アニメーション］"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［効果のオプション］→［左上から］"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［継続時間］に「0.55」→［Enter］"
+    },
+    {
+      "image": "step06.png",
+      "caption": "図以外をクリックして選択解除"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スライド2の2つの画像が左上から0.55秒で登場する"
+    }
+  ]
+}

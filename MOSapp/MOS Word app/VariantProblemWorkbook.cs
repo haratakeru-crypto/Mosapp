@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 
@@ -118,7 +119,7 @@ namespace MOS_Word_app
 
                     var sharedStrings = workbookPart.SharedStringTablePart?.SharedStringTable
                         ?.Elements<SharedStringItem>()
-                        .Select(item => item.InnerText ?? string.Empty)
+                        .Select(VisibleSharedStringText)
                         .ToList();
 
                     bool headerFound = false;
@@ -227,9 +228,45 @@ namespace MOS_Word_app
             }
 
             if (cell.DataType != null && cell.DataType.Value == CellValues.InlineString)
-                return cell.InlineString?.InnerText ?? string.Empty;
+                return VisibleInlineStringText(cell.InlineString);
 
             return cell.CellValue?.InnerText ?? string.Empty;
+        }
+
+        /// <summary>
+        /// セルに表示される文字だけを返す。InnerText は Excel のふりがな（rPh）まで連結してしまう。
+        /// </summary>
+        private static string VisibleSharedStringText(SharedStringItem item)
+        {
+            if (item == null)
+                return string.Empty;
+
+            if (item.Text != null)
+                return item.Text.Text ?? string.Empty;
+
+            return ConcatenateRunText(item.Elements<Run>());
+        }
+
+        private static string VisibleInlineStringText(InlineString inline)
+        {
+            if (inline == null)
+                return string.Empty;
+
+            if (inline.Text != null)
+                return inline.Text.Text ?? string.Empty;
+
+            return ConcatenateRunText(inline.Elements<Run>());
+        }
+
+        private static string ConcatenateRunText(IEnumerable<Run> runs)
+        {
+            if (runs == null)
+                return string.Empty;
+
+            var text = new StringBuilder();
+            foreach (Run run in runs)
+                text.Append(run.Text?.Text);
+            return text.ToString();
         }
 
         private static int ColumnIndex(string cellReference)

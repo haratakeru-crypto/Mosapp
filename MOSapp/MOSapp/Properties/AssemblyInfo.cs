@@ -7,12 +7,12 @@ using System.Windows;
 // アセンブリに関する一般的な情報は、次の方法で制御されます
 // アセンブリに関連付けられている情報を変更するには、
 // これらの属性値を変更してください。
-[assembly: AssemblyTitle("MOSapp")]
+[assembly: AssemblyTitle("前田式MOS演習システム")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("WORKGROUP")]
-[assembly: AssemblyProduct("MOSapp")]
-[assembly: AssemblyCopyright("Copyright © WORKGROUP 2026")]
+[assembly: AssemblyCompany("Rabbit")]
+[assembly: AssemblyProduct("前田式MOS演習システム")]
+[assembly: AssemblyCopyright("Copyright © Rabbit 2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

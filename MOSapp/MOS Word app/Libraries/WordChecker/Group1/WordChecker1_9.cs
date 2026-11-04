@@ -329,17 +329,17 @@ namespace Libraries.Group1
                     return false;
                 }
 
-                // 2. パスワードが「654」に設定されているかをサイレント検証
+                // 2. パスワードが「456」に設定されているかをサイレント検証
                 bool passwordOk = false;
                 try
                 {
-                    // パスワード「654」で解除を試みる (画面上のダイアログや警告は一切出ません)
-                    document.Unprotect("654");
+                    // パスワード「456」で解除を試みる (画面上のダイアログや警告は一切出ません)
+                    document.Unprotect("456");
                     passwordOk = true;
 
-                    // 検証成功したため、即座に同じ「変更履歴のみ」「パスワード: 654」で保護を掛け直す
+                    // 検証成功したため、即座に同じ「変更履歴のみ」「パスワード: 456」で保護を掛け直す
                     // NoReset: true を指定することで、文書の状態を一切リセットせず完全に維持します
-                    document.Protect(WdProtectionType.wdAllowOnlyRevisions, NoReset: true, Password: "654");
+                    document.Protect(WdProtectionType.wdAllowOnlyRevisions, NoReset: true, Password: "456");
                 }
                 catch (COMException)
                 {

@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 9,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "表内をクリックし、［テーブルレイアウト］→［セルの配置］"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［右］に「4」と入力して［OK］"
+    },
+    {
+      "image": "step03.png",
+      "caption": "表以外をクリックして選択を解除する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：「小豆島のうまいもの市場売上」下の表のセル右余白が「4」mmになっている"
+    }
+  ]
+}

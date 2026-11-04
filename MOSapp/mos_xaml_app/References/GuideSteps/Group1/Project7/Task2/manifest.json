@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［受注明細］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "表内の任意のセルを選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［データ］タブ→［並べ替え］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［最優先されるキー］で［商品ID］を選択し、順序が［小さい順］であることを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［レベルの追加］→次キー［金額］・順序［大きい順］→［OK］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：商品ID昇順・金額降順で並べ替えられている"
+    }
+  ]
+}

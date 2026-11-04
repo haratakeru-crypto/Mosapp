@@ -44,18 +44,50 @@ namespace Libraries
             return Path.Combine(Path.GetTempPath(), "mos_excel_flush_boundary.txt");
         }
 
+        public static string GetLogSchemaMarkerPath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_excel_log_schema_v2.marker");
+        }
+
+        /// <summary>
+        /// 教材と類題のログキーを分離したスキーマへ一度だけ移行する。
+        /// 旧ログは教材/類題を判別できないため、初回のみ操作ログと破壊ログを破棄する。
+        /// </summary>
+        public static void EnsureLogSchemaV2()
+        {
+            try
+            {
+                string marker = GetLogSchemaMarkerPath();
+                if (File.Exists(marker))
+                    return;
+
+                ClearOperationLog();
+                ClearDestructiveLog();
+                ClearCurrentTaskFile();
+                CancelPendingBoundaryFlush();
+                ClearLogLinesCache();
+                File.WriteAllText(marker, DateTime.UtcNow.ToString("o"), Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ExcelLogReader] EnsureLogSchemaV2: " + ex.Message);
+            }
+        }
+
         /// <summary>
         /// その場採点の開始時、いま開いているタスクの未記録差分だけをアドインへ書き出させる。
         /// 採点対象プロジェクトと現在タスクが違うときは何もしない。
         /// </summary>
-        public static void RequestOpenTaskBoundaryFlush(int scoringProjectId, int timeoutMs = 1500)
+        public static void RequestOpenTaskBoundaryFlush(int scoringProjectId, int timeoutMs = 1500, int variantSetNo = -1)
         {
-            if (!TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo))
+            if (!TryReadCurrentTask(out TaskLogContext context) || !context.IsValid)
                 return;
-            if (projectId != scoringProjectId || taskId <= 0)
+            if (context.ProjectId != scoringProjectId)
+                return;
+            if (variantSetNo >= 0 && context.VariantSetNo != variantSetNo)
                 return;
 
-            TryRequestBoundaryFlush(projectId, taskId, attemptNo, timeoutMs, out _);
+            TryRequestBoundaryFlush(context, timeoutMs, out _);
         }
 
         /// <summary>
@@ -64,22 +96,22 @@ namespace Libraries
         /// </summary>
         public static bool TryRequestCurrentTaskBoundaryFlush(int timeoutMs, out string detail)
         {
-            if (!TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo) || taskId <= 0)
+            if (!TryReadCurrentTask(out TaskLogContext context) || !context.IsValid)
             {
                 detail = "no-current-task";
                 return false;
             }
 
-            return TryRequestBoundaryFlush(projectId, taskId, attemptNo, timeoutMs, out detail);
+            return TryRequestBoundaryFlush(context, timeoutMs, out detail);
         }
 
-        private static bool TryRequestBoundaryFlush(int projectId, int taskId, int attemptNo, int timeoutMs, out string detail)
+        private static bool TryRequestBoundaryFlush(TaskLogContext context, int timeoutMs, out string detail)
         {
-            detail = $"P{projectId}-T{taskId}-A{attemptNo}";
+            detail = context.FormatTaskToken();
             string path = GetBoundaryFlushRequestPath();
             try
             {
-                File.WriteAllText(path, $"{projectId},{taskId},{attemptNo}", Encoding.UTF8);
+                File.WriteAllText(path, context.FormatCurrentTaskLine(), Encoding.UTF8);
                 var sw = Stopwatch.StartNew();
                 while (sw.ElapsedMilliseconds < timeoutMs)
                 {
@@ -102,36 +134,55 @@ namespace Libraries
             }
         }
 
-        private static bool TryReadCurrentTask(out int projectId, out int taskId, out int attemptNo)
+        public static void CancelPendingBoundaryFlush()
         {
-            projectId = taskId = 0;
-            attemptNo = 1;
+            try
+            {
+                string path = GetBoundaryFlushRequestPath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch { }
+        }
+
+        public static void CancelPendingBoundaryFlushIfMatches(int projectId, int variantSetNo)
+        {
+            try
+            {
+                string path = GetBoundaryFlushRequestPath();
+                if (!File.Exists(path))
+                    return;
+                string line = File.ReadAllText(path).Trim();
+                if (!TaskLogFormat.TryParseCurrentTaskLine(line, out TaskLogContext context)
+                    || context.MatchesProjectScope(projectId, variantSetNo))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch { }
+        }
+
+        private static bool TryReadCurrentTask(out TaskLogContext context)
+        {
+            context = default(TaskLogContext);
             try
             {
                 string path = GetCurrentTaskFilePath();
                 if (!File.Exists(path))
                     return false;
                 string line = File.ReadAllText(path).Trim();
-                if (string.IsNullOrEmpty(line))
-                    return false;
-                string[] parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length < 2)
-                    return false;
-                if (!int.TryParse(parts[0].Trim(), out projectId))
-                    return false;
-                if (!int.TryParse(parts[1].Trim(), out taskId))
-                    return false;
-                if (parts.Length >= 3)
-                {
-                    int.TryParse(parts[2].Trim(), out attemptNo);
-                    if (attemptNo < 1) attemptNo = 1;
-                }
-                return projectId > 0 && taskId > 0;
+                return TaskLogFormat.TryParseCurrentTaskLine(line, out context) && context.IsValid;
             }
             catch
             {
                 return false;
             }
+        }
+
+        public static void ClearCurrentTaskFileIfMatches(int projectId, int variantSetNo)
+        {
+            if (TryReadCurrentTask(out TaskLogContext context) && context.MatchesProjectScope(projectId, variantSetNo))
+                ClearCurrentTaskFile();
         }
 
         public static void ClearCurrentTaskFile()
@@ -150,11 +201,14 @@ namespace Libraries
             return Path.Combine(Path.GetTempPath(), "mos_excel_destructive_errors.log");
         }
 
-        public static void AppendDestructiveError(int projectId, int taskId, int attemptNo, string message)
+        public static void AppendDestructiveError(int projectId, int taskId, int attemptNo, string message, int variantSetNo = 0)
         {
+            if (!ExcelDiagFlags.IsVerbose)
+                return;
             try
             {
-                string line = $"{projectId},{taskId},{attemptNo}:{message}{Environment.NewLine}";
+                var context = TaskLogContext.Create(projectId, taskId, attemptNo, variantSetNo);
+                string line = context.FormatDestructivePrefix() + message + Environment.NewLine;
                 File.AppendAllText(GetDestructiveLogPath(), line);
             }
             catch { }
@@ -163,14 +217,27 @@ namespace Libraries
         /// <summary>指定したプロジェクトに関連する破壊的操作エラーログのみをクリアします。</summary>
         public static void ClearDestructiveLogForProject(int projectId)
         {
+            ClearDestructiveLogForProject(projectId, 0);
+        }
+
+        public static void ClearDestructiveLogForProject(int projectId, int variantSetNo)
+        {
             try
             {
                 string path = GetDestructiveLogPath();
                 if (!File.Exists(path)) return;
 
-                string prefix = $"{projectId},";
                 var lines = File.ReadAllLines(path);
-                var keptLines = lines.Where(l => !l.StartsWith(prefix)).ToList();
+                var keptLines = new List<string>();
+                foreach (string line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+                    if (TaskLogFormat.TryParseDestructivePrefix(line, out TaskLogContext context)
+                        && context.MatchesProjectScope(projectId, variantSetNo))
+                        continue;
+                    keptLines.Add(line);
+                }
 
                 File.WriteAllLines(path, keptLines);
             }
@@ -190,6 +257,11 @@ namespace Libraries
         /// <summary>指定したプロジェクトに関連する操作ログ（%TEMP%\mos_excel_log.txt）をクリアします。</summary>
         public static void ClearOperationLogForProject(int projectId)
         {
+            ClearOperationLogForProject(projectId, 0);
+        }
+
+        public static void ClearOperationLogForProject(int projectId, int variantSetNo)
+        {
             try
             {
                 string path = GetLogFilePath();
@@ -197,42 +269,47 @@ namespace Libraries
 
                 var lines = File.ReadAllLines(path);
                 var keptLines = new List<string>();
-                int currentLineProjectId = -1;
+                TaskLogContext currentLineContext = default(TaskLogContext);
+                bool currentLineValid = false;
 
                 foreach (var line in lines)
                 {
                     if (string.IsNullOrWhiteSpace(line)) continue;
 
-                    // [TaskStart] 行のチェック
-                    int taskStartIdx = line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase);
-                    if (taskStartIdx >= 0)
+                    if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        ParseTaskStart(line, out currentLineProjectId, out _, out _);
-                        if (currentLineProjectId != projectId)
-                        {
+                        currentLineValid = TaskLogFormat.TryParseTaskStartLine(line, out currentLineContext);
+                        if (!(currentLineValid && currentLineContext.MatchesProjectScope(projectId, variantSetNo)))
                             keptLines.Add(line);
-                        }
                         continue;
                     }
 
-                    // 明示的なプロジェクト接頭辞（例: [Task 1-2-1]）のチェック
-                    string projectPrefix = $"[Task {projectId}-";
-                    if (line.IndexOf(projectPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (TaskLogFormat.TryParseExplicitTaskPrefix(line, out TaskLogContext explicitContext)
+                        && explicitContext.MatchesProjectScope(projectId, variantSetNo))
                     {
-                        // リセット対象プロジェクトの行なのでスキップ
                         continue;
                     }
 
-                    // 文脈上のプロジェクトIDが一致しない（または不明な）場合は保持
-                    if (currentLineProjectId != projectId)
-                    {
-                        keptLines.Add(line);
-                    }
+                    if (currentLineValid && currentLineContext.MatchesProjectScope(projectId, variantSetNo))
+                        continue;
+
+                    keptLines.Add(line);
                 }
 
                 File.WriteAllLines(path, keptLines);
+                ClearLogLinesCache();
             }
             catch { }
+        }
+
+        public static void ClearLogsForProjectScope(int projectId, int variantSetNo)
+        {
+            ClearOperationLogForProject(projectId, variantSetNo);
+            ClearDestructiveLogForProject(projectId, variantSetNo);
+            ExcelTaskAttemptRegistry.ClearProject(projectId, variantSetNo);
+            ClearLogLinesCache();
+            ClearCurrentTaskFileIfMatches(projectId, variantSetNo);
+            CancelPendingBoundaryFlushIfMatches(projectId, variantSetNo);
         }
 
         public static void ClearOperationLog()
@@ -245,6 +322,10 @@ namespace Libraries
             catch { }
         }
 
+        /// <summary>
+        /// VSTO 診断ログ。詳細は Debug、または %TEMP%\mos_excel_diag.on があるときだけ書く。
+        /// 起動待ちの Startup completed / Baseline completed は常に残す。
+        /// </summary>
         public static string GetDiagnosticLogPath()
         {
             return Path.Combine(Path.GetTempPath(), "mos_excel_addin_diag.txt");
@@ -272,9 +353,10 @@ namespace Libraries
             int taskId,
             int attemptNo,
             ExcelValidationExemptFlags exemptFlags,
-            out string message)
+            out string message,
+            int variantSetNo = 0)
         {
-            if (!TryCollectNonExemptViolations(projectId, taskId, attemptNo, exemptFlags, out string firstLogMessage, out _))
+            if (!TryCollectNonExemptViolations(projectId, taskId, attemptNo, exemptFlags, out string firstLogMessage, out _, variantSetNo))
             {
                 message = null;
                 return false;
@@ -293,13 +375,14 @@ namespace Libraries
             int attemptNo,
             ExcelValidationExemptFlags exemptFlags,
             out string firstLogMessage,
-            out List<string> studentReasons)
+            out List<string> studentReasons,
+            int variantSetNo = 0)
         {
             firstLogMessage = null;
             studentReasons = new List<string>();
             // 破壊的操作の判定は、同一タスク内の全試行（セッション）の操作を合算して判定する。
             // 以前は latestOnly: true だったが、タスクを切り替えて戻るだけで違反が消えてしまうのを防ぐため false に変更。
-            var ops = GetOperationsForTask(projectId, taskId, attemptNo, latestOnly: false);
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo, latestOnly: false, variantSetNo: variantSetNo);
             bool useRangeGate = ExcelTaskValidationConfig.ShouldDenyOutsideAllowedRanges(projectId, taskId);
             List<string> allowedRanges = useRangeGate
                 ? ExcelTaskValidationConfig.GetAllowedRanges(projectId, taskId)
@@ -549,7 +632,12 @@ namespace Libraries
             return n;
         }
 
-        private static List<(string Type, string Detail)> GetOperationsForTask(int projectId, int taskId, int attemptNo, bool latestOnly = false)
+        private static List<(string Type, string Detail)> GetOperationsForTask(
+            int projectId,
+            int taskId,
+            int attemptNo,
+            bool latestOnly = false,
+            int variantSetNo = 0)
         {
             var result = new List<(string Type, string Detail)>();
             string path = GetLogFilePath();
@@ -563,10 +651,10 @@ namespace Libraries
                     if (!File.Exists(path)) return result;
                     lines = File.ReadAllLines(path);
                 }
-                
+
                 bool inTarget = false;
-                int curP = -1, curT = -1, curA = 1;
-                string explicitPrefix = $"[Task {projectId}-{taskId}-{attemptNo}]";
+                var target = TaskLogContext.Create(projectId, taskId, attemptNo, variantSetNo);
+                string explicitPrefix = target.FormatExplicitTaskPrefix();
 
                 foreach (string line in lines)
                 {
@@ -574,9 +662,12 @@ namespace Libraries
 
                     if (line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        ParseTaskStart(line, out curP, out curT, out curA);
-                        inTarget = (curP == projectId && curT == taskId && curA == attemptNo);
-                        
+                        inTarget = TaskLogFormat.TryParseTaskStartLine(line, out TaskLogContext startContext)
+                            && startContext.ProjectId == projectId
+                            && startContext.TaskId == taskId
+                            && startContext.AttemptNo == attemptNo
+                            && startContext.VariantSetNo == variantSetNo;
+
                         if (inTarget && latestOnly)
                         {
                             result.Clear();
@@ -584,7 +675,16 @@ namespace Libraries
                         continue;
                     }
 
-                    bool hasExplicitTaskPrefix = line.IndexOf(explicitPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool hasExplicitTaskPrefix = false;
+                    if (TaskLogFormat.TryParseExplicitTaskPrefix(line, out TaskLogContext explicitContext))
+                    {
+                        hasExplicitTaskPrefix = explicitContext.Equals(target);
+                    }
+                    else
+                    {
+                        hasExplicitTaskPrefix = variantSetNo == 0
+                            && line.IndexOf(explicitPrefix, StringComparison.OrdinalIgnoreCase) >= 0;
+                    }
                     if (!inTarget && !hasExplicitTaskPrefix) continue;
 
                     int opIdx = line.IndexOf("[Op]", StringComparison.OrdinalIgnoreCase);
@@ -606,9 +706,9 @@ namespace Libraries
         /// <summary>
         /// 指定されたグラフが作成された際の選択範囲（Selection）をログから取得する。
         /// </summary>
-        public static string GetChartCreationSelection(int projectId, int taskId, int attemptNo, string chartName, string targetSheetName = null)
+        public static string GetChartCreationSelection(int projectId, int taskId, int attemptNo, string chartName, string targetSheetName = null, int variantSetNo = 0)
         {
-            var ops = GetOperationsForTask(projectId, taskId, attemptNo);
+            var ops = GetOperationsForTask(projectId, taskId, attemptNo, variantSetNo: variantSetNo);
             string finalSelection = null;
 
             string normChart = NormalizeChartName(chartName);
@@ -678,43 +778,34 @@ namespace Libraries
             return Regex.Replace(normalized, @"\s+", "");
         }
 
-        private static void ParseTaskStart(string line, out int projectId, out int taskId, out int attemptNo)
-        {
-            projectId = -1;
-            taskId = -1;
-            attemptNo = 1;
-            int idx = line.IndexOf("[TaskStart]", StringComparison.OrdinalIgnoreCase);
-            if (idx < 0) return;
-
-            string part = line.Substring(idx + 11).Trim();
-            var tokens = part.Split(new[] { '-', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Length < 2) return;
-
-            if (!int.TryParse(tokens[0].Trim(), out projectId)) { projectId = -1; return; }
-            if (!int.TryParse(tokens[1].Trim(), out taskId)) { taskId = -1; return; }
-            if (tokens.Length >= 3)
-            {
-                int.TryParse(tokens[2].Trim(), out attemptNo);
-                if (attemptNo < 1) attemptNo = 1;
-            }
-        }
     }
 
     /// <summary>
     /// タスク単位の再挑戦番号。未登録は 1。結果画面から×のタスクに戻ったときだけ増やす。
+    /// 類題は V{set}-{project}-{task}、教材は {project}-{task}。
     /// </summary>
     public static class ExcelTaskAttemptRegistry
     {
         private static readonly object Sync = new object();
         private static readonly Dictionary<string, int> Attempts = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        private static string Key(int projectId, int taskId) => $"{projectId}-{taskId}";
+        private static string Key(int projectId, int taskId, int variantSetNo)
+        {
+            if (variantSetNo > 0)
+                return "V" + variantSetNo + "-" + projectId + "-" + taskId;
+            return projectId + "-" + taskId;
+        }
 
         public static int GetAttempt(int projectId, int taskId)
         {
+            return GetAttempt(projectId, taskId, 0);
+        }
+
+        public static int GetAttempt(int projectId, int taskId, int variantSetNo)
+        {
             lock (Sync)
             {
-                if (Attempts.TryGetValue(Key(projectId, taskId), out int v) && v >= 1)
+                if (Attempts.TryGetValue(Key(projectId, taskId, variantSetNo), out int v) && v >= 1)
                     return v;
                 return 1;
             }
@@ -722,18 +813,28 @@ namespace Libraries
 
         public static void SetAttempt(int projectId, int taskId, int attemptNo)
         {
+            SetAttempt(projectId, taskId, attemptNo, 0);
+        }
+
+        public static void SetAttempt(int projectId, int taskId, int attemptNo, int variantSetNo)
+        {
             if (attemptNo < 1) attemptNo = 1;
             lock (Sync)
             {
-                Attempts[Key(projectId, taskId)] = attemptNo;
+                Attempts[Key(projectId, taskId, variantSetNo)] = attemptNo;
             }
         }
 
         public static int Increment(int projectId, int taskId)
         {
+            return Increment(projectId, taskId, 0);
+        }
+
+        public static int Increment(int projectId, int taskId, int variantSetNo)
+        {
             lock (Sync)
             {
-                string key = Key(projectId, taskId);
+                string key = Key(projectId, taskId, variantSetNo);
                 int current = 1;
                 if (Attempts.TryGetValue(key, out int v) && v >= 1)
                     current = v;
@@ -745,14 +846,33 @@ namespace Libraries
 
         public static void ClearProject(int projectId)
         {
-            string prefix = projectId + "-";
+            ClearProject(projectId, 0);
+        }
+
+        public static void ClearProject(int projectId, int variantSetNo)
+        {
             lock (Sync)
             {
                 var keys = new List<string>();
-                foreach (var key in Attempts.Keys)
+                if (variantSetNo > 0)
                 {
-                    if (key.StartsWith(prefix, StringComparison.Ordinal))
-                        keys.Add(key);
+                    string prefix = "V" + variantSetNo + "-" + projectId + "-";
+                    foreach (var key in Attempts.Keys)
+                    {
+                        if (key.StartsWith(prefix, StringComparison.Ordinal))
+                            keys.Add(key);
+                    }
+                }
+                else
+                {
+                    string prefix = projectId + "-";
+                    foreach (var key in Attempts.Keys)
+                    {
+                        if (key.StartsWith("V", StringComparison.Ordinal))
+                            continue;
+                        if (key.StartsWith(prefix, StringComparison.Ordinal))
+                            keys.Add(key);
+                    }
                 }
                 foreach (var key in keys)
                     Attempts.Remove(key);

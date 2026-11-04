@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 1,
+  "taskId": 3,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "画像の左の段落を選び、［ホーム］タブを確認する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［スタイル］をクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［参照 2］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：画像の左の段落にスタイル「参照 2」が付いている"
+    }
+  ]
+}

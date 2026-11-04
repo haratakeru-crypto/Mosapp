@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 7,
+  "taskId": 1,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上報告］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［数式］タブ→［数式の表示］をクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：数式が表示されている"
+    }
+  ]
+}

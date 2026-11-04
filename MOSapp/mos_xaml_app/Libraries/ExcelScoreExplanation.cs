@@ -64,7 +64,21 @@ namespace Libraries
         /// チェッカー結果に破壊的操作の判定を重ねる。戻り値の正誤は従来と同じです。
         /// 要件ミスと破壊的操作の両方があるときは、両方の理由を改行でつなぎます。
         /// </summary>
-        public static bool Apply(int projectId, int taskId, bool checkerResult, string checkerReason, out string reasonText)
+        public static bool Apply(
+            int projectId,
+            int taskId,
+            bool checkerResult,
+            string checkerReason,
+            out string reasonText,
+            int variantSetNo = 0)
+        {
+            using (ExcelTaskValidationConfig.BeginVariantSet(variantSetNo))
+            {
+                return ApplyCore(projectId, taskId, checkerResult, checkerReason, out reasonText, variantSetNo);
+            }
+        }
+
+        private static bool ApplyCore(int projectId, int taskId, bool checkerResult, string checkerReason, out string reasonText, int variantSetNo)
         {
             reasonText = null;
             if (projectId <= 0 || taskId <= 0)
@@ -77,14 +91,15 @@ namespace Libraries
             try
             {
                 ExcelValidationExemptFlags exemptFlags = ExcelTaskValidationConfig.GetExemptFlags(projectId, taskId);
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId, variantSetNo);
                 bool violation = ExcelLogReader.TryCollectNonExemptViolations(
                     projectId,
                     taskId,
                     attemptNo,
                     exemptFlags,
                     out string firstLogMessage,
-                    out List<string> studentActions);
+                    out List<string> studentActions,
+                    variantSetNo);
 
                 if (violation)
                 {
@@ -92,7 +107,7 @@ namespace Libraries
                     {
                         string line = $"P{projectId}-T{taskId} {firstLogMessage}";
                         System.Diagnostics.Debug.WriteLine($"[ExcelScoreExplanation] Destructive validation failed: {line}");
-                        ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, line);
+                        ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, line, variantSetNo);
                     }
 
                     string destructiveText = FormatDestructiveStudentReasons(studentActions);
@@ -113,8 +128,8 @@ namespace Libraries
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ExcelScoreExplanation] Apply error: {ex.Message}");
-                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId);
-                ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, $"P{projectId}-T{taskId} 例外: {ex.Message}");
+                int attemptNo = ExcelTaskAttemptRegistry.GetAttempt(projectId, taskId, variantSetNo);
+                ExcelLogReader.AppendDestructiveError(projectId, taskId, attemptNo, $"P{projectId}-T{taskId} 例外: {ex.Message}", variantSetNo);
                 reasonText = UnavailableText;
                 return false;
             }

@@ -1,0 +1,31 @@
+{
+  "groupId": 1,
+  "projectId": 10,
+  "taskId": 4,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［担当者リスト］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル［A5］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "「=se」と入力し、一覧から［SEQUENCE］をダブルクリックして fx［関数の挿入］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "SEQUENCE関数の［関数の引数］ダイアログボックスが表示されたことを確認する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［行］に「22」、［列］［開始］［目盛り］に「1」と入力し、［OK］をクリックする"
+    },
+    {
+      "image": "step06.png",
+      "caption": "完成：［No］列に 1 から 22 が表示されている"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "groupId": 1,
+  "projectId": 5,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［商品別売上］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "グラフエリアをクリックし、［グラフのデザイン］タブをクリックする"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［グラフスタイル］グループの［クイックスタイル］をクリックする"
+    },
+    {
+      "image": "step04.png",
+      "caption": "［スタイル 12］を選択する"
+    },
+    {
+      "image": "step05.png",
+      "caption": "［色の変更］→［カラフルなパレット 3］を選択する"
+    },
+    {
+      "image": "step06.png",
+      "caption": "任意のセルをクリックしてグラフの選択を解除する"
+    },
+    {
+      "image": "step07.png",
+      "caption": "完成：スタイル12・カラフルなパレット3のグラフが表示されている"
+    }
+  ]
+}

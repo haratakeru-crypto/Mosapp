@@ -275,10 +275,10 @@ namespace Libraries
                 }
                 int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
                 WordScoreExplanation.ClearCheckerReason();
-                if (!WordGradingGate.TryPass(groupId, projectId, taskId, attemptNo, out string gateReason))
+                if (!WordGradingGate.TryPass(groupId, projectId, taskId, attemptNo, out List<string> gateActions))
                 {
                     string failReason = WordScoreExplanation.ResolveFailReason(
-                        passed: false, gateFailed: true, gateInternalReason: gateReason);
+                        passed: false, gateFailed: true, gateStudentActions: gateActions);
                     ScoreResultStore.RecordResult(groupId, projectId, taskId, false, failReason);
                     return false;
                 }
@@ -505,7 +505,7 @@ namespace Libraries
                         WordScoreExplanation.ClearCheckerReason();
                         int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskNum);
                         var gateSw = Stopwatch.StartNew();
-                        bool gatePassed = WordGradingGate.TryPass(groupId, projectId, taskNum, attemptNo, out string gateReason);
+                        bool gatePassed = WordGradingGate.TryPass(groupId, projectId, taskNum, attemptNo, out List<string> gateActions);
                         WordGradingPerf.Log(
                             "GradeTask.WordGradingGate",
                             gateSw.ElapsedMilliseconds,
@@ -513,7 +513,7 @@ namespace Libraries
                         if (!gatePassed)
                         {
                             string failReason = WordScoreExplanation.ResolveFailReason(
-                                passed: false, gateFailed: true, gateInternalReason: gateReason);
+                                passed: false, gateFailed: true, gateStudentActions: gateActions);
                             results.Add(new TaskScoreResult { Passed = false, FailReason = failReason });
                             System.Diagnostics.Debug.WriteLine($"[WordBatchScoring] P{projectId} T{taskNum}: fail (grading gate)");
                             WordGradingPerf.Log("GradeTask.total", taskSw.ElapsedMilliseconds, $"P{projectId}-{taskNum} gate");
@@ -1011,15 +1011,16 @@ namespace Libraries
     // 破壊的操作検知（採点前ゲート WordGradingGate）
     //
     // 【記録の種類】
-    // ・スナップショット … VSTO がタスク開始時に Project{N} の COM 状態を mos_word_snapshot.txt に保存。
+    // ・スナップショット … VSTO がタスク開始時に Project{N} / similar{V}-{N} の COM 状態を mos_word_snapshot.txt に保存。
     //   タスク切替時・採点時に差分 → mos_word_destructive_errors.log（例: SectionsCount, BodyTextLength）。
-    //   リボン未接続の編集（余白・段組み・書式など）の補完に使う。
-    // ・[Op] … VSTO Ribbon / ポーリングが mos_word_log.txt に [Task P-T-A] [Op] Type … で追記。
+    //   リボン未接続の編集（余白・段組み・書式など）の補完に使う。類題キーは V1,P,T,A:。
+    // ・[Op] … VSTO Ribbon / ポーリングが mos_word_log.txt に [Task P-T-A] / [Task Vn-P-T-A] [Op] Type … で追記。
     //   例: Cut, Paste, InsertTable, FileSaveAs, HeaderFooterEdit, RibbonCommand（idMso 汎用）。
     // ・Executed … 正解証跡（破壊検知とは別軸）。同じ mos_word_log.txt。[ProjectN] … Executed。
     // ・TaskStart … 試験アプリがタスク表示時に記録。Op 区間の境界に使用。
     //
     // 【採点ゲート順】①既存 destructive ログ → ②許可外 [Op] → ③スナップショット差分 → ④WordChecker
+    // 類題セット1は WordVariantValidationConfig + WordVariantScoring 経由で同じゲートを通す。
     // -------------------------------------------------------------------------
 
     /// <summary>
@@ -1258,6 +1259,129 @@ namespace Libraries
     }
 
     /// <summary>
+    /// 類題セット1のスナップショット免除と [Op] 許可。教材の WordTaskValidationConfig とは別体系。
+    /// </summary>
+    public static class WordVariantValidationConfig
+    {
+        public static WordValidationExemptFlags GetExemptFlags(int variantSetNo, int projectId, int taskId)
+        {
+            if (variantSetNo != 1)
+                return WordValidationExemptFlags.None;
+
+            WordValidationExemptFlags flags = WordValidationExemptFlags.None;
+
+            if (projectId == 1)
+            {
+                if (taskId == 4 || taskId == 5)
+                    flags |= WordValidationExemptFlags.TablesCount | WordValidationExemptFlags.BodyTextLength;
+            }
+            else if (projectId == 2)
+            {
+                if (taskId == 2)
+                    flags |= WordValidationExemptFlags.BodyTextLength;
+                if (taskId == 3)
+                    flags |= WordValidationExemptFlags.BodyTextLength | WordValidationExemptFlags.TablesCount;
+                if (taskId == 4)
+                    flags |= WordValidationExemptFlags.InlineShapesCount | WordValidationExemptFlags.BodyTextLength;
+                if (taskId == 5)
+                    flags |= WordValidationExemptFlags.BodyTextLength;
+            }
+            else if (projectId == 3)
+            {
+                if (taskId == 1)
+                    flags |= WordValidationExemptFlags.SectionsCount | WordValidationExemptFlags.BodyTextLength;
+                if (taskId == 2)
+                    flags |= WordValidationExemptFlags.BodyTextLength;
+                if (taskId == 3)
+                    flags |= WordValidationExemptFlags.CommentsCount
+                        | WordValidationExemptFlags.HeaderFooterFingerprint
+                        | WordValidationExemptFlags.Watermark;
+            }
+            else if (projectId == 4)
+            {
+                if (taskId == 1)
+                    flags |= WordValidationExemptFlags.PageBorder;
+                if (taskId == 4)
+                    flags |= WordValidationExemptFlags.BodyTextLength | WordValidationExemptFlags.CommentsCount;
+            }
+            else if (projectId == 5)
+            {
+                if (taskId == 1 || taskId == 3)
+                    flags |= WordValidationExemptFlags.BodyTextLength;
+                if (taskId == 2 || taskId == 4)
+                    flags |= WordValidationExemptFlags.TablesCount | WordValidationExemptFlags.BodyTextLength;
+            }
+            else if (projectId == 6)
+            {
+                if (taskId == 2)
+                    flags |= WordValidationExemptFlags.CommentsCount | WordValidationExemptFlags.BodyTextLength;
+                if (taskId == 3)
+                    flags |= WordValidationExemptFlags.InlineShapesCount | WordValidationExemptFlags.FloatingShapesCount;
+                if (taskId == 4)
+                    flags |= WordValidationExemptFlags.FloatingShapesCount | WordValidationExemptFlags.BodyTextLength;
+            }
+            else if (projectId == 7)
+            {
+                if (taskId == 1 || taskId == 2)
+                    flags |= WordValidationExemptFlags.BodyTextLength;
+                if (taskId == 4)
+                    flags |= WordValidationExemptFlags.FloatingShapesCount | WordValidationExemptFlags.BodyTextLength;
+            }
+            else if (projectId == 8)
+            {
+                if (taskId == 1)
+                    flags |= WordValidationExemptFlags.InlineShapesCount | WordValidationExemptFlags.FloatingShapesCount;
+                if (taskId == 2 || taskId == 3)
+                    flags |= WordValidationExemptFlags.CommentsCount;
+                if (taskId == 4)
+                    flags |= WordValidationExemptFlags.BodyTextLength | WordValidationExemptFlags.TablesCount;
+                if (taskId == 5)
+                    flags |= WordValidationExemptFlags.ShowAllState;
+            }
+
+            // クリックコピー対象は貼り付けで本文長が変わり得る
+            if (MOS_Word_app.WordVariantCopyTargets.AllowsPaste(projectId, taskId))
+                flags |= WordValidationExemptFlags.BodyTextLength;
+
+            return flags;
+        }
+
+        public static HashSet<string> GetAllowedOperationTypes(int variantSetNo, int projectId, int taskId)
+        {
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "RibbonCommand" };
+            if (variantSetNo != 1)
+                return allowed;
+
+            // 下線・青文字のクリックコピー対象（明示リスト + 「…」と入力）
+            if (MOS_Word_app.WordVariantCopyTargets.AllowsPaste(projectId, taskId))
+                allowed.Add("Paste");
+
+            if (projectId == 1 && taskId == 1)
+                allowed.Add("FileSaveAs");
+            if (projectId == 1 && (taskId == 4 || taskId == 5))
+                allowed.Add("InsertTable");
+            if (projectId == 2 && taskId == 3)
+                allowed.Add("InsertTable");
+            if (projectId == 2 && taskId == 4)
+                allowed.Add("InsertPicture");
+            if (projectId == 3 && taskId == 1)
+                allowed.Add("InsertSectionBreak");
+            if (projectId == 4 && taskId == 1)
+                allowed.Add("PageBorders");
+            if (projectId == 5 && (taskId == 2 || taskId == 4))
+                allowed.Add("InsertTable");
+            if (projectId == 6 && taskId == 2)
+                allowed.Add("ReviewNewComment");
+            if (projectId == 6 && taskId == 3)
+                allowed.Add("InsertPicture");
+            if (projectId == 8 && taskId == 1)
+                allowed.Add("InsertPicture");
+
+            return allowed;
+        }
+    }
+
+    /// <summary>
     /// タスク開始時スナップショット（mos_word_snapshot.txt）と採点時の COM 再取得の差分。
     /// 取得: VSTO WordDestructiveMonitor.TakeSnapshot／採点: 本クラス CompareAndGetErrors。
     /// </summary>
@@ -1268,6 +1392,7 @@ namespace Libraries
             public int ProjectId { get; set; }
             public int TaskId { get; set; }
             public int AttemptNo { get; set; }
+            public int VariantSetNo { get; set; }
             public string FullName { get; set; }
             public int Sections { get; set; }
             public int BodyTextLength { get; set; }
@@ -1283,31 +1408,37 @@ namespace Libraries
             public int VisibleBodyTextLength { get; set; } = -1;
         }
 
-        public static List<string> CompareAndGetErrors(int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags)
+        public static List<string> CompareAndGetErrors(
+            int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags, int variantSetNo = 0)
         {
             var sw = Stopwatch.StartNew();
             try
             {
-                return CompareAndGetErrorsCore(groupId, projectId, taskId, attemptNo, exemptFlags);
+                return CompareAndGetErrorsCore(groupId, projectId, taskId, attemptNo, exemptFlags, variantSetNo);
             }
             finally
             {
                 WordGradingPerf.Log(
                     "WordSnapshotChecker.CompareAndGetErrors",
                     sw.ElapsedMilliseconds,
-                    $"P{projectId} T{taskId}");
+                    variantSetNo > 0
+                        ? $"V{variantSetNo} P{projectId} T{taskId}"
+                        : $"P{projectId} T{taskId}");
             }
         }
 
-        private static List<string> CompareAndGetErrorsCore(int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags)
+        private static List<string> CompareAndGetErrorsCore(
+            int groupId, int projectId, int taskId, int attemptNo, WordValidationExemptFlags exemptFlags, int variantSetNo)
         {
             var errors = new List<string>();
             var snapshot = LoadSnapshot();
             if (snapshot == null)
                 return errors;
-            if (snapshot.ProjectId != projectId || snapshot.TaskId != taskId || snapshot.AttemptNo != attemptNo)
+            int expectedVariant = variantSetNo < 0 ? 0 : variantSetNo;
+            if (snapshot.ProjectId != projectId || snapshot.TaskId != taskId || snapshot.AttemptNo != attemptNo
+                || snapshot.VariantSetNo != expectedVariant)
                 return errors;
-            string expectedPath = ResolveSnapshotProjectPath(projectId, groupId);
+            string expectedPath = ResolveSnapshotProjectPath(projectId, groupId, expectedVariant);
             if (!SnapshotPathMatches(snapshot.FullName, expectedPath))
             {
                 WordGradingPerf.Log(
@@ -1317,7 +1448,7 @@ namespace Libraries
                 return errors;
             }
 
-            SnapshotData current = CaptureProjectDocument(projectId, groupId);
+            SnapshotData current = CaptureProjectDocument(projectId, groupId, expectedVariant);
             if (current == null)
                 return errors;
 
@@ -1384,15 +1515,17 @@ namespace Libraries
             _reuseCurrent = null;
         }
 
-        public static void LogMatchingBaselineDiffOnce(int groupId, int projectId, int taskId, int attemptNo)
+        public static void LogMatchingBaselineDiffOnce(int groupId, int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
-            var exempt = WordTaskValidationConfig.GetExemptFlags(projectId, taskId);
-            var errors = CompareAndGetErrors(groupId, projectId, taskId, attemptNo, exempt);
+            var exempt = variantSetNo > 0
+                ? WordVariantValidationConfig.GetExemptFlags(variantSetNo, projectId, taskId)
+                : WordTaskValidationConfig.GetExemptFlags(projectId, taskId);
+            var errors = CompareAndGetErrors(groupId, projectId, taskId, attemptNo, exempt, variantSetNo);
             if (errors != null && errors.Count > 0)
-                LogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, errors);
+                LogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, errors, variantSetNo);
         }
 
-        private static SnapshotData CaptureProjectDocument(int projectId, int groupId)
+        private static SnapshotData CaptureProjectDocument(int projectId, int groupId, int variantSetNo = 0)
         {
             WordApp app = null;
             try
@@ -1400,7 +1533,7 @@ namespace Libraries
                 try { app = (WordApp)Marshal.GetActiveObject("Word.Application"); }
                 catch { return null; }
                 if (app == null) return null;
-                string path = ResolveSnapshotProjectPath(projectId, groupId);
+                string path = ResolveSnapshotProjectPath(projectId, groupId, variantSetNo);
                 if (string.IsNullOrEmpty(path)) return null;
                 if (_reuseActive && _reuseCaptured && groupId == _reuseGroupId && projectId == _reuseProjectId)
                     return _reuseCurrent;
@@ -1504,8 +1637,10 @@ namespace Libraries
             return null;
         }
 
-        private static string ResolveSnapshotProjectPath(int projectId, int groupId)
+        private static string ResolveSnapshotProjectPath(int projectId, int groupId, int variantSetNo = 0)
         {
+            if (variantSetNo > 0)
+                return MOS_Word_app.WordDataPathHelper.FindVariantWorkingFile(groupId, projectId, variantSetNo);
             return MOS_Word_app.WordDataPathHelper.FindExistingWorkingFile(groupId, projectId);
         }
 
@@ -1547,6 +1682,7 @@ namespace Libraries
                         case "ProjectId": int.TryParse(val, out int p); data.ProjectId = p; break;
                         case "TaskId": int.TryParse(val, out int t); data.TaskId = t; break;
                         case "AttemptNo": int.TryParse(val, out int a); data.AttemptNo = a; break;
+                        case "VariantSetNo": int.TryParse(val, out int v); data.VariantSetNo = v; break;
                         case "FullName": data.FullName = val; break;
                         case "Sections": int.TryParse(val, out int s); data.Sections = s; break;
                         case "BodyTextLength": int.TryParse(val, out int bl); data.BodyTextLength = bl; break;
@@ -1579,50 +1715,77 @@ namespace Libraries
         /// ① mos_word_destructive_errors.log（タスク切替時の VSTO 記録 or 過去の採点③）
         /// ② mos_word_log.txt の [Op]（許可外: 例 7-3 の［ホーム］切り取り＝Cut）
         /// ③ スナップショット差分（例: ［レイアウト］区切りで SectionsCount 変化）→ 失敗時に destructive へ追記
+        /// 失敗時は studentActions に学生向け動作名を列挙する（Excel と同型）。
         /// </summary>
-        public static bool TryPass(int groupId, int projectId, int taskId, int attemptNo, out string failReason)
+        public static bool TryPass(
+            int groupId, int projectId, int taskId, int attemptNo, out List<string> studentActions, int variantSetNo = 0)
         {
-            failReason = null;
-            if (projectId == 2 && taskId == 1
-                && LogReader.HasTaskEvidence(2, 1, "CutParagraphSelection"))
+            var actions = new List<string>();
+            void AddAction(string action)
             {
-                failReason = "CutParagraphSelection detected";
-                return false;
+                if (string.IsNullOrWhiteSpace(action))
+                    return;
+                string line = action.Trim();
+                if (!actions.Contains(line))
+                    actions.Add(line);
             }
-            if (projectId == 4 && taskId == 3
-                && LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment")
-                && !LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment"))
+
+            int expectedVariant = variantSetNo < 0 ? 0 : variantSetNo;
+
+            if (expectedVariant == 0)
             {
-                failReason = "ReviewDeleteComment without resolve";
-                return false;
+                if (projectId == 2 && taskId == 1
+                    && LogReader.HasTaskEvidence(2, 1, "CutParagraphSelection"))
+                {
+                    AddAction(WordScoreExplanation.DescribeSnapshotOrGateToken("CutParagraphSelection"));
+                }
+                if (projectId == 4 && taskId == 3
+                    && LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment")
+                    && !LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment"))
+                {
+                    AddAction(WordScoreExplanation.DescribeSnapshotOrGateToken("ReviewDeleteComment without resolve"));
+                }
+                if (projectId == 4 && taskId == 3
+                    && LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment")
+                    && !LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment"))
+                {
+                    AddAction(WordScoreExplanation.DescribeSnapshotOrGateToken("ReviewResolveComment without delete"));
+                }
             }
-            if (projectId == 4 && taskId == 3
-                && LogReader.HasTaskEvidence(4, 3, "ReviewResolveComment")
-                && !LogReader.HasTaskEvidence(4, 3, "ReviewDeleteComment"))
+
+            bool alreadyLogged = LogReader.HasLoggedDestructiveError(projectId, taskId, attemptNo, expectedVariant);
+            if (alreadyLogged)
             {
-                failReason = "ReviewResolveComment without delete";
-                return false;
+                foreach (string token in LogReader.GetLoggedDestructiveErrorTokens(projectId, taskId, attemptNo, expectedVariant))
+                    AddAction(WordScoreExplanation.DescribeSnapshotOrGateToken(token));
             }
-            if (LogReader.HasLoggedDestructiveError(projectId, taskId, attemptNo))
+
+            var allowedOps = expectedVariant > 0
+                ? WordVariantValidationConfig.GetAllowedOperationTypes(expectedVariant, projectId, taskId)
+                : WordTaskValidationConfig.GetAllowedOperationTypes(projectId, taskId);
+            foreach (string opType in LogReader.CollectDisallowedOperationTypes(
+                projectId, taskId, attemptNo, allowedOps, expectedVariant))
             {
-                failReason = "logged destructive error";
-                return false;
+                AddAction(WordScoreExplanation.DescribeOperationType(opType));
             }
-            var allowedOps = WordTaskValidationConfig.GetAllowedOperationTypes(projectId, taskId);
-            if (LogReader.HasDisallowedOperations(projectId, taskId, attemptNo, allowedOps))
+
+            if (!alreadyLogged)
             {
-                failReason = "disallowed operation in log";
-                return false;
+                var exempt = expectedVariant > 0
+                    ? WordVariantValidationConfig.GetExemptFlags(expectedVariant, projectId, taskId)
+                    : WordTaskValidationConfig.GetExemptFlags(projectId, taskId);
+                var errors = WordSnapshotChecker.CompareAndGetErrors(
+                    groupId, projectId, taskId, attemptNo, exempt, expectedVariant);
+                if (errors != null && errors.Count > 0)
+                {
+                    LogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, errors, expectedVariant);
+                    foreach (string err in errors)
+                        AddAction(WordScoreExplanation.DescribeSnapshotOrGateToken(err));
+                }
             }
-            var exempt = WordTaskValidationConfig.GetExemptFlags(projectId, taskId);
-            var errors = WordSnapshotChecker.CompareAndGetErrors(groupId, projectId, taskId, attemptNo, exempt);
-            if (errors != null && errors.Count > 0)
-            {
-                LogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, errors);
-                failReason = string.Join(" | ", errors);
-                return false;
-            }
-            return true;
+
+            studentActions = actions;
+            return actions.Count == 0 && !alreadyLogged;
         }
     }
 }

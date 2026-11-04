@@ -1,0 +1,19 @@
+{
+  "groupId": 1,
+  "projectId": 4,
+  "taskId": 5,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "［デザイン］タブをクリックし、［透かし］をクリックする"
+    },
+    {
+      "image": "step02.png",
+      "caption": "［サンプル2］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "完成：透かし「サンプル2」が挿入されている"
+    }
+  ]
+}

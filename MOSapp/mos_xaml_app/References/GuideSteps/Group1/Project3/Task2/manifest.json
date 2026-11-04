@@ -1,0 +1,23 @@
+{
+  "groupId": 1,
+  "projectId": 3,
+  "taskId": 2,
+  "steps": [
+    {
+      "image": "step01.png",
+      "caption": "シート［売上一覧］を選択する"
+    },
+    {
+      "image": "step02.png",
+      "caption": "セル範囲［A4:F131］を選択する"
+    },
+    {
+      "image": "step03.png",
+      "caption": "［ページレイアウト］→［印刷範囲］→［印刷範囲の設定］を選択する"
+    },
+    {
+      "image": "step04.png",
+      "caption": "完成：印刷範囲が［A4:F131］に設定されている"
+    }
+  ]
+}
