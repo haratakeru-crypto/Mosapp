@@ -9,17 +9,21 @@ namespace MosPracticeClient
     public partial class ScoringRangeDialog : Window
     {
         private readonly List<int> _availableProjectIds;
+        private readonly ScoringRangeProfile _profile;
 
         public IReadOnlyList<int> SelectedProjectIds { get; private set; }
         public string SelectedRangeLabel { get; private set; }
 
-        public ScoringRangeDialog(IReadOnlyCollection<int> availableProjectIds)
+        public ScoringRangeDialog(
+            IReadOnlyCollection<int> availableProjectIds,
+            ScoringRangeProfile profile = ScoringRangeProfile.Standard)
         {
             _availableProjectIds = (availableProjectIds ?? Array.Empty<int>())
                 .Where(id => id > 0)
                 .Distinct()
                 .OrderBy(id => id)
                 .ToList();
+            _profile = profile;
             InitializeComponent();
             ApplyAvailableRangeOptions();
             BuildCustomCheckboxes();
@@ -38,11 +42,12 @@ namespace MosPracticeClient
             Window owner,
             IReadOnlyCollection<int> availableProjectIds,
             out IReadOnlyList<int> selectedIds,
-            out string rangeLabel)
+            out string rangeLabel,
+            ScoringRangeProfile profile = ScoringRangeProfile.Standard)
         {
             selectedIds = Array.Empty<int>();
             rangeLabel = "";
-            var dialog = new ScoringRangeDialog(availableProjectIds);
+            var dialog = new ScoringRangeDialog(availableProjectIds, profile);
             if (owner != null)
             {
                 dialog.Owner = owner;
@@ -68,6 +73,7 @@ namespace MosPracticeClient
         {
             SetOptionVisibility(Range1To3, ScoringRangeKind.Projects1To3);
             SetOptionVisibility(Range4To6, ScoringRangeKind.Projects4To6);
+            SetOptionVisibility(Range7To8, ScoringRangeKind.Projects7To8);
             SetOptionVisibility(Range7To9, ScoringRangeKind.Projects7To9);
             SetOptionVisibility(Range1To9, ScoringRangeKind.Projects1To9);
         }
@@ -77,7 +83,7 @@ namespace MosPracticeClient
             if (button == null)
                 return;
 
-            bool offer = ScoringRangeSelection.ShouldOffer(kind, _availableProjectIds);
+            bool offer = ScoringRangeSelection.ShouldOffer(kind, _availableProjectIds, _profile);
             button.Visibility = offer ? Visibility.Visible : Visibility.Collapsed;
             if (!offer && button.IsChecked == true && RangeAll != null)
                 RangeAll.IsChecked = true;
@@ -133,6 +139,7 @@ namespace MosPracticeClient
                 return ScoringRangeKind.All;
             if (Range1To3.IsChecked == true) return ScoringRangeKind.Projects1To3;
             if (Range4To6.IsChecked == true) return ScoringRangeKind.Projects4To6;
+            if (Range7To8 != null && Range7To8.IsChecked == true) return ScoringRangeKind.Projects7To8;
             if (Range7To9.IsChecked == true) return ScoringRangeKind.Projects7To9;
             if (Range1To9.IsChecked == true) return ScoringRangeKind.Projects1To9;
             if (RangeCustom.IsChecked == true) return ScoringRangeKind.Custom;

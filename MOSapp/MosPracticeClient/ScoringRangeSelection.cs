@@ -8,10 +8,17 @@ namespace MosPracticeClient
     {
         Projects1To3,
         Projects4To6,
+        Projects7To8,
         Projects7To9,
         Projects1To9,
         All,
         Custom
+    }
+
+    public enum ScoringRangeProfile
+    {
+        Standard,
+        WordVariant
     }
 
     public static class ScoringRangeSelection
@@ -30,6 +37,9 @@ namespace MosPracticeClient
                     break;
                 case ScoringRangeKind.Projects4To6:
                     candidates = Enumerable.Range(4, 3);
+                    break;
+                case ScoringRangeKind.Projects7To8:
+                    candidates = Enumerable.Range(7, 2);
                     break;
                 case ScoringRangeKind.Projects7To9:
                     candidates = Enumerable.Range(7, 3);
@@ -52,8 +62,14 @@ namespace MosPracticeClient
                 .ToList();
         }
 
-        public static bool ShouldOffer(ScoringRangeKind kind, IReadOnlyCollection<int> availableProjectIds)
+        public static bool ShouldOffer(
+            ScoringRangeKind kind,
+            IReadOnlyCollection<int> availableProjectIds,
+            ScoringRangeProfile profile = ScoringRangeProfile.Standard)
         {
+            if (!IsKindInProfile(kind, profile))
+                return false;
+
             if (kind == ScoringRangeKind.All || kind == ScoringRangeKind.Custom)
                 return true;
 
@@ -82,6 +98,20 @@ namespace MosPracticeClient
             return label;
         }
 
+        public static bool IsKindInProfile(ScoringRangeKind kind, ScoringRangeProfile profile)
+        {
+            if (profile == ScoringRangeProfile.WordVariant)
+            {
+                return kind == ScoringRangeKind.Projects1To3
+                    || kind == ScoringRangeKind.Projects4To6
+                    || kind == ScoringRangeKind.Projects7To8
+                    || kind == ScoringRangeKind.All
+                    || kind == ScoringRangeKind.Custom;
+            }
+
+            return kind != ScoringRangeKind.Projects7To8;
+        }
+
         public static string FormatRangeLabel(ScoringRangeKind kind, IReadOnlyList<int> selectedIds)
         {
             switch (kind)
@@ -90,6 +120,8 @@ namespace MosPracticeClient
                     return "プロジェクト1～3";
                 case ScoringRangeKind.Projects4To6:
                     return "プロジェクト4～6";
+                case ScoringRangeKind.Projects7To8:
+                    return "プロジェクト7・8";
                 case ScoringRangeKind.Projects7To9:
                     return "プロジェクト7～9";
                 case ScoringRangeKind.Projects1To9:

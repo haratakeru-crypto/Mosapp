@@ -28,6 +28,8 @@
                          Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
             <RadioButton x:Name="Range4To6" Content="プロジェクト4～6" GroupName="ScoringRange"
                          Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
+            <RadioButton x:Name="Range7To8" Content="プロジェクト7・8" GroupName="ScoringRange"
+                         Margin="0,0,0,8" FontSize="14" Visibility="Collapsed" Checked="RangeOption_Changed"/>
             <RadioButton x:Name="Range7To9" Content="プロジェクト7～9" GroupName="ScoringRange"
                          Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
             <RadioButton x:Name="Range1To9" Content="プロジェクト1～9" GroupName="ScoringRange"
