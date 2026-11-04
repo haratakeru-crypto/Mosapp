@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using Libraries;
 using Microsoft.Office.Interop.Word;
 
 namespace New_MOSWordVSTOAddIn
@@ -62,6 +63,13 @@ namespace New_MOSWordVSTOAddIn
 
         public static void LogCommandWithEvidence(string commandId)
         {
+            if (TryGetVariantExamTask(out int variantProjectId, out int variantTaskId))
+            {
+                if (IsKnownEvidenceCommand(commandId))
+                    Logger.LogTaskEvidence(variantProjectId, variantTaskId, commandId);
+                return;
+            }
+
             if (string.Equals(commandId, "BulletDefineNew", StringComparison.OrdinalIgnoreCase))
             {
                 LogBulletDefineNewForSelection();
@@ -85,6 +93,52 @@ namespace New_MOSWordVSTOAddIn
 
                 Logger.LogTaskEvidence(entry.ProjectId, entry.TaskId, commandId);
             }
+        }
+
+        private static bool TryGetVariantExamTask(out int projectId, out int taskId)
+        {
+            if (Logger.TryGetCurrentTaskContext(out projectId, out taskId, out int variantSetNo)
+                && variantSetNo > 0
+                && projectId > 0
+                && taskId > 0)
+                return true;
+
+            projectId = 0;
+            taskId = 0;
+            try
+            {
+                string path = Path.Combine(Path.GetTempPath(), "mos_word_current_task.txt");
+                if (!File.Exists(path))
+                    return false;
+                if (!WordTaskLogFormat.TryParseCurrentTaskLine(File.ReadAllText(path), out var context)
+                    || !context.IsVariant
+                    || !context.IsValid)
+                    return false;
+
+                projectId = context.ProjectId;
+                taskId = context.TaskId;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsKnownEvidenceCommand(string commandId)
+        {
+            if (string.Equals(commandId, "BulletDefineNew", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandId, "CutParagraphSelection", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(commandId, "IndentIncrease", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            foreach (var entry in EvidenceTargets)
+            {
+                if (string.Equals(entry.CommandId, commandId, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>

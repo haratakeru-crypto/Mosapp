@@ -104,6 +104,9 @@ namespace Libraries
                 {
                     if (!kv.Key.StartsWith(prefix, StringComparison.Ordinal) || kv.Value)
                         continue;
+                    if (_initialTaskFailReasons.TryGetValue(kv.Key, out string reason)
+                        && string.Equals(reason, WordScoreExplanation.UnimplementedText, StringComparison.Ordinal))
+                        continue;
                     var parts = kv.Key.Substring(prefix.Length).Split('-');
                     if (parts.Length == 2)
                         yield return $"{parts[0]}-{parts[1]}";
@@ -163,7 +166,9 @@ namespace Libraries
             {
                 _taskResults[key] = isPassed;
                 _taskFailReasons[key] = isPassed ? "" : (failReason ?? "");
-                if (!isPassed)
+                bool unimplemented = !isPassed
+                    && string.Equals(failReason, WordScoreExplanation.UnimplementedText, StringComparison.Ordinal);
+                if (!isPassed && !unimplemented)
                     _incorrectTaskKeys.Add(key);
                 else
                     _incorrectTaskKeys.Remove(key);

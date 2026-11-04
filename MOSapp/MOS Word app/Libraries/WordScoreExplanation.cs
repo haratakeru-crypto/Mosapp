@@ -13,6 +13,7 @@ namespace Libraries
     {
         public const string RequirementMissText = "求められている状態になっていないため、×になりました。";
         public const string UnavailableText = "この課題は確認できませんでした。";
+        public const string UnimplementedText = "この課題は未実装のため採点しません。";
 
         /// <summary>破壊的操作の動作名（未知）。一覧組み立て用。</summary>
         public const string UnknownStudentAction = "操作をした";

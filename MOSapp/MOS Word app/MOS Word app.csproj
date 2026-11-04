@@ -30,6 +30,7 @@
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -55,28 +56,60 @@
       <Project>{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_1_PV1.csproj">
+      <Project>{A1B2C3D4-E5F6-7890-ABCD-EF12345678A1}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_2.csproj">
       <Project>{A1B2C3D4-E5F6-7890-ABCD-EF1234567892}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_2_PV1.csproj">
+      <Project>{01E05640-B518-46C1-9802-312C58D9CD43}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_3.csproj">
       <Project>{A1B2C3D4-E5F6-7893-ABCD-EF1234567893}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_3_PV1.csproj">
+      <Project>{8F2A1C4D-5E6B-4A9C-8D1E-2F3B4C5D6E7F}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_4.csproj">
       <Project>{A1B2C3D4-E5F6-7894-ABCD-EF1234567894}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_4_PV1.csproj">
+      <Project>{7C4E9A2B-1D3F-4E5A-9B8C-6D7E8F9A0B1C}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_5.csproj">
       <Project>{A1B2C3D4-E5F6-7895-ABCD-EF1234567895}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_5_PV1.csproj">
+      <Project>{3A8B5C2D-4E6F-4A1B-9C0D-8E7F6A5B4C3D}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_6.csproj">
       <Project>{A1B2C3D4-E5F6-7896-ABCD-EF1234567896}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_6_PV1.csproj">
+      <Project>{5D9E8F7A-2B4C-4D1E-9F0A-1B2C3D4E5F6A}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_7_PV1.csproj">
+      <Project>{6E8F9A0B-3C4D-5E6F-7A8B-9C0D1E2F3A4B}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_7.csproj">
       <Project>{A1B2C3D4-E5F6-7897-ABCD-EF1234567897}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_8_PV1.csproj">
+      <Project>{8A7B6C5D-4E3F-2A1B-9C0D-1E2F3A4B5C6D}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <ProjectReference Include="Libraries\WordChecker\Group1\WordChecker1_8.csproj">
@@ -160,6 +193,12 @@
     <Compile Include="Guide\GuideStepsRepository.cs" />
     <Compile Include="WordDataPathHelper.cs" />
     <Compile Include="VariantProblemWorkbook.cs" />
+    <Compile Include="Libraries\WordVariantScoring.cs" />
+    <Compile Include="Libraries\WordTaskReviewState.cs" />
+    <Compile Include="Libraries\WordTaskReviewStateStore.cs" />
+    <Compile Include="Libraries\WordPracticeScore.cs" />
+    <Compile Include="Libraries\WordVariantPriorityLookup.cs" />
+    <Compile Include="Libraries\WordBulkResetCoordinator.cs" />
     <Compile Include="WordProjectResetHelper.cs" />
     <Compile Include="TabTaskInfo.cs" />
     <Compile Include="TabChecker.cs" />
@@ -168,6 +207,7 @@
     </Compile>
     <Compile Include="Converters.cs" />
     <Compile Include="Libraries\LogReader.cs" />
+    <Compile Include="Libraries\WordTaskLogContext.cs" />
     <Compile Include="Libraries\ScoreResultStore.cs" />
     <Compile Include="Libraries\WordScoreExplanation.cs" />
     <Compile Include="Libraries\WordBatchScoring.cs" />
@@ -185,6 +225,17 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Views\AnswerGuideWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\BulkResetScopeDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="Views\BulkResetScopeDialog.xaml.cs">
+      <DependentUpon>BulkResetScopeDialog.xaml</DependentUpon>
+    </Compile>
+    <Page Include="Views\AnswerStepsWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -218,6 +269,10 @@
     </Page>
     <Compile Include="Views\AnswerGuideWindow.xaml.cs">
       <DependentUpon>AnswerGuideWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Views\AnswerStepsWindow.xaml.cs">
+      <DependentUpon>AnswerStepsWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Views\UiTestAppBarWindow.xaml.cs">
@@ -269,6 +324,7 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+    <None Include="AppIcon.ico" />
     <None Include="MOS Word app_TemporaryKey.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
@@ -293,6 +349,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Reference\CSV\MOS模擬アプリ正誤判定表251120_挿入入力のみ.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="References\CSV\Word類題_セット1_優先度.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="References\CSV\WordVocabularyKeywords.csv">
@@ -323,23 +382,47 @@
     <Content Include="$(OutputPath)Dlls\WordChecker1_1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_1.dll')">
       <Link>Dlls\WordChecker1_1.dll</Link>
     </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_1_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_1_PV1.dll')">
+      <Link>Dlls\WordChecker1_1_PV1.dll</Link>
+    </Content>
     <Content Include="$(OutputPath)Dlls\WordChecker1_2.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_2.dll')">
       <Link>Dlls\WordChecker1_2.dll</Link>
+    </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_2_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_2_PV1.dll')">
+      <Link>Dlls\WordChecker1_2_PV1.dll</Link>
     </Content>
     <Content Include="$(OutputPath)Dlls\WordChecker1_3.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_3.dll')">
       <Link>Dlls\WordChecker1_3.dll</Link>
     </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_3_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_3_PV1.dll')">
+      <Link>Dlls\WordChecker1_3_PV1.dll</Link>
+    </Content>
     <Content Include="$(OutputPath)Dlls\WordChecker1_4.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_4.dll')">
       <Link>Dlls\WordChecker1_4.dll</Link>
+    </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_4_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_4_PV1.dll')">
+      <Link>Dlls\WordChecker1_4_PV1.dll</Link>
     </Content>
     <Content Include="$(OutputPath)Dlls\WordChecker1_5.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_5.dll')">
       <Link>Dlls\WordChecker1_5.dll</Link>
     </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_5_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_5_PV1.dll')">
+      <Link>Dlls\WordChecker1_5_PV1.dll</Link>
+    </Content>
     <Content Include="$(OutputPath)Dlls\WordChecker1_6.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_6.dll')">
       <Link>Dlls\WordChecker1_6.dll</Link>
     </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_6_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_6_PV1.dll')">
+      <Link>Dlls\WordChecker1_6_PV1.dll</Link>
+    </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_7_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_7_PV1.dll')">
+      <Link>Dlls\WordChecker1_7_PV1.dll</Link>
+    </Content>
     <Content Include="$(OutputPath)Dlls\WordChecker1_7.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_7.dll')">
       <Link>Dlls\WordChecker1_7.dll</Link>
+    </Content>
+    <Content Include="$(OutputPath)Dlls\WordChecker1_8_PV1.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_8_PV1.dll')">
+      <Link>Dlls\WordChecker1_8_PV1.dll</Link>
     </Content>
     <Content Include="$(OutputPath)Dlls\WordChecker1_8.dll" Condition="Exists('$(OutputPath)Dlls\WordChecker1_8.dll')">
       <Link>Dlls\WordChecker1_8.dll</Link>
