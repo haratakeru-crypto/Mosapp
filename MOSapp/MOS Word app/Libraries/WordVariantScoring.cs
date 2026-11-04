@@ -58,7 +58,7 @@ namespace MOS_Word_app
 
             foreach (VariantTaskText task in tasks)
             {
-                int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, task.TaskId);
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, task.TaskId, variantSetNo);
                 if (!WordGradingGate.TryPass(
                     groupId, projectId, task.TaskId, attemptNo, out List<string> gateActions, variantSetNo))
                 {
@@ -104,7 +104,7 @@ namespace MOS_Word_app
                 .OrderBy(id => id)
                 .ToList();
 
-            ScoreResultStore.ClearGroup(groupId);
+            ScoreResultStore.ClearGroup(groupId, variantSetNo);
             ReportProgress(progress, "採点の準備をしています...", 0, projectIdsToScore.Count);
 
             WordApp wordApp = null;
@@ -130,17 +130,17 @@ namespace MOS_Word_app
                         string filePath = WordDataPathHelper.FindVariantWorkingFile(groupId, projectId, variantSetNo);
                         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath) || !OpenDocument(wordApp, filePath))
                         {
-                            RecordUnavailable(groupId, projectId, tasks);
+                            RecordUnavailable(groupId, projectId, tasks, variantSetNo);
                             continue;
                         }
 
                         IReadOnlyList<TaskResult> results = ScoreProject(groupId, projectId, variantSetNo);
-                        RecordProjectResults(groupId, projectId, tasks, results);
+                        RecordProjectResults(groupId, projectId, tasks, results, variantSetNo);
                     }
                     catch (Exception ex)
                     {
                         Debug.WriteLine($"[WordVariantScoring] Project {projectId} failed: {ex.Message}");
-                        RecordUnavailable(groupId, projectId, tasks);
+                        RecordUnavailable(groupId, projectId, tasks, variantSetNo);
                     }
                     finally
                     {
@@ -189,13 +189,13 @@ namespace MOS_Word_app
                 if (!TryActivateDocument(wordApp, filePath) && !OpenDocument(wordApp, filePath))
                     return null;
 
-                int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(projectId, taskId, variantSetNo);
                 if (!WordGradingGate.TryPass(
                     groupId, projectId, taskId, attemptNo, out List<string> gateActions, variantSetNo))
                 {
                     string gateFail = WordScoreExplanation.ResolveFailReason(
                         passed: false, gateFailed: true, gateStudentActions: gateActions);
-                    ScoreResultStore.RecordResult(groupId, projectId, taskId, false, gateFail);
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, false, gateFail, variantSetNo);
                     return false;
                 }
 
@@ -203,12 +203,12 @@ namespace MOS_Word_app
                 bool? passed = TryScoreTask(checkerType, checkerInstance, groupId, projectId, taskId);
                 if (!passed.HasValue)
                 {
-                    ScoreResultStore.RecordResult(groupId, projectId, taskId, false, UnimplementedReason);
+                    ScoreResultStore.RecordResult(groupId, projectId, taskId, false, UnimplementedReason, variantSetNo);
                     return null;
                 }
 
                 string failReason = passed.Value ? "" : WordScoreExplanation.ResolveFailReason(false);
-                ScoreResultStore.RecordResult(groupId, projectId, taskId, passed.Value, failReason);
+                ScoreResultStore.RecordResult(groupId, projectId, taskId, passed.Value, failReason, variantSetNo);
                 return passed;
             }
             catch (Exception ex)
@@ -242,7 +242,8 @@ namespace MOS_Word_app
             int groupId,
             int projectId,
             IReadOnlyList<VariantTaskText> tasks,
-            IReadOnlyList<TaskResult> results)
+            IReadOnlyList<TaskResult> results,
+            int variantSetNo)
         {
             foreach (VariantTaskText task in tasks)
             {
@@ -250,7 +251,8 @@ namespace MOS_Word_app
                 bool? passed = match?.IsPassed;
                 if (!passed.HasValue)
                 {
-                    ScoreResultStore.RecordResult(groupId, projectId, task.TaskId, false, UnimplementedReason);
+                    ScoreResultStore.RecordResult(
+                        groupId, projectId, task.TaskId, false, UnimplementedReason, variantSetNo);
                     continue;
                 }
 
@@ -259,16 +261,18 @@ namespace MOS_Word_app
                     projectId,
                     task.TaskId,
                     passed.Value,
-                    passed.Value ? "" : (match?.FailReason ?? WordScoreExplanation.ResolveFailReason(false)));
+                    passed.Value ? "" : (match?.FailReason ?? WordScoreExplanation.ResolveFailReason(false)),
+                    variantSetNo);
             }
         }
 
-        private static void RecordUnavailable(int groupId, int projectId, IReadOnlyList<VariantTaskText> tasks)
+        private static void RecordUnavailable(
+            int groupId, int projectId, IReadOnlyList<VariantTaskText> tasks, int variantSetNo)
         {
             foreach (VariantTaskText task in tasks)
             {
                 ScoreResultStore.RecordResult(
-                    groupId, projectId, task.TaskId, false, WordScoreExplanation.UnavailableText);
+                    groupId, projectId, task.TaskId, false, WordScoreExplanation.UnavailableText, variantSetNo);
             }
         }
 

@@ -669,10 +669,11 @@ namespace MOS_Word_app.Views
                             });
                     }
                 });
-                ScoreResultStore.SnapshotGroup(_groupId);
+                int resultVariantSetNo = _isVariantMode ? WordVariantScoring.DefaultVariantSetNo : 0;
+                ScoreResultStore.SnapshotGroup(_groupId, resultVariantSetNo);
                 try
                 {
-                    var logResults = ScoreResultStore.GetProjectResults(_groupId);
+                    var logResults = ScoreResultStore.GetProjectResults(_groupId, resultVariantSetNo);
                     if (logResults.Count > 0)
                     {
                         MosPracticeClient.ScoringLogStore.Append(

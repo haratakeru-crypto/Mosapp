@@ -444,7 +444,8 @@ namespace MOS_Word_app.Views
                     MethodInfo beginOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("Begin");
                     MethodInfo endOpenXml = assembly.GetType("Libraries.Group1.WordOpenXmlSession")?.GetMethod("End");
 
-                    int openAttempt = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                    int openAttempt = WordTaskAttemptRegistry.GetAttempt(
+                        _currentProjectId, _currentTaskId, CurrentVariantSetNo);
                     WordSnapshotChecker.BeginReuseCurrentDocument(_groupId, _currentProjectId);
                     beginOpenXml?.Invoke(null, null);
                     try
@@ -469,19 +470,22 @@ namespace MOS_Word_app.Views
                             try
                             {
                                 WordScoreExplanation.ClearCheckerReason();
-                                int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, taskNum);
+                                int attemptNo = WordTaskAttemptRegistry.GetAttempt(
+                                    _currentProjectId, taskNum, CurrentVariantSetNo);
                                 if (!WordGradingGate.TryPass(_groupId, _currentProjectId, taskNum, attemptNo, out List<string> gateActions))
                                 {
                                     string failReason = WordScoreExplanation.ResolveFailReason(
                                         passed: false, gateFailed: true, gateStudentActions: gateActions);
                                     taskResults.Add((taskNum, false, failReason));
-                                    ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
+                                    ScoreResultStore.RecordResult(
+                                        _groupId, _currentProjectId, taskNum, false, failReason, CurrentVariantSetNo);
                                     continue;
                                 }
                                 bool taskResult = (bool)method.Invoke(checkerInstance, null);
                                 string reason = WordScoreExplanation.ResolveFailReason(taskResult);
                                 taskResults.Add((taskNum, taskResult, reason));
-                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, taskResult, reason);
+                                ScoreResultStore.RecordResult(
+                                    _groupId, _currentProjectId, taskNum, taskResult, reason, CurrentVariantSetNo);
 
                                 if (taskResult)
                                 {
@@ -496,7 +500,8 @@ namespace MOS_Word_app.Views
                                 string failReason = WordScoreExplanation.ResolveFailReason(
                                     passed: false, unavailable: true);
                                 taskResults.Add((taskNum, false, failReason));
-                                ScoreResultStore.RecordResult(_groupId, _currentProjectId, taskNum, false, failReason);
+                                ScoreResultStore.RecordResult(
+                                    _groupId, _currentProjectId, taskNum, false, failReason, CurrentVariantSetNo);
                                 System.Diagnostics.Debug.WriteLine($"[ScoreButton] タスク{taskNum} エラー: {exTask.Message}");
                             }
                         }
@@ -804,9 +809,12 @@ namespace MOS_Word_app.Views
                 // 通常モード: レビューページを開く（編集内容をディスクに保存してから Word を閉じる）
                 LogReader.RequestCloseNavigationPaneIfOpen();
                 WriteCurrentTaskFile();
-                int reviewAttemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
-                WordSnapshotChecker.LogMatchingBaselineDiffOnce(_groupId, _currentProjectId, _currentTaskId, reviewAttemptNo);
-                WordBatchScoring.PrepareBeforeClosingDocumentsForBatchScoring(_currentProjectId, _currentTaskId, reviewAttemptNo);
+                int reviewAttemptNo = WordTaskAttemptRegistry.GetAttempt(
+                    _currentProjectId, _currentTaskId, CurrentVariantSetNo);
+                WordSnapshotChecker.LogMatchingBaselineDiffOnce(
+                    _groupId, _currentProjectId, _currentTaskId, reviewAttemptNo, CurrentVariantSetNo);
+                WordBatchScoring.PrepareBeforeClosingDocumentsForBatchScoring(
+                    _currentProjectId, _currentTaskId, reviewAttemptNo);
                 SaveAndCloseAllWordDocuments();
                 this.Hide();
 
@@ -890,7 +898,8 @@ namespace MOS_Word_app.Views
         {
             try
             {
-                int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+                int attemptNo = WordTaskAttemptRegistry.GetAttempt(
+                    _currentProjectId, _currentTaskId, CurrentVariantSetNo);
                 int flags = CurrentVariantSetNo > 0
                     ? (int)WordVariantValidationConfig.GetExemptFlags(
                         CurrentVariantSetNo, _currentProjectId, _currentTaskId)
@@ -907,7 +916,8 @@ namespace MOS_Word_app.Views
 
         private void LogTaskStartIfNeeded()
         {
-            int attemptNo = WordTaskAttemptRegistry.GetAttempt(_currentProjectId, _currentTaskId);
+            int attemptNo = WordTaskAttemptRegistry.GetAttempt(
+                _currentProjectId, _currentTaskId, CurrentVariantSetNo);
             var context = WordTaskLogContext.Create(
                 _currentProjectId, _currentTaskId, attemptNo, CurrentVariantSetNo);
             string key = context.FormatTaskToken();
@@ -924,10 +934,11 @@ namespace MOS_Word_app.Views
                 return false;
             if (_preparedRetryTaskKeys.Contains(key))
                 return true;
-            int cur = WordTaskAttemptRegistry.GetAttempt(projectId, taskId);
-            WordTaskAttemptRegistry.SetAttempt(projectId, taskId, Math.Max(1, cur + 1));
+            int cur = WordTaskAttemptRegistry.GetAttempt(projectId, taskId, CurrentVariantSetNo);
+            WordTaskAttemptRegistry.SetAttempt(projectId, taskId, Math.Max(1, cur + 1), CurrentVariantSetNo);
             _preparedRetryTaskKeys.Add(key);
-            System.Diagnostics.Debug.WriteLine($"[RetryAttempt] P{projectId} T{taskId} attempt={WordTaskAttemptRegistry.GetAttempt(projectId, taskId)}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[RetryAttempt] P{projectId} T{taskId} V{CurrentVariantSetNo} attempt={WordTaskAttemptRegistry.GetAttempt(projectId, taskId, CurrentVariantSetNo)}");
             return true;
         }
 

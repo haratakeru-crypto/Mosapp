@@ -36,6 +36,9 @@ namespace MOS_Word_app.Views
 
         public bool ShowDispositionColumns => _isVariantMode;
 
+        private int ResultVariantSetNo =>
+            _isVariantMode ? WordVariantScoring.DefaultVariantSetNo : 0;
+
         public ResultWindow(
             Dictionary<int, bool[]> projectTaskFlaggedStates = null,
             Dictionary<int, bool[]> projectTaskViewedStates = null,
@@ -196,7 +199,7 @@ namespace MOS_Word_app.Views
 
             Dictionary<int, List<bool>> results = _fromScoringLog
                 ? _snapshotResults
-                : ScoreResultStore.GetProjectResults(_groupId);
+                : ScoreResultStore.GetProjectResults(_groupId, ResultVariantSetNo);
             int total = WordPracticeScore.Compute(WordPracticeScore.FlattenResults(results));
 
             TotalScorePanel.Visibility = Visibility.Visible;
@@ -307,9 +310,9 @@ namespace MOS_Word_app.Views
 
             if (!_fromScoringLog)
             {
-                string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId);
+                string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId, ResultVariantSetNo);
                 if (string.IsNullOrEmpty(reason))
-                    reason = ScoreResultStore.GetInitialFailReason(_groupId, projectId, taskId);
+                    reason = ScoreResultStore.GetInitialFailReason(_groupId, projectId, taskId, ResultVariantSetNo);
                 if (WordVariantScoring.IsUnimplementedReason(reason))
                     return true;
             }
@@ -369,7 +372,7 @@ namespace MOS_Word_app.Views
                     int arrayIndex = task.TaskId - 1;
                     bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                     if (!isUnread) continue;
-                    if (ScoreResultStore.IsScored(_groupId, project.ProjectId, task.TaskId)) continue;
+                    if (ScoreResultStore.IsScored(_groupId, project.ProjectId, task.TaskId, ResultVariantSetNo)) continue;
                     firstProjectId = project.ProjectId;
                     firstTaskId = task.TaskId;
                     return;
@@ -401,8 +404,8 @@ namespace MOS_Word_app.Views
             }
             bool isPassed;
             bool hasResult = useInitialSnapshot
-                ? ScoreResultStore.TryGetInitialResult(_groupId, projectId, taskId, out isPassed)
-                : ScoreResultStore.TryGetResult(_groupId, projectId, taskId, out isPassed);
+                ? ScoreResultStore.TryGetInitialResult(_groupId, projectId, taskId, out isPassed, ResultVariantSetNo)
+                : ScoreResultStore.TryGetResult(_groupId, projectId, taskId, out isPassed, ResultVariantSetNo);
             if (hasResult)
             {
                 if (!isPassed) countsAsWrong = true;
@@ -417,7 +420,7 @@ namespace MOS_Word_app.Views
                 }
                 return "";
             }
-            if (ScoreResultStore.IsIncorrect(_groupId, projectId, taskId))
+            if (ScoreResultStore.IsIncorrect(_groupId, projectId, taskId, ResultVariantSetNo))
             {
                 countsAsWrong = true;
                 return "✖";
@@ -509,7 +512,7 @@ namespace MOS_Word_app.Views
                 return;
             }
 
-            var scored = ScoreResultStore.GetScoredProjectIds(_groupId);
+            var scored = ScoreResultStore.GetScoredProjectIds(_groupId, ResultVariantSetNo);
             if (scored.Count > 0)
             {
                 _includedProjectIds = scored;
@@ -582,10 +585,10 @@ namespace MOS_Word_app.Views
                 return "";
             if (_fromScoringLog)
                 return "";
-            string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId);
+            string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId, ResultVariantSetNo);
             if (!string.IsNullOrEmpty(reason))
                 return reason;
-            return ScoreResultStore.GetInitialFailReason(_groupId, projectId, taskId);
+            return ScoreResultStore.GetInitialFailReason(_groupId, projectId, taskId, ResultVariantSetNo);
         }
 
         private void FailReason_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -621,7 +624,7 @@ namespace MOS_Word_app.Views
             try
             {
                 bool canRetry = taskInfo.ResultMark != "－";
-                var initialWrongKeys = ScoreResultStore.GetInitialWrongKeys(_groupId).ToList();
+                var initialWrongKeys = ScoreResultStore.GetInitialWrongKeys(_groupId, ResultVariantSetNo).ToList();
                 var uiTestAppBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
                 if (uiTestAppBar != null)
                 {

@@ -85,6 +85,10 @@ namespace MOS_Word_app
                 Directory.CreateDirectory(workingDirectory);
 
             RestoreFromTemplate(templatePath, workingPath, initialPath: null);
+
+            // 類題1-1: PDF 出力を消し、リセット後に再作成しないと ○ にならないようにする
+            if (groupId == 1 && projectId == 1)
+                TryDeleteVariantP1DerivativeOutputs(workingDirectory);
         }
 
         public static void ClearLogsAfterSuccessfulCopy(int projectId, int variantSetNo)
@@ -138,6 +142,9 @@ namespace MOS_Word_app
                 Directory.CreateDirectory(workingDirectory);
 
             RestoreFromTemplate(templatePath, workingPath, initialPath: null);
+
+            if (groupId == 1 && projectId == 1)
+                TryDeleteVariantP1DerivativeOutputs(workingDirectory);
         }
 
         public static void UnblockResetReferenceFolders(int groupId, int variantSetNo, bool includeTextbook, bool includeVariant)
@@ -274,6 +281,25 @@ namespace MOS_Word_app
                     System.Diagnostics.Debug.WriteLine(
                         $"[WordProjectResetHelper] 派生ファイル削除スキップ ({name}): {ex.Message}");
                 }
+            }
+        }
+
+        /// <summary>類題1-1: 作業フォルダの「写真展案内完成.pdf」（教材7-4/7-5の派生削除と同型）。</summary>
+        private static void TryDeleteVariantP1DerivativeOutputs(string workingFolder)
+        {
+            if (string.IsNullOrEmpty(workingFolder) || !Directory.Exists(workingFolder))
+                return;
+
+            const string pdfName = "写真展案内完成.pdf";
+            string path = Path.Combine(workingFolder, pdfName);
+            if (!File.Exists(path))
+                return;
+
+            try { File.Delete(path); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[WordProjectResetHelper] 派生ファイル削除スキップ ({pdfName}): {ex.Message}");
             }
         }
     }

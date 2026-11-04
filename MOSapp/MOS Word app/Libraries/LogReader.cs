@@ -290,7 +290,7 @@ namespace Libraries
         {
             ClearOperationLogForProject(projectId, variantSetNo);
             ClearDestructiveLogForProject(projectId, variantSetNo);
-            WordTaskAttemptRegistry.ClearProject(projectId);
+            WordTaskAttemptRegistry.ClearProject(projectId, variantSetNo);
             ClearCurrentTaskFileIfMatches(projectId, variantSetNo);
             ClearSnapshotIfMatches(projectId, variantSetNo);
         }
@@ -1342,30 +1342,38 @@ namespace Libraries
         }
     }
 
-    /// <summary>タスク単位の attempt 番号（通常 0、結果画面からの再採点は 1 以上）。</summary>
+    /// <summary>
+    /// タスク単位の attempt 番号（通常 0、結果画面からの再採点は 1 以上）。
+    /// 教材は `{project}-{task}`、類題は `V{set}-{project}-{task}`。
+    /// </summary>
     public static class WordTaskAttemptRegistry
     {
         private static readonly object Sync = new object();
         private static readonly Dictionary<string, int> Attempts = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        private static string Key(int projectId, int taskId) => $"{projectId}-{taskId}";
+        private static string Key(int projectId, int taskId, int variantSetNo)
+        {
+            if (variantSetNo > 0)
+                return "V" + variantSetNo + "-" + projectId + "-" + taskId;
+            return projectId + "-" + taskId;
+        }
 
-        public static int GetAttempt(int projectId, int taskId)
+        public static int GetAttempt(int projectId, int taskId, int variantSetNo = 0)
         {
             lock (Sync)
             {
-                if (Attempts.TryGetValue(Key(projectId, taskId), out int v))
+                if (Attempts.TryGetValue(Key(projectId, taskId, variantSetNo), out int v))
                     return Math.Max(0, v);
                 return 0;
             }
         }
 
-        public static void SetAttempt(int projectId, int taskId, int attemptNo)
+        public static void SetAttempt(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             if (attemptNo < 0) attemptNo = 0;
             lock (Sync)
             {
-                Attempts[Key(projectId, taskId)] = attemptNo;
+                Attempts[Key(projectId, taskId, variantSetNo)] = attemptNo;
             }
         }
 
@@ -1377,17 +1385,33 @@ namespace Libraries
             }
         }
 
-        public static void ClearProject(int projectId)
+        public static void ClearProject(int projectId, int variantSetNo = 0)
         {
-            string prefix = projectId + "-";
             lock (Sync)
             {
                 var keys = new List<string>();
-                foreach (var k in Attempts.Keys)
+                if (variantSetNo > 0)
                 {
-                    if (k.StartsWith(prefix, StringComparison.Ordinal))
-                        keys.Add(k);
+                    string prefix = "V" + variantSetNo + "-" + projectId + "-";
+                    foreach (var k in Attempts.Keys)
+                    {
+                        if (k.StartsWith(prefix, StringComparison.Ordinal))
+                            keys.Add(k);
+                    }
                 }
+                else
+                {
+                    string prefix = projectId + "-";
+                    foreach (var k in Attempts.Keys)
+                    {
+                        // 類題キー Vn-P-T は除外
+                        if (k.Length > 0 && (k[0] == 'V' || k[0] == 'v'))
+                            continue;
+                        if (k.StartsWith(prefix, StringComparison.Ordinal))
+                            keys.Add(k);
+                    }
+                }
+
                 foreach (var k in keys)
                     Attempts.Remove(k);
             }

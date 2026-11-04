@@ -1,74 +1,119 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace Libraries
 {
     /// <summary>
     /// 採点結果をプロセス内で共有するためのストア。
-    /// グループID＋プロジェクトID＋タスク番号をキーに、全問の正誤と×理由を保持する。
+    /// キーは教材 `{group}-{project}-{task}`、類題 `{group}-V{set}-{project}-{task}`。
     /// </summary>
     public static class ScoreResultStore
     {
         private static readonly object _lock = new object();
-        // key 形式: "{groupId}-{projectId}-{taskNumber}"
         private static readonly Dictionary<string, bool> _taskResults = new Dictionary<string, bool>(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> _taskFailReasons = new Dictionary<string, string>(StringComparer.Ordinal);
         private static readonly HashSet<string> _incorrectTaskKeys = new HashSet<string>(StringComparer.Ordinal);
-        /// <summary>試験終了直後の初回採点スナップショット（キーは MakeKey と同形式）</summary>
         private static readonly Dictionary<string, bool> _initialTaskResults = new Dictionary<string, bool>(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> _initialTaskFailReasons = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        private static string MakeKey(int groupId, int projectId, int taskNumber)
+        private static string MakeKey(int groupId, int projectId, int taskNumber, int variantSetNo)
         {
-            return $"{groupId}-{projectId}-{taskNumber}";
+            if (variantSetNo > 0)
+            {
+                return groupId.ToString(CultureInfo.InvariantCulture)
+                    + "-V" + variantSetNo.ToString(CultureInfo.InvariantCulture)
+                    + "-" + projectId.ToString(CultureInfo.InvariantCulture)
+                    + "-" + taskNumber.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return groupId.ToString(CultureInfo.InvariantCulture)
+                + "-" + projectId.ToString(CultureInfo.InvariantCulture)
+                + "-" + taskNumber.ToString(CultureInfo.InvariantCulture);
         }
 
-        /// <summary>
-        /// 指定グループの採点結果をクリアする（一括採点開始前に呼ぶ）。
-        /// </summary>
-        public static void ClearGroup(int groupId)
+        private static bool MatchesScope(string key, int groupId, int variantSetNo)
         {
-            string prefix = $"{groupId}-";
+            if (string.IsNullOrEmpty(key))
+                return false;
+
+            string groupPrefix = groupId.ToString(CultureInfo.InvariantCulture) + "-";
+            if (!key.StartsWith(groupPrefix, StringComparison.Ordinal))
+                return false;
+
+            string rest = key.Substring(groupPrefix.Length);
+            if (variantSetNo > 0)
+            {
+                string variantPrefix = "V" + variantSetNo.ToString(CultureInfo.InvariantCulture) + "-";
+                return rest.StartsWith(variantPrefix, StringComparison.Ordinal);
+            }
+
+            return rest.Length > 0 && rest[0] != 'V' && rest[0] != 'v';
+        }
+
+        private static bool TryParseProjectTask(string key, int groupId, int variantSetNo, out int projectId, out int taskNumber)
+        {
+            projectId = 0;
+            taskNumber = 0;
+            if (!MatchesScope(key, groupId, variantSetNo))
+                return false;
+
+            string groupPrefix = groupId.ToString(CultureInfo.InvariantCulture) + "-";
+            string rest = key.Substring(groupPrefix.Length);
+            if (variantSetNo > 0)
+            {
+                string variantPrefix = "V" + variantSetNo.ToString(CultureInfo.InvariantCulture) + "-";
+                if (!rest.StartsWith(variantPrefix, StringComparison.Ordinal))
+                    return false;
+                rest = rest.Substring(variantPrefix.Length);
+            }
+
+            string[] parts = rest.Split('-');
+            if (parts.Length != 2)
+                return false;
+            return int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out projectId)
+                && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out taskNumber)
+                && projectId > 0
+                && taskNumber > 0;
+        }
+
+        /// <summary>指定グループ・スコープ（教材 / 類題セット）の採点結果をクリアする。</summary>
+        public static void ClearGroup(int groupId, int variantSetNo = 0)
+        {
             lock (_lock)
             {
-                foreach (var key in _taskResults.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
-                    _taskResults.Remove(key);
-                foreach (var key in _taskFailReasons.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
-                    _taskFailReasons.Remove(key);
-                _incorrectTaskKeys.RemoveWhere(k => k.StartsWith(prefix, StringComparison.Ordinal));
-                foreach (var key in _initialTaskResults.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
-                    _initialTaskResults.Remove(key);
-                foreach (var key in _initialTaskFailReasons.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
-                    _initialTaskFailReasons.Remove(key);
+                RemoveKeysMatching(_taskResults, groupId, variantSetNo);
+                RemoveKeysMatching(_taskFailReasons, groupId, variantSetNo);
+                _incorrectTaskKeys.RemoveWhere(k => MatchesScope(k, groupId, variantSetNo));
+                RemoveKeysMatching(_initialTaskResults, groupId, variantSetNo);
+                RemoveKeysMatching(_initialTaskFailReasons, groupId, variantSetNo);
             }
         }
 
-        /// <summary>
-        /// 現在の採点結果を初回スナップショットとして保存する（一括採点直後に1回呼ぶ）。
-        /// </summary>
-        public static void SnapshotGroup(int groupId)
+        private static void RemoveKeysMatching<T>(Dictionary<string, T> map, int groupId, int variantSetNo)
         {
-            string prefix = $"{groupId}-";
+            foreach (var key in map.Keys.Where(k => MatchesScope(k, groupId, variantSetNo)).ToList())
+                map.Remove(key);
+        }
+
+        /// <summary>現在の採点結果を初回スナップショットとして保存する。</summary>
+        public static void SnapshotGroup(int groupId, int variantSetNo = 0)
+        {
             lock (_lock)
             {
-                foreach (var key in _initialTaskResults.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
-                    _initialTaskResults.Remove(key);
-                foreach (var key in _initialTaskFailReasons.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
-                    _initialTaskFailReasons.Remove(key);
-                foreach (var kv in _taskResults.Where(k => k.Key.StartsWith(prefix, StringComparison.Ordinal)))
+                RemoveKeysMatching(_initialTaskResults, groupId, variantSetNo);
+                RemoveKeysMatching(_initialTaskFailReasons, groupId, variantSetNo);
+                foreach (var kv in _taskResults.Where(k => MatchesScope(k.Key, groupId, variantSetNo)))
                     _initialTaskResults[kv.Key] = kv.Value;
-                foreach (var kv in _taskFailReasons.Where(k => k.Key.StartsWith(prefix, StringComparison.Ordinal)))
+                foreach (var kv in _taskFailReasons.Where(k => MatchesScope(k.Key, groupId, variantSetNo)))
                     _initialTaskFailReasons[kv.Key] = kv.Value;
             }
         }
 
-        /// <summary>
-        /// 初回スナップショットから採点結果を取得する。
-        /// </summary>
-        public static bool TryGetInitialResult(int groupId, int projectId, int taskNumber, out bool isPassed)
+        public static bool TryGetInitialResult(int groupId, int projectId, int taskNumber, out bool isPassed, int variantSetNo = 0)
         {
-            var key = MakeKey(groupId, projectId, taskNumber);
+            var key = MakeKey(groupId, projectId, taskNumber, variantSetNo);
             lock (_lock)
             {
                 if (_initialTaskResults.TryGetValue(key, out isPassed))
@@ -78,12 +123,9 @@ namespace Libraries
             }
         }
 
-        /// <summary>
-        /// 初回スナップショットから×理由を取得する。合格・未採点は空文字。
-        /// </summary>
-        public static string GetInitialFailReason(int groupId, int projectId, int taskNumber)
+        public static string GetInitialFailReason(int groupId, int projectId, int taskNumber, int variantSetNo = 0)
         {
-            var key = MakeKey(groupId, projectId, taskNumber);
+            var key = MakeKey(groupId, projectId, taskNumber, variantSetNo);
             lock (_lock)
             {
                 if (_initialTaskFailReasons.TryGetValue(key, out string reason))
@@ -92,54 +134,39 @@ namespace Libraries
             }
         }
 
-        /// <summary>
-        /// 初回採点で不正解だったタスクのキー一覧（"{projectId}-{taskId}" 形式）。
-        /// </summary>
-        public static IEnumerable<string> GetInitialWrongKeys(int groupId)
+        /// <summary>初回採点で不正解だったタスクのキー一覧（"{projectId}-{taskId}" 形式）。</summary>
+        public static IEnumerable<string> GetInitialWrongKeys(int groupId, int variantSetNo = 0)
         {
-            string prefix = $"{groupId}-";
             lock (_lock)
             {
                 foreach (var kv in _initialTaskResults)
                 {
-                    if (!kv.Key.StartsWith(prefix, StringComparison.Ordinal) || kv.Value)
+                    if (!MatchesScope(kv.Key, groupId, variantSetNo) || kv.Value)
                         continue;
                     if (_initialTaskFailReasons.TryGetValue(kv.Key, out string reason)
                         && string.Equals(reason, WordScoreExplanation.UnimplementedText, StringComparison.Ordinal))
                         continue;
-                    var parts = kv.Key.Substring(prefix.Length).Split('-');
-                    if (parts.Length == 2)
-                        yield return $"{parts[0]}-{parts[1]}";
+                    if (!TryParseProjectTask(kv.Key, groupId, variantSetNo, out int projectId, out int taskNumber))
+                        continue;
+                    yield return projectId.ToString(CultureInfo.InvariantCulture)
+                        + "-" + taskNumber.ToString(CultureInfo.InvariantCulture);
                 }
             }
         }
 
-        /// <summary>
-        /// 指定グループで採点済みのプロジェクトID一覧。
-        /// </summary>
-        public static HashSet<int> GetScoredProjectIds(int groupId)
+        public static HashSet<int> GetScoredProjectIds(int groupId, int variantSetNo = 0)
         {
-            return new HashSet<int>(GetProjectResults(groupId).Keys);
+            return new HashSet<int>(GetProjectResults(groupId, variantSetNo).Keys);
         }
 
-        /// <summary>
-        /// 指定グループの採点結果を projectId → タスク順の正否リスト で返す。
-        /// </summary>
-        public static Dictionary<int, List<bool>> GetProjectResults(int groupId)
+        public static Dictionary<int, List<bool>> GetProjectResults(int groupId, int variantSetNo = 0)
         {
-            string prefix = $"{groupId}-";
             var byProject = new Dictionary<int, SortedDictionary<int, bool>>();
             lock (_lock)
             {
                 foreach (var kv in _taskResults)
                 {
-                    if (!kv.Key.StartsWith(prefix, StringComparison.Ordinal))
-                        continue;
-                    var rest = kv.Key.Substring(prefix.Length);
-                    var parts = rest.Split('-');
-                    if (parts.Length != 2)
-                        continue;
-                    if (!int.TryParse(parts[0], out int projectId) || !int.TryParse(parts[1], out int taskNumber))
+                    if (!TryParseProjectTask(kv.Key, groupId, variantSetNo, out int projectId, out int taskNumber))
                         continue;
                     if (!byProject.TryGetValue(projectId, out var tasks))
                     {
@@ -156,12 +183,10 @@ namespace Libraries
             return results;
         }
 
-        /// <summary>
-        /// 1 問分の採点結果を記録する。合格時は failReason を空にする。
-        /// </summary>
-        public static void RecordResult(int groupId, int projectId, int taskNumber, bool isPassed, string failReason = null)
+        public static void RecordResult(
+            int groupId, int projectId, int taskNumber, bool isPassed, string failReason = null, int variantSetNo = 0)
         {
-            var key = MakeKey(groupId, projectId, taskNumber);
+            var key = MakeKey(groupId, projectId, taskNumber, variantSetNo);
             lock (_lock)
             {
                 _taskResults[key] = isPassed;
@@ -175,12 +200,9 @@ namespace Libraries
             }
         }
 
-        /// <summary>
-        /// ×理由を取得する。合格・未採点は空文字。
-        /// </summary>
-        public static string GetFailReason(int groupId, int projectId, int taskNumber)
+        public static string GetFailReason(int groupId, int projectId, int taskNumber, int variantSetNo = 0)
         {
-            var key = MakeKey(groupId, projectId, taskNumber);
+            var key = MakeKey(groupId, projectId, taskNumber, variantSetNo);
             lock (_lock)
             {
                 if (_taskFailReasons.TryGetValue(key, out string reason))
@@ -189,24 +211,18 @@ namespace Libraries
             }
         }
 
-        /// <summary>
-        /// 採点済みかどうかを返す。
-        /// </summary>
-        public static bool IsScored(int groupId, int projectId, int taskNumber)
+        public static bool IsScored(int groupId, int projectId, int taskNumber, int variantSetNo = 0)
         {
-            var key = MakeKey(groupId, projectId, taskNumber);
+            var key = MakeKey(groupId, projectId, taskNumber, variantSetNo);
             lock (_lock)
             {
                 return _taskResults.ContainsKey(key);
             }
         }
 
-        /// <summary>
-        /// 採点結果を取得する。未採点の場合は false を返し、取得失敗時は false。
-        /// </summary>
-        public static bool TryGetResult(int groupId, int projectId, int taskNumber, out bool isPassed)
+        public static bool TryGetResult(int groupId, int projectId, int taskNumber, out bool isPassed, int variantSetNo = 0)
         {
-            var key = MakeKey(groupId, projectId, taskNumber);
+            var key = MakeKey(groupId, projectId, taskNumber, variantSetNo);
             lock (_lock)
             {
                 if (_taskResults.TryGetValue(key, out isPassed))
@@ -216,12 +232,9 @@ namespace Libraries
             }
         }
 
-        /// <summary>
-        /// 指定の問題が「採点で不正解だったか」を取得する。
-        /// </summary>
-        public static bool IsIncorrect(int groupId, int projectId, int taskNumber)
+        public static bool IsIncorrect(int groupId, int projectId, int taskNumber, int variantSetNo = 0)
         {
-            var key = MakeKey(groupId, projectId, taskNumber);
+            var key = MakeKey(groupId, projectId, taskNumber, variantSetNo);
             lock (_lock)
             {
                 if (_taskResults.TryGetValue(key, out bool isPassed))
