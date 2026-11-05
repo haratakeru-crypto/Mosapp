@@ -112,12 +112,14 @@ namespace MOS_PowerPoint_app
             }
         }
 
-        /// <summary>Group1 通常教材かつオプション ON のときだけ手順ボタンを出す。</summary>
+        /// <summary>通常教材は紙芝居手順、類題はテキスト手順を出す。</summary>
         public bool ShowAnswerGuideEffective
         {
             get
             {
-                if (!ShowAnswerGuide || IsVariantMode)
+                if (IsVariantMode)
+                    return true;
+                if (!ShowAnswerGuide)
                     return false;
                 return CurrentProject == null || CurrentProject.GroupId == 1;
             }
