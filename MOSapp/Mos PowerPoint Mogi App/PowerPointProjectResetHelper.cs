@@ -117,6 +117,51 @@ namespace MOS_PowerPoint_app
             }
         }
 
+        /// <summary>類題作業ファイルを PracticeVariantN\Templates から復元（Initial は更新しない）。</summary>
+        public static void ResetVariantProject(int groupId, int projectId, int variantSetNo = 1)
+        {
+            if (variantSetNo < 1)
+                variantSetNo = 1;
+
+            string templatePath = PowerPointDataPathHelper.FindVariantTemplateFile(groupId, projectId, variantSetNo);
+            if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+            {
+                throw new FileNotFoundException(
+                    $"類題{variantSetNo} プロジェクト{projectId} のテンプレートが見つかりません。",
+                    templatePath ?? string.Empty);
+            }
+
+            PowerPointDataPathHelper.ClearReadOnly(templatePath, "類題テンプレート");
+            RemoveZoneIdentifier(templatePath);
+
+            string workingPath = PowerPointDataPathHelper.ResolveVariantWorkingFilePath(
+                groupId, projectId, variantSetNo, templatePath);
+            string workingDirectory = Path.GetDirectoryName(workingPath);
+            if (!string.IsNullOrEmpty(workingDirectory) && !Directory.Exists(workingDirectory))
+                Directory.CreateDirectory(workingDirectory);
+
+            if (File.Exists(workingPath))
+            {
+                var workingInfo = new FileInfo(workingPath);
+                if (workingInfo.IsReadOnly)
+                    workingInfo.IsReadOnly = false;
+            }
+
+            File.Copy(templatePath, workingPath, overwrite: true);
+            RemoveZoneIdentifier(workingPath);
+            try
+            {
+                var workingInfo = new FileInfo(workingPath);
+                if (workingInfo.IsReadOnly)
+                    workingInfo.IsReadOnly = false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[PowerPointProjectResetHelper] 類題作業ファイルの読み取り専用解除: {ex.Message}");
+            }
+        }
+
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool DeleteFileW(string lpFileName);
 
