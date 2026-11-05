@@ -1,0 +1,88 @@
+<Window x:Class="MOS_PowerPoint_app.Views.AnswerStepsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="解答手順"
+        WindowStartupLocation="Manual"
+        Width="560"
+        Height="480"
+        MinWidth="400"
+        MinHeight="300"
+        Topmost="True"
+        ShowActivated="False"
+        ResizeMode="CanResize">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#0F766E" Padding="15,10">
+            <TextBlock x:Name="HeaderTextBlock"
+                       Foreground="White"
+                       FontSize="16"
+                       FontWeight="Bold"
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Margin="16,12">
+            <TextBlock x:Name="AnswerStepsTextBlock"
+                       TextWrapping="Wrap"
+                       FontSize="14"
+                       LineHeight="22"/>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Background="#F5F5F5" Padding="15,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="1"
+                        Content="閉じる"
+                        Width="100"
+                        Height="35"
+                        HorizontalAlignment="Center"
+                        Click="CloseButton_Click"
+                        Background="#0F766E"
+                        Foreground="White"
+                        BorderThickness="0"
+                        FontWeight="Medium"
+                        Cursor="Hand">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#0D9488"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button x:Name="PrevButton"
+                            Content="戻る"
+                            Width="72"
+                            Height="32"
+                            Margin="0,0,6,0"
+                            Click="PrevButton_Click"/>
+                    <Button x:Name="NextButton"
+                            Content="次へ"
+                            Width="72"
+                            Height="32"
+                            Click="NextButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -366,10 +366,40 @@ namespace MOS_Word_app
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            if (!App.AutoOpenGroupId.HasValue || !App.AutoOpenProjectId.HasValue)
+            // 起動スプラッシュ（Topmost）閉鎖後に確認を出す
+            Dispatcher.BeginInvoke(new Action(() =>
             {
+                TryPromptStartupReset();
+                TryAutoOpenProject();
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        private void TryPromptStartupReset()
+        {
+            if (!MosPracticeClient.StartupResetPrompt.Ask(this))
+                return;
+
+            if (_viewModel != null && _viewModel.IsBulkResetInProgress)
+                return;
+
+            List<WordResetTarget> targets = _viewModel.GetBulkResetTargets(WordBulkResetScope.All);
+            if (targets.Count == 0)
+            {
+                MessageBox.Show(
+                    "リセット対象のプロジェクトが見つかりませんでした。",
+                    "エラー",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
                 return;
             }
+
+            RunBulkReset(WordBulkResetScope.All, targets);
+        }
+
+        private void TryAutoOpenProject()
+        {
+            if (!App.AutoOpenGroupId.HasValue || !App.AutoOpenProjectId.HasValue)
+                return;
 
             int groupId = App.AutoOpenGroupId.Value;
             int projectId = App.AutoOpenProjectId.Value;
@@ -377,16 +407,11 @@ namespace MOS_Word_app
 
             var group = _viewModel.ProjectGroups?.FirstOrDefault(g => g.GroupId == groupId);
             var project = group?.Projects?.FirstOrDefault(p => p.ProjectId == projectId);
-
             if (project == null)
-            {
                 return;
-            }
 
             if (_viewModel.OpenProjectCommand.CanExecute(project))
-            {
                 _viewModel.OpenProjectCommand.Execute(project);
-            }
         }
     }
 }

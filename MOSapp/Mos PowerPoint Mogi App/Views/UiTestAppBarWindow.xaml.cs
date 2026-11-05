@@ -136,6 +136,9 @@ namespace MOS_PowerPoint_app.Views
         private readonly Action _onScoreClick; // 採点ボタン押下時（プロジェクト一覧の採点と同じ処理を実行）
         private readonly bool _isVariantMode;
         private AnswerGuideWindow _answerGuideWindow;
+        private AnswerStepsWindow _answerStepsWindow;
+        private bool _answerGuideUserDismissed;
+        private bool _suppressAnswerGuideDismissTracking;
         private readonly MainViewModel _viewModel;
 
         public int CurrentProjectId => _currentProjectId;
@@ -201,6 +204,8 @@ namespace MOS_PowerPoint_app.Views
                 }
                 catch { }
             };
+
+            BeginProjectWorkSession();
         }
         
         private void SetWindowPosition()
@@ -1038,6 +1043,7 @@ namespace MOS_PowerPoint_app.Views
                     this.WindowState = WindowState.Normal;
                     this.Activate();
                     this.Focus();
+                    BeginProjectWorkSession();
 
                     System.Diagnostics.Debug.WriteLine($"プロジェクト{projectId}のタスク{taskId}に移動しました");
                 });
@@ -1185,14 +1191,8 @@ namespace MOS_PowerPoint_app.Views
 
             try
             {
-                if (_isVariantMode)
-                {
-                    MainViewModel.ShowVariantAnswerSteps(_currentProjectId);
-                    return;
-                }
-
                 SyncProjectToMainViewModel();
-                System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint)");
+                System.Diagnostics.Debug.WriteLine($"[ScoreButton] 採点を開始: プロジェクト{_currentProjectId}, グループ{_groupId} (PowerPoint{(_isVariantMode ? " 類題" : "")})");
 
                 BeginScoringSession();
                 _instantScoringFinished = false;
@@ -1209,6 +1209,14 @@ namespace MOS_PowerPoint_app.Views
 
                     // 採点本体は画面スレッドの外で行い、バーの更新を止めない。結果表示は ExecuteScore 内で画面側に戻す。
                     await Task.Run(() => _onScoreClick());
+                }
+                else if (_isVariantMode)
+                {
+                    var scoreList = PowerPointVariantScoring.ScoreProject(_groupId, _currentProjectId);
+                    if (scoreList.Count == 0)
+                        MessageBox.Show("タスクが見つかりません。", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    else
+                        ShowScoreResult(scoreList);
                 }
                 else
                     MessageBox.Show("採点機能は利用できません。プロジェクト一覧からプロジェクトを開いて採点してください。", "採点", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2783,6 +2791,7 @@ namespace MOS_PowerPoint_app.Views
 
             // プロジェクトタイマーをリセット
             ResetProjectTimer();
+            BeginProjectWorkSession();
 
             System.Diagnostics.Debug.WriteLine($"プロジェクト{_currentProjectId}に移動しました");
         }
@@ -3647,6 +3656,39 @@ namespace MOS_PowerPoint_app.Views
             if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
                 return;
 
+            _answerGuideUserDismissed = false;
+            OpenAnswerGuideOrSteps();
+        }
+
+        /// <summary>プロジェクト作業セッション開始（初回・次プロ・結果/レビューからの再開）。</summary>
+        private void BeginProjectWorkSession()
+        {
+            _answerGuideUserDismissed = false;
+            Dispatcher.BeginInvoke(
+                new Action(TryAutoOpenAnswerGuide),
+                DispatcherPriority.ApplicationIdle);
+        }
+
+        private void TryAutoOpenAnswerGuide()
+        {
+            if (_answerGuideUserDismissed)
+                return;
+            if (_isScoring || _isScoreResultOpen)
+                return;
+            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
+                return;
+
+            OpenAnswerGuideOrSteps();
+        }
+
+        private void OpenAnswerGuideOrSteps()
+        {
+            if (_isVariantMode)
+            {
+                OpenVariantAnswerSteps();
+                return;
+            }
+
             if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
             {
                 _answerGuideWindow.BringToFrontPassive();
@@ -3654,6 +3696,51 @@ namespace MOS_PowerPoint_app.Views
             }
 
             OpenAnswerGuide();
+        }
+
+        private void OpenVariantAnswerSteps()
+        {
+            int projectId = _currentProjectId;
+            int taskId = _currentTaskId;
+            const int setNo = 1;
+
+            if (_answerStepsWindow != null && _answerStepsWindow.IsVisible)
+            {
+                _answerStepsWindow.ShowTask(taskId, confirmIfMismatch: false);
+                _answerStepsWindow.BringToFrontPassive();
+                return;
+            }
+
+            List<AnswerStepsWindow.TaskStepsItem> tasks;
+            try
+            {
+                tasks = VariantProblemWorkbook.GetTasks(projectId)
+                    .Select(item => new AnswerStepsWindow.TaskStepsItem
+                    {
+                        TaskId = item.TaskId,
+                        AnswerSteps = item.AnswerSteps
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OpenVariantAnswerSteps] {ex.Message}");
+                tasks = new List<AnswerStepsWindow.TaskStepsItem>();
+            }
+
+            CloseAnswerStepsWindow();
+            _answerStepsWindow = new AnswerStepsWindow(
+                $"類題{setNo} プロジェクト {projectId}",
+                tasks,
+                taskId,
+                () => _currentTaskId)
+            {
+                Owner = this,
+                Topmost = true
+            };
+            _answerStepsWindow.Closed += AnswerStepsWindow_Closed;
+            _answerStepsWindow.ApplyInitialPlacement(GetAnswerGuidePreferredBoundsDip());
+            _answerStepsWindow.Show();
         }
 
         private void OpenAnswerGuide()
@@ -3681,12 +3768,52 @@ namespace MOS_PowerPoint_app.Views
             if (ReferenceEquals(_answerGuideWindow, sender))
                 _answerGuideWindow = null;
 
+            if (!_suppressAnswerGuideDismissTracking)
+                _answerGuideUserDismissed = true;
+
             _viewModel?.SetAnswerGuideOpen(false);
             ApplyNavigationLockState();
         }
 
+        private void AnswerStepsWindow_Closed(object sender, EventArgs e)
+        {
+            if (sender is AnswerStepsWindow window)
+                window.Closed -= AnswerStepsWindow_Closed;
+
+            if (ReferenceEquals(_answerStepsWindow, sender))
+                _answerStepsWindow = null;
+
+            if (!_suppressAnswerGuideDismissTracking)
+                _answerGuideUserDismissed = true;
+        }
+
+        private void CloseAnswerStepsWindow()
+        {
+            if (_answerStepsWindow == null)
+                return;
+
+            _suppressAnswerGuideDismissTracking = true;
+            try
+            {
+                _answerStepsWindow.Closed -= AnswerStepsWindow_Closed;
+                if (_answerStepsWindow.IsVisible)
+                    _answerStepsWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[UiTestAppBarWindow] CloseAnswerStepsWindow: {ex.Message}");
+            }
+            finally
+            {
+                _answerStepsWindow = null;
+                _suppressAnswerGuideDismissTracking = false;
+            }
+        }
+
         private void CloseAnswerGuide()
         {
+            CloseAnswerStepsWindow();
+
             if (_answerGuideWindow == null)
             {
                 _viewModel?.SetAnswerGuideOpen(false);
@@ -3694,6 +3821,7 @@ namespace MOS_PowerPoint_app.Views
                 return;
             }
 
+            _suppressAnswerGuideDismissTracking = true;
             try
             {
                 _answerGuideWindow.Closed -= AnswerGuideWindow_Closed;
@@ -3707,6 +3835,7 @@ namespace MOS_PowerPoint_app.Views
             finally
             {
                 _answerGuideWindow = null;
+                _suppressAnswerGuideDismissTracking = false;
                 _viewModel?.SetAnswerGuideOpen(false);
                 ApplyNavigationLockState();
             }
@@ -3747,6 +3876,8 @@ namespace MOS_PowerPoint_app.Views
             {
                 if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
                     _answerGuideWindow.ClampToScreen();
+                if (_answerStepsWindow != null && _answerStepsWindow.IsVisible)
+                    _answerStepsWindow.ClampToScreen();
             }
             catch (Exception ex)
             {

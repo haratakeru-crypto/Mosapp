@@ -43,7 +43,6 @@ namespace MOS_PowerPoint_app
             OpenProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: false), _ => !_isOpeningProject);
             OpenVariantProjectCommand = new RelayCommand(p => ExecuteOpenProject(p, openAsVariant: true), CanOpenVariantProject);
             ScoreCommand = new RelayCommand(ExecuteScore, CanExecuteScore);
-            ResetAllProjectsCommand = new RelayCommand(ExecuteResetAllProjects);
             TaskResults = new ObservableCollection<TaskResult>();
         }
 
@@ -77,7 +76,6 @@ namespace MOS_PowerPoint_app
 
         public ICommand OpenProjectCommand { get; }
         public ICommand ScoreCommand { get; }
-        public ICommand ResetAllProjectsCommand { get; }
 
         public ProjectViewModel CurrentProject
         {
@@ -114,12 +112,14 @@ namespace MOS_PowerPoint_app
             }
         }
 
-        /// <summary>Group1 通常教材かつオプション ON のときだけ手順ボタンを出す。</summary>
+        /// <summary>通常教材は紙芝居手順、類題はテキスト手順を出す。</summary>
         public bool ShowAnswerGuideEffective
         {
             get
             {
-                if (!ShowAnswerGuide || IsVariantMode)
+                if (IsVariantMode)
+                    return true;
+                if (!ShowAnswerGuide)
                     return false;
                 return CurrentProject == null || CurrentProject.GroupId == 1;
             }
@@ -633,50 +633,71 @@ namespace MOS_PowerPoint_app
                 dispatcher.Invoke(action);
         }
 
-        private void ExecuteResetAllProjects(object parameter)
+        public List<Libraries.PowerPointResetTarget> GetBulkResetTargets(Libraries.PowerPointBulkResetScope scope)
         {
-            var result = MessageBox.Show(
-                "すべてのPowerPointプロジェクトをテンプレートからリセットします。\n現在の変更内容は失われます。実行しますか？",
-                "すべてをリセットする",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-            if (result != MessageBoxResult.Yes)
-                return;
+            var targets = new List<Libraries.PowerPointResetTarget>();
 
-            try { Libraries.PPTaskAttemptRegistry.ClearAll(); } catch { }
-
-            // 全プロジェクトリセット時のみ採点用証跡も消す（単体リセットでは残す）
-            try { Libraries.PPLogReader.ClearTaskEvidence(); } catch { }
-
-            var errors = new System.Collections.Generic.List<string>();
-            int done = 0;
-            foreach (int groupId in new[] { 1 }) // Tab1のみリセットし、Tab3（応用編）は除外
+            if (scope == Libraries.PowerPointBulkResetScope.Textbook || scope == Libraries.PowerPointBulkResetScope.All)
             {
-                for (int projectId = 1; projectId <= 10; projectId++)
+                // Tab1のみ。Tab3（応用編）は除外
+                ProjectGroupViewModel group = ProjectGroups?.FirstOrDefault(g => g.GroupId == 1);
+                if (group?.Projects != null)
                 {
-                    try
+                    foreach (ProjectViewModel project in group.Projects)
                     {
-                        PowerPointProjectResetHelper.ResetProject(groupId, projectId);
-                        done++;
-                    }
-                    catch (Exception ex)
-                    {
-                        errors.Add($"Tab{groupId} Project{projectId}: {ex.Message}");
+                        targets.Add(new Libraries.PowerPointResetTarget
+                        {
+                            GroupId = group.GroupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = 0,
+                            Label = "演習 プロジェクト" + project.ProjectId
+                        });
                     }
                 }
             }
 
-            if (errors.Count == 0)
-                ResultMessage = $"すべてのプロジェクトをリセットしました（{done}件）。";
-            else
-                ResultMessage = $"{done}件リセットしました。失敗: {errors.Count}件";
-            MessageBox.Show(
-                errors.Count == 0
-                    ? $"すべてのプロジェクトをリセットしました（{done}件）。"
-                    : $"{done}件リセットしました。\n失敗 {errors.Count}件:\n" + string.Join("\n", errors.Take(10)) + (errors.Count > 10 ? "\n…他" : ""),
-                "リセット結果",
-                MessageBoxButton.OK,
-                errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            if (scope == Libraries.PowerPointBulkResetScope.Variant || scope == Libraries.PowerPointBulkResetScope.All)
+            {
+                int variantSetNo = Libraries.PowerPointBulkResetCoordinator.DefaultVariantSetNo;
+                if (VariantLaunchProjects != null)
+                {
+                    foreach (ProjectViewModel project in VariantLaunchProjects)
+                    {
+                        string templatePath = PowerPointDataPathHelper.FindVariantTemplateFile(
+                            project.GroupId, project.ProjectId, variantSetNo);
+                        if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+                            continue;
+
+                        targets.Add(new Libraries.PowerPointResetTarget
+                        {
+                            GroupId = project.GroupId,
+                            ProjectId = project.ProjectId,
+                            VariantSetNo = variantSetNo,
+                            Label = "類題 プロジェクト" + project.ProjectId
+                        });
+                    }
+                }
+            }
+
+            return targets;
+        }
+
+        /// <summary>選択範囲の作業ファイルをテンプレートから戻す。確認ダイアログは出さない。</summary>
+        public Libraries.PowerPointBulkResetResult RunBulkReset(Libraries.PowerPointBulkResetScope scope)
+        {
+            var targets = GetBulkResetTargets(scope);
+            if (targets.Count == 0)
+                return new Libraries.PowerPointBulkResetResult();
+
+            try { Libraries.PPTaskAttemptRegistry.ClearAll(); } catch { }
+
+            // 全プロジェクトリセット時のみ採点用証跡も消す（単体リセットでは残す）
+            if (scope == Libraries.PowerPointBulkResetScope.Textbook || scope == Libraries.PowerPointBulkResetScope.All)
+            {
+                try { Libraries.PPLogReader.ClearTaskEvidence(); } catch { }
+            }
+
+            return Libraries.PowerPointBulkResetCoordinator.CopyTargets(targets, null);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

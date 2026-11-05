@@ -54,14 +54,33 @@ namespace MOS_PowerPoint_app
         public static string FindVariantWorkingFile(int groupId, int projectId, int variantSetNo = 1)
         {
             string folder = GetVariantFolder(groupId, variantSetNo);
-            foreach (string name in GetVariantFileNames(projectId, variantSetNo))
-            {
-                string path = Path.Combine(folder, name);
-                if (File.Exists(path))
-                    return path;
-            }
+            return FindFirstExisting(folder, GetVariantFileNames(projectId, variantSetNo));
+        }
 
-            return null;
+        public static string FindVariantTemplateFile(int groupId, int projectId, int variantSetNo = 1)
+        {
+            string folder = Path.Combine(GetVariantFolder(groupId, variantSetNo), "Templates");
+            return FindFirstExisting(folder, GetVariantFileNames(projectId, variantSetNo));
+        }
+
+        /// <summary>類題リセット用。既存作業ファイルがあればそれを、なければテンプレ拡張子付き similar 名のパスを返す。</summary>
+        public static string ResolveVariantWorkingFilePath(
+            int groupId,
+            int projectId,
+            int variantSetNo,
+            string templatePath)
+        {
+            string existing = FindVariantWorkingFile(groupId, projectId, variantSetNo);
+            if (!string.IsNullOrEmpty(existing))
+                return existing;
+
+            string extension = Path.GetExtension(templatePath);
+            if (string.IsNullOrEmpty(extension))
+                extension = ".pptx";
+
+            return Path.Combine(
+                GetVariantFolder(groupId, variantSetNo),
+                $"similar{variantSetNo}-{projectId}{extension}");
         }
 
         public static bool IsVariantFileAvailable(int groupId, int projectId, int variantSetNo = 1)
@@ -76,6 +95,21 @@ namespace MOS_PowerPoint_app
             yield return $"similar{variantSetNo}-{projectId}.ppt";
             yield return $"Project{projectId}.pptx";
             yield return $"project{projectId}.pptx";
+        }
+
+        private static string FindFirstExisting(string folder, IEnumerable<string> fileNames)
+        {
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                return null;
+
+            foreach (string name in fileNames)
+            {
+                string path = Path.Combine(folder, name);
+                if (File.Exists(path))
+                    return path;
+            }
+
+            return null;
         }
 
         public static string GetWorkingProjectPath(int groupId, int projectId)
