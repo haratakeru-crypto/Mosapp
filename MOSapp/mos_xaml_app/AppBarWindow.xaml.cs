@@ -64,6 +64,9 @@ namespace MOSExcelMogiApp
         private int _resultRetryTaskId;
         private bool _resultRetryIsWrong;
         private AnswerGuideWindow _answerGuideWindow;
+        private AnswerStepsWindow _answerStepsWindow;
+        private bool _answerGuideUserDismissed;
+        private bool _suppressAnswerGuideDismissTracking;
 
         // Win32 API
         [DllImport("user32.dll", SetLastError = true)]
@@ -203,6 +206,7 @@ namespace MOSExcelMogiApp
             };
 
             System.Diagnostics.Debug.WriteLine("[AppBarWindow] Constructor completed");
+            BeginProjectWorkSession();
         }
 
         /// <param name="bringExcelToForeground">
@@ -1898,6 +1902,7 @@ namespace MOSExcelMogiApp
                 SetCurrentTask(_currentTaskId, notifyGuide: true);
                 
                 System.Diagnostics.Debug.WriteLine($"[AppBarWindow] Task display updated: Project={_currentProjectId}, Task={_currentTaskId}");
+                BeginProjectWorkSession();
             }
             catch (Exception ex)
             {
@@ -2003,7 +2008,34 @@ namespace MOSExcelMogiApp
             if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
                 return;
 
-            if (_viewModel.IsVariantMode)
+            _answerGuideUserDismissed = false;
+            OpenAnswerGuideOrSteps();
+        }
+
+        /// <summary>プロジェクト作業セッション開始（初回・次プロ・結果/レビューからの再開）。</summary>
+        private void BeginProjectWorkSession()
+        {
+            _answerGuideUserDismissed = false;
+            Dispatcher.BeginInvoke(
+                new Action(TryAutoOpenAnswerGuide),
+                DispatcherPriority.ApplicationIdle);
+        }
+
+        private void TryAutoOpenAnswerGuide()
+        {
+            if (_answerGuideUserDismissed)
+                return;
+            if (_viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen))
+                return;
+            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
+                return;
+
+            OpenAnswerGuideOrSteps();
+        }
+
+        private void OpenAnswerGuideOrSteps()
+        {
+            if (_viewModel != null && _viewModel.IsVariantMode)
             {
                 OpenVariantAnswerSteps();
                 return;
@@ -2023,27 +2055,44 @@ namespace MOSExcelMogiApp
             int projectId = _currentProjectId;
             int taskId = _currentTaskId;
             int setNo = _viewModel?.VariantSetNo ?? 1;
-            string steps = string.Empty;
+
+            if (_answerStepsWindow != null && _answerStepsWindow.IsVisible)
+            {
+                _answerStepsWindow.ShowTask(taskId, confirmIfMismatch: false);
+                _answerStepsWindow.BringToFrontPassive();
+                return;
+            }
+
+            List<AnswerStepsWindow.TaskStepsItem> tasks;
             try
             {
-                VariantTaskText task = VariantProblemWorkbook.GetTasks(projectId)
-                    .FirstOrDefault(item => item.TaskId == taskId);
-                steps = task?.AnswerSteps ?? string.Empty;
+                tasks = VariantProblemWorkbook.GetTasks(projectId)
+                    .Select(item => new AnswerStepsWindow.TaskStepsItem
+                    {
+                        TaskId = item.TaskId,
+                        AnswerSteps = item.AnswerSteps
+                    })
+                    .ToList();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[OpenVariantAnswerSteps] {ex.Message}");
+                tasks = new List<AnswerStepsWindow.TaskStepsItem>();
             }
 
-            if (string.IsNullOrWhiteSpace(steps))
-                steps = "手順未登録";
-
-            var window = new AnswerStepsWindow($"類題{setNo} プロジェクト {projectId} タスク {taskId} 解答手順", steps)
+            CloseAnswerStepsWindow();
+            _answerStepsWindow = new AnswerStepsWindow(
+                $"類題{setNo} プロジェクト {projectId}",
+                tasks,
+                taskId,
+                () => _currentTaskId)
             {
                 Owner = this,
                 Topmost = true
             };
-            window.ShowDialog();
+            _answerStepsWindow.Closed += AnswerStepsWindow_Closed;
+            _answerStepsWindow.ApplyInitialPlacement(GetAnswerGuidePreferredBoundsDip());
+            _answerStepsWindow.Show();
         }
 
         private void OpenAnswerGuide()
@@ -2080,12 +2129,52 @@ namespace MOSExcelMogiApp
             if (ReferenceEquals(_answerGuideWindow, sender))
                 _answerGuideWindow = null;
 
+            if (!_suppressAnswerGuideDismissTracking)
+                _answerGuideUserDismissed = true;
+
             _viewModel?.SetAnswerGuideOpen(false);
             ApplyNavigationLockState();
         }
 
+        private void AnswerStepsWindow_Closed(object sender, EventArgs e)
+        {
+            if (sender is AnswerStepsWindow window)
+                window.Closed -= AnswerStepsWindow_Closed;
+
+            if (ReferenceEquals(_answerStepsWindow, sender))
+                _answerStepsWindow = null;
+
+            if (!_suppressAnswerGuideDismissTracking)
+                _answerGuideUserDismissed = true;
+        }
+
+        private void CloseAnswerStepsWindow()
+        {
+            if (_answerStepsWindow == null)
+                return;
+
+            _suppressAnswerGuideDismissTracking = true;
+            try
+            {
+                _answerStepsWindow.Closed -= AnswerStepsWindow_Closed;
+                if (_answerStepsWindow.IsVisible)
+                    _answerStepsWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AppBarWindow] CloseAnswerStepsWindow: {ex.Message}");
+            }
+            finally
+            {
+                _answerStepsWindow = null;
+                _suppressAnswerGuideDismissTracking = false;
+            }
+        }
+
         private void CloseAnswerGuide()
         {
+            CloseAnswerStepsWindow();
+
             if (_answerGuideWindow == null)
             {
                 _viewModel?.SetAnswerGuideOpen(false);
@@ -2093,6 +2182,7 @@ namespace MOSExcelMogiApp
                 return;
             }
 
+            _suppressAnswerGuideDismissTracking = true;
             try
             {
                 _answerGuideWindow.Closed -= AnswerGuideWindow_Closed;
@@ -2106,6 +2196,7 @@ namespace MOSExcelMogiApp
             finally
             {
                 _answerGuideWindow = null;
+                _suppressAnswerGuideDismissTracking = false;
                 _viewModel?.SetAnswerGuideOpen(false);
                 ApplyNavigationLockState();
             }
@@ -2167,6 +2258,8 @@ namespace MOSExcelMogiApp
             {
                 if (_answerGuideWindow != null && _answerGuideWindow.IsVisible)
                     _answerGuideWindow.ClampToScreen();
+                if (_answerStepsWindow != null && _answerStepsWindow.IsVisible)
+                    _answerStepsWindow.ClampToScreen();
             }
             catch (Exception ex)
             {
@@ -2199,6 +2292,7 @@ namespace MOSExcelMogiApp
                     SetCurrentTask(nextTaskId, notifyGuide: false);
 
                     StartExcelPositionRetryTimer();
+                    BeginProjectWorkSession();
                 }
                 else
                 {
@@ -2230,6 +2324,7 @@ namespace MOSExcelMogiApp
             CloseAnswerGuide();
             LoadTasks();
             SetCurrentTask(1, notifyGuide: false);
+            BeginProjectWorkSession();
         }
 
         private void OnOpenReviewPageRequested(object sender, EventArgs e)
