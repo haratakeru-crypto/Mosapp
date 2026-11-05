@@ -635,7 +635,7 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "PowerPoint");
+                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "PowerPoint", _isVariantMode);
             }
             catch (Exception ex)
             {

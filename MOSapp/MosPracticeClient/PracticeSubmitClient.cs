@@ -31,13 +31,17 @@ namespace MosPracticeClient
             return client;
         }
 
-        public static async Task<PracticeSubmitResult> SubmitInitialAsync(int wrongCount, string subject)
+        public static async Task<PracticeSubmitResult> SubmitInitialAsync(int wrongCount, string subject, bool isVariant = false)
         {
             var settings = PracticeSubmitConfig.Load();
             var profile = ExamineeStore.Load();
             var scoredAt = DateTime.Now;
             string attempt = "";
             string range = "";
+            if (isVariant)
+            {
+                range = "類題";
+            }
             if (!string.IsNullOrEmpty(subject))
             {
                 var logs = ScoringLogStore.Load(subject);
@@ -46,8 +50,11 @@ namespace MosPracticeClient
                     var latest = logs[0];
                     if (latest.ScoredAt != default(DateTime))
                         scoredAt = latest.ScoredAt;
-                    attempt = logs.Count.ToString(CultureInfo.InvariantCulture);
-                    range = ScoringRangeSelection.ShortenRangeLabel(latest.RangeLabel);
+                    if (!isVariant)
+                    {
+                        attempt = logs.Count.ToString(CultureInfo.InvariantCulture);
+                        range = ScoringRangeSelection.ShortenRangeLabel(latest.RangeLabel);
+                    }
                 }
             }
             string at = scoredAt.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
