@@ -22,6 +22,7 @@ namespace MosPracticeSessionWatch
 
         static string ExamineePath => Path.Combine(DataDirectory, "examinee.json");
         static string WordTaskReviewStatePath => Path.Combine(DataDirectory, "word-task-review-state.json");
+        static string PowerPointTaskReviewStatePath => Path.Combine(DataDirectory, "powerpoint-task-review-state.json");
         static string ClientIdPath => Path.Combine(DataDirectory, "client-id.txt");
         static string BaseUrlPath => Path.Combine(DataDirectory, "presence-baseurl.txt");
         static string KeyPath => Path.Combine(DataDirectory, "presence-key.txt");
@@ -220,6 +221,15 @@ namespace MosPracticeSessionWatch
             {
                 if (File.Exists(WordTaskReviewStatePath))
                     File.Delete(WordTaskReviewStatePath);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                if (File.Exists(PowerPointTaskReviewStatePath))
+                    File.Delete(PowerPointTaskReviewStatePath);
             }
             catch
             {

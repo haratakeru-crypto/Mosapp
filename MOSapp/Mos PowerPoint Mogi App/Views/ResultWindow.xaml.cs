@@ -27,15 +27,22 @@ namespace MOS_PowerPoint_app.Views
         private bool _showingWrongOnly = false; // フィルター状態
         private bool _seatChartSubmitStarted;
         private readonly bool _fromScoringLog;
+        private readonly bool _isVariantMode;
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
         public Action OnEndRequested { get; set; } // 終了ボタン押下時（PowerPoint終了・メイン画面に戻る）
+
+        public bool ShowDispositionColumns => _isVariantMode;
+
+        private int ResultVariantSetNo =>
+            _isVariantMode ? PowerPointVariantScoring.DefaultVariantSetNo : 0;
 
         public ResultWindow(Dictionary<int, bool[]> projectTaskCompletedStates = null,
                            Dictionary<int, bool[]> projectTaskFlaggedStates = null, 
                            Dictionary<int, bool[]> projectTaskViewedStates = null, 
                            int groupId = 1,
                            Dictionary<int, List<bool>> allProjectScoringResults = null,
-                           bool fromScoringLog = false)
+                           bool fromScoringLog = false,
+                           bool isVariantMode = false)
         {
             InitializeComponent();
             _projectTaskCompletedStates = projectTaskCompletedStates ?? new Dictionary<int, bool[]>();
@@ -45,7 +52,8 @@ namespace MOS_PowerPoint_app.Views
             _initialProjectScoringResults = CloneScoringResults(_allProjectScoringResults);
             _groupId = groupId;
             _fromScoringLog = fromScoringLog;
-            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}, fromLog: {_fromScoringLog}");
+            _isVariantMode = isVariantMode;
+            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}, fromLog: {_fromScoringLog}, variant: {_isVariantMode}");
             
             this.Loaded += ResultWindow_Loaded;
         }
@@ -65,29 +73,12 @@ namespace MOS_PowerPoint_app.Views
             {
                 System.Diagnostics.Debug.WriteLine($"[ResultWindow] LoadResultsAsync called");
                 
-                // JSONファイルから全プロジェクトのデータを読み込む（全63問を考慮するため）
-                ProjectData projectData = await Task.Run(() =>
-                {
-                    string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
-                        "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                    
-                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] Loading from: {jsonPath}");
-                    
-                    if (!File.Exists(jsonPath))
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] JSON file not found: {jsonPath}");
-                        return null;
-                    }
-                    
-                    // JSONファイルを読み込む（バックグラウンドスレッド）
-                    string jsonContent = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);
-                    return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
-                });
-                
+                ProjectData projectData = await Task.Run(LoadProblemData);
+
                 if (projectData == null || projectData.Projects == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"[ResultWindow] Project data is null");
-                    int fallbackTotal = 63;
+                    int fallbackTotal = _isVariantMode ? PracticeScoreClient.RequiredResultCount : 63;
                     await Dispatcher.InvokeAsync(() =>
                     {
                         WrongCountTextBlock.Text = "0";
@@ -95,6 +86,7 @@ namespace MOS_PowerPoint_app.Views
                         CorrectCountTextBlock.Text = $"{fallbackTotal}";
                         CorrectTotalCountTextBlock.Text = $"/ {fallbackTotal}";
                         AccuracyTextBlock.Text = "初回 100.0% / 修正後 100.0%";
+                        UpdateTotalScoreDisplay();
                     });
                     await StartSeatChartSubmitAsync(0);
                     await LoadProjectDataAsync();
@@ -127,24 +119,7 @@ namespace MOS_PowerPoint_app.Views
                     ProjectsItemsControl.ItemsSource = null;
                 });
                 
-                // バックグラウンドでJSONファイルを読み込む
-                ProjectData projectData = await Task.Run(() =>
-                {
-                    string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
-                        "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                    
-                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] Loading from: {jsonPath}");
-                    
-                    if (!File.Exists(jsonPath))
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] JSON file not found: {jsonPath}");
-                        return null;
-                    }
-                    
-                    // JSONファイルを読み込む（バックグラウンドスレッド）
-                    string jsonContent = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);
-                    return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
-                });
+                ProjectData projectData = await Task.Run(LoadProblemData);
                 
                 // UIスレッドでデータを処理して表示
                 if (projectData == null)
@@ -186,6 +161,8 @@ namespace MOS_PowerPoint_app.Views
                             {
                                 task.ResultColor = Brushes.Transparent; // 空欄の場合は透明
                             }
+
+                            ApplyPriorityBadgeColors(task);
                         }
                     }
                     
@@ -309,7 +286,12 @@ namespace MOS_PowerPoint_app.Views
                                     TaskId = task.TaskId,
                                     ResultMark = resultMark,
                                     ResultColor = null, // 後でUIスレッドで設定
-                                    IsInitiallyWrong = _initialWrongTaskKeys.Contains(GetTaskKey(project.ProjectId, task.TaskId))
+                                    IsInitiallyWrong = _initialWrongTaskKeys.Contains(GetTaskKey(project.ProjectId, task.TaskId)),
+                                    ShowDispositionColumns = ShowDispositionColumns,
+                                    IsCompleted = isCompleted,
+                                    IsFlagged = isFlagged,
+                                    IsCompletedAndWrong = isCompleted && resultMark == "✖",
+                                    PriorityBadgeText = PriorityBadgeFor(project.ProjectId, task.TaskId)
                                 };
                             }).ToList() ?? new List<ResultTaskInfo>()
                         };
@@ -457,6 +439,12 @@ namespace MOS_PowerPoint_app.Views
                 scoreList.Add(false);
             scoreList[index] = passed.Value;
 
+            if (_isVariantMode)
+            {
+                Libraries.ScoreResultStore.RecordResult(
+                    _groupId, projectId, taskId, passed.Value, null, ResultVariantSetNo);
+            }
+
             _ = Dispatcher.InvokeAsync(async () =>
             {
                 try
@@ -480,15 +468,42 @@ namespace MOS_PowerPoint_app.Views
 
         private async Task<ProjectData> LoadProjectDataModelAsync()
         {
-            return await Task.Run(() =>
+            return await Task.Run(LoadProblemData);
+        }
+
+        private ProjectData LoadProblemData()
+        {
+            if (_isVariantMode)
             {
-                string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
-                    "MOS模擬アプリ問題文一覧_PowerPoint.json");
-                if (!File.Exists(jsonPath))
-                    return null;
-                string jsonContent = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);
-                return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
-            });
+                var data = new ProjectData { Projects = new List<ProjectInfo>() };
+                foreach (int projectId in VariantProblemWorkbook.GetProjectIds())
+                {
+                    data.Projects.Add(new ProjectInfo
+                    {
+                        ProjectId = projectId,
+                        Tasks = VariantProblemWorkbook.GetTasks(projectId)
+                            .Select(t => new TaskInfo
+                            {
+                                TaskId = t.TaskId,
+                                Description = t.Description
+                            })
+                            .ToList()
+                    });
+                }
+                return data;
+            }
+
+            string jsonPath = PowerPointDataPathHelper.ResolveJsonPath(
+                "MOS模擬アプリ問題文一覧_PowerPoint.json");
+            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Loading from: {jsonPath}");
+            if (!File.Exists(jsonPath))
+            {
+                System.Diagnostics.Debug.WriteLine($"[ResultWindow] JSON file not found: {jsonPath}");
+                return null;
+            }
+
+            string jsonContent = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);
+            return JsonConvert.DeserializeObject<ProjectData>(jsonContent);
         }
 
         private int UpdateSummary(ProjectData projectData)
@@ -511,8 +526,106 @@ namespace MOS_PowerPoint_app.Views
                 CorrectCountTextBlock.Text = $"{latestCorrect}";
                 CorrectTotalCountTextBlock.Text = $"/ {totalTasks}";
                 AccuracyTextBlock.Text = $"初回 {initialAccuracy:F1}% / 修正後 {latestAccuracy:F1}%";
+                UpdateTotalScoreDisplay();
             });
             return latestWrong;
+        }
+
+        private void UpdateTotalScoreDisplay()
+        {
+            if (TotalScorePanel == null || TotalScoreTextBlock == null)
+                return;
+
+            if (PassingRangeBadge != null)
+                PassingRangeBadge.Visibility = Visibility.Collapsed;
+
+            if (!_isVariantMode)
+            {
+                TotalScorePanel.Visibility = Visibility.Collapsed;
+                if (LostPointsTextBlock != null)
+                    LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            TotalScorePanel.Visibility = Visibility.Visible;
+            bool showPracticeTotal = PowerPointVariantExam.HasAllProjects(_allProjectScoringResults);
+            if (TotalScoreLabel != null)
+                TotalScoreLabel.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+            TotalScoreTextBlock.Visibility = showPracticeTotal ? Visibility.Visible : Visibility.Collapsed;
+
+            if (showPracticeTotal)
+            {
+                if (PracticeScoreClient.TryCompute(
+                        PowerPointVariantExam.FlattenResults(_allProjectScoringResults),
+                        out int total,
+                        out string error))
+                {
+                    TotalScoreTextBlock.Text = $"{total}点/1000点";
+                    if (PassingRangeBadge != null && total >= PracticeScoreClient.PassingScoreThreshold)
+                        PassingRangeBadge.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    TotalScoreTextBlock.Text = error ?? "総合点を表示できません。";
+                }
+            }
+            else
+            {
+                TotalScoreTextBlock.Text = string.Empty;
+            }
+
+            UpdateLostPointsDisplay();
+        }
+
+        private void UpdateLostPointsDisplay()
+        {
+            if (LostPointsTextBlock == null)
+                return;
+
+            if (!PowerPointTaskReviewState.ShowLostPoints(_isVariantMode))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            int completedWrongCount = PowerPointTaskReviewState.CountCompletedWrong(
+                _allProjectScoringResults,
+                _projectTaskCompletedStates);
+            string message = PowerPointTaskReviewState.FormatLostPointsMessage(completedWrongCount);
+            if (string.IsNullOrEmpty(message))
+            {
+                LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            LostPointsTextBlock.Text = message;
+            LostPointsTextBlock.Visibility = Visibility.Visible;
+        }
+
+        private string PriorityBadgeFor(int projectId, int taskId)
+        {
+            if (!_isVariantMode)
+                return string.Empty;
+            return PowerPointVariantPriorityLookup.GetBadgeText(ResultVariantSetNo, projectId, taskId);
+        }
+
+        private static void ApplyPriorityBadgeColors(ResultTaskInfo task)
+        {
+            if (task == null || !task.HasPriorityBadge)
+                return;
+
+            if (task.PriorityBadgeText == "優先")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0x1E, 0x40, 0xAF));
+                task.PriorityBadgeForeground = Brushes.White;
+                return;
+            }
+
+            if (task.PriorityBadgeText == "次点")
+            {
+                task.PriorityBadgeBackground = new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06));
+                task.PriorityBadgeForeground = Brushes.White;
+            }
         }
 
         private async Task StartSeatChartSubmitAsync(int wrongTasks)
@@ -608,5 +721,13 @@ namespace MOS_PowerPoint_app.Views
         public string ResultMark { get; set; }
         public Brush ResultColor { get; set; }
         public bool IsInitiallyWrong { get; set; }
+        public bool ShowDispositionColumns { get; set; }
+        public bool IsCompleted { get; set; }
+        public bool IsFlagged { get; set; }
+        public bool IsCompletedAndWrong { get; set; }
+        public string PriorityBadgeText { get; set; }
+        public bool HasPriorityBadge => !string.IsNullOrEmpty(PriorityBadgeText);
+        public Brush PriorityBadgeBackground { get; set; }
+        public Brush PriorityBadgeForeground { get; set; }
     }
 }

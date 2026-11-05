@@ -164,6 +164,7 @@ namespace MOS_PowerPoint_app
 
         private void UniversityRegistration_Deleted(object sender, EventArgs e)
         {
+            PowerPointTaskReviewStateStore.Discard();
             ScoringLogList?.Reload();
             _viewModel.SelectedTabIndex = 0;
         }
@@ -177,12 +178,13 @@ namespace MOS_PowerPoint_app
         {
             if (entry == null) return;
             var window = new Views.ResultWindow(
-                null,
-                null,
+                entry.GetCompletedStates(),
+                entry.GetFlaggedStates(),
                 null,
                 entry.GroupId,
                 entry.ProjectResults ?? new Dictionary<int, List<bool>>(),
-                fromScoringLog: true);
+                fromScoringLog: true,
+                isVariantMode: entry.IsVariantMode);
             window.Owner = this;
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             window.Show();
