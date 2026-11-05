@@ -336,7 +336,7 @@ namespace MOSExcelMogiApp.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Excel");
+                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Excel", _isVariantMode);
             }
             catch (Exception ex)
             {

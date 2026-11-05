@@ -271,7 +271,7 @@ namespace MOS_Word_app.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Word");
+                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Word", _isVariantMode);
             }
             catch (Exception ex)
             {

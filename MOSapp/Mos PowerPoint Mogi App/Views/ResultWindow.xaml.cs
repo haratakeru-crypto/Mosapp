@@ -27,6 +27,7 @@ namespace MOS_PowerPoint_app.Views
         private bool _showingWrongOnly = false; // フィルター状態
         private bool _seatChartSubmitStarted;
         private readonly bool _fromScoringLog;
+        private readonly bool _isVariantMode;
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
         public Action OnEndRequested { get; set; } // 終了ボタン押下時（PowerPoint終了・メイン画面に戻る）
 
@@ -35,7 +36,8 @@ namespace MOS_PowerPoint_app.Views
                            Dictionary<int, bool[]> projectTaskViewedStates = null, 
                            int groupId = 1,
                            Dictionary<int, List<bool>> allProjectScoringResults = null,
-                           bool fromScoringLog = false)
+                           bool fromScoringLog = false,
+                           bool isVariantMode = false)
         {
             InitializeComponent();
             _projectTaskCompletedStates = projectTaskCompletedStates ?? new Dictionary<int, bool[]>();
@@ -45,6 +47,7 @@ namespace MOS_PowerPoint_app.Views
             _initialProjectScoringResults = CloneScoringResults(_allProjectScoringResults);
             _groupId = groupId;
             _fromScoringLog = fromScoringLog;
+            _isVariantMode = isVariantMode;
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}, fromLog: {_fromScoringLog}");
             
             this.Loaded += ResultWindow_Loaded;
@@ -522,7 +525,7 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "PowerPoint");
+                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "PowerPoint", _isVariantMode);
             }
             catch (Exception ex)
             {

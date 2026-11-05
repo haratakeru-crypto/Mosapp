@@ -158,3 +158,5 @@ C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Docu
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\DocumentFormat.OpenXml.xml
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\DocumentFormat.OpenXml.Framework.xml
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\References\CSV\PowerPointVocabularyKeywords.csv
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\AnswerGuideWindow.baml
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\obj\Debug\Views\AnswerGuideWindow.g.cs

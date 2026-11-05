@@ -605,7 +605,7 @@ namespace MOS_PowerPoint_app.Views
                 }
                 
                 // 結果画面を作成（採点結果を渡す）
-                var resultWindow = new ResultWindow(_projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, _groupId, allResults);
+                var resultWindow = new ResultWindow(_projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, _groupId, allResults, isVariantMode: _isVariantMode);
                 resultWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                 resultWindow.Topmost = true;
                 
