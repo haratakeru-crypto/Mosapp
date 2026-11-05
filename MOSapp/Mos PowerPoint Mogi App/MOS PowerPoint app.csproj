@@ -195,7 +195,16 @@
     <Compile Include="PowerPointDataPathHelper.cs" />
     <Compile Include="VariantProblemWorkbook.cs" />
     <Compile Include="PowerPointProjectResetHelper.cs" />
+    <Compile Include="Libraries\PowerPointBulkResetCoordinator.cs" />
     <Compile Include="PowerPointGrader.cs" />
+    <Page Include="Views\BulkResetScopeDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="Views\BulkResetScopeDialog.xaml.cs">
+      <DependentUpon>BulkResetScopeDialog.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Page Include="Views\PreparingWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

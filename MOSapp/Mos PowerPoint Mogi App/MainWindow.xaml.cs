@@ -46,6 +46,7 @@ namespace MOS_PowerPoint_app
 
                 ApplyExamineeTabState();
                 MosPracticeClient.ExamineeStore.EnsureSessionWatch();
+                Loaded += MainWindow_Loaded;
                 Closing += MainWindow_Closing;
             }
             catch (Exception ex)
@@ -55,6 +56,100 @@ namespace MOS_PowerPoint_app
                 System.Diagnostics.Debug.WriteLine($"MainWindow初期化エラー: {ex}");
                 throw;
             }
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= MainWindow_Loaded;
+            // 起動スプラッシュ（Topmost）閉鎖後に確認を出す
+            Dispatcher.BeginInvoke(
+                new Action(TryPromptStartupReset),
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        private void TryPromptStartupReset()
+        {
+            if (!MosPracticeClient.StartupResetPrompt.Ask(this))
+                return;
+
+            RunBulkReset(Libraries.PowerPointBulkResetScope.All);
+        }
+
+        private void ProjectResetButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Views.BulkResetScopeDialog { Owner = this };
+            if (dialog.ShowDialog() != true)
+                return;
+
+            RunBulkReset(dialog.SelectedScope);
+        }
+
+        private void RunBulkReset(Libraries.PowerPointBulkResetScope scope)
+        {
+            if (_viewModel == null)
+                return;
+
+            var targets = _viewModel.GetBulkResetTargets(scope);
+            if (targets.Count == 0)
+            {
+                MessageBox.Show(
+                    "リセット対象のプロジェクトが見つかりませんでした。",
+                    "エラー",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+
+            if (ProjectResetButton != null)
+                ProjectResetButton.IsEnabled = false;
+            try
+            {
+                Libraries.PowerPointBulkResetResult result = _viewModel.RunBulkReset(scope);
+                ShowBulkResetResult(scope, result);
+                _viewModel.ResultMessage = result.TotalFail == 0
+                    ? "すべてリセットしました。"
+                    : "リセットが完了しました（一部失敗あり）。";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"プロジェクトリセット中にエラーが発生しました: {ex.Message}",
+                    "エラー",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (ProjectResetButton != null)
+                    ProjectResetButton.IsEnabled = true;
+            }
+        }
+
+        private static void ShowBulkResetResult(
+            Libraries.PowerPointBulkResetScope scope,
+            Libraries.PowerPointBulkResetResult result)
+        {
+            if (result.TotalFail == 0)
+            {
+                MessageBox.Show("すべてリセットしました", "完了", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var message = new StringBuilder();
+            message.AppendLine("リセットが完了しました。");
+            message.AppendLine();
+            if (scope == Libraries.PowerPointBulkResetScope.Textbook || scope == Libraries.PowerPointBulkResetScope.All)
+                message.AppendLine($"演習 成功: {result.TextbookSuccess} / 失敗: {result.TextbookFail}");
+            if (scope == Libraries.PowerPointBulkResetScope.Variant || scope == Libraries.PowerPointBulkResetScope.All)
+                message.AppendLine($"類題 成功: {result.VariantSuccess} / 失敗: {result.VariantFail}");
+            if (result.FailedProjects.Count > 0)
+            {
+                message.AppendLine();
+                message.Append("失敗したプロジェクト: ");
+                message.Append(string.Join(", ", result.FailedProjects));
+            }
+
+            MessageBox.Show(message.ToString(), "完了", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void ApplyExamineeTabState()
