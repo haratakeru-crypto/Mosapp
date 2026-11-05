@@ -19,9 +19,9 @@ namespace MOS_PowerPoint_app
             // プロジェクト1/5/10/11をやり直すときは該当タスクの証跡のみ削除。他プロジェクトの証跡は残す。
             PPLogReader.ClearTaskEvidenceForProject(projectId);
             PPLogReader.ClearCurrentTaskFile();
-            PPLogReader.ClearDestructiveLog();
+            PPLogReader.ClearDestructiveLogForProject(projectId, 0);
             PPLogReader.ClearSnapshot();
-            PPTaskAttemptRegistry.ClearProject(projectId);
+            PPTaskAttemptRegistry.ClearProject(projectId, 0);
 
             string projectFilePath = PowerPointDataPathHelper.GetWorkingProjectPath(groupId, projectId);
             string templatePath = PowerPointDataPathHelper.GetTemplateProjectPath(groupId, projectId);
@@ -122,6 +122,13 @@ namespace MOS_PowerPoint_app
         {
             if (variantSetNo < 1)
                 variantSetNo = 1;
+
+            // 教材 ResetProject と同様、やり直し時は当該プロジェクトのログ依存証跡を消す。
+            PPLogReader.ClearTaskEvidenceForProject(projectId);
+            PPLogReader.ClearCurrentTaskFile();
+            PPLogReader.ClearDestructiveLogForProject(projectId, variantSetNo);
+            PPLogReader.ClearSnapshot();
+            PPTaskAttemptRegistry.ClearProject(projectId, variantSetNo);
 
             string templatePath = PowerPointDataPathHelper.FindVariantTemplateFile(groupId, projectId, variantSetNo);
             if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))

@@ -13,6 +13,8 @@ namespace Libraries.Group1
         public const float P9_3ExpectedFadeOutMs = 3000f;
         public const float P9_3FadeOutToleranceMs = 500f;
         public const int P9_3PlayAcrossStopAfterSlidesLegacy = 999;
+        public const float V1_5_6ExpectedFadeInMs = 4000f;
+        public const float V1_5_6FadeInToleranceMs = 500f;
 
         public static bool IsFadeOutDurationAbout3Seconds(float fadeOutRaw)
         {
@@ -20,6 +22,16 @@ namespace Libraries.Group1
                 return true;
             // UI で「3」秒と ms 未換算の値が返る環境向け
             if (Math.Abs(fadeOutRaw - 3f) < 0.5f)
+                return true;
+            return false;
+        }
+
+        public static bool IsFadeInDurationAbout4Seconds(float fadeInRaw)
+        {
+            if (Math.Abs(fadeInRaw - V1_5_6ExpectedFadeInMs) < V1_5_6FadeInToleranceMs)
+                return true;
+            // UI で「4」秒と ms 未換算の値が返る環境向け
+            if (Math.Abs(fadeInRaw - 4f) < 0.5f)
                 return true;
             return false;
         }
@@ -133,11 +145,40 @@ namespace Libraries.Group1
             }
         }
 
+        public static bool IsAudioFadeInAbout4Seconds(PptShape sh)
+        {
+            if (sh == null) return false;
+            MediaFormat mf = null;
+            try
+            {
+                try { mf = sh.MediaFormat; }
+                catch { return false; }
+                if (mf == null) return false;
+
+                float fadeIn;
+                try { fadeIn = (float)mf.FadeInDuration; }
+                catch { return false; }
+
+                return IsFadeInDurationAbout4Seconds(fadeIn);
+            }
+            finally
+            {
+                if (mf != null) { try { Marshal.ReleaseComObject(mf); } catch { } }
+            }
+        }
+
         public static bool ShapeMatchesP9_3AudioSettings(PptShape sh, Presentation pres)
         {
             return TryIsSoundShape(sh)
                 && IsAudioPlayAcrossSlides(sh, pres)
                 && IsAudioFadeOutAbout3Seconds(sh);
+        }
+
+        public static bool ShapeMatchesV1_5_6AudioSettings(PptShape sh, Presentation pres)
+        {
+            return TryIsSoundShape(sh)
+                && IsAudioPlayAcrossSlides(sh, pres)
+                && IsAudioFadeInAbout4Seconds(sh);
         }
     }
 }

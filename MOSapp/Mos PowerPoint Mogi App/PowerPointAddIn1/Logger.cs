@@ -215,6 +215,24 @@ namespace PowerPointAddIn1
             LogTaskTag("Task10-7", "LayoutDuplicate");
         }
 
+        /// <summary>類題セット1 / 1-3-1: レイアウト「表スライド」適用を記録（教材 Task1-3 と分離）。</summary>
+        public static void LogTaskV1_3_1TableSlideLayout()
+        {
+            LogTaskTag("TaskV1-3-1", "TableSlideLayout");
+        }
+
+        /// <summary>類題セット1 / 1-5-6: 表紙音声のスライド間再生を記録。</summary>
+        public static void LogTaskV1_5_6PlayAcrossSlides()
+        {
+            LogTaskTag("TaskV1-5-6", "PlayAcrossSlides");
+        }
+
+        /// <summary>類題セット1 / 1-5-6: 表紙音声のフェードイン4秒を記録。</summary>
+        public static void LogTaskV1_5_6FadeIn4000()
+        {
+            LogTaskTag("TaskV1-5-6", "FadeIn4000");
+        }
+
         /// <summary>
         /// 現在タスク開始を記録（試験アプリがタスクを切り替えたとき）。形式: [timestamp] [TaskStart] P-T
         /// </summary>
@@ -296,7 +314,9 @@ namespace PowerPointAddIn1
                         || string.Equals(taskTag, "Task9-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task2-1", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task2-2", StringComparison.Ordinal)
-                        || string.Equals(taskTag, "Task2-3", StringComparison.Ordinal))
+                        || string.Equals(taskTag, "Task2-3", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "TaskV1-3-1", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "TaskV1-5-6", StringComparison.Ordinal))
                     {
                         AppendToFile(TaskEvidenceFilePath, logEntry);
                     }

@@ -77,7 +77,7 @@ namespace MOS_PowerPoint_app
         {
             try
             {
-                var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
+                var flags = Libraries.PPVariantValidationConfig.ResolveExemptFlags(projectId, taskId);
                 Libraries.PPLogReader.WriteCurrentTaskFile(projectId, taskId, (int)flags, attemptNo, snapshotGen);
             }
             catch { }
@@ -145,14 +145,18 @@ namespace MOS_PowerPoint_app
                 if (snapProjectId != curProjectId || snapTaskId != curTaskId || snapAttemptNo != attemptNo || snapGen != 0)
                     return false;
 
-                var exempt = Libraries.PPTaskValidationConfig.GetExemptFlags(curProjectId, curTaskId);
+                var exempt = Libraries.PPVariantValidationConfig.ResolveExemptFlags(curProjectId, curTaskId);
                 List<string> errors;
                 lock (PowerPointCheckerCommon.PowerPointComInteropSync)
                 {
                     errors = Libraries.PPSnapshotChecker.CompareAndGetErrors(curProjectId, curTaskId, attemptNo, exempt);
                 }
                 if (errors != null && errors.Count > 0)
-                    Libraries.PPLogReader.AppendDestructiveErrors(curProjectId, curTaskId, attemptNo, errors);
+                {
+                    int variantSetNo = Libraries.PPVariantValidationConfig.ActiveVariantSetNo();
+                    Libraries.PPLogReader.AppendDestructiveErrors(
+                        curProjectId, curTaskId, attemptNo, errors, variantSetNo);
+                }
                 return true;
             }
             catch (Exception ex)
@@ -180,8 +184,9 @@ namespace MOS_PowerPoint_app
                 return false;
 
             var sw = Stopwatch.StartNew();
-            // 1. 過去の破壊的操作ログのチェック
-            if (PPLogReader.HasLoggedDestructiveError(projectId, taskId, attemptNo))
+            int variantSetNo = Libraries.PPVariantValidationConfig.ActiveVariantSetNo();
+            // 1. 過去の破壊的操作ログのチェック（教材 / 類題をキー分離）
+            if (PPLogReader.HasLoggedDestructiveError(projectId, taskId, attemptNo, variantSetNo))
             {
                 System.Diagnostics.Debug.WriteLine($"[Grader] Task {projectId}-{taskId} FAILED due to logged destructive operation.");
                 if (projectId == 1 && taskId == 1)
@@ -205,7 +210,7 @@ namespace MOS_PowerPoint_app
 
             // 2. スナップショット比較と COM 採点を同一ロックで実行（閉じる処理とスナップショット COM の間に割り込まれないようにする）
             sw.Restart();
-            var exemptFlags = Libraries.PPTaskValidationConfig.GetExemptFlags(projectId, taskId);
+            var exemptFlags = Libraries.PPVariantValidationConfig.ResolveExemptFlags(projectId, taskId);
             bool comResult = false;
             lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
@@ -239,7 +244,7 @@ namespace MOS_PowerPoint_app
                         {
                             System.Diagnostics.Debug.WriteLine($"[Validation] Project{projectId} Task{taskId}: {err}");
                         }
-                        PPLogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, destructiveErrors);
+                        PPLogReader.AppendDestructiveErrors(projectId, taskId, attemptNo, destructiveErrors, variantSetNo);
                         if (projectId == 1 && taskId == 1)
                         {
                             Debug.WriteLine($"[Task1-1] GradeTask: FAIL early exit (snapshot errors={destructiveErrors.Count}, COM not run)");

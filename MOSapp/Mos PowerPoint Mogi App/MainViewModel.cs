@@ -466,49 +466,48 @@ namespace MOS_PowerPoint_app
             }
         }
 
-        internal static void ShowVariantAnswerSteps(int projectId)
-        {
-            var tasks = VariantProblemWorkbook.GetTasks(projectId);
-            var text = new StringBuilder();
-            if (tasks.Count == 0)
-            {
-                text.Append("解答手順が登録されていません。");
-            }
-            else
-            {
-                foreach (var task in tasks)
-                {
-                    text.AppendLine($"タスク {task.TaskId}");
-                    text.AppendLine(string.IsNullOrWhiteSpace(task.AnswerSteps)
-                        ? "解答手順が登録されていません。"
-                        : task.AnswerSteps);
-                    text.AppendLine();
-                }
-            }
-
-            var window = new Window
-            {
-                Title = $"類題 プロジェクト {projectId} 解答手順",
-                Width = 640,
-                Height = 480,
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                Content = new System.Windows.Controls.ScrollViewer
-                {
-                    Padding = new Thickness(16),
-                    Content = new System.Windows.Controls.TextBlock
-                    {
-                        Text = text.ToString(),
-                        TextWrapping = TextWrapping.Wrap,
-                        FontSize = 14
-                    }
-                }
-            };
-            window.ShowDialog();
-        }
-
         private bool CanExecuteScore(object parameter)
         {
             return CurrentProject != null;
+        }
+
+        private void ExecuteVariantScore()
+        {
+            if (CurrentProject == null)
+            {
+                RunOnUi(() => ResultMessage = "プロジェクトを開いてから実行してください。");
+                return;
+            }
+
+            RunOnUi(() =>
+            {
+                TaskResults.Clear();
+                ResultMessage = "採点中...";
+            });
+
+            try
+            {
+                var results = PowerPointVariantScoring.ScoreProject(
+                    CurrentProject.GroupId, CurrentProject.ProjectId);
+                if (results.Count == 0)
+                {
+                    RunOnUi(() => ResultMessage = "該当プロジェクトのタスクが見つかりません。");
+                    return;
+                }
+
+                int passedCount = results.Count(r => r.IsPassed);
+                RunOnUi(() =>
+                {
+                    foreach (var r in results)
+                        TaskResults.Add(r);
+                    ResultMessage = $"採点: {passedCount}/{results.Count} タスク合格";
+                    ScoreCompleted?.Invoke(this, EventArgs.Empty);
+                });
+            }
+            catch (Exception ex)
+            {
+                RunOnUi(() => ResultMessage = $"採点中にエラーが発生しました: {ex.Message}");
+            }
         }
 
         private void ExecuteScore(object parameter)
@@ -521,7 +520,7 @@ namespace MOS_PowerPoint_app
 
             if (IsVariantMode)
             {
-                RunOnUi(() => ShowVariantAnswerSteps(CurrentProject.ProjectId));
+                ExecuteVariantScore();
                 return;
             }
 

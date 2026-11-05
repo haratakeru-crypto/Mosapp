@@ -172,6 +172,74 @@ namespace Libraries
         }
 
         /// <summary>
+        /// 類題モード共有ファイル（%TEMP%\mos_ppt_variant_set.txt）。
+        /// 内容は類題セット番号（例: 1）。教材モードでは削除する。
+        /// VSTO が類題専用証跡（TaskV1-*）を教材ログと混ぜないために使う。
+        /// </summary>
+        public static string GetVariantSetFilePath()
+        {
+            return Path.Combine(Path.GetTempPath(), "mos_ppt_variant_set.txt");
+        }
+
+        public static void WriteVariantSetNo(int variantSetNo)
+        {
+            try
+            {
+                if (variantSetNo < 1) variantSetNo = 1;
+                AtomicWriteAllText(GetVariantSetFilePath(), variantSetNo.ToString());
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] WriteVariantSetNo: " + ex.Message);
+            }
+        }
+
+        public static void ClearVariantSetNo()
+        {
+            try
+            {
+                string path = GetVariantSetFilePath();
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] ClearVariantSetNo: " + ex.Message);
+            }
+        }
+
+        public static bool TryReadVariantSetNo(out int variantSetNo)
+        {
+            variantSetNo = 0;
+            string path = GetVariantSetFilePath();
+            if (!File.Exists(path))
+                return false;
+            try
+            {
+                string text;
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    text = (sr.ReadToEnd() ?? string.Empty).Trim();
+                if (!int.TryParse(text, out variantSetNo) || variantSetNo < 1)
+                {
+                    variantSetNo = 0;
+                    return false;
+                }
+                return true;
+            }
+            catch
+            {
+                variantSetNo = 0;
+                return false;
+            }
+        }
+
+        public static bool IsVariantModeActive()
+        {
+            return TryReadVariantSetNo(out _);
+        }
+
+        /// <summary>
         /// 採点／レビュー直前の証跡確定要求（%TEMP%\mos_ppt_flush_evidence.txt）。
         /// 形式: ProjectId,TaskId,AttemptNo。VSTO が処理後に削除する（Excel 境界 flush と同型）。
         /// </summary>
@@ -393,7 +461,8 @@ namespace Libraries
 
         /// <summary>
         /// 単体プロジェクトリセット時、そのプロジェクトのログ依存採点タスクに対応する証跡行だけを削除する。
-        /// 1→1-2/1-3/1-4/1-8、4→4-3、5→5-1、10→10-4、11→11-7。他プロジェクトでは何もしない。
+        /// 証跡ファイルと本ログの両方から消す（Has* が両ファイルを見るため）。
+        /// 類題: 3→TaskV1-3-1。教材: 1→1-2/1-3/1-4/1-8 など。
         /// </summary>
         public static void ClearTaskEvidenceForProject(int projectId)
         {
@@ -401,7 +470,14 @@ namespace Libraries
             if (markers == null || markers.Length == 0)
                 return;
 
-            string path = GetTaskEvidenceLogPath();
+            RemoveMarkerLinesFromFile(GetTaskEvidenceLogPath(), markers);
+            RemoveMarkerLinesFromFile(GetLogFilePath(), markers);
+        }
+
+        private static void RemoveMarkerLinesFromFile(string path, string[] markers)
+        {
+            if (string.IsNullOrEmpty(path) || markers == null || markers.Length == 0)
+                return;
             if (!File.Exists(path))
                 return;
 
@@ -433,7 +509,7 @@ namespace Libraries
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[PPLogReader] ClearTaskEvidenceForProject: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] RemoveMarkerLinesFromFile: " + ex.Message);
             }
         }
 
@@ -457,8 +533,17 @@ namespace Libraries
                         "[Task2-2] TransitionDuration3Sec",
                         "[Task2-3] SwitchRight"
                     };
+                case 3:
+                    // 類題セット1 / 1-3-1（教材 Task1-3 と分離した TaskV1-3-1）
+                    return new[] { "[TaskV1-3-1] TableSlideLayout" };
                 case 5:
-                    return new[] { "[Task5-1] Print" };
+                    return new[]
+                    {
+                        "[Task5-1] Print",
+                        // 類題セット1 / 1-5-6
+                        "[TaskV1-5-6] PlayAcrossSlides",
+                        "[TaskV1-5-6] FadeIn4000"
+                    };
                 case 4:
                     return new[] { "[Task4-3] Glow18Accent6" };
                 case 8:
@@ -491,14 +576,115 @@ namespace Libraries
             }
         }
 
-        /// <summary>破壊的操作ログに同一 project-task-attempt の記録があるか。</summary>
-        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo)
+        /// <summary>
+        /// 破壊的ログ行のキー（Word/Excel と同型）。
+        /// 教材: <c>P,T,A:</c> / 類題: <c>V{set},P,T,A:</c>
+        /// </summary>
+        public static string FormatDestructivePrefix(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
+        {
+            if (attemptNo < 1) attemptNo = 1;
+            if (variantSetNo > 0)
+                return "V" + variantSetNo + "," + projectId + "," + taskId + "," + attemptNo + ":";
+            return projectId + "," + taskId + "," + attemptNo + ":";
+        }
+
+        /// <summary>破壊的ログ行先頭の P,T,A / Vn,P,T,A を解析する。</summary>
+        public static bool TryParseDestructiveLinePrefix(
+            string line, out int projectId, out int taskId, out int attemptNo, out int variantSetNo)
+        {
+            projectId = taskId = attemptNo = variantSetNo = 0;
+            if (string.IsNullOrWhiteSpace(line))
+                return false;
+
+            int colon = line.IndexOf(':');
+            string prefix = colon >= 0 ? line.Substring(0, colon) : line;
+            string[] parts = prefix.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 3)
+            {
+                if (!int.TryParse(parts[0].Trim(), out projectId) || projectId <= 0)
+                    return false;
+                if (!int.TryParse(parts[1].Trim(), out taskId) || taskId <= 0)
+                    return false;
+                if (!int.TryParse(parts[2].Trim(), out attemptNo) || attemptNo < 1)
+                    attemptNo = 1;
+                variantSetNo = 0;
+                return true;
+            }
+
+            if (parts.Length == 4)
+            {
+                string marker = parts[0].Trim();
+                if (marker.Length < 2 || (marker[0] != 'V' && marker[0] != 'v'))
+                    return false;
+                if (!int.TryParse(marker.Substring(1), out variantSetNo) || variantSetNo < 1)
+                    return false;
+                if (!int.TryParse(parts[1].Trim(), out projectId) || projectId <= 0)
+                    return false;
+                if (!int.TryParse(parts[2].Trim(), out taskId) || taskId <= 0)
+                    return false;
+                if (!int.TryParse(parts[3].Trim(), out attemptNo) || attemptNo < 1)
+                    attemptNo = 1;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>指定プロジェクトの破壊的ログのみ削除（教材 scope=0 / 類題 scope=Vn）。</summary>
+        public static void ClearDestructiveLogForProject(int projectId, int variantSetNo = 0)
+        {
+            if (variantSetNo < 0) variantSetNo = 0;
+            string path = GetDestructiveLogPath();
+            if (!File.Exists(path))
+                return;
+
+            try
+            {
+                var lines = File.ReadAllLines(path, Encoding.UTF8);
+                var kept = new List<string>(lines.Length);
+                string projectPrefix = projectId.ToString() + ",";
+                foreach (string line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    if (TryParseDestructiveLinePrefix(line, out int lineProjectId, out _, out _, out int lineVariantSetNo)
+                        && lineProjectId == projectId
+                        && lineVariantSetNo == variantSetNo)
+                    {
+                        continue;
+                    }
+
+                    // 修正前に類題が教材形式で書いた行も、教材リセット時に掃除する
+                    if (variantSetNo == 0
+                        && line.StartsWith(projectPrefix, StringComparison.Ordinal)
+                        && !line.StartsWith("V", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    kept.Add(line);
+                }
+
+                if (kept.Count == 0)
+                    File.Delete(path);
+                else
+                    File.WriteAllLines(path, kept, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[PPLogReader] ClearDestructiveLogForProject: " + ex.Message);
+            }
+        }
+
+        /// <summary>破壊的操作ログに同一 scope の project-task-attempt 記録があるか。</summary>
+        public static bool HasLoggedDestructiveError(int projectId, int taskId, int attemptNo, int variantSetNo = 0)
         {
             try
             {
                 string path = GetDestructiveLogPath();
                 if (!File.Exists(path)) return false;
-                string prefix = $"{projectId},{taskId},{attemptNo}:";
+                string prefix = FormatDestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
                 foreach (string line in File.ReadAllLines(path))
                 {
                     if (line != null && line.StartsWith(prefix, StringComparison.Ordinal))
@@ -513,14 +699,15 @@ namespace Libraries
         }
 
         /// <summary>破壊的操作ログへ追記（Word の AppendDestructiveErrors 相当）。</summary>
-        public static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, IList<string> errors)
+        public static void AppendDestructiveErrors(
+            int projectId, int taskId, int attemptNo, IList<string> errors, int variantSetNo = 0)
         {
             if (errors == null || errors.Count == 0) return;
             try
             {
                 string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
                 if (string.IsNullOrWhiteSpace(body)) return;
-                string key = $"{projectId},{taskId},{attemptNo}:";
+                string key = FormatDestructivePrefix(projectId, taskId, attemptNo, variantSetNo);
                 File.AppendAllText(GetDestructiveLogPath(), key + body + Environment.NewLine, Encoding.UTF8);
             }
             catch (Exception ex)
@@ -804,6 +991,33 @@ namespace Libraries
         public static bool HasTask10_7LayoutDuplicateExecuted()
         {
             return HasLogLineContaining("[Task10-7] LayoutDuplicate");
+        }
+
+        /// <summary>
+        /// 類題セット1 / 1-3-1: レイアウト「表スライド」適用の証跡（[TaskV1-3-1] TableSlideLayout）。
+        /// テーマ変更後にレイアウト名が消えても、証跡があれば合格にできる。
+        /// </summary>
+        public static bool HasTaskV1_3_1TableSlideLayout()
+        {
+            const string marker = "[TaskV1-3-1] TableSlideLayout";
+            return FileContainsMarker(GetTaskEvidenceLogPath(), marker)
+                || FileContainsMarker(GetLogFilePath(), marker);
+        }
+
+        /// <summary>類題セット1 / 1-5-6: 表紙音声のスライド間再生証跡。</summary>
+        public static bool HasTaskV1_5_6PlayAcrossSlides()
+        {
+            const string marker = "[TaskV1-5-6] PlayAcrossSlides";
+            return FileContainsMarker(GetTaskEvidenceLogPath(), marker)
+                || FileContainsMarker(GetLogFilePath(), marker);
+        }
+
+        /// <summary>類題セット1 / 1-5-6: 表紙音声のフェードイン4秒証跡。</summary>
+        public static bool HasTaskV1_5_6FadeIn4000()
+        {
+            const string marker = "[TaskV1-5-6] FadeIn4000";
+            return FileContainsMarker(GetTaskEvidenceLogPath(), marker)
+                || FileContainsMarker(GetLogFilePath(), marker);
         }
 
         private static bool HasLogLineContaining(string marker)

@@ -124,8 +124,12 @@ namespace MOS_PowerPoint_app.Views
         private int _groupId = 1; // グループIDを保存
         private List<TaskInfo> _tasks;
         private ProjectData _projectData;
-        private Dictionary<int, bool[]> _projectTaskCompletedStates = new Dictionary<int, bool[]>(); // プロジェクトごとの解答済み状態
-        private Dictionary<int, bool[]> _projectTaskFlaggedStates = new Dictionary<int, bool[]>(); // プロジェクトごとのフラグ状態
+        private readonly Dictionary<int, bool[]> _localCompletedStates = new Dictionary<int, bool[]>();
+        private readonly Dictionary<int, bool[]> _localFlaggedStates = new Dictionary<int, bool[]>();
+        private Dictionary<int, bool[]> _projectTaskCompletedStates =>
+            _isVariantMode ? PowerPointTaskReviewStateStore.Completed() : _localCompletedStates;
+        private Dictionary<int, bool[]> _projectTaskFlaggedStates =>
+            _isVariantMode ? PowerPointTaskReviewStateStore.Flagged() : _localFlaggedStates;
         private Dictionary<int, bool[]> _projectTaskViewedStates = new Dictionary<int, bool[]>(); // プロジェクトごとの閲覧状態（未読問題の追跡用）
         private DateTime _projectStartTime; // プロジェクト開始時刻
         private DispatcherTimer _projectTimer; // プロジェクト用タイマー（5分制限）
@@ -165,6 +169,11 @@ namespace MOS_PowerPoint_app.Views
             _onScoreClick = onScoreClick;
             _isVariantMode = isVariantMode;
             _viewModel = viewModel;
+            if (_isVariantMode)
+            {
+                // 類題セッション開始時に教材スコープと分離した結果バケットをクリア
+                Libraries.ScoreResultStore.ClearGroup(_groupId, PowerPointVariantScoring.DefaultVariantSetNo);
+            }
             if (_viewModel != null)
             {
                 DataContext = _viewModel;
@@ -537,6 +546,9 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] Showing result window (scoring all projects first)");
 
                 BeginScoringSession();
+
+                Dictionary<int, bool[]> completedSnapshot = PowerPointTaskReviewState.Clone(_projectTaskCompletedStates);
+                Dictionary<int, bool[]> flaggedSnapshot = PowerPointTaskReviewState.Clone(_projectTaskFlaggedStates);
                 
                 overlay = CreateScoringProgressOverlay();
                 overlay.Window.Show();
@@ -601,7 +613,14 @@ namespace MOS_PowerPoint_app.Views
                     {
                         MosPracticeClient.ScoringLogStore.Append(
                             MosPracticeClient.ScoringLogStore.SubjectPowerPoint,
-                            MosPracticeClient.ScoringLogEntry.Create(rangeLabel, _groupId, allResults));
+                            MosPracticeClient.ScoringLogEntry.Create(
+                                rangeLabel,
+                                _groupId,
+                                allResults,
+                                isVariantMode: _isVariantMode,
+                                variantSetNo: _isVariantMode ? PowerPointVariantScoring.DefaultVariantSetNo : 0,
+                                completedStates: completedSnapshot,
+                                flaggedStates: flaggedSnapshot));
                     }
                     catch (Exception logEx)
                     {
@@ -609,8 +628,21 @@ namespace MOS_PowerPoint_app.Views
                     }
                 }
                 
+                if (_isVariantMode && allResults.Count > 0)
+                {
+                    Libraries.ScoreResultStore.SnapshotGroupIfEmpty(
+                        _groupId, PowerPointVariantScoring.DefaultVariantSetNo);
+                }
+
                 // 結果画面を作成（採点結果を渡す）
-                var resultWindow = new ResultWindow(_projectTaskCompletedStates, _projectTaskFlaggedStates, _projectTaskViewedStates, _groupId, allResults, isVariantMode: _isVariantMode);
+                var resultWindow = new ResultWindow(
+                    _projectTaskCompletedStates,
+                    _projectTaskFlaggedStates,
+                    _projectTaskViewedStates,
+                    _groupId,
+                    allResults,
+                    fromScoringLog: false,
+                    isVariantMode: _isVariantMode);
                 resultWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                 resultWindow.Topmost = true;
                 
@@ -858,6 +890,66 @@ namespace MOS_PowerPoint_app.Views
         }
         
         /// <summary>
+        /// 類題セットの全プロジェクトを PV チェッカーで採点する。
+        /// </summary>
+        private Dictionary<int, List<bool>> ScoreAllVariantProjects(
+            ISet<int> projectIds = null,
+            Action<string, int, int> progress = null)
+        {
+            var results = new Dictionary<int, List<bool>>();
+            var projectIdList = VariantProblemWorkbook.GetProjectIds()
+                .Where(id => projectIds == null || projectIds.Count == 0 || projectIds.Contains(id))
+                .OrderBy(id => id)
+                .ToList();
+            int completedProjects = 0;
+            progress?.Invoke("類題の採点準備をしています...", 0, projectIdList.Count);
+
+            foreach (int projectId in projectIdList)
+            {
+                progress?.Invoke($"プロジェクト {projectId} を採点中", completedProjects, projectIdList.Count);
+                var list = new List<bool>();
+                try
+                {
+                    bool opened = OpenProjectDocument(projectId, _groupId, forBatchScoring: true);
+                    if (!opened)
+                    {
+                        int taskCount = VariantProblemWorkbook.GetTaskCount(projectId);
+                        for (int i = 0; i < taskCount; i++)
+                            list.Add(false);
+                        results[projectId] = list;
+                        Libraries.ScoreResultStore.RecordProjectResults(
+                            _groupId, projectId, list, PowerPointVariantScoring.DefaultVariantSetNo);
+                        continue;
+                    }
+
+                    var scoreList = PowerPointVariantScoring.ScoreProject(
+                        _groupId, projectId, PowerPointVariantScoring.DefaultVariantSetNo);
+                    foreach (var task in scoreList.OrderBy(t => t.TaskNumber))
+                        list.Add(task.IsPassed);
+                    results[projectId] = list;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ScoreAllVariantProjects] P{projectId}: {ex.Message}");
+                    int taskCount = VariantProblemWorkbook.GetTaskCount(projectId);
+                    while (list.Count < taskCount)
+                        list.Add(false);
+                    results[projectId] = list;
+                    Libraries.ScoreResultStore.RecordProjectResults(
+                        _groupId, projectId, list, PowerPointVariantScoring.DefaultVariantSetNo);
+                }
+                finally
+                {
+                    completedProjects++;
+                    progress?.Invoke($"プロジェクト {projectId} の採点が完了しました", completedProjects, projectIdList.Count);
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[ScoreAllVariantProjects] Done: {results.Count} projects");
+            return results;
+        }
+
+        /// <summary>
         /// 全プロジェクトを採点し、projectId → タスクごとの正否リスト を返す（方式A用）
         /// </summary>
         private Dictionary<int, List<bool>> ScoreAllProjects(
@@ -869,6 +961,9 @@ namespace MOS_PowerPoint_app.Views
             var scoringTimer = Stopwatch.StartNew();
             try
             {
+            if (_isVariantMode)
+                return ScoreAllVariantProjects(projectIds, progress);
+
             if (_projectData?.Projects == null || _projectData.Projects.Count == 0)
                 return results;
 
@@ -1085,6 +1180,8 @@ namespace MOS_PowerPoint_app.Views
                     completedStates[index] = task.IsPassed;
                 }
             }
+            if (_isVariantMode)
+                PowerPointTaskReviewStateStore.Persist();
             System.Diagnostics.Debug.WriteLine($"[ApplyScoreResults] プロジェクト{projectId}: {list.Count(r => r.IsPassed)}/{list.Count} を解答済みに反映しました");
         }
         
@@ -1450,6 +1547,7 @@ namespace MOS_PowerPoint_app.Views
             CloseAnswerGuide();
             _timer?.Stop();
             _projectTimer?.Stop();
+            try { Libraries.PPLogReader.ClearVariantSetNo(); } catch { }
             SaveAllPowerPointPresentations();
             CloseAllPowerPointPresentations();
             try
@@ -2083,13 +2181,18 @@ namespace MOS_PowerPoint_app.Views
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] プロジェクト{_currentProjectId}にタスク{_currentTaskId}が含まれているか: {_clipboardTargets[_currentProjectId].ContainsKey(_currentTaskId)}");
             }
             
-            // 現在のプロジェクト・タスクがクリップボード対象に含まれているかチェック
+            // 現在のプロジェクト・タスクがクリップボード対象に含まれているかチェック（類題は xlsx の問題文を優先）
             string clipboardTargetDescription = null;
-            if (_clipboardTargets.ContainsKey(_currentProjectId) &&
+            if (!_isVariantMode &&
+                _clipboardTargets.ContainsKey(_currentProjectId) &&
                 _clipboardTargets[_currentProjectId].ContainsKey(_currentTaskId))
             {
                 clipboardTargetDescription = _clipboardTargets[_currentProjectId][_currentTaskId];
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] クリップボード対象の問題文を取得: {clipboardTargetDescription.Substring(0, Math.Min(100, clipboardTargetDescription.Length))}...");
+            }
+            else if (_isVariantMode)
+            {
+                System.Diagnostics.Debug.WriteLine("[UpdateTaskDisplay] 類題モードのため xlsx の問題文を使用します");
             }
             else
             {
@@ -2097,9 +2200,15 @@ namespace MOS_PowerPoint_app.Views
             }
             
             // コピーできる部分を""で囲んでから表示（「…」と入力 の 「」内をコピー対象に）
-            string descriptionForDisplay = clipboardTargetDescription ?? currentTask.Description;
+            string descriptionForDisplay = _isVariantMode
+                ? currentTask.Description
+                : (clipboardTargetDescription ?? currentTask.Description);
             descriptionForDisplay = WrapCopyablePartInQuotes(descriptionForDisplay);
-            if (clipboardTargetDescription != null)
+            if (_isVariantMode)
+                descriptionForDisplay = WrapVariantCopyablePhrases(_currentProjectId, _currentTaskId, descriptionForDisplay);
+            if (_isVariantMode)
+                System.Diagnostics.Debug.WriteLine("[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（類題 xlsx）");
+            else if (clipboardTargetDescription != null)
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（クリップボード対象）");
             else
                 System.Diagnostics.Debug.WriteLine($"[UpdateTaskDisplay] SetTextWithUnderlineを呼び出します（通常の問題文）");
@@ -2145,10 +2254,57 @@ namespace MOS_PowerPoint_app.Views
         {
             if (string.IsNullOrEmpty(description)) return description;
             if (description.IndexOf('"') >= 0) return description;
+            // 「A」「B」と入力 → "A"、"B"と入力（連続青下線で一塊に見えないよう読点を入れる）
             return Regex.Replace(
                 description,
                 @"(?:「([^」]*)」(?:、[^「]*?)?)+と入力",
-                m => Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\""));
+                m =>
+                {
+                    string quoted = Regex.Replace(m.Value, @"「([^」]*)」", "\"$1\"");
+                    return Regex.Replace(quoted, "\"\"", "\"、\"");
+                });
+        }
+
+        /// <summary>
+        /// 類題の明示コピー対象語句を半角 "…" にし、下線・青文字クリックコピー可能にする。
+        /// 「phrase」があれば置換し、なければ素の出現（例: 33.12）を囲む。
+        /// </summary>
+        private static string WrapVariantCopyablePhrases(int projectId, int taskId, string description)
+        {
+            if (string.IsNullOrEmpty(description))
+                return description;
+            if (!PowerPointVariantCopyTargets.TryGetPhrases(projectId, taskId, out string[] phrases))
+                return description;
+
+            foreach (string phrase in phrases)
+            {
+                if (string.IsNullOrEmpty(phrase))
+                    continue;
+
+                string asciiQuoted = "\"" + phrase + "\"";
+                if (description.IndexOf(asciiQuoted, StringComparison.Ordinal) >= 0)
+                    continue;
+
+                string japaneseQuoted = "「" + phrase + "」";
+                int japaneseIndex = description.IndexOf(japaneseQuoted, StringComparison.Ordinal);
+                if (japaneseIndex >= 0)
+                {
+                    description = description.Substring(0, japaneseIndex)
+                        + asciiQuoted
+                        + description.Substring(japaneseIndex + japaneseQuoted.Length);
+                    continue;
+                }
+
+                int bareIndex = description.IndexOf(phrase, StringComparison.Ordinal);
+                if (bareIndex >= 0)
+                {
+                    description = description.Substring(0, bareIndex)
+                        + asciiQuoted
+                        + description.Substring(bareIndex + phrase.Length);
+                }
+            }
+
+            return description;
         }
 
         /// <summary>
@@ -2646,7 +2802,15 @@ namespace MOS_PowerPoint_app.Views
             _lastTaskDestructiveBaselineConfirmed = false;
             try
             {
-                var flags = Libraries.PPTaskValidationConfig.GetExemptFlags(_currentProjectId, _currentTaskId);
+                if (_isVariantMode)
+                    Libraries.PPLogReader.WriteVariantSetNo(1);
+                else
+                    Libraries.PPLogReader.ClearVariantSetNo();
+
+                var flags = Libraries.PPVariantValidationConfig.ResolveExemptFlags(
+                    _isVariantMode ? 1 : 0,
+                    _currentProjectId,
+                    _currentTaskId);
                 if (_fromResultWindow)
                 {
                     EnsureRetryAttemptPrepared(_currentProjectId, _currentTaskId);
@@ -3190,74 +3354,30 @@ namespace MOS_PowerPoint_app.Views
         
         private void FlagButton_Click(object sender, RoutedEventArgs e)
         {
-            // 現在のプロジェクトの状態を取得または初期化
-            if (!_projectTaskFlaggedStates.ContainsKey(_currentProjectId))
-            {
-                int taskCount = _tasks != null ? _tasks.Count : 0;
-                int arraySize = Math.Max(taskCount, 1); // 配列は0始まりなので+1は不要
-                _projectTaskFlaggedStates[_currentProjectId] = new bool[arraySize];
-            }
-            
-            bool[] flaggedStates = _projectTaskFlaggedStates[_currentProjectId];
-            // タスクIDは1始まり、配列は0始まりなので -1
-            int arrayIndex = _currentTaskId - 1;
-            
-            if (arrayIndex >= 0 && arrayIndex < flaggedStates.Length)
-            {
-                System.Diagnostics.Debug.WriteLine($"FlagButton_Click: flaggedStates[{arrayIndex}]={flaggedStates[arrayIndex]}, _currentTaskId={_currentTaskId}");
-                
-                if (!flaggedStates[arrayIndex])
-                {
-                    // フラグを設定
-                    flaggedStates[arrayIndex] = true;
-                    System.Diagnostics.Debug.WriteLine($"タスク{_currentTaskId}のフラグを設定しました");
-                }
-                else
-                {
-                    // フラグを解除
-                    flaggedStates[arrayIndex] = false;
-                    System.Diagnostics.Debug.WriteLine($"タスク{_currentTaskId}のフラグを解除しました");
-                }
-            }
-            
-            // UIを更新
+            int minLength = Math.Max(_tasks != null ? _tasks.Count : 1, _currentTaskId);
+            PowerPointTaskReviewState.ToggleReviewLater(
+                _projectTaskCompletedStates,
+                _projectTaskFlaggedStates,
+                _currentProjectId,
+                _currentTaskId,
+                minLength);
+            if (_isVariantMode)
+                PowerPointTaskReviewStateStore.Persist();
             UpdateTaskDisplay();
         }
         
         
         private void CompleteButton_Click(object sender, RoutedEventArgs e)
         {
-            // 現在のプロジェクトの状態を取得または初期化
-            if (!_projectTaskCompletedStates.ContainsKey(_currentProjectId))
-            {
-                int taskCount = _tasks != null ? _tasks.Count : 0;
-                int arraySize = Math.Max(taskCount, 1); // 配列は0始まりなので+1は不要
-                _projectTaskCompletedStates[_currentProjectId] = new bool[arraySize];
-            }
-            
-            bool[] completedStates = _projectTaskCompletedStates[_currentProjectId];
-            // タスクIDは1始まり、配列は0始まりなので -1
-            int arrayIndex = _currentTaskId - 1;
-            
-            if (arrayIndex >= 0 && arrayIndex < completedStates.Length)
-            {
-                System.Diagnostics.Debug.WriteLine($"CompleteButton_Click: completedStates[{arrayIndex}]={completedStates[arrayIndex]}, _currentTaskId={_currentTaskId}");
-                
-                if (!completedStates[arrayIndex])
-                {
-                    // チェックマークを設定
-                    completedStates[arrayIndex] = true;
-                    System.Diagnostics.Debug.WriteLine($"タスク{_currentTaskId}のチェックマークを設定しました");
-                }
-                else
-                {
-                    // チェックマークを解除
-                    completedStates[arrayIndex] = false;
-                    System.Diagnostics.Debug.WriteLine($"タスク{_currentTaskId}のチェックマークを解除しました");
-                }
-            }
-            
-            // UIを更新
+            int minLength = Math.Max(_tasks != null ? _tasks.Count : 1, _currentTaskId);
+            PowerPointTaskReviewState.ToggleCompleted(
+                _projectTaskCompletedStates,
+                _projectTaskFlaggedStates,
+                _currentProjectId,
+                _currentTaskId,
+                minLength);
+            if (_isVariantMode)
+                PowerPointTaskReviewStateStore.Persist();
             UpdateTaskDisplay();
         }
         
@@ -3297,6 +3417,19 @@ namespace MOS_PowerPoint_app.Views
                         }
                     }
                     WriteCurrentTaskFile();
+
+                    if (_isVariantMode)
+                    {
+                        PowerPointTaskReviewStateStore.ClearProject(_currentProjectId);
+                    }
+                    else
+                    {
+                        int taskCount = _tasks != null ? _tasks.Count : 0;
+                        int arraySize = Math.Max(taskCount, 1);
+                        _localCompletedStates[_currentProjectId] = new bool[arraySize];
+                        _localFlaggedStates[_currentProjectId] = new bool[arraySize];
+                    }
+                    UpdateTaskDisplay();
                 }
             }
             catch (Exception ex)
@@ -3323,7 +3456,13 @@ namespace MOS_PowerPoint_app.Views
             var copySw = Stopwatch.StartNew();
             try
             {
-                MOS_PowerPoint_app.PowerPointProjectResetHelper.ResetProject(groupId, projectId);
+                if (_isVariantMode)
+                    MOS_PowerPoint_app.PowerPointProjectResetHelper.ResetVariantProject(
+                        groupId, projectId, PowerPointVariantScoring.DefaultVariantSetNo);
+                else
+                    MOS_PowerPoint_app.PowerPointProjectResetHelper.ResetProject(groupId, projectId);
+
+                // 証跡・attempt クリアは ResetProject / ResetVariantProject 側で実施済み
                 ResetPerfLog.Write("powerpoint", projectId, "copy", copySw.ElapsedMilliseconds, "main");
             }
             catch
@@ -3962,9 +4101,12 @@ namespace MOS_PowerPoint_app.Views
             return $"{projectId}-{taskId}";
         }
 
-        private static int GetCurrentTaskAttempt(int projectId, int taskId)
+        private int CurrentVariantSetNo =>
+            _isVariantMode ? PowerPointVariantScoring.DefaultVariantSetNo : 0;
+
+        private int GetCurrentTaskAttempt(int projectId, int taskId)
         {
-            return Libraries.PPTaskAttemptRegistry.GetAttempt(projectId, taskId);
+            return Libraries.PPTaskAttemptRegistry.GetAttempt(projectId, taskId, CurrentVariantSetNo);
         }
 
         private bool EnsureRetryAttemptPrepared(int projectId, int taskId)
@@ -3976,10 +4118,12 @@ namespace MOS_PowerPoint_app.Views
                 return true;
 
             int currentAttempt = GetCurrentTaskAttempt(projectId, taskId);
-            Libraries.PPTaskAttemptRegistry.SetAttempt(projectId, taskId, currentAttempt + 1);
+            Libraries.PPTaskAttemptRegistry.SetAttempt(
+                projectId, taskId, currentAttempt + 1, CurrentVariantSetNo);
             _retryTaskKeys.Add(key);
             _preparedRetryTaskKeys.Add(key);
-            System.Diagnostics.Debug.WriteLine($"[RetryAttempt] Started for {key}, attempt={GetCurrentTaskAttempt(projectId, taskId)}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[RetryAttempt] Started for {key} V{CurrentVariantSetNo}, attempt={GetCurrentTaskAttempt(projectId, taskId)}");
             return true;
         }
 

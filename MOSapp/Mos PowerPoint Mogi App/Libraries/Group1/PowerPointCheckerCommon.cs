@@ -415,6 +415,74 @@ namespace Libraries.Group1
             return c;
         }
 
+        /// <summary>MsoShapeType.mso3DModel (30) / Graphic (31)。</summary>
+        public static bool Is3DModelShapeTypeValue(int typeValue)
+        {
+            return typeValue == 30 || typeValue == 31;
+        }
+
+        /// <summary>
+        /// 直接の 3D 図形、またはプレースホルダー内に 3D を含む図形か。
+        /// AI 生成教材では 3D が Type=14 (Placeholder) のまま入ることがある。
+        /// </summary>
+        public static bool Is3DModelShape(PptShape sh)
+        {
+            if (sh == null) return false;
+            try
+            {
+                int st = (int)sh.Type;
+                if (Is3DModelShapeTypeValue(st))
+                    return true;
+            }
+            catch { }
+
+            try
+            {
+                if (sh.Type == MsoShapeType.msoPlaceholder)
+                {
+                    PlaceholderFormat pf = null;
+                    try
+                    {
+                        pf = sh.PlaceholderFormat;
+                        if (pf != null)
+                        {
+                            int contained = (int)pf.ContainedType;
+                            // 30/31=3D、28=msoGraphic（環境によって3Dがここになることがある）
+                            if (Is3DModelShapeTypeValue(contained) || contained == 28)
+                                return true;
+                        }
+                    }
+                    finally
+                    {
+                        if (pf != null) { try { Marshal.ReleaseComObject(pf); } catch { } }
+                    }
+
+                    // ContainedType が期待値でない AI 生成ファイル向け: 「模型」プレースホルダー
+                    try
+                    {
+                        string phName = sh.Name ?? "";
+                        if (phName.IndexOf("模型", StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            try
+            {
+                string name = sh.Name ?? "";
+                if (name.IndexOf("3D", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("３Ｄ", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("３D", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("3Ｄ", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+            catch { }
+
+            return false;
+        }
+
         /// <summary>
         /// スライド内の 3D モデル図形を検索する。
         /// </summary>
@@ -433,17 +501,11 @@ namespace Libraries.Group1
                     try
                     {
                         sh = shapes[i];
-                        try
-                        {
-                            var st = (MsoShapeType)sh.Type;
-                            if ((int)st == 31 || (int)st == 30) { PptShape r = sh; sh = null; return r; }
-                        }
-                        catch { }
-                        try
-                        {
-                            if (sh.Name != null && sh.Name.IndexOf("3D", StringComparison.OrdinalIgnoreCase) >= 0) { PptShape r = sh; sh = null; return r; }
-                        }
-                        catch { }
+                        if (!Is3DModelShape(sh))
+                            continue;
+                        PptShape r = sh;
+                        sh = null;
+                        return r;
                     }
                     finally
                     {
@@ -477,12 +539,8 @@ namespace Libraries.Group1
                     try
                     {
                         sh = shapes[i];
-                        try
-                        {
-                            var st = (MsoShapeType)sh.Type;
-                            if ((int)st != 31 && (int)st != 30) continue;
-                        }
-                        catch { continue; }
+                        if (!Is3DModelShape(sh))
+                            continue;
                         try
                         {
                             if (sh.Name != null && sh.Name.IndexOf(namePart, StringComparison.OrdinalIgnoreCase) >= 0)

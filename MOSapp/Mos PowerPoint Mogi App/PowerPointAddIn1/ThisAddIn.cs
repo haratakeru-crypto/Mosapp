@@ -87,6 +87,12 @@ namespace PowerPointAddIn1
         private bool _task4_3GlowWasOn;
         private Timer _layout10_7PollTimer;
         private bool _task10_7Logged;
+        /// <summary>類題セット1 / 1-3-1: 表スライドレイアウト適用の証跡。</summary>
+        private bool _taskV1_3_1Logged;
+        /// <summary>類題セット1 / 1-5-6: 表紙音声のスライド間再生／フェードイン証跡。</summary>
+        private bool _taskV1_5_6PlayAcrossLogged;
+        private bool _taskV1_5_6FadeInLogged;
+        private static readonly string VariantSetFilePath = Path.Combine(Path.GetTempPath(), "mos_ppt_variant_set.txt");
         private Timer _printOptionsPollTimer;
         /// <summary>6-5 / 6-6: 印刷設定がそろった直後の取りこぼしを減らす。既存の1秒確認と離脱前確認は残す。</summary>
         private Timer _task6PrintFastPollTimer;
@@ -188,6 +194,8 @@ namespace PowerPointAddIn1
 
             _task9_3PlayAcrossLogged = false;
             _task9_3FadeOutLogged = false;
+            _taskV1_5_6PlayAcrossLogged = false;
+            _taskV1_5_6FadeInLogged = false;
             _audio9_3PollTimer = new Timer();
             _audio9_3PollTimer.Interval = 1000;
             _audio9_3PollTimer.Tick += Audio9_3PollTimer_Tick;
@@ -205,6 +213,7 @@ namespace PowerPointAddIn1
             _task4_3GlowFastPollTimer.Start();
 
             _task10_7Logged = false;
+            _taskV1_3_1Logged = false;
             _layout10_7PollTimer = new Timer();
             _layout10_7PollTimer.Interval = 1500;
             _layout10_7PollTimer.Tick += Layout10_7PollTimer_Tick;
@@ -325,6 +334,12 @@ namespace PowerPointAddIn1
                 _currentSnapshotGen = snapshotGen;
                 if (!(projectId == 1 && taskId == 2)) _task1_2Logged = false;
                 if (!(projectId == 1 && taskId == 3)) _task1_3Logged = false;
+                if (!(projectId == 3 && taskId == 1)) _taskV1_3_1Logged = false;
+                if (!(projectId == 5 && taskId == 6))
+                {
+                    _taskV1_5_6PlayAcrossLogged = false;
+                    _taskV1_5_6FadeInLogged = false;
+                }
                 if (!(projectId == 1 && taskId == 4))
                 {
                     _task1_4Logged = false;
@@ -1021,7 +1036,7 @@ namespace PowerPointAddIn1
                 List<string> errors = CompareSnapshots(startSnapshot, currentStatus, exemptFlagsInt);
                 if (errors.Count > 0)
                 {
-                    AppendDestructiveErrors(projectId, taskId, attemptNo, errors);
+                    AppendDestructiveErrors(projectId, taskId, attemptNo, errors, ReadActiveVariantSetNo());
                     string errorMsg = string.Join(" | ", errors);
                     System.Diagnostics.Debug.WriteLine($"[DestructiveCheck] Task {projectId}-{taskId}-{attemptNo} FAILED: {errorMsg}");
                 }
@@ -1032,15 +1047,23 @@ namespace PowerPointAddIn1
             }
         }
 
-        /// <summary>PPLogReader.AppendDestructiveErrors と同一フォーマット（VSTO は Libraries 未参照のためローカル実装）。</summary>
-        private static void AppendDestructiveErrors(int projectId, int taskId, int attemptNo, List<string> errors)
+        /// <summary>
+        /// PPLogReader.AppendDestructiveErrors と同一フォーマット（VSTO は PPLogReader 未リンクのためローカル実装）。
+        /// 教材: P,T,A: / 類題: V{set},P,T,A:
+        /// </summary>
+        private static void AppendDestructiveErrors(
+            int projectId, int taskId, int attemptNo, List<string> errors, int variantSetNo = 0)
         {
             if (errors == null || errors.Count == 0) return;
             try
             {
                 string body = string.Join(" | ", errors.Where(e => !string.IsNullOrWhiteSpace(e)));
                 if (string.IsNullOrWhiteSpace(body)) return;
-                File.AppendAllText(DestructiveLogPath, $"{projectId},{taskId},{attemptNo}:{body}{Environment.NewLine}", Encoding.UTF8);
+                if (attemptNo < 1) attemptNo = 1;
+                string key = variantSetNo > 0
+                    ? "V" + variantSetNo + "," + projectId + "," + taskId + "," + attemptNo + ":"
+                    : projectId + "," + taskId + "," + attemptNo + ":";
+                File.AppendAllText(DestructiveLogPath, key + body + Environment.NewLine, Encoding.UTF8);
             }
             catch (Exception ex)
             {
@@ -1068,6 +1091,12 @@ namespace PowerPointAddIn1
 
 
         private void Layout10_7PollTimer_Tick(object sender, EventArgs e)
+        {
+            TryLogTask10_7LayoutDuplicateFromPoll();
+            TryLogTaskV1_3_1TableSlideLayout();
+        }
+
+        private void TryLogTask10_7LayoutDuplicateFromPoll()
         {
             if (_task10_7Logged) return;
             if (!IsCurrentTask(10, 7)) return;
@@ -1115,6 +1144,111 @@ namespace PowerPointAddIn1
                 finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// 類題セット1 / 1-3-1: いずれかのスライドの CustomLayout が「表スライド」なら証跡を残す。
+        /// テーマ変更後はレイアウト名が消えるため、適用時点（タスク3-1中）で確定する。
+        /// </summary>
+        /// <param name="requireCurrentTask">
+        /// true: ポーリング用（現在タスクが 3-1 のときだけ）。
+        /// false: 離脱／フラッシュ用（呼び出し側で 3-1 と判明しているとき）。
+        /// </param>
+        private void TryLogTaskV1_3_1TableSlideLayout(bool requireCurrentTask = true)
+        {
+            if (_taskV1_3_1Logged)
+            {
+                // プロジェクトリセットで証跡が消えたあとは、同じタスク上でも再記録できるようにする。
+                if (HasTaskV1_3_1EvidenceInLogFiles())
+                    return;
+                _taskV1_3_1Logged = false;
+            }
+            if (!IsVariantSetActive()) return;
+            if (requireCurrentTask && !IsCurrentTask(3, 1)) return;
+            try
+            {
+                if (Application == null || Application.Presentations == null) return;
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+                    PowerPoint.Slides slides = null;
+                    try
+                    {
+                        slides = pres.Slides;
+                        if (slides == null) return;
+                        for (int i = 1; i <= slides.Count; i++)
+                        {
+                            PowerPoint.Slide slide = null;
+                            try
+                            {
+                                slide = slides[i];
+                                if (slide == null) continue;
+                                PowerPoint.CustomLayout layout = null;
+                                try
+                                {
+                                    layout = slide.CustomLayout;
+                                    if (layout == null) continue;
+                                    string name = "";
+                                    try { name = layout.Name ?? ""; } catch { continue; }
+                                    if (!IsTableSlideLayoutName(name)) continue;
+                                    Logger.LogTaskV1_3_1TableSlideLayout();
+                                    _taskV1_3_1Logged = true;
+                                    return;
+                                }
+                                finally { if (layout != null) try { Marshal.ReleaseComObject(layout); } catch { } }
+                            }
+                            finally { if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { } }
+                        }
+                    }
+                    finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        private static bool IsTableSlideLayoutName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name.IndexOf("表スライド", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.IndexOf("テーブルスライド", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>リセット後に証跡が消えているかを見る（メモリ上の logged フラグ再同期用）。</summary>
+        private static bool HasTaskV1_3_1EvidenceInLogFiles()
+        {
+            const string marker = "[TaskV1-3-1] TableSlideLayout";
+            try
+            {
+                string evidencePath = Path.Combine(Path.GetTempPath(), "mos_ppt_task_evidence.txt");
+                if (FileContainsMarker(evidencePath, marker))
+                    return true;
+                string logPath = Logger.GetLogFilePath();
+                return FileContainsMarker(logPath, marker);
+            }
+            catch { return false; }
+        }
+
+        private static bool IsVariantSetActive()
+        {
+            return ReadActiveVariantSetNo() > 0;
+        }
+
+        /// <summary>%TEMP%\mos_ppt_variant_set.txt のセット番号。教材モードは 0。</summary>
+        private static int ReadActiveVariantSetNo()
+        {
+            try
+            {
+                if (!File.Exists(VariantSetFilePath)) return 0;
+                string text;
+                using (var fs = new FileStream(VariantSetFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    text = (sr.ReadToEnd() ?? string.Empty).Trim();
+                return int.TryParse(text, out int setNo) && setNo >= 1 ? setNo : 0;
+            }
+            catch { return 0; }
         }
 
         private void Task6PrintFastPollTimer_Tick(object sender, EventArgs e)
@@ -1313,6 +1447,10 @@ namespace PowerPointAddIn1
                 TryLogTask2_2TransitionDuration3SecOnTaskBoundary();
             else if (projectId == 2 && taskId == 3)
                 TryLogTask2_3SwitchRightOnTaskBoundary();
+            else if (projectId == 3 && taskId == 1)
+                TryLogTaskV1_3_1TableSlideLayout(requireCurrentTask: false);
+            else if (projectId == 5 && taskId == 6)
+                TryLogTaskV1_5_6AudioSettings(requireCurrentTask: false);
         }
 
         /// <summary>
@@ -1531,6 +1669,12 @@ namespace PowerPointAddIn1
 
         private void Audio9_3PollTimer_Tick(object sender, EventArgs e)
         {
+            TryLogTask9_3AudioFromPoll();
+            TryLogTaskV1_5_6AudioSettings();
+        }
+
+        private void TryLogTask9_3AudioFromPoll()
+        {
             if (_task9_3PlayAcrossLogged && _task9_3FadeOutLogged) return;
             if (!IsCurrentTask(9, 3)) return;
             try
@@ -1584,6 +1728,89 @@ namespace PowerPointAddIn1
                 finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
             }
             catch { }
+        }
+
+        /// <param name="requireCurrentTask">
+        /// true: ポーリング用（現在タスクが類題 5-6 のときだけ）。
+        /// false: 離脱／フラッシュ用。
+        /// </param>
+        private void TryLogTaskV1_5_6AudioSettings(bool requireCurrentTask = true)
+        {
+            if (_taskV1_5_6PlayAcrossLogged && _taskV1_5_6FadeInLogged)
+            {
+                if (HasTaskV1_5_6EvidenceInLogFiles())
+                    return;
+                _taskV1_5_6PlayAcrossLogged = false;
+                _taskV1_5_6FadeInLogged = false;
+            }
+            if (!IsVariantSetActive()) return;
+            if (requireCurrentTask && !IsCurrentTask(5, 6)) return;
+            try
+            {
+                if (Application == null || Application.Presentations == null) return;
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+                    PowerPoint.Slide slide = null;
+                    try
+                    {
+                        PowerPoint.Slides slides = pres.Slides;
+                        if (slides == null || slides.Count < 1) return;
+                        slide = slides[1];
+                        if (slide == null) return;
+                        PowerPoint.Shapes shapes = slide.Shapes;
+                        if (shapes == null) return;
+                        for (int i = 1; i <= shapes.Count; i++)
+                        {
+                            PowerPoint.Shape sh = null;
+                            try
+                            {
+                                sh = shapes[i];
+                                if (!PptAudioMediaHelper.TryIsSoundShape(sh))
+                                    continue;
+
+                                if (!_taskV1_5_6PlayAcrossLogged
+                                    && PptAudioMediaHelper.IsAudioPlayAcrossSlides(sh, pres))
+                                {
+                                    Logger.LogTaskV1_5_6PlayAcrossSlides();
+                                    _taskV1_5_6PlayAcrossLogged = true;
+                                }
+
+                                if (!_taskV1_5_6FadeInLogged
+                                    && PptAudioMediaHelper.IsAudioFadeInAbout4Seconds(sh))
+                                {
+                                    Logger.LogTaskV1_5_6FadeIn4000();
+                                    _taskV1_5_6FadeInLogged = true;
+                                }
+
+                                if (_taskV1_5_6PlayAcrossLogged && _taskV1_5_6FadeInLogged)
+                                    return;
+                            }
+                            finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
+                        }
+                    }
+                    finally { if (slide != null) try { Marshal.ReleaseComObject(slide); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch { }
+        }
+
+        private static bool HasTaskV1_5_6EvidenceInLogFiles()
+        {
+            try
+            {
+                string evidencePath = Path.Combine(Path.GetTempPath(), "mos_ppt_task_evidence.txt");
+                string logPath = Logger.GetLogFilePath();
+                bool play = FileContainsMarker(evidencePath, "[TaskV1-5-6] PlayAcrossSlides")
+                    || FileContainsMarker(logPath, "[TaskV1-5-6] PlayAcrossSlides");
+                bool fade = FileContainsMarker(evidencePath, "[TaskV1-5-6] FadeIn4000")
+                    || FileContainsMarker(logPath, "[TaskV1-5-6] FadeIn4000");
+                return play && fade;
+            }
+            catch { return false; }
         }
 
         private void Glow4_3PollTimer_Tick(object sender, EventArgs e)
