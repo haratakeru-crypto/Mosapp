@@ -60,7 +60,39 @@ namespace MOSExcelMogiApp
 
             ApplyExamineeTabState();
             MosPracticeClient.ExamineeStore.EnsureSessionWatch();
+            Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= MainWindow_Loaded;
+            // 起動スプラッシュ（Topmost）閉鎖後に確認を出す
+            Dispatcher.BeginInvoke(
+                new Action(TryPromptStartupReset),
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        private void TryPromptStartupReset()
+        {
+            if (!MosPracticeClient.StartupResetPrompt.Ask(this))
+                return;
+
+            if (_viewModel != null && _viewModel.IsBulkResetInProgress)
+                return;
+
+            var targets = _viewModel.GetBulkResetTargets(ExcelBulkResetScope.All);
+            if (targets.Count == 0)
+            {
+                MessageBox.Show(
+                    "リセット対象のプロジェクトが見つかりませんでした。",
+                    "エラー",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+
+            RunBulkReset(ExcelBulkResetScope.All, targets);
         }
 
         private void ApplyExamineeTabState()
