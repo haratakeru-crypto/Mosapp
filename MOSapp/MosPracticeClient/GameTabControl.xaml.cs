@@ -14,6 +14,10 @@ namespace MosPracticeClient
         public static readonly DependencyProperty SnipeUrlProperty =
             DependencyProperty.Register(nameof(SnipeUrl), typeof(string), typeof(GameTabControl), new PropertyMetadata(string.Empty));
 
+        public static readonly DependencyProperty FunctionSnipeUrlProperty =
+            DependencyProperty.Register(nameof(FunctionSnipeUrl), typeof(string), typeof(GameTabControl),
+                new PropertyMetadata(string.Empty, OnFunctionSnipeUrlChanged));
+
         public static readonly DependencyProperty ButtonBackgroundProperty =
             DependencyProperty.Register(nameof(ButtonBackground), typeof(Brush), typeof(GameTabControl),
                 new PropertyMetadata(new SolidColorBrush(Color.FromRgb(0x42, 0x42, 0x42))));
@@ -37,6 +41,13 @@ namespace MosPracticeClient
             set => SetValue(SnipeUrlProperty, value);
         }
 
+        /// <summary>関数スナイプの Web ゲーム URL。空ならボタンを出さない。</summary>
+        public string FunctionSnipeUrl
+        {
+            get => (string)GetValue(FunctionSnipeUrlProperty);
+            set => SetValue(FunctionSnipeUrlProperty, value);
+        }
+
         public Brush ButtonBackground
         {
             get => (Brush)GetValue(ButtonBackgroundProperty);
@@ -46,6 +57,17 @@ namespace MosPracticeClient
         void JudgeButton_Click(object sender, RoutedEventArgs e) => OpenGame(JudgeUrl, "5秒ジャッジ");
 
         void SnipeButton_Click(object sender, RoutedEventArgs e) => OpenGame(SnipeUrl, "5秒スナイプ");
+
+        void FunctionSnipeButton_Click(object sender, RoutedEventArgs e) => OpenGame(FunctionSnipeUrl, "関数スナイプ");
+
+        static void OnFunctionSnipeUrlChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var control = (GameTabControl)d;
+            if (control.FunctionSnipeButton == null) return;
+            control.FunctionSnipeButton.Visibility = string.IsNullOrWhiteSpace(e.NewValue as string)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
 
         void OpenGame(string url, string gameName)
         {

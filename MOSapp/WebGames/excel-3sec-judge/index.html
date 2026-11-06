@@ -134,7 +134,7 @@
     .card {
       width: 100%;
       height: 100%;
-      max-height: 420px;
+      max-height: 520px;
       background: var(--card-bg);
       border: 2px solid var(--card-border);
       border-radius: 20px;
@@ -160,22 +160,95 @@
       color: #58a6ff;
     }
 
+    .card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 0;
+      gap: 16px;
+    }
+
     .card-question {
-      font-size: clamp(17px, 4.8vw, 22px);
-      line-height: 1.55;
+      font-size: clamp(15px, 4.2vw, 20px);
+      line-height: 1.5;
       font-weight: 700;
       color: var(--text);
       text-align: center;
-      margin: auto 0;
+      overflow-y: auto;
+      min-height: 0;
     }
 
-    .card-hint {
-      text-align: center;
-      font-size: 12px;
-      color: var(--subtext);
+    .card-choices {
       display: flex;
-      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
     }
+
+    .choice-box {
+      flex: 1;
+      min-width: 0;
+      appearance: none;
+      font: inherit;
+      background: #0d1117;
+      border: 2px solid #30363d;
+      border-radius: 12px;
+      padding: 14px 8px;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .choice-box:active:not(:disabled) {
+      transform: scale(0.96);
+      filter: brightness(1.2);
+    }
+
+    .choice-box:disabled {
+      cursor: default;
+    }
+
+    .choice-box.left {
+      border-color: rgba(248, 81, 73, 0.45);
+    }
+
+    .choice-box.right {
+      border-color: rgba(46, 160, 67, 0.45);
+    }
+
+    .choice-box.picked-ok {
+      background: rgba(46, 160, 67, 0.22);
+      border-color: var(--pass-color);
+    }
+
+    .choice-box.picked-ng {
+      background: rgba(248, 81, 73, 0.22);
+      border-color: var(--hold-color);
+    }
+
+    .choice-box.dim {
+      opacity: 0.35;
+    }
+
+    .choice-dir {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--subtext);
+      margin-bottom: 4px;
+    }
+
+    .choice-label {
+      display: block;
+      font-size: clamp(13px, 3.6vw, 16px);
+      font-weight: 800;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .choice-box.left .choice-label { color: #ff7b72; }
+    .choice-box.right .choice-label { color: #7ee787; }
 
     /* スワイプ判定スタンプ */
     .badge-stamp {
@@ -203,54 +276,6 @@
       border-color: var(--hold-color);
       color: var(--hold-color);
       transform: rotate(-12deg);
-    }
-
-    /* 下部親指操作ボタン */
-    .action-controls {
-      display: flex;
-      gap: 12px;
-      width: 100%;
-      margin-bottom: 4px;
-    }
-
-    .btn-action {
-      flex: 1;
-      height: 60px;
-      border-radius: 14px;
-      border: none;
-      font-size: 15px;
-      font-weight: 800;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 0.08s ease, filter 0.15s ease;
-    }
-
-    .btn-action:active {
-      transform: scale(0.95);
-      filter: brightness(1.2);
-    }
-
-    .btn-hold {
-      background: #21262d;
-      color: #ff7b72;
-      border: 1.5px solid rgba(248, 81, 73, 0.4);
-    }
-
-    .btn-pass {
-      background: #21262d;
-      color: #7ee787;
-      border: 1.5px solid rgba(46, 160, 67, 0.4);
-    }
-
-    .btn-sub {
-      font-size: 11px;
-      opacity: 0.7;
-      font-weight: 500;
     }
 
     /* コンボ演出 */
@@ -491,23 +516,20 @@
         <div class="badge-stamp badge-hold" id="badge-hold">解けない ↩</div>
         <div class="badge-stamp badge-pass" id="badge-pass">解ける ↪</div>
         <div class="card-category" id="card-category">CATEGORY</div>
-        <div class="card-question" id="card-question">問題文がロードされます</div>
-        <div class="card-hint">
-          <span>👈 ← 解けない</span>
-          <span>解ける → 👉</span>
+        <div class="card-body">
+          <div class="card-question" id="card-question">問題文がロードされます</div>
+          <div class="card-choices">
+            <button type="button" class="choice-box left" id="btn-hold">
+              <span class="choice-dir">👈 ←</span>
+              <span class="choice-label">解けない</span>
+            </button>
+            <button type="button" class="choice-box right" id="btn-pass">
+              <span class="choice-dir">→ 👉</span>
+              <span class="choice-label">解ける</span>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-
-    <div class="action-controls">
-      <button class="btn-action btn-hold" id="btn-hold">
-        <span>👈 解けない</span>
-        <span class="btn-sub">← キー</span>
-      </button>
-      <button class="btn-action btn-pass" id="btn-pass">
-        <span>ぱっと解ける！ 👉</span>
-        <span class="btn-sub">→ キー</span>
-      </button>
     </div>
 
     <div id="combo-popup"></div>
@@ -885,6 +907,8 @@
       card.style.transition = 'transform 0.45s cubic-bezier(0.6, -0.28, 0.735, 0.045), opacity 0.45s';
       card.style.transform = 'translate(-120%, 70%) rotate(-30deg)';
       card.style.opacity = '0';
+      btnHold.classList.add('dim');
+      btnPass.classList.add('dim');
       badgeHold.style.opacity = '1';
       badgeHold.textContent = '💣 タイムアップ！もう一周';
 
@@ -913,12 +937,16 @@
         sound.playSlash();
         vibrate(25); // 即答の短振動
         solvable.push(question);
+        btnPass.classList.add('picked-ok');
+        btnHold.classList.add('dim');
         card.style.transform = 'translate(130%, -15%) rotate(22deg)';
         badgePass.style.opacity = '1';
       } else {
         sound.playWhoosh();
         vibrate(35); // 保留の短振動
         unsolvable.push(question);
+        btnHold.classList.add('picked-ng');
+        btnPass.classList.add('dim');
         card.style.transform = 'translate(-130%, -15%) rotate(-22deg)';
         badgeHold.style.opacity = '1';
       }
@@ -952,12 +980,20 @@
       }
     }
 
+    function resetChoiceStyles() {
+      [btnHold, btnPass].forEach((el) => {
+        el.classList.remove('picked-ok', 'picked-ng', 'dim');
+        el.disabled = false;
+      });
+    }
+
     function resetCardTransform() {
       card.style.transition = 'none';
       card.style.transform = 'translate(0px, 0px) rotate(0deg)';
       card.style.opacity = '1';
       badgePass.style.opacity = '0';
       badgeHold.style.opacity = '0';
+      resetChoiceStyles();
     }
 
     function questionOrder(a, b) {
@@ -1042,6 +1078,7 @@
 
     function handlePointerDown(e) {
       if (isProcessing || !isPlaying) return;
+      if (e.target.closest('button')) return;
       isDragging = true;
       startX = e.clientX;
       currentX = 0;
