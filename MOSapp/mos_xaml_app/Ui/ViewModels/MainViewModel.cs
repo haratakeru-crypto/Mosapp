@@ -335,17 +335,17 @@ namespace Ui.ViewModels
         /// <summary>単語帳中は採点ボタンを出さない。</summary>
         public bool ShowScoreButtonEffective => ShowScoreButton && !IsVocabularyMode;
 
-        /// <summary>通常教材は紙芝居手順、類題第1回はテキスト手順を出す。</summary>
+        /// <summary>通常教材は紙芝居手順、類題第1回はテキスト手順を出す。どちらもプロジェクト選択のオン/オフに従う。</summary>
         public bool ShowAnswerGuideEffective
         {
             get
             {
                 if (IsVocabularyMode)
                     return false;
-                if (IsVariantMode)
-                    return VariantSetNo == 1;
                 if (!ShowAnswerGuide)
                     return false;
+                if (IsVariantMode)
+                    return VariantSetNo == 1;
                 if (!TryGetCurrentGroupProjectId(out int groupId, out _))
                     return false;
                 return groupId == 1;

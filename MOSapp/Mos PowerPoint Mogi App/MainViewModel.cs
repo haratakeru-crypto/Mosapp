@@ -112,15 +112,15 @@ namespace MOS_PowerPoint_app
             }
         }
 
-        /// <summary>通常教材は紙芝居手順、類題はテキスト手順を出す。</summary>
+        /// <summary>通常教材は紙芝居手順、類題はテキスト手順を出す。どちらもプロジェクト選択のオン/オフに従う。</summary>
         public bool ShowAnswerGuideEffective
         {
             get
             {
-                if (IsVariantMode)
-                    return true;
                 if (!ShowAnswerGuide)
                     return false;
+                if (IsVariantMode)
+                    return true;
                 return CurrentProject == null || CurrentProject.GroupId == 1;
             }
         }
