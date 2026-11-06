@@ -244,7 +244,7 @@
                                           SettingsRequested="VocabularyTab_SettingsRequested"/>
             </TabItem>
             <TabItem Header="ゲーム">
-                <mos:GameTabControl JudgeUrl="https://mos-excel-3sec-judge.netlify.app/" SnipeUrl="https://mos-excel-3sec-snipe.netlify.app/">
+                <mos:GameTabControl JudgeUrl="https://mos-excel-3sec-judge.netlify.app/" SnipeUrl="https://mos-excel-3sec-snipe.netlify.app/" FunctionSnipeUrl="https://mos-excel-3sec-snipe.netlify.app/?mode=function">
                     <mos:GameTabControl.ButtonBackground>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                             <GradientStop Color="#028760" Offset="0"/>

@@ -515,8 +515,8 @@
 
     <div class="overlay-screen" id="start-screen">
       <div class="overlay-subtitle" id="start-subtitle">5秒で正解を見抜く！</div>
-      <div class="overlay-title">5秒スナイプ！ Excel</div>
-      <p class="overlay-desc">
+      <div class="overlay-title" id="start-title">5秒スナイプ！ Excel</div>
+      <p class="overlay-desc" id="start-desc">
         MOS Excel の問題文を読んで、最初に押すタブ／ボタンを選べ。<br><br>
         ⏱ <b>1問の猶予はたったの5秒</b><br>
         問題の中の2択から正解をスナイプせよ。<br>
@@ -570,6 +570,30 @@
     const ROUND_BANNER_MS = 1400;
     const FEEDBACK_MS = 400;
     const timeLimit = 5000;
+    const FUNCTION_NAMES = new Set([
+      "AVERAGE", "CONCAT", "COUNT", "COUNTA", "COUNTBLANK", "IF", "LEFT",
+      "MAX", "MIN", "RANDBETWEEN", "RIGHT", "SEQUENCE", "SORT", "SUM", "UNIQUE"
+    ]);
+
+    function isFunctionQuestion(q) {
+      const match = /^［([A-Z][A-Z0-9]*)］$/.exec(q.correct || "");
+      return !!match && FUNCTION_NAMES.has(match[1]);
+    }
+
+    const FUNCTION_MODE = new URLSearchParams(location.search).get("mode") === "function";
+    const ACTIVE_QUESTIONS = QUESTIONS.filter((q) => isFunctionQuestion(q) === FUNCTION_MODE);
+
+    if (FUNCTION_MODE) {
+      document.title = "関数スナイプ！ Excel";
+      document.getElementById("start-subtitle").textContent = "5秒で関数を見抜く！";
+      document.getElementById("start-title").textContent = "関数スナイプ！ Excel";
+      document.getElementById("start-desc").innerHTML =
+        "MOS Excel の問題文を読んで、使う関数を選べ。<br><br>" +
+        "⏱ <b>1問の猶予はたったの5秒</b><br>" +
+        "2つの関数から正解をスナイプせよ。<br>" +
+        "<b>1周は10問</b>。外した問題は残り、正解した分だけ新しい問題が入る。<br>" +
+        "全部当てたらクリア。";
+    }
 
     function vibrate(pattern) {
       if ('vibrate' in navigator) {
@@ -792,7 +816,7 @@
 
     function startGame() {
       round = 1;
-      pool = shuffle(QUESTIONS);
+      pool = shuffle(ACTIVE_QUESTIONS);
       nextRoundQueue = [];
       roundQueue = takeCards([], ROUND_SIZE);
       roundIndex = 0;
@@ -1058,14 +1082,14 @@
       document.getElementById('stat-timeout').textContent = totalTimeouts;
       document.getElementById('stat-max-combo').textContent = maxCombo;
       document.getElementById('result-comparison').innerHTML =
-        `全 ${QUESTIONS.length} 問を <b>${round} 周</b>・<b>${totalElapsedSeconds} 秒</b> でスナイプ完了！`;
+        `全 ${ACTIVE_QUESTIONS.length} 問を <b>${round} 周</b>・<b>${totalElapsedSeconds} 秒</b> でスナイプ完了！`;
 
-      const missed = QUESTIONS
+      const missed = ACTIVE_QUESTIONS
         .filter(q => wrongCounts.has(q.id))
         .sort((a, b) => wrongCounts.get(b.id) - wrongCounts.get(a.id) || questionOrder(a, b));
       renderList(document.getElementById('list-wrong'), missed, q => wrongCounts.get(q.id));
 
-      const timedOut = QUESTIONS
+      const timedOut = ACTIVE_QUESTIONS
         .filter(q => timeoutCounts.has(q.id))
         .sort((a, b) => timeoutCounts.get(b.id) - timeoutCounts.get(a.id) || questionOrder(a, b));
       renderList(document.getElementById('list-timeout'), timedOut, q => timeoutCounts.get(q.id));

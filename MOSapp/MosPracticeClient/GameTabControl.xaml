@@ -53,6 +53,13 @@
                     <Run Text="5秒ジャッジ！" FontSize="26"/>
                 </TextBlock>
             </Button>
+            <Button x:Name="FunctionSnipeButton" Style="{StaticResource GameButtonStyle}" Click="FunctionSnipeButton_Click" Visibility="Collapsed">
+                <TextBlock TextAlignment="Center" TextWrapping="Wrap">
+                    <Run Text="5秒で関数を見抜く！" FontSize="16" FontWeight="Medium"/>
+                    <LineBreak/>
+                    <Run Text="関数スナイプ！" FontSize="26"/>
+                </TextBlock>
+            </Button>
         </StackPanel>
     </Grid>
 </UserControl>
