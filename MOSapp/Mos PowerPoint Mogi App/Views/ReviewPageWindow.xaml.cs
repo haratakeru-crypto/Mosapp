@@ -43,8 +43,8 @@ namespace MOS_PowerPoint_app.Views
             _projectTaskViewedStates = viewedStates ?? new Dictionary<int, bool[]>();
             _groupId = groupId;
             _isVariantMode = isVariantMode;
-            if (_isVariantMode && ShowResultButton != null)
-                ShowResultButton.Visibility = Visibility.Collapsed;
+            if (ShowResultButton != null)
+                ShowResultButton.Visibility = Visibility.Visible;
 
             LoadAllProjects();
             InitializeTimer();
@@ -318,6 +318,25 @@ namespace MOS_PowerPoint_app.Views
             {
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Duplicate scoring request ignored.");
                 return;
+            }
+
+            if (PowerPointTaskReviewState.RequiresDispositionBeforeScoring(_isVariantMode))
+            {
+                var allTasks = GetAvailableProjectIds()
+                    .SelectMany(pid => VariantProblemWorkbook.GetTasks(pid)
+                        .Select(t => (ProjectId: pid, TaskId: t.TaskId)));
+                var unmarked = PowerPointTaskReviewState.FindUnmarked(
+                    allTasks, _projectTaskCompletedStates, _projectTaskFlaggedStates);
+                if (unmarked.Count > 0)
+                {
+                    var confirm = MessageBox.Show(
+                        PowerPointTaskReviewState.FormatUnmarkedMessage(unmarked),
+                        "確認",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (confirm != MessageBoxResult.Yes)
+                        return;
+                }
             }
 
             IReadOnlyCollection<int> selectedIds = null;

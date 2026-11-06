@@ -59,6 +59,63 @@
                            Foreground="#1E40AF" 
                            HorizontalAlignment="Center"
                            Margin="0,0,0,30"/>
+
+                <StackPanel x:Name="TotalScorePanel"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,24"
+                            Visibility="Collapsed">
+                    <TextBlock x:Name="TotalScoreLabel"
+                               Text="総合点"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="#374151"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TotalScoreTextBlock"
+                               Text=""
+                               FontSize="48"
+                               FontWeight="Bold"
+                               Foreground="#1E40AF"
+                               HorizontalAlignment="Center"/>
+                    <Border x:Name="PassingRangeBadge"
+                            Background="#059669"
+                            CornerRadius="6"
+                            Padding="16,6"
+                            Margin="0,8,0,0"
+                            HorizontalAlignment="Center"
+                            Visibility="Collapsed">
+                        <TextBlock Text="合格圏内"
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="White"/>
+                    </Border>
+                    <TextBlock x:Name="LostPointsTextBlock"
+                               Text=""
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="#B91C1C"
+                               HorizontalAlignment="Center"
+                               Margin="0,10,0,0"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               MaxWidth="520"
+                               Visibility="Collapsed"/>
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,10,0,0">
+                        <Border Background="#1E40AF" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                            <TextBlock Text="優先" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <TextBlock Text=" → " FontSize="14" Foreground="#6B7280" VerticalAlignment="Center"/>
+                        <Border Background="#D97706" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                            <TextBlock Text="次点" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <TextBlock Text="の順で、解けるようになりましょう"
+                                   FontSize="14"
+                                   Foreground="#6B7280"
+                                   VerticalAlignment="Center"
+                                   Margin="6,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
                 
                 <!-- 統計情報 -->
                 <Border Background="White" CornerRadius="8" Padding="30" Margin="0,0,0,20">
@@ -176,21 +233,68 @@
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
                                         
-                                        <!-- テーブルヘッダー -->
-                                        <Border Grid.Row="0" Background="#F8FAFC" 
+                                        <!-- テーブルヘッダー（類題時のみ 解答済み／あとで見直す） -->
+                                        <Border Grid.Row="0" Background="#F8FAFC"
                                                 BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShowDispositionColumns, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="160"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="プロジェクト番号・タスク番号"
+                                                           FontSize="19" FontWeight="Bold"
+                                                           Foreground="#374151" Padding="15,10"/>
+                                                <TextBlock Grid.Column="1" Text="解答済み"
+                                                           FontSize="19" FontWeight="Bold"
+                                                           Foreground="#374151" Padding="15,10"
+                                                           HorizontalAlignment="Center" MinWidth="120"/>
+                                                <TextBlock Grid.Column="2" Text="あとで見直す"
+                                                           FontSize="19" FontWeight="Bold"
+                                                           Foreground="#374151" Padding="15,10"
+                                                           HorizontalAlignment="Center" MinWidth="120"/>
+                                                <TextBlock Grid.Column="3" Text="結果"
+                                                           FontSize="19" FontWeight="Bold"
+                                                           Foreground="#374151" Padding="15,10"
+                                                           HorizontalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- 教材用ヘッダー（類題以外） -->
+                                        <Border Grid.Row="0" Background="#F8FAFC"
+                                                BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShowDispositionColumns, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="120"/>
                                                 </Grid.ColumnDefinitions>
-                                                
-                                                <TextBlock Grid.Column="0" Text="プロジェクト番号・タスク番号" 
-                                                           FontSize="19" FontWeight="Bold" 
+                                                <TextBlock Grid.Column="0" Text="プロジェクト番号・タスク番号"
+                                                           FontSize="19" FontWeight="Bold"
                                                            Foreground="#374151" Padding="15,10"/>
-                                                <TextBlock Grid.Column="1" Text="結果" 
-                                                           FontSize="19" FontWeight="Bold" 
-                                                           Foreground="#374151" Padding="15,10" 
+                                                <TextBlock Grid.Column="1" Text="結果"
+                                                           FontSize="19" FontWeight="Bold"
+                                                           Foreground="#374151" Padding="15,10"
                                                            HorizontalAlignment="Center"/>
                                             </Grid>
                                         </Border>
@@ -201,35 +305,122 @@
                                                 <DataTemplate>
                                                     <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1"
                                                             MouseDown="TaskRow_MouseDown"
-                                                            Cursor="Hand"
-                                                            Background="Transparent">
+                                                            Cursor="Hand">
                                                         <Border.Style>
                                                             <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="Transparent"/>
                                                                 <Style.Triggers>
                                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter Property="Background" Value="#F3F4F6"/>
+                                                                        <Setter Property="Background" Value="#E0F2FE"/>
                                                                     </Trigger>
+                                                                    <DataTrigger Binding="{Binding IsCompletedAndWrong}" Value="True">
+                                                                        <Setter Property="Background" Value="#FECACA"/>
+                                                                        <Setter Property="BorderBrush" Value="#F87171"/>
+                                                                        <Setter Property="BorderThickness" Value="4,0,0,1"/>
+                                                                    </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </Border.Style>
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*"/>
-                                                                <ColumnDefinition Width="120"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="160"/>
                                                             </Grid.ColumnDefinitions>
                                                             
                                                             <!-- タスク情報 -->
                                                             <StackPanel Grid.Column="0" Margin="15,10">
-                                                                <TextBlock Text="{Binding TaskTitle}" 
-                                                                           FontSize="19" FontWeight="SemiBold" 
-                                                                           Foreground="#374151" Margin="0,0,0,4"/>
+                                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                                    <TextBlock Text="{Binding TaskTitle}" 
+                                                                               FontSize="19" FontWeight="SemiBold" 
+                                                                               Foreground="#374151"
+                                                                               VerticalAlignment="Center"
+                                                                               TextWrapping="Wrap"/>
+                                                                    <Border Margin="10,0,0,0"
+                                                                            CornerRadius="4"
+                                                                            Padding="8,2"
+                                                                            VerticalAlignment="Center"
+                                                                            Background="{Binding PriorityBadgeBackground}">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding HasPriorityBadge}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="{Binding PriorityBadgeText}"
+                                                                                   FontSize="13"
+                                                                                   FontWeight="Bold"
+                                                                                   Foreground="{Binding PriorityBadgeForeground}"/>
+                                                                    </Border>
+                                                                </StackPanel>
                                                                 <TextBlock Text="{Binding Description}" 
                                                                            FontSize="17" Foreground="#6B7280" 
                                                                            TextWrapping="Wrap" LineHeight="21"/>
                                                             </StackPanel>
+
+                                                            <Grid Grid.Column="1" VerticalAlignment="Center" MinWidth="120">
+                                                                <Grid.Style>
+                                                                    <Style TargetType="Grid">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding ShowDispositionColumns}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Grid.Style>
+                                                                <TextBlock Text="✓"
+                                                                           FontSize="20"
+                                                                           Foreground="#10B981"
+                                                                           FontWeight="Bold"
+                                                                           HorizontalAlignment="Center">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Grid>
+
+                                                            <Grid Grid.Column="2" VerticalAlignment="Center" MinWidth="120">
+                                                                <Grid.Style>
+                                                                    <Style TargetType="Grid">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding ShowDispositionColumns}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Grid.Style>
+                                                                <TextBlock Text="🚩"
+                                                                           FontSize="20"
+                                                                           HorizontalAlignment="Center">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsFlagged}" Value="True">
+                                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Grid>
                                                             
-                                                            <!-- 結果列（✖のみ） -->
-                                                            <Grid Grid.Column="1" VerticalAlignment="Center">
+                                                            <!-- 結果列 -->
+                                                            <Grid Grid.Column="3" VerticalAlignment="Center">
                                                                 <TextBlock Text="{Binding ResultMark}" 
                                                                            FontSize="24" 
                                                                            FontWeight="Bold"

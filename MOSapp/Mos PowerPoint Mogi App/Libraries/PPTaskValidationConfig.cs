@@ -309,6 +309,9 @@ namespace Libraries
         /// <summary>スライド挿入によりスナップショット番号と現在番号の対応付けが必要か。</summary>
         public static bool UsesSlideIndexMapping(int projectId, int taskId)
         {
+            // 類題は教材 P1 の挿入マッピングを使わない
+            if (PPVariantValidationConfig.IsVariantActive())
+                return false;
             return projectId == 1 && (taskId == 1 || taskId == 8);
         }
 
@@ -327,6 +330,9 @@ namespace Libraries
         /// <summary>スライド枚数がタスク操作として許容されるか。</summary>
         public static bool IsSlidesCountValidForTask(int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
         {
+            if (PPVariantValidationConfig.IsVariantActive())
+                return currentSlidesCount == snapshotSlidesCount;
+
             if (projectId == 1 && (taskId == 1 || taskId == 8))
             {
                 if (taskId == 1)
@@ -391,6 +397,9 @@ namespace Libraries
         {
             snapshotSlideIndex = currentSlideIndex;
             isInsertedSlide = false;
+            if (PPVariantValidationConfig.IsVariantActive())
+                return true;
+
             if (projectId == 1 && taskId == 1)
             {
                 if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
@@ -443,6 +452,9 @@ namespace Libraries
             int snapshotSlidesCount,
             int currentSlidesCount)
         {
+            if (PPVariantValidationConfig.IsVariantActive())
+                return snapshotSlideIndex;
+
             if (projectId == 1 && taskId == 1)
             {
                 if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
@@ -465,12 +477,16 @@ namespace Libraries
         /// <summary>ShapePosition 免除をスライド単位で適用するタスクか。</summary>
         public static bool UsesPerSlideShapePositionExempt(int projectId, int taskId)
         {
+            if (PPVariantValidationConfig.IsVariantActive())
+                return false;
             return projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8);
         }
 
         /// <summary>指定スライドで ShapePosition チェックを免除するか。</summary>
         public static bool IsShapePositionExemptForSlide(int projectId, int taskId, int slideIndex)
         {
+            if (PPVariantValidationConfig.IsVariantActive())
+                return false;
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex);
             if (projectId == 1 && taskId == 3)
@@ -483,6 +499,8 @@ namespace Libraries
         /// <summary>対象スライドはレイアウト/挿入でアニメーションが変わるため AnimationRemoved を緩和する。</summary>
         public static bool IsAnimationRemovedCheckExemptForSlide(int projectId, int taskId, int slideIndex)
         {
+            if (PPVariantValidationConfig.IsVariantActive())
+                return false;
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex);
             if (projectId == 1 && taskId == 3)
@@ -499,6 +517,10 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedShapesCountDelta(int projectId, int taskId, int slideIndex)
         {
+            int variantSetNo = PPVariantValidationConfig.ActiveVariantSetNo();
+            if (variantSetNo > 0)
+                return PPVariantValidationConfig.GetAllowedShapesCountDelta(variantSetNo, projectId, taskId, slideIndex);
+
             // 厳格に図形数の増減を管理するタスク
             // 目的のスライド以外からの呼び出しに対しては「0（増減禁止）」を返すことで、他スライドへの変更をブロックします。
             if (projectId == 3 && taskId == 1) return slideIndex == 7 ? 0 : 0; // P3-1 SmartArt挿入
@@ -576,6 +598,10 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
+            int variantSetNo = PPVariantValidationConfig.ActiveVariantSetNo();
+            if (variantSetNo > 0)
+                return PPVariantValidationConfig.GetAllowedTextLengthDelta(variantSetNo, projectId, taskId, slideIndex);
+
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 3)
