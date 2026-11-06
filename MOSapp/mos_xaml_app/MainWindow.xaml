@@ -36,12 +36,13 @@
                           Margin="0,0,15,0"
                           VerticalAlignment="Center"
                           FontSize="14"/>
-                <!-- 類題ボタンの表示 -->
+                <!-- 類題ボタンの表示（ホームでは非表示。既定はオフのまま） -->
                 <CheckBox Content="類題ボタンの表示"
                           IsChecked="{Binding ShowVariantButton, Mode=TwoWay}"
                           Margin="0,0,15,0"
                           VerticalAlignment="Center"
-                          FontSize="14"/>
+                          FontSize="14"
+                          Visibility="Collapsed"/>
                 <!-- 解答手順ガイドの表示 -->
                 <CheckBox Content="解答手順ガイドの表示"
                           IsChecked="{Binding ShowAnswerGuide, Mode=TwoWay}"

@@ -10,11 +10,11 @@ none
 false
 DEBUG;TRACE
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\App.xaml
-8600928747
-71327478124
-27-418145390
-341908221376
-MainWindow.xaml;Views\PreparingWindow.xaml;Views\UiTestAppBarWindow.xaml;Views\ResultWindow.xaml;Views\PasswordWindow.xaml;Views\ReviewPageWindow.xaml;Views\SubjectSelectionWindow.xaml;Views\ScoreResultWindow.xaml;
+11-2138405207
+4411437648601
+42-52450038
+414478582
+MainWindow.xaml;Views\BulkResetScopeDialog.xaml;Views\PreparingWindow.xaml;Views\AnswerGuideWindow.xaml;Views\AnswerStepsWindow.xaml;Views\UiTestAppBarWindow.xaml;Views\ResultWindow.xaml;Views\PasswordWindow.xaml;Views\ReviewPageWindow.xaml;Views\SubjectSelectionWindow.xaml;Views\ScoreResultWindow.xaml;
 
 True
 

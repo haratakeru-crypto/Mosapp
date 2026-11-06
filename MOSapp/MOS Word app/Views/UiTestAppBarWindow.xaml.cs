@@ -784,10 +784,11 @@ namespace MOS_Word_app.Views
         
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isScoreResultOpen)
+            if (_isScoreResultOpen || _isScoring)
                 return;
-            if (_viewModel?.IsNavigationLocked == true)
+            if (_viewModel?.IsBulkResetInProgress == true)
                 return;
+            CloseAnswerGuide();
             var owner = Application.Current.MainWindow;
             var result = owner != null
                 ? MessageBox.Show(owner, "アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question)
@@ -795,7 +796,6 @@ namespace MOS_Word_app.Views
             if (result != MessageBoxResult.Yes)
                 return;
             MOS_Word_app.Views.WordStartupInputGate.End();
-            CloseAnswerGuide();
             _timer?.Stop();
             SaveAllWordDocumentsAndQuitWord();
             this.Close();
@@ -803,9 +803,9 @@ namespace MOS_Word_app.Views
         
         private async void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_isScoreResultOpen)
+            if (_isScoreResultOpen || _isScoring)
                 return;
-            if (_viewModel?.IsNavigationLocked == true)
+            if (_viewModel?.IsBulkResetInProgress == true)
                 return;
             CloseAnswerGuide();
             try
@@ -3144,21 +3144,6 @@ namespace MOS_Word_app.Views
         private void BeginProjectWorkSession()
         {
             _answerGuideUserDismissed = false;
-            Dispatcher.BeginInvoke(
-                new Action(TryAutoOpenAnswerGuide),
-                DispatcherPriority.ApplicationIdle);
-        }
-
-        private void TryAutoOpenAnswerGuide()
-        {
-            if (_answerGuideUserDismissed)
-                return;
-            if (_isScoring || _isScoreResultOpen)
-                return;
-            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
-                return;
-
-            OpenAnswerGuideOrSteps();
         }
 
         private void OpenAnswerGuideOrSteps()
@@ -3334,15 +3319,16 @@ namespace MOS_Word_app.Views
         {
             bool scoringBusy = _isScoring || _isScoreResultOpen;
             bool navigationEnabled = !scoringBusy && !(_viewModel?.IsNavigationLocked ?? false);
+            bool reviewAndEndEnabled = !scoringBusy && !(_viewModel?.IsBulkResetInProgress ?? false);
 
             if (ReviewPageButton != null)
-                ReviewPageButton.IsEnabled = navigationEnabled;
+                ReviewPageButton.IsEnabled = reviewAndEndEnabled;
             if (ResetButton != null)
                 ResetButton.IsEnabled = navigationEnabled;
             if (NextProjectButton != null)
                 NextProjectButton.IsEnabled = navigationEnabled;
             if (CloseExamButton != null)
-                CloseExamButton.IsEnabled = navigationEnabled;
+                CloseExamButton.IsEnabled = reviewAndEndEnabled;
             if (AnswerGuideButton != null)
                 AnswerGuideButton.IsEnabled = !scoringBusy;
         }

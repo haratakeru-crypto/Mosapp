@@ -1576,11 +1576,12 @@ namespace MOSExcelMogiApp
         
         private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel != null && _viewModel.IsNavigationLocked)
+            if (_viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen || _viewModel.IsBulkResetInProgress))
                 return;
             if (_isOpeningReviewPage)
                 return;
 
+            CloseAnswerGuide();
             _isOpeningReviewPage = true;
             try
             {
@@ -1969,8 +1970,9 @@ namespace MOSExcelMogiApp
 
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel != null && _viewModel.IsNavigationLocked)
+            if (_viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen || _viewModel.IsBulkResetInProgress))
                 return;
+            CloseAnswerGuide();
             // モーダル確認中も DispatcherTimer は進むため、先に止めないと Timer_Tick から試験終了が走り Excel が先に閉じることがある
             bool timerWasEnabled = _timer != null && _timer.IsEnabled;
             if (timerWasEnabled)
@@ -1979,7 +1981,6 @@ namespace MOSExcelMogiApp
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
             {
-                CloseAnswerGuide();
                 _viewModel.EndExamCommand.Execute(null);
                 return;
             }
@@ -2016,21 +2017,6 @@ namespace MOSExcelMogiApp
         private void BeginProjectWorkSession()
         {
             _answerGuideUserDismissed = false;
-            Dispatcher.BeginInvoke(
-                new Action(TryAutoOpenAnswerGuide),
-                DispatcherPriority.ApplicationIdle);
-        }
-
-        private void TryAutoOpenAnswerGuide()
-        {
-            if (_answerGuideUserDismissed)
-                return;
-            if (_viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen))
-                return;
-            if (!(_viewModel?.ShowAnswerGuideEffective ?? false))
-                return;
-
-            OpenAnswerGuideOrSteps();
         }
 
         private void OpenAnswerGuideOrSteps()
@@ -2387,13 +2373,14 @@ namespace MOSExcelMogiApp
         {
             bool navigationEnabled = _viewModel == null || !_viewModel.IsNavigationLocked;
             bool scoringBusy = _viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen);
+            bool reviewAndEndEnabled = !scoringBusy && !(_viewModel?.IsBulkResetInProgress ?? false);
 
             if (ReviewPageButton != null)
-                ReviewPageButton.IsEnabled = navigationEnabled;
+                ReviewPageButton.IsEnabled = reviewAndEndEnabled;
             if (ProjectResetButton != null)
                 ProjectResetButton.IsEnabled = navigationEnabled;
             if (EndButton != null)
-                EndButton.IsEnabled = navigationEnabled;
+                EndButton.IsEnabled = reviewAndEndEnabled;
             if (AnswerGuideButton != null)
                 AnswerGuideButton.IsEnabled = !scoringBusy;
 
