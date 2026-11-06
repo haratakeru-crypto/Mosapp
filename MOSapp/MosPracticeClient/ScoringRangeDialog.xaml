@@ -15,7 +15,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0"
@@ -23,7 +22,7 @@
                    FontSize="14" Foreground="#374151" TextWrapping="Wrap"
                    Margin="0,0,0,16"/>
 
-        <StackPanel Grid.Row="1">
+        <StackPanel Grid.Row="1" x:Name="RangeOptionsPanel">
             <RadioButton x:Name="Range1To3" Content="プロジェクト1～3" GroupName="ScoringRange"
                          Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
             <RadioButton x:Name="Range4To6" Content="プロジェクト4～6" GroupName="ScoringRange"
@@ -31,23 +30,28 @@
             <RadioButton x:Name="Range7To8" Content="プロジェクト7・8" GroupName="ScoringRange"
                          Margin="0,0,0,8" FontSize="14" Visibility="Collapsed" Checked="RangeOption_Changed"/>
             <RadioButton x:Name="Range7To9" Content="プロジェクト7～9" GroupName="ScoringRange"
+                         Margin="0,0,0,8" FontSize="14" Visibility="Collapsed" Checked="RangeOption_Changed"/>
+            <StackPanel x:Name="CustomOptionBlock">
+                <RadioButton x:Name="RangeCustom" Content="カスタム" GroupName="ScoringRange"
+                             Margin="0,0,0,8" FontSize="14" IsChecked="True" Checked="RangeOption_Changed"/>
+                <ScrollViewer x:Name="CustomScroll"
+                              Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto"
+                              Margin="20,0,0,8">
+                    <WrapPanel x:Name="CustomCheckPanel"/>
+                </ScrollViewer>
+            </StackPanel>
+            <RadioButton x:Name="Range1To7" Content="プロジェクト1～7" GroupName="ScoringRange"
+                         Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
+            <RadioButton x:Name="Range1To8" Content="プロジェクト1～8" GroupName="ScoringRange"
                          Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
             <RadioButton x:Name="Range1To9" Content="プロジェクト1～9" GroupName="ScoringRange"
                          Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
             <RadioButton x:Name="RangeAll" Content="すべてのプロジェクト" GroupName="ScoringRange"
-                         Margin="0,0,0,8" FontSize="14" IsChecked="True" Checked="RangeOption_Changed"/>
-            <RadioButton x:Name="RangeCustom" Content="カスタム" GroupName="ScoringRange"
                          Margin="0,0,0,8" FontSize="14" Checked="RangeOption_Changed"/>
         </StackPanel>
 
-        <ScrollViewer Grid.Row="2" x:Name="CustomScroll"
-                      MaxHeight="160" Visibility="Collapsed"
-                      VerticalScrollBarVisibility="Auto"
-                      Margin="20,0,0,12">
-            <WrapPanel x:Name="CustomCheckPanel"/>
-        </ScrollViewer>
-
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="採点開始" Name="StartButton"
                     Width="100" Height="32"
                     Background="#1E40AF" Foreground="White"
