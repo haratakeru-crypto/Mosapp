@@ -10,6 +10,8 @@ namespace MosPracticeClient
         Projects4To6,
         Projects7To8,
         Projects7To9,
+        Projects1To7,
+        Projects1To8,
         Projects1To9,
         All,
         Custom
@@ -44,6 +46,12 @@ namespace MosPracticeClient
                 case ScoringRangeKind.Projects7To9:
                     candidates = Enumerable.Range(7, 3);
                     break;
+                case ScoringRangeKind.Projects1To7:
+                    candidates = Enumerable.Range(1, 7);
+                    break;
+                case ScoringRangeKind.Projects1To8:
+                    candidates = Enumerable.Range(1, 8);
+                    break;
                 case ScoringRangeKind.Projects1To9:
                     candidates = Enumerable.Range(1, 9);
                     break;
@@ -77,7 +85,9 @@ namespace MosPracticeClient
             if (resolved.Count == 0)
                 return false;
 
-            if (kind == ScoringRangeKind.Projects1To9)
+            if (kind == ScoringRangeKind.Projects1To7
+                || kind == ScoringRangeKind.Projects1To8
+                || kind == ScoringRangeKind.Projects1To9)
             {
                 var all = Resolve(ScoringRangeKind.All, availableProjectIds);
                 if (resolved.SequenceEqual(all))
@@ -109,7 +119,11 @@ namespace MosPracticeClient
                     || kind == ScoringRangeKind.Custom;
             }
 
-            return kind != ScoringRangeKind.Projects7To8;
+            return kind == ScoringRangeKind.Projects1To7
+                || kind == ScoringRangeKind.Projects1To8
+                || kind == ScoringRangeKind.Projects1To9
+                || kind == ScoringRangeKind.All
+                || kind == ScoringRangeKind.Custom;
         }
 
         public static string FormatRangeLabel(ScoringRangeKind kind, IReadOnlyList<int> selectedIds)
@@ -124,6 +138,10 @@ namespace MosPracticeClient
                     return "プロジェクト7・8";
                 case ScoringRangeKind.Projects7To9:
                     return "プロジェクト7～9";
+                case ScoringRangeKind.Projects1To7:
+                    return "プロジェクト1～7";
+                case ScoringRangeKind.Projects1To8:
+                    return "プロジェクト1～8";
                 case ScoringRangeKind.Projects1To9:
                     return "プロジェクト1～9";
                 case ScoringRangeKind.All:
