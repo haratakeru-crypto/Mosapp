@@ -73,8 +73,8 @@
                 </ItemsControl>
             </StackPanel>
 
-            <!-- Reason 行は一旦非表示。Word の詳細誤答理由は未完成のため学生に見せない。戻すときは Visibility を外す。 -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20" Visibility="Collapsed">
+            <!-- Reason 行。教材採点では HasFailReason のタスクに「詳細」を出す。類題は呼び出し側で FailReason を空にする。 -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,20">
                 <TextBlock Text="Reason" FontWeight="SemiBold" MinWidth="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                 <ItemsControl x:Name="ReasonsPanel" ItemsSource="{Binding}">
                     <ItemsControl.ItemsPanel>

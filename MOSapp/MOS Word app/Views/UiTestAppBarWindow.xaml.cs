@@ -629,12 +629,23 @@ namespace MOS_Word_app.Views
 
         private void ShowVariantScoreResult()
         {
-            var scoreList = WordVariantScoring.ScoreProject(_groupId, _currentProjectId);
-            if (scoreList.Count == 0)
+            var scored = WordVariantScoring.ScoreProject(_groupId, _currentProjectId);
+            if (scored.Count == 0)
             {
                 MessageBox.Show("タスクが見つかりません。", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            // 詳細理由は教材のみ。類題の即時採点では「詳細」リンクを出さない。
+            var scoreList = scored
+                .Select(t => new MOS_Word_app.TaskResult
+                {
+                    TaskNumber = t.TaskNumber,
+                    IsPassed = t.IsPassed,
+                    TaskName = t.TaskName,
+                    FailReason = ""
+                })
+                .ToList();
 
             ShowScoreResult(scoreList);
         }

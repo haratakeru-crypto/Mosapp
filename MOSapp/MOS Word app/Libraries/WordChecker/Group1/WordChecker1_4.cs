@@ -10,15 +10,30 @@ namespace Libraries.Group1
 {
     public class WordChecker1_4
     {
-        public bool CheckTask_1_4_01() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_4_01(filePath); } catch { return false; } }
-        public bool CheckTask_1_4_02() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_4_02(filePath); } catch { return false; } }
-        public bool CheckTask_1_4_03() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_4_03(filePath); } catch { return false; } }
-        public bool CheckTask_1_4_04() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_4_04(filePath); } catch { return false; } }
-        public bool CheckTask_1_4_05() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_4_05(filePath); } catch { return false; } }
-        public bool CheckTask_1_4_06() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_4_06(filePath); } catch { return false; } }
-        public bool CheckTask_1_4_07() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_4_07(filePath); } catch { return false; } }
+        public bool CheckTask_1_4_01() => RunCheck(CheckTask_1_4_01_Impl);
+        public bool CheckTask_1_4_02() => RunCheck(CheckTask_1_4_02_Impl);
+        public bool CheckTask_1_4_03() => RunCheck(CheckTask_1_4_03_Impl);
+        public bool CheckTask_1_4_04() => RunCheck(CheckTask_1_4_04_Impl);
+        public bool CheckTask_1_4_05() => RunCheck(CheckTask_1_4_05_Impl);
+        public bool CheckTask_1_4_06() => RunCheck(CheckTask_1_4_06_Impl);
+        public bool CheckTask_1_4_07() => RunCheck(CheckTask_1_4_07_Impl);
 
-        private bool CheckTask_1_4_01(string filePath)
+        private bool RunCheck(Func<string, bool> task)
+        {
+            try
+            {
+                string filePath = GetCurrentWordFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(WordScoreExplanation.UnavailableText);
+                return task(filePath);
+            }
+            catch
+            {
+                return Miss(WordScoreExplanation.UnavailableText);
+            }
+        }
+
+        private bool CheckTask_1_4_01_Impl(string filePath)
         {
             System.Diagnostics.Debug.WriteLine(">>> [CheckTask_1_4_01] 開始");
             Application wordApp = null;
@@ -55,7 +70,7 @@ namespace Libraries.Group1
                     }
                 }
 
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] ロジック実行開始");
                 Range searchRange = WordFindHelper.DuplicateContent(document);
@@ -77,7 +92,7 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(find);
                     Marshal.ReleaseComObject(searchRange);
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] 指定のテキストが見つかりません。");
-                    return false;
+                    return Miss("見出し「1.生活の中でできるエコ活動」がありません。");
                 }
                 Marshal.ReleaseComObject(find);
                 Marshal.ReleaseComObject(searchRange);
@@ -85,6 +100,7 @@ namespace Libraries.Group1
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] コメント取得開始...");
                 Comments comments = document.Comments;
                 bool result = false;
+                string otherBodyOnHeading = null;
                 try
                 {
                     int count = comments.Count;
@@ -99,6 +115,12 @@ namespace Libraries.Group1
                                 result = true;
                                 break;
                             }
+                            if (otherBodyOnHeading == null && CommentScopeLooksLikeEcoHeading(SafeCommentScopeText(comment)))
+                            {
+                                string body = StripWordCommentControlChars(SafeCommentRangeText(comment));
+                                if (!string.IsNullOrEmpty(body) && !IsExactCommentPhrase(body, "最新の情報を確認"))
+                                    otherBodyOnHeading = body;
+                            }
                         }
                         finally
                         {
@@ -111,12 +133,16 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(comments);
                 }
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_01] 終了。結果={result}");
-                return result;
+                if (result)
+                    return true;
+                if (!string.IsNullOrEmpty(otherBodyOnHeading))
+                    return Miss($"見出し「1.生活の中でできるエコ活動」のコメントが「{Quote(otherBodyOnHeading)}」になっています。");
+                return Miss("見出し「1.生活の中でできるエコ活動」に「最新の情報を確認」のコメントがありません。");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_01] 例外発生: {ex.Message}");
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -126,7 +152,7 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_4_02(string filePath)
+        private bool CheckTask_1_4_02_Impl(string filePath)
         {
             System.Diagnostics.Debug.WriteLine(">>> [CheckTask_1_4_02] 開始");
             Application wordApp = null;
@@ -166,42 +192,41 @@ namespace Libraries.Group1
                 if (document == null)
                 {
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] 文書が見つかりません。");
-                    return false;
+                    return Miss(WordScoreExplanation.UnavailableText);
                 }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] ロジック実行開始");
-                // コメント返信は Word の有効な idMso が環境により異なり Ribbon フック不可のため、ログは使わず WordOpenXML のみで判定する。
-
-                // 【最重要】COMの Comments コレクションはモダンコメント環境で不安定なため使用しない。
-                // 文書全体の WordOpenXML を取得し、XML内のテキストノードから判定する。
-                bool fileStateCheck = false;
-                bool xmlContainsPhrase = false;
-                bool replyOnSonoTa = false;
-                try
+                // 合否は指定文言との完全一致（余分な空白は×）。Word 由来の段落記号のみ除去。
+                // COM を優先し、取れない環境向けに OpenXML の <w:t> テキストも同じ厳密照合する。
+                const string expectedReply = "前田先生に最終確認";
+                bool fileStateCheck = DocumentHasExactReplyOnSonoTaComment(document, expectedReply);
+                if (!fileStateCheck)
                 {
-                    System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
-                    string xml = WordOpenXmlSession.Get(document);
-                    if (!string.IsNullOrEmpty(xml))
+                    try
                     {
-                        xmlContainsPhrase = xml.Contains("前田先生に最終確認");
-                        if (xmlContainsPhrase)
-                            fileStateCheck = true;
-                        replyOnSonoTa = DocumentHasMaedaReplyOnSonoTaComment(document);
+                        System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
+                        string xml = WordOpenXmlSession.Get(document);
+                        fileStateCheck = XmlHasExactWtText(xml, expectedReply);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"    [CheckTask_1_4_02] XML解析エラー: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"    [CheckTask_1_4_02] XML解析エラー: {ex.Message}");
-                }
 
-                bool result = fileStateCheck;
-                System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_02] 終了。結果={result}");
-                return result;
+                System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_02] 終了。結果={fileStateCheck}");
+                if (fileStateCheck)
+                    return true;
+
+                string otherReply = TryGetFirstReplyBodyOnSonoTaComment(document);
+                if (!string.IsNullOrEmpty(otherReply))
+                    return Miss($"見出し「その他」のコメントの返信が「{Quote(otherReply)}」になっています。");
+                return Miss("見出し「その他」のコメントに「前田先生に最終確認」の返信がありません。");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_02] 例外発生: {ex.Message}");
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -211,7 +236,7 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_4_03(string filePath)
+        private bool CheckTask_1_4_03_Impl(string filePath)
         {
             System.Diagnostics.Debug.WriteLine(">>> [CheckTask_1_4_03] 開始");
             Application wordApp = null;
@@ -248,7 +273,7 @@ namespace Libraries.Group1
                     }
                 }
 
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_03] ロジック実行開始");
                 // 本文に「エコと節約」があること（教材の前提）
@@ -261,7 +286,7 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(find);
                     Marshal.ReleaseComObject(searchRange);
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_03] 'エコと節約' が見つかりません。");
-                    return false;
+                    return Miss("本文の「エコと節約」が見つかりません。");
                 }
                 Marshal.ReleaseComObject(find);
                 Marshal.ReleaseComObject(searchRange);
@@ -274,12 +299,22 @@ namespace Libraries.Group1
                 bool result = logResolve && logDelete && !anyEcoComment;
 
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_03] 終了。結果={result} (logResolve={logResolve}, logDelete={logDelete}, anyEcoComment={anyEcoComment})");
-                return result;
+                if (result)
+                    return true;
+                if (!logResolve)
+                    WordScoreExplanation.Note("「エコと節約」のコメントを解決した記録がありません。");
+                if (!logDelete)
+                    WordScoreExplanation.Note("「エコと節約」のコメントを削除した記録がありません。");
+                if (anyEcoComment)
+                    WordScoreExplanation.Note("「エコと節約」に関するコメントが残っています。");
+                if (logResolve || logDelete || anyEcoComment)
+                    return false;
+                return Miss("「エコと節約」のコメントについて、解決と削除が完了していません。");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_03] 例外発生: {ex.Message}");
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -289,7 +324,7 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_4_04(string filePath)
+        private bool CheckTask_1_4_04_Impl(string filePath)
         {
             System.Diagnostics.Debug.WriteLine(">>> [CheckTask_1_4_04] 開始");
             Application wordApp = null;
@@ -329,7 +364,7 @@ namespace Libraries.Group1
                 if (document == null)
                 {
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_04] 文書が見つかりません。");
-                    return false;
+                    return Miss(WordScoreExplanation.UnavailableText);
                 }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_04] ロジック実行開始");
@@ -339,12 +374,18 @@ namespace Libraries.Group1
                 // 過去の StyleSetLineStylish は見ない。別セットのままなら lineSimple が false で ×。
                 bool result = lineSimple && logSimple;
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_04] 終了。結果={result} (lineSimple={lineSimple}, logSimple={logSimple})");
-                return result;
+                if (result)
+                    return true;
+                if (styleSet.IsStylish)
+                    return Miss("スタイルセットが「線（スタイリッシュ）」になっています。");
+                if (!lineSimple)
+                    return Miss("スタイルセットが「線（シンプル）」になっていません。");
+                return Miss("スタイルセット「線（シンプル）」について、必要な操作の記録がありません。");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_04] 例外発生: {ex.Message}");
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -354,7 +395,7 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_4_05(string filePath)
+        private bool CheckTask_1_4_05_Impl(string filePath)
         {
             System.Diagnostics.Debug.WriteLine(">>> [CheckTask_1_4_05] 開始");
             Application wordApp = null;
@@ -394,7 +435,7 @@ namespace Libraries.Group1
                 if (document == null)
                 {
                     System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_05] 文書が見つかりません。");
-                    return false;
+                    return Miss(WordScoreExplanation.UnavailableText);
                 }
 
                 string normalizedXml = "";
@@ -407,28 +448,31 @@ namespace Libraries.Group1
 
                 // 1) 現在の文書: 透かし「サンプル２」（ヘッダー内「サンプル」）のみ ○
                 if (WordWatermarkInspection.HasForbiddenWatermark(normalizedXml))
-                    return false;
+                {
+                    string forbidden = FindForbiddenWatermarkKeyword(normalizedXml);
+                    if (!string.IsNullOrEmpty(forbidden))
+                        return Miss($"透かしが「{forbidden}」になっています。");
+                    return Miss("指定以外の透かしが入っています。");
+                }
                 if (WordWatermarkInspection.IsSample2Watermark(normalizedXml))
                     return true;
                 if (WordWatermarkInspection.IsDraft1Watermark(normalizedXml))
-                    return false;
+                    return Miss("透かしが「下書き1」になっています。");
                 if (WordWatermarkInspection.IsDraft2HorizontalWatermark(normalizedXml))
-                    return false;
+                    return Miss("透かしが「下書き2」になっています。");
 
                 // 2) 4-7 後: 透かしなし + 4-5 で透かし挿入証跡 + 4-7 相当（ヘッダー/フッター空）
                 bool cleared = WordWatermarkInspection.IsWatermarkClearedForTask47FollowUp(normalizedXml);
                 bool evidenceWatermark = LogReader.HasTaskEvidence(4, 5, "Watermark");
                 bool task47State = IsPrimaryHeaderFooterEmpty(document);
-                return cleared && evidenceWatermark && task47State;
-
-
-
-
+                if (cleared && evidenceWatermark && task47State)
+                    return true;
+                return Miss("透かし「サンプル２」がありません。");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_05] 例外発生: {ex.Message}");
-                return false;
+                return Miss(WordScoreExplanation.UnavailableText);
             }
             finally
             {
@@ -438,7 +482,7 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_4_06(string filePath)
+        private bool CheckTask_1_4_06_Impl(string filePath)
         {
             System.Diagnostics.Debug.WriteLine(">>> [CheckTask_1_4_06] 開始");
             Application wordApp = null;
@@ -457,11 +501,13 @@ namespace Libraries.Group1
                     try { doc = docs[i]; if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                     catch { } finally { if (doc != null && doc != document) Marshal.ReleaseComObject(doc); }
                 }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 bool logOk = LogReader.HasTaskEvidence(4, 6, "PageBorders");
                 bool hasTop = false, hasBottom = false, hasLeft = false, hasRight = false;
                 int bordersShadow = -999;
+                string wrongWidthLabel = null;
+                bool anySidePresent = false;
 
                 if (document.Sections.Count >= 1)
                 {
@@ -473,10 +519,18 @@ namespace Libraries.Group1
                     Border left = borders1[WdBorderType.wdBorderLeft];
                     Border right = borders1[WdBorderType.wdBorderRight];
 
-                    hasTop = top != null && (WdLineStyle)top.LineStyle == WdLineStyle.wdLineStyleSingle && (WdLineWidth)top.LineWidth == WdLineWidth.wdLineWidth150pt;
-                    hasBottom = bottom != null && (WdLineStyle)bottom.LineStyle == WdLineStyle.wdLineStyleSingle && (WdLineWidth)bottom.LineWidth == WdLineWidth.wdLineWidth150pt;
-                    hasLeft = left != null && (WdLineStyle)left.LineStyle == WdLineStyle.wdLineStyleSingle && (WdLineWidth)left.LineWidth == WdLineWidth.wdLineWidth150pt;
-                    hasRight = right != null && (WdLineStyle)right.LineStyle == WdLineStyle.wdLineStyleSingle && (WdLineWidth)right.LineWidth == WdLineWidth.wdLineWidth150pt;
+                    hasTop = IsPageBorderSide150Single(top);
+                    hasBottom = IsPageBorderSide150Single(bottom);
+                    hasLeft = IsPageBorderSide150Single(left);
+                    hasRight = IsPageBorderSide150Single(right);
+
+                    if (!hasTop) wrongWidthLabel = DescribePageBorderSideMismatch(top) ?? wrongWidthLabel;
+                    if (!hasBottom) wrongWidthLabel = DescribePageBorderSideMismatch(bottom) ?? wrongWidthLabel;
+                    if (!hasLeft) wrongWidthLabel = DescribePageBorderSideMismatch(left) ?? wrongWidthLabel;
+                    if (!hasRight) wrongWidthLabel = DescribePageBorderSideMismatch(right) ?? wrongWidthLabel;
+                    anySidePresent =
+                        IsPageBorderSideVisible(top) || IsPageBorderSideVisible(bottom)
+                        || IsPageBorderSideVisible(left) || IsPageBorderSideVisible(right);
 
                     Marshal.ReleaseComObject(right); Marshal.ReleaseComObject(left); Marshal.ReleaseComObject(bottom); Marshal.ReleaseComObject(top); Marshal.ReleaseComObject(borders1); Marshal.ReleaseComObject(section1);
                 }
@@ -485,13 +539,50 @@ namespace Libraries.Group1
 
                 bool result = logOk && hasTop && hasBottom && hasLeft && hasRight && colorOk && bordersShadow == 0;
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_06] 終了。結果={result}");
-                return result;
+                if (result)
+                    return true;
+
+                bool sidesOk = hasTop && hasBottom && hasLeft && hasRight;
+                bool noted = false;
+                if (!anySidePresent)
+                {
+                    WordScoreExplanation.Note("ページ罫線が設定されていません。");
+                    noted = true;
+                }
+                else if (!sidesOk && !string.IsNullOrEmpty(wrongWidthLabel))
+                {
+                    WordScoreExplanation.Note($"ページ罫線の線の太さが「{wrongWidthLabel}」になっています。");
+                    noted = true;
+                }
+                else if (!sidesOk)
+                {
+                    WordScoreExplanation.Note("上下左右のページ罫線が「1.5pt」の実線になっていません。");
+                    noted = true;
+                }
+                if (anySidePresent && sidesOk && !colorOk)
+                {
+                    WordScoreExplanation.Note("ページ罫線の色が「オリーブ、アクセント3」になっていません。");
+                    noted = true;
+                }
+                if (anySidePresent && bordersShadow != 0 && bordersShadow != -999)
+                {
+                    WordScoreExplanation.Note("ページ罫線に影が付いています。");
+                    noted = true;
+                }
+                if (!logOk)
+                {
+                    WordScoreExplanation.Note("ページ罫線について、必要な操作の記録がありません。");
+                    noted = true;
+                }
+                if (noted)
+                    return false;
+                return Miss("ページ罫線が指定どおりになっていません。");
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_06] 例外: {ex.Message}"); return false; }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_06] 例外: {ex.Message}"); return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); if (docs != null) Marshal.ReleaseComObject(docs); if (wordApp != null) Marshal.ReleaseComObject(wordApp); }
         }
 
-        private bool CheckTask_1_4_07(string filePath)
+        private bool CheckTask_1_4_07_Impl(string filePath)
         {
             System.Diagnostics.Debug.WriteLine(">>> [CheckTask_1_4_07] 開始");
             Application wordApp = null;
@@ -510,12 +601,32 @@ namespace Libraries.Group1
                     try { doc = docs[i]; if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
                     catch { } finally { if (doc != null && doc != document) Marshal.ReleaseComObject(doc); }
                 }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 // 文書検査はバージョンにより idMso が無効・非公開のため Ribbon フック不可。ヘッダー/フッターが空であることのみで判定する。
-                return IsPrimaryHeaderFooterEmpty(document);
+                if (IsPrimaryHeaderFooterEmpty(document))
+                    return true;
+
+                string normalizedXml = "";
+                try
+                {
+                    normalizedXml = WordWatermarkInspection.NormalizeXml(WordOpenXmlSession.Get(document));
+                }
+                catch { }
+
+                bool hasWatermark =
+                    WordWatermarkInspection.IsSample2Watermark(normalizedXml)
+                    || WordWatermarkInspection.IsDraft1Watermark(normalizedXml)
+                    || WordWatermarkInspection.IsDraft2HorizontalWatermark(normalizedXml)
+                    || WordWatermarkInspection.HasForbiddenWatermark(normalizedXml)
+                    || (!string.IsNullOrEmpty(normalizedXml)
+                        && normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0);
+
+                if (hasWatermark)
+                    return Miss("透かし文字またはヘッダー・フッターが残っています。");
+                return Miss("ヘッダーまたはフッターが残っています。");
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_07] 例外: {ex.Message}"); return false; }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_07] 例外: {ex.Message}"); return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); if (docs != null) Marshal.ReleaseComObject(docs); if (wordApp != null) Marshal.ReleaseComObject(wordApp); }
         }
 
@@ -674,12 +785,14 @@ namespace Libraries.Group1
             return !string.IsNullOrEmpty(n) && n.Contains("その他");
         }
 
-        private static bool DocumentHasMaedaReplyOnSonoTaComment(Document document)
+        private static bool DocumentHasExactReplyOnSonoTaComment(Document document, string expectedPhrase)
         {
             Comments comments = null;
             try
             {
-                comments = document.Comments;
+                comments = document?.Comments;
+                if (comments == null)
+                    return false;
                 int count = comments.Count;
                 for (int i = 1; i <= count; i++)
                 {
@@ -712,7 +825,7 @@ namespace Libraries.Group1
                                     reply = replies[r];
                                     string rt = "";
                                     try { rt = reply.Range?.Text ?? ""; } catch { }
-                                    if (NormalizeCommentBody(rt).Contains("前田先生に最終確認"))
+                                    if (IsExactCommentPhrase(rt, expectedPhrase))
                                         return true;
                                 }
                                 finally { if (reply != null) Marshal.ReleaseComObject(reply); }
@@ -728,11 +841,78 @@ namespace Libraries.Group1
             return false;
         }
 
+        /// <summary>
+        /// 見出し「その他」コメントへの返信のうち、正解文でない最初の本文を返す。
+        /// 返信が無い／COM で取れない／すべて正解文のときは null。
+        /// </summary>
+        private static string TryGetFirstReplyBodyOnSonoTaComment(Document document)
+        {
+            const string expectedReply = "前田先生に最終確認";
+            Comments comments = null;
+            try
+            {
+                comments = document?.Comments;
+                if (comments == null)
+                    return null;
+                int count = comments.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    Comment comment = null;
+                    try
+                    {
+                        comment = comments[i];
+                        Range scope = null;
+                        string scopeText = "";
+                        try
+                        {
+                            scope = comment.Scope;
+                            scopeText = scope?.Text ?? "";
+                        }
+                        finally { if (scope != null) Marshal.ReleaseComObject(scope); }
+                        if (!CommentScopeLooksLikeSonoTaHeading(scopeText))
+                            continue;
+
+                        Comments replies = null;
+                        try
+                        {
+                            replies = comment.Replies;
+                            if (replies == null)
+                                continue;
+                            int rc = replies.Count;
+                            for (int r = 1; r <= rc; r++)
+                            {
+                                Comment reply = null;
+                                try
+                                {
+                                    reply = replies[r];
+                                    string rt = "";
+                                    try { rt = reply.Range?.Text ?? ""; } catch { }
+                                    string body = StripWordCommentControlChars(rt);
+                                    if (string.IsNullOrEmpty(body))
+                                        continue;
+                                    if (IsExactCommentPhrase(body, expectedReply))
+                                        continue;
+                                    return body;
+                                }
+                                finally { if (reply != null) Marshal.ReleaseComObject(reply); }
+                            }
+                        }
+                        finally { if (replies != null) Marshal.ReleaseComObject(replies); }
+                    }
+                    finally { if (comment != null) Marshal.ReleaseComObject(comment); }
+                }
+            }
+            catch { }
+            finally { if (comments != null) Marshal.ReleaseComObject(comments); }
+            return null;
+        }
+
         private static bool CommentBodyMatchesLatestInfoCheck(Comment comment)
         {
+            const string expected = "最新の情報を確認";
             string raw = "";
             try { raw = comment.Range.Text ?? ""; } catch { }
-            if (PassesLatestInfoPhrase(NormalizeCommentBody(raw)))
+            if (IsExactCommentPhrase(raw, expected))
                 return true;
             Comments replies = null;
             try
@@ -749,7 +929,7 @@ namespace Libraries.Group1
                             reply = replies[i];
                             string rt = "";
                             try { rt = reply.Range.Text ?? ""; } catch { }
-                            if (PassesLatestInfoPhrase(NormalizeCommentBody(rt)))
+                            if (IsExactCommentPhrase(rt, expected))
                                 return true;
                         }
                         finally { if (reply != null) Marshal.ReleaseComObject(reply); }
@@ -761,22 +941,61 @@ namespace Libraries.Group1
             return false;
         }
 
-        private static bool PassesLatestInfoPhrase(string normalized)
+        /// <summary>
+        /// 指定文言との完全一致。Word 由来の段落記号などは除去するが、空白は残す（余分な空白は×）。
+        /// </summary>
+        private static bool IsExactCommentPhrase(string raw, string expectedPhrase)
         {
-            const string needle = "最新の情報を確認";
-            if (string.IsNullOrEmpty(normalized))
+            if (string.IsNullOrEmpty(expectedPhrase))
                 return false;
-            if (normalized.Contains(needle))
+            string actual = StripWordCommentControlChars(raw ?? "");
+            if (actual == expectedPhrase)
                 return true;
             try
             {
-                if (normalized.Normalize(NormalizationForm.FormKC).Contains(needle))
+                return actual.Normalize(NormalizationForm.FormKC) == expectedPhrase.Normalize(NormalizationForm.FormKC);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>OpenXML の各 &lt;w:t&gt; テキストが指定文言と完全一致するか（空白付きは不一致）。</summary>
+        private static bool XmlHasExactWtText(string xml, string expectedPhrase)
+        {
+            if (string.IsNullOrEmpty(xml) || string.IsNullOrEmpty(expectedPhrase))
+                return false;
+            MatchCollection matches = Regex.Matches(
+                xml,
+                @"<w:t(?:\s[^>]*)?>([^<]*)</w:t>",
+                RegexOptions.CultureInvariant);
+            foreach (Match match in matches)
+            {
+                if (!match.Success || match.Groups.Count < 2)
+                    continue;
+                if (IsExactCommentPhrase(match.Groups[1].Value, expectedPhrase))
                     return true;
             }
-            catch { }
             return false;
         }
 
+        /// <summary>Word がコメント本文に付けやすい制御文字・段落記号だけ除去。空白は残す。</summary>
+        private static string StripWordCommentControlChars(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return "";
+            var sb = new StringBuilder(s.Length);
+            foreach (char c in s)
+            {
+                if (c == '\r' || c == '\n' || c == '\a' || c == '\v' || c == '\f' || c == '\u0007')
+                    continue;
+                sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>スコープ判定など寛容照合用。4-1/4-2 の合否には使わない。</summary>
         private static string NormalizeCommentBody(string s)
         {
             if (string.IsNullOrEmpty(s))
@@ -1035,6 +1254,125 @@ namespace Libraries.Group1
             {
                 if (comments != null) Marshal.ReleaseComObject(comments);
             }
+        }
+
+        private static bool IsPageBorderSide150Single(Border border)
+        {
+            if (border == null)
+                return false;
+            try
+            {
+                return (WdLineStyle)border.LineStyle == WdLineStyle.wdLineStyleSingle
+                    && (WdLineWidth)border.LineWidth == WdLineWidth.wdLineWidth150pt;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsPageBorderSideVisible(Border border)
+        {
+            if (border == null)
+                return false;
+            try
+            {
+                return (WdLineStyle)border.LineStyle != WdLineStyle.wdLineStyleNone;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>1.5pt 実線でない側について、太さが取れればその表示名を返す。</summary>
+        private static string DescribePageBorderSideMismatch(Border border)
+        {
+            if (border == null)
+                return null;
+            try
+            {
+                WdLineStyle style = (WdLineStyle)border.LineStyle;
+                if (style == WdLineStyle.wdLineStyleNone)
+                    return null;
+                if (style != WdLineStyle.wdLineStyleSingle)
+                    return null;
+                WdLineWidth width = (WdLineWidth)border.LineWidth;
+                if (width == WdLineWidth.wdLineWidth150pt)
+                    return null;
+                return FormatLineWidth(width);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string FormatLineWidth(WdLineWidth width)
+        {
+            switch (width)
+            {
+                case WdLineWidth.wdLineWidth025pt: return "0.25pt";
+                case WdLineWidth.wdLineWidth050pt: return "0.5pt";
+                case WdLineWidth.wdLineWidth075pt: return "0.75pt";
+                case WdLineWidth.wdLineWidth100pt: return "1pt";
+                case WdLineWidth.wdLineWidth150pt: return "1.5pt";
+                case WdLineWidth.wdLineWidth225pt: return "2.25pt";
+                case WdLineWidth.wdLineWidth300pt: return "3pt";
+                case WdLineWidth.wdLineWidth450pt: return "4.5pt";
+                case WdLineWidth.wdLineWidth600pt: return "6pt";
+                default: return null;
+            }
+        }
+
+        private static string FindForbiddenWatermarkKeyword(string normalizedXml)
+        {
+            if (string.IsNullOrEmpty(normalizedXml))
+                return null;
+            string[] keywords = { "社外秘", "至急", "案内", "転送厳禁", "CONFIDENTIAL", "URGENT", "DO NOT COPY" };
+            foreach (string keyword in keywords)
+            {
+                if (normalizedXml.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return keyword;
+            }
+            return null;
+        }
+
+        private static string SafeCommentScopeText(Comment comment)
+        {
+            try
+            {
+                Range scope = comment.Scope;
+                try { return scope?.Text ?? ""; }
+                finally { if (scope != null) Marshal.ReleaseComObject(scope); }
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private static string SafeCommentRangeText(Comment comment)
+        {
+            try { return comment.Range?.Text ?? ""; }
+            catch { return ""; }
+        }
+
+        private static string Quote(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        private static bool Miss(string reason)
+        {
+            WordScoreExplanation.Note(reason);
+            return false;
         }
 
         private string GetCurrentWordFilePath()

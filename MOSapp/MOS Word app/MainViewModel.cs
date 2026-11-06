@@ -861,8 +861,8 @@ namespace MOS_Word_app
         public string TaskName { get; set; }
         /// <summary>×のときの学生向け理由。合格時は空。</summary>
         public string FailReason { get; set; }
-        /// <summary>Word の詳細誤答理由は未完成のため、学生向け「詳細」は出さない。</summary>
-        public bool HasFailReason => false;
+        /// <summary>×かつ理由があるとき ScoreResultWindow の「詳細」リンクを出す。</summary>
+        public bool HasFailReason => !string.IsNullOrEmpty(FailReason);
     }
 }
 

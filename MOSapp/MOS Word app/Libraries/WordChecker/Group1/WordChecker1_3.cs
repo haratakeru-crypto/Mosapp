@@ -8,14 +8,29 @@ namespace Libraries.Group1
 {
     public class WordChecker1_3
     {
-        public bool CheckTask_1_3_01() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_3_01(filePath); } catch { return false; } }
-        public bool CheckTask_1_3_02() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_3_02(filePath); } catch { return false; } }
-        public bool CheckTask_1_3_03() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_3_03(filePath); } catch { return false; } }
-        public bool CheckTask_1_3_04() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_3_04(filePath); } catch { return false; } }
-        public bool CheckTask_1_3_05() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_3_05(filePath); } catch { return false; } }
-        public bool CheckTask_1_3_06() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_3_06(filePath); } catch { return false; } }
+        public bool CheckTask_1_3_01() => RunCheck(CheckTask_1_3_01_Impl);
+        public bool CheckTask_1_3_02() => RunCheck(CheckTask_1_3_02_Impl);
+        public bool CheckTask_1_3_03() => RunCheck(CheckTask_1_3_03_Impl);
+        public bool CheckTask_1_3_04() => RunCheck(CheckTask_1_3_04_Impl);
+        public bool CheckTask_1_3_05() => RunCheck(CheckTask_1_3_05_Impl);
+        public bool CheckTask_1_3_06() => RunCheck(CheckTask_1_3_06_Impl);
 
-        private bool CheckTask_1_3_01(string filePath)
+        private bool RunCheck(Func<string, bool> task)
+        {
+            try
+            {
+                string filePath = GetCurrentWordFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(WordScoreExplanation.UnavailableText);
+                return task(filePath);
+            }
+            catch
+            {
+                return Miss(WordScoreExplanation.UnavailableText);
+            }
+        }
+
+        private bool CheckTask_1_3_01_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
@@ -24,44 +39,61 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 // 文書の余白が「やや狭い」プリセット相当になっているかを判定する
-                // 一般的な「やや狭い」= 上下 2.54cm (約72pt)、左右 1.91cm (約54pt) を想定し、多少の誤差を許容する
                 Section section = document.Sections[1];
                 PageSetup ps = section.PageSetup;
                 float top = ps.TopMargin;
                 float bottom = ps.BottomMargin;
                 float left = ps.LeftMargin;
                 float right = ps.RightMargin;
-
-                bool IsApprox(float value, float target)
-                {
-                    return Math.Abs(value - target) <= 1.5f;
-                }
-
-                bool fileStateOk =
-                    IsApprox(top, 72.0f) &&
-                    IsApprox(bottom, 72.0f) &&
-                    IsApprox(left, 54.0f) &&
-                    IsApprox(right, 54.0f);
+                string presetName = IdentifyCommonMarginPreset(top, bottom, left, right);
 
                 Marshal.ReleaseComObject(ps);
                 Marshal.ReleaseComObject(section);
 
                 // 文書状態が本番試験と同等であれば正解とする（ログは補助情報として扱い、必須にはしない）
-                if (fileStateOk)
+                if (presetName == "やや狭い")
                     return true;
 
                 // 余白プリセットを使った操作は証跡で記録（個別リセット後の旧全体ログ誤判定を防ぐ）
                 bool logOk = LogReader.HasTaskEvidence(3, 1, "PageMarginsModerate");
-                return logOk;
+                if (logOk)
+                    return true;
+
+                if (!string.IsNullOrEmpty(presetName))
+                    return Miss($"文書の余白が「{presetName}」になっています。");
+                return Miss("文書の余白が「やや狭い」になっていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        private bool CheckTask_1_3_02(string filePath)
+        /// <summary>
+        /// 日本語版の一般的な余白プリセット名を返す。一致しなければ null。
+        /// やや狭い=上下72pt/左右54pt、狭い=全辺36pt、広い=上下72pt/左右144pt、
+        /// 標準=上約35.01mm・下左右30mm（約99.26/85.04pt）。
+        /// </summary>
+        private static string IdentifyCommonMarginPreset(float top, float bottom, float left, float right)
+        {
+            bool IsApprox(float value, float target) => Math.Abs(value - target) <= 1.5f;
+            bool Match(float t, float b, float l, float r) =>
+                IsApprox(top, t) && IsApprox(bottom, b) && IsApprox(left, l) && IsApprox(right, r);
+
+            if (Match(72.0f, 72.0f, 54.0f, 54.0f))
+                return "やや狭い";
+            if (Match(36.0f, 36.0f, 36.0f, 36.0f))
+                return "狭い";
+            if (Match(72.0f, 72.0f, 144.0f, 144.0f))
+                return "広い";
+            // 日本語版「標準」: 上 35.01mm / 下・左・右 30mm
+            if (Match(99.26f, 85.04f, 85.04f, 85.04f))
+                return "標準";
+            return null;
+        }
+
+        private bool CheckTask_1_3_02_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
@@ -70,9 +102,13 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
                 Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
+                if (!find.Found)
+                {
+                    Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
+                    return Miss("見出し「参考文献一覧」がありません。");
+                }
                 Range foundRange = searchRange;
                 // 教材どおり「参考文献一覧」はセクション2の本文にあること（区切りだけ挿入して別セクションに見出しが無い誤正解を防ぐ）
                 bool headingInSection2 = false;
@@ -190,13 +226,23 @@ namespace Libraries.Group1
                 Marshal.ReleaseComObject(headingParagraph);
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
                 // 文書状態が「次のページから開始」のセクション区切りで見出し直後に境界があれば正解
-                return fileStateOk && headingInSection2;
+                // 失敗理由は典型ミス別に分ける（改ページのみ／区切り位置違い／連続など）
+                if (document.Sections.Count < 2)
+                {
+                    WordScoreExplanation.Note("見出し「参考文献一覧」の直前にセクション区切りがありません。");
+                    return Miss("セクション区切りは「次のページから開始」にする必要があります。");
+                }
+                if (!headingInSection2)
+                    return Miss("見出し「参考文献一覧」が、セクション区切りの次のセクション先頭になっていません。");
+                if (!fileStateOk)
+                    return Miss("セクション区切りが「次のページから開始」になっていません。");
+                return true;
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        private bool CheckTask_1_3_03(string filePath)
+        private bool CheckTask_1_3_03_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
@@ -205,16 +251,24 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
                 Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
+                if (!find.Found)
+                {
+                    Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
+                    return Miss("見出し「参考文献一覧」がありません。");
+                }
                 Range foundRange = searchRange;
                 Paragraph headingPara = foundRange.Paragraphs[1];
                 int headingEnd = headingPara.Range.End;
                 Marshal.ReleaseComObject(headingPara);
                 int anchorPos = foundRange.Start;
                 Section section = GetSectionContainingPosition(document, anchorPos);
-                if (section == null) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
+                if (section == null)
+                {
+                    Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
+                    return Miss(WordScoreExplanation.UnavailableText);
+                }
                 bool landscape = false;
                 int secIndex = 0;
                 try
@@ -244,13 +298,17 @@ namespace Libraries.Group1
                 }
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
                 bool logOk = LogReader.HasTaskEvidence(3, 3, "PageOrientationPortraitLandscape");
-                return logOk && landscape;
+                if (!landscape)
+                    return Miss("見出し「参考文献一覧」で始まるセクションが横向きになっていません。");
+                if (!logOk)
+                    return Miss("印刷の向きについて、必要な操作の記録がありません。");
+                return true;
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        private bool CheckTask_1_3_04(string filePath)
+        private bool CheckTask_1_3_04_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
@@ -259,28 +317,36 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
                 Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
+                if (!find.Found)
+                {
+                    Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
+                    return Miss("見出し「参考文献一覧」がありません。");
+                }
                 Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
                 // セクション2のみ「2段組」（等幅）を判定。他セクションの段組や「狭くした2段組」（不等幅）は不正解
                 if (document.Sections.Count < 2)
-                    return false;
+                    return Miss("見出し「参考文献一覧」で始まるセクションが2段組みになっていません。");
                 bool stateOk = false;
+                int columnCount = 0;
+                bool evenlySpaced = false;
+                bool equalWidths = false;
                 Section section2 = document.Sections[2];
                 try
                 {
                     TextColumns cols = section2.PageSetup.TextColumns;
+                    columnCount = cols.Count;
                     if (cols.Count == 2)
                     {
                         TextColumn c1 = cols[1];
                         TextColumn c2 = cols[2];
                         try
                         {
-                            bool evenlySpaced = cols.EvenlySpaced != 0;
+                            evenlySpaced = cols.EvenlySpaced != 0;
                             float w1 = (float)c1.Width;
                             float w2 = (float)c2.Width;
-                            bool equalWidths = Math.Abs(w1 - w2) <= 2.0f;
+                            equalWidths = Math.Abs(w1 - w2) <= 2.0f;
                             stateOk = evenlySpaced && equalWidths;
                         }
                         finally
@@ -295,13 +361,19 @@ namespace Libraries.Group1
                 {
                     Marshal.ReleaseComObject(section2);
                 }
-                return stateOk;
+                if (stateOk)
+                    return true;
+                if (columnCount != 2)
+                    return Miss("見出し「参考文献一覧」で始まるセクションが2段組みになっていません。");
+                if (!evenlySpaced || !equalWidths)
+                    return Miss("見出し「参考文献一覧」で始まるセクションが、幅の等しい2段組みになっていません。");
+                return Miss("見出し「参考文献一覧」で始まるセクションが2段組みになっていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        private bool CheckTask_1_3_05(string filePath)
+        private bool CheckTask_1_3_05_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
@@ -310,7 +382,7 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
                 Range searchRange = WordFindHelper.DuplicateContent(document);
                 Find find = searchRange.Find;
                 WordFindHelper.ConfigureSafeFind(find, "茨城県天心記念五浦美術館");
@@ -325,7 +397,11 @@ namespace Libraries.Group1
                     find.Text = "tenshin.museum.ibk.ed.jp";
                     find.Execute();
                 }
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
+                if (!find.Found)
+                {
+                    Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
+                    return Miss("「●茨城県天心記念五浦美術館『…』」の段落がありません。");
+                }
                 Paragraph para = searchRange.Paragraphs[1];
                 Range paraRange = para.Range;
                 int paraStart = paraRange.Start;
@@ -334,9 +410,11 @@ namespace Libraries.Group1
                 Marshal.ReleaseComObject(find);
                 Marshal.ReleaseComObject(searchRange);
                 // 該当段落の先頭の直前に列区切りのみ正解。セクション内の別位置に区切りがあっても不正解
-                return IsColumnBreakImmediatelyBeforeParagraph(document, paraStart);
+                if (IsColumnBreakImmediatelyBeforeParagraph(document, paraStart))
+                    return true;
+                return Miss("「●茨城県天心記念五浦美術館『…』」の先頭に段区切りがありません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
@@ -412,7 +490,7 @@ namespace Libraries.Group1
             return false;
         }
 
-        private bool CheckTask_1_3_06(string filePath)
+        private bool CheckTask_1_3_06_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
@@ -421,12 +499,20 @@ namespace Libraries.Group1
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
                 { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
                 Range searchRange = WordFindHelper.DuplicateContent(document); Find find = searchRange.Find; WordFindHelper.ConfigureSafeFind(find, "参考文献一覧"); find.Execute();
-                if (!find.Found) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
+                if (!find.Found)
+                {
+                    Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
+                    return Miss("見出し「参考文献一覧」がありません。");
+                }
                 Range foundRange = searchRange;
                 Section section = GetSectionContainingPosition(document, foundRange.Start);
-                if (section == null) { Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange); return false; }
+                if (section == null)
+                {
+                    Marshal.ReleaseComObject(find); Marshal.ReleaseComObject(searchRange);
+                    return Miss(WordScoreExplanation.UnavailableText);
+                }
                 Paragraph headingPara = foundRange.Paragraphs[1];
                 int headingEnd = headingPara.Range.End;
                 Marshal.ReleaseComObject(headingPara);
@@ -453,7 +539,7 @@ namespace Libraries.Group1
                     Marshal.ReleaseComObject(find);
                     Marshal.ReleaseComObject(searchRange);
                     Marshal.ReleaseComObject(section);
-                    return false;
+                    return Miss("「●茨城県天心記念五浦美術館『…』」の段落がありません。");
                 }
                 Paragraph task5Para = searchRange.Paragraphs[1];
                 int firstColumnEndStart = task5Para.Range.Start;
@@ -464,12 +550,13 @@ namespace Libraries.Group1
                 if (firstColumnEndStart <= headingEnd)
                 {
                     Marshal.ReleaseComObject(section);
-                    return false;
+                    return Miss("1段目の範囲が確認できません。");
                 }
 
                 // 1段目のみ: 見出し直後〜 task5 段落の直前までの全段落が行間 1.3（部分選択のみ変更は不正解）
                 bool sawFirstColumnParagraph = false;
                 bool allParagraphs13 = true;
+                string firstWrongSpacingLabel = null;
                 try
                 {
                     int n = section.Range.Paragraphs.Count;
@@ -500,7 +587,11 @@ namespace Libraries.Group1
                                 finally { if (oneChar != null) Marshal.ReleaseComObject(oneChar); }
                             }
                             if (!IsLineSpacingAbout13Times(pf, fontSize))
+                            {
                                 allParagraphs13 = false;
+                                if (firstWrongSpacingLabel == null)
+                                    firstWrongSpacingLabel = DescribeLineSpacing(pf, fontSize);
+                            }
                             Marshal.ReleaseComObject(pf);
                         }
                         finally
@@ -513,9 +604,17 @@ namespace Libraries.Group1
                 {
                     Marshal.ReleaseComObject(section);
                 }
-                return sawFirstColumnParagraph && allParagraphs13;
+                if (!sawFirstColumnParagraph)
+                    return Miss("1段目の段落がありません。");
+                if (!allParagraphs13)
+                {
+                    if (!string.IsNullOrEmpty(firstWrongSpacingLabel))
+                        return Miss($"見出し「参考文献一覧」で始まるセクションの1段目の行間が「{firstWrongSpacingLabel}」になっています。");
+                    return Miss("見出し「参考文献一覧」で始まるセクションの1段目の行間がすべて「1.3」になっていません。");
+                }
+                return true;
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
@@ -531,20 +630,15 @@ namespace Libraries.Group1
 
             if (rule == WdLineSpacing.wdLineSpaceMultiple)
             {
-                // 行の倍数（1.3）そのまま。spacing/fontSize は混在させない
+                // 行の倍数（1.3）そのまま
                 if (spacing >= 1.0f && spacing <= 3.0f)
                     return Math.Abs(spacing - target) <= eps;
-                // 環境によって 1 行を 12 単位で表す（1.3 行 ≈ 15.6）
+                // 環境によって 1 行を 12 単位で表す（1.3 行 ≈ 15.6）。
+                // ここに入ったら /12 のみで判定する（/fontSize へ落とすと 1.1 行などが誤〇になる）。
                 if (spacing >= 10f && spacing <= 48f)
                 {
                     float m12 = spacing / 12f;
-                    if (m12 >= 1.0f && m12 <= 2.0f && Math.Abs(m12 - target) <= eps)
-                        return true;
-                }
-                if (fontSize > 0f)
-                {
-                    float multiple = spacing / fontSize;
-                    return Math.Abs(multiple - target) <= eps;
+                    return m12 >= 1.0f && m12 <= 2.0f && Math.Abs(m12 - target) <= eps;
                 }
                 return false;
             }
@@ -558,6 +652,54 @@ namespace Libraries.Group1
                 return false;
             }
             return false;
+        }
+
+        /// <summary>学生向けに行間の現状を短いラベルにする（倍数なら「1.1」、固定なら「固定値」など）。</summary>
+        private static string DescribeLineSpacing(ParagraphFormat pf, float fontSize)
+        {
+            WdLineSpacing rule;
+            float spacing;
+            try
+            {
+                rule = pf.LineSpacingRule;
+                spacing = (float)pf.LineSpacing;
+            }
+            catch
+            {
+                return null;
+            }
+
+            if (rule == WdLineSpacing.wdLineSpaceMultiple)
+            {
+                float multiple;
+                if (spacing >= 1.0f && spacing <= 3.0f)
+                    multiple = spacing;
+                else if (spacing >= 10f && spacing <= 48f)
+                    multiple = spacing / 12f;
+                else
+                    return "倍数（不明）";
+                return FormatLineSpacingMultiple(multiple);
+            }
+            if (rule == WdLineSpacing.wdLineSpaceSingle)
+                return "1行";
+            if (rule == WdLineSpacing.wdLineSpace1pt5)
+                return "1.5行";
+            if (rule == WdLineSpacing.wdLineSpaceDouble)
+                return "2行";
+            if (rule == WdLineSpacing.wdLineSpaceExactly)
+                return "固定値";
+            if (rule == WdLineSpacing.wdLineSpaceAtLeast)
+                return "最小値";
+            return null;
+        }
+
+        private static string FormatLineSpacingMultiple(float multiple)
+        {
+            // 1.1 / 1.15 / 1.3 など、見た目の桁を抑える
+            float rounded = (float)Math.Round(multiple, 2);
+            if (Math.Abs(rounded * 10f - Math.Round(rounded * 10f)) < 0.001f)
+                return rounded.ToString("0.0", CultureInfo.InvariantCulture);
+            return rounded.ToString("0.##", CultureInfo.InvariantCulture);
         }
 
         /// <summary>指定文字位置を含むセクションを返す。呼び出し元で Section を Release すること。</summary>
@@ -578,6 +720,12 @@ namespace Libraries.Group1
             return null;
         }
 
+        private static bool Miss(string reason)
+        {
+            WordScoreExplanation.Note(reason);
+            return false;
+        }
+
         private string GetCurrentWordFilePath()
         {
             Application wordApp = null;
@@ -587,4 +735,3 @@ namespace Libraries.Group1
         }
     }
 }
-

@@ -613,6 +613,9 @@ namespace MOS_Word_app.Views
                 return "";
             if (_fromScoringLog)
                 return "";
+            // 詳細理由は教材のみ表示（類題は未整備のため出さない）
+            if (_isVariantMode)
+                return "";
             string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId, ResultVariantSetNo);
             if (!string.IsNullOrEmpty(reason))
                 return reason;
@@ -746,8 +749,8 @@ namespace MOS_Word_app.Views
         public Brush ResultColor { get; set; }
         /// <summary>×のときの学生向け理由。〇・時間切れは空。</summary>
         public string FailReason { get; set; }
-        /// <summary>Word の詳細誤答理由は未完成のため、学生向け「詳細」は出さない。</summary>
-        public bool HasFailReason => false;
+        /// <summary>×かつ理由があるとき「詳細」リンクを出す（教材のみ ResolveDisplayedFailReason で埋める）。</summary>
+        public bool HasFailReason => !string.IsNullOrEmpty(FailReason);
         public bool ShowDispositionColumns { get; set; }
         public bool IsCompleted { get; set; }
         public bool IsFlagged { get; set; }
