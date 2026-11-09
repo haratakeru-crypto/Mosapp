@@ -225,6 +225,8 @@
                     </mos:GameTabControl.ButtonBackground>
                 </mos:GameTabControl>
             </TabItem>
+            <TabItem Header="ID確認">
+            </TabItem>
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">
                     <Grid Margin="20">
