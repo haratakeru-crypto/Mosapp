@@ -21,8 +21,12 @@ namespace MosPracticeSessionWatch
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MOSapp");
 
         static string ExamineePath => Path.Combine(DataDirectory, "examinee.json");
+        static string ExcelTaskReviewStatePath => Path.Combine(DataDirectory, "excel-task-review-state.json");
         static string WordTaskReviewStatePath => Path.Combine(DataDirectory, "word-task-review-state.json");
         static string PowerPointTaskReviewStatePath => Path.Combine(DataDirectory, "powerpoint-task-review-state.json");
+        static string ScoringLogExcelPath => Path.Combine(DataDirectory, "scoring-logs-Excel.json");
+        static string ScoringLogWordPath => Path.Combine(DataDirectory, "scoring-logs-Word.json");
+        static string ScoringLogPowerPointPath => Path.Combine(DataDirectory, "scoring-logs-PowerPoint.json");
         static string ClientIdPath => Path.Combine(DataDirectory, "client-id.txt");
         static string BaseUrlPath => Path.Combine(DataDirectory, "presence-baseurl.txt");
         static string KeyPath => Path.Combine(DataDirectory, "presence-key.txt");
@@ -208,36 +212,29 @@ namespace MosPracticeSessionWatch
             {
             }
 
-            try
-            {
-                if (File.Exists(ExamineePath))
-                    File.Delete(ExamineePath);
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                if (File.Exists(WordTaskReviewStatePath))
-                    File.Delete(WordTaskReviewStatePath);
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                if (File.Exists(PowerPointTaskReviewStatePath))
-                    File.Delete(PowerPointTaskReviewStatePath);
-            }
-            catch
-            {
-            }
+            TryDeleteFile(ExamineePath);
+            TryDeleteFile(ExcelTaskReviewStatePath);
+            TryDeleteFile(WordTaskReviewStatePath);
+            TryDeleteFile(PowerPointTaskReviewStatePath);
+            TryDeleteFile(ScoringLogExcelPath);
+            TryDeleteFile(ScoringLogWordPath);
+            TryDeleteFile(ScoringLogPowerPointPath);
 
             try
             {
                 Application.Exit();
+            }
+            catch
+            {
+            }
+        }
+
+        static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
             }
             catch
             {
