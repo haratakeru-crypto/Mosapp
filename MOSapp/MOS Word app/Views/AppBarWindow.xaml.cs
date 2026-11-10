@@ -161,7 +161,9 @@ namespace MOS_Word_app.Views
                 this.Height = barH;
                 this.Left = 0;
                 this.Top = barTop;
+                this.Topmost = false;
                 this.Topmost = true;
+                ScoreResultWindow.TryBringOpenToFront();
                 return;
             }
 
@@ -177,12 +179,21 @@ namespace MOS_Word_app.Views
             int height = barH + borderHeight;
 
             MoveWindow(hWnd, x, y, width, height, true);
+            this.Topmost = false;
             this.Topmost = true;
+            IntPtr foregroundHwnd = hWnd;
+            try
+            {
+                SetForegroundWindow(foregroundHwnd);
+            }
+            catch { /* ignore */ }
+            ScoreResultWindow.TryBringOpenToFront();
         }
 
         private void PositionWordWindow()
         {
             WordWindowLayoutHelper.PositionWordForExamMode();
+            WordWindowLayoutHelper.TryBringExamAppBarToFront();
         }
 
         protected override void OnContentRendered(EventArgs e)

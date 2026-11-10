@@ -217,7 +217,9 @@ namespace MOS_Word_app.Views
                 this.Height = barH;
                 this.Left = 0;
                 this.Top = barTop;
+                this.Topmost = false;
                 this.Topmost = true;
+                ScoreResultWindow.TryBringOpenToFront();
                 return;
             }
 
@@ -233,12 +235,17 @@ namespace MOS_Word_app.Views
             int height = barH + borderHeight;
 
             MoveWindow(hWnd, x, y, width, height, true);
+            this.Topmost = false;
             this.Topmost = true;
+            // PositionWordForExamMode 内の Word 前面化より後で、アプリバーを再前面化する
+            TryForceForeground(hWnd);
+            ScoreResultWindow.TryBringOpenToFront();
         }
 
         private void PositionWordWindow()
         {
             WordWindowLayoutHelper.PositionWordForExamMode();
+            WordWindowLayoutHelper.TryBringExamAppBarToFront();
         }
 
         protected override void OnContentRendered(EventArgs e)
@@ -707,9 +714,10 @@ namespace MOS_Word_app.Views
             {
                 WordStartupInputGate.EnsureWordInputEnabled();
                 IntPtr hwnd = TryGetWordMainWindowHandle();
-                if (hwnd == IntPtr.Zero)
-                    return;
-                TryForceForeground(hwnd);
+                if (hwnd != IntPtr.Zero)
+                    TryForceForeground(hwnd);
+                // Word 前面化のあとアプリバーを戻し、タスクバーがアプリバーの裏に隠れた状態を維持する
+                WordWindowLayoutHelper.TryBringExamAppBarToFront();
             }
             catch
             {
