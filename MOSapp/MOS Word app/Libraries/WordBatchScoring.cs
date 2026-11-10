@@ -23,7 +23,9 @@ namespace Libraries
         private const int ReadyPollIntervalMs = 30;
         private const int DocumentReadyTimeoutMs = 3000;
         private const int DocumentsClosedTimeoutMs = 2000;
-        private const int WordStartupTimeoutMs = 3000;
+        /// <summary>Save As 直後など ROT が一瞬取れないときの再試行。新規 Word は起動しない。</summary>
+        private const int GetActiveObjectRetryCount = 8;
+        private const int GetActiveObjectRetryDelayMs = 150;
         private const string LastTaskFlushAttemptedKey = "MOS.Word.LastTaskEvidenceFlush.Attempted";
         private const string LastTaskFlushCompletedKey = "MOS.Word.LastTaskEvidenceFlush.Completed";
         private const string LastTaskFlushElapsedKey = "MOS.Word.LastTaskEvidenceFlush.ElapsedMs";
@@ -84,30 +86,22 @@ namespace Libraries
             try
             {
                 var connectSw = Stopwatch.StartNew();
-                try
+                // Phase1: 既存 Word のみ使用。GetActiveObject 失敗時に new WordApp() しない（二重起動防止）。
+                if (!TryGetActiveWordApplication(out wordApp))
                 {
-                    wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
-                }
-                catch
-                {
-                    wordApp = new WordApp();
-                    try { wordApp.Visible = true; } catch { }
-                    if (!WaitUntilWordApplicationReady(wordApp))
-                    {
-                        AppendScoringErrorLog(
-                            $"ScoreAllProjects group={groupId} Word startup",
-                            new TimeoutException("Word application was not ready"));
-                    }
+                    WordGradingPerf.Log("ScoreAllProjects.Connect", connectSw.ElapsedMilliseconds, "no-active-word");
+                    AppendScoringErrorLog(
+                        $"ScoreAllProjects group={groupId} Word connect",
+                        new InvalidOperationException("Active Word.Application was not found"));
+                    ReportProgress(progress, "Word に接続できませんでした。Word を開いてから再度採点してください。", 0, projectsToScore.Count);
+                    return;
                 }
                 WordGradingPerf.Log("ScoreAllProjects.Connect", connectSw.ElapsedMilliseconds);
 
-                if (wordApp != null)
-                {
-                    try { wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone; } catch { }
-                    try { wordApp.Visible = true; } catch { }
-                    WordWindowLayoutHelper.PositionWordForBatchScoring(wordApp);
-                    SaveAllOpenDocuments(wordApp);
-                }
+                try { wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone; } catch { }
+                try { wordApp.Visible = true; } catch { }
+                WordWindowLayoutHelper.PositionWordForBatchScoring(wordApp);
+                SaveAllOpenDocuments(wordApp);
 
                 int completedProjects = 0;
                 foreach (var project in projectsToScore)
@@ -234,25 +228,14 @@ namespace Libraries
             WordApp wordApp = null;
             try
             {
-                try
+                // Phase1: 既存 Word のみ。失敗時は新規起動せず null（二重起動防止）。
+                if (!TryGetActiveWordApplication(out wordApp))
                 {
-                    wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
-                }
-                catch
-                {
-                    wordApp = new WordApp();
-                    try { wordApp.Visible = true; } catch { }
-                    if (!WaitUntilWordApplicationReady(wordApp))
-                    {
-                        AppendScoringErrorLog(
-                            $"ScoreSingleTask group={groupId} project={projectId} task={taskId} Word startup",
-                            new TimeoutException("Word application was not ready"));
-                        return null;
-                    }
-                }
-
-                if (wordApp == null)
+                    AppendScoringErrorLog(
+                        $"ScoreSingleTask group={groupId} project={projectId} task={taskId} Word connect",
+                        new InvalidOperationException("Active Word.Application was not found"));
                     return null;
+                }
 
                 try { wordApp.DisplayAlerts = Microsoft.Office.Interop.Word.WdAlertLevel.wdAlertsNone; } catch { }
 
@@ -829,32 +812,37 @@ namespace Libraries
             }
         }
 
-        private static bool WaitUntilWordApplicationReady(WordApp wordApp)
+        /// <summary>
+        /// 実行中の Word を取得する。取れないときは短く再試行し、それでも駄目なら false（新規起動しない）。
+        /// </summary>
+        private static bool TryGetActiveWordApplication(out WordApp wordApp)
         {
-            var wait = Stopwatch.StartNew();
-            while (wait.ElapsedMilliseconds < WordStartupTimeoutMs)
+            wordApp = null;
+            for (int attempt = 1; attempt <= GetActiveObjectRetryCount; attempt++)
             {
-                if (IsWordApplicationReady(wordApp))
-                    return true;
-                Thread.Sleep(ReadyPollIntervalMs);
-            }
-            return IsWordApplicationReady(wordApp);
-        }
+                try
+                {
+                    wordApp = (WordApp)Marshal.GetActiveObject("Word.Application");
+                    if (wordApp != null)
+                        return true;
+                }
+                catch (COMException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WordBatchScoring] GetActiveObject attempt {attempt}/{GetActiveObjectRetryCount}: 0x{ex.HResult:X8}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WordBatchScoring] GetActiveObject attempt {attempt}/{GetActiveObjectRetryCount}: {ex.Message}");
+                }
 
-        private static bool IsWordApplicationReady(WordApp wordApp)
-        {
-            if (wordApp == null)
-                return false;
-            try
-            {
-                bool visible = wordApp.Visible;
-                int count = wordApp.Documents.Count;
-                return visible && count >= 0;
+                if (attempt < GetActiveObjectRetryCount)
+                    Thread.Sleep(GetActiveObjectRetryDelayMs);
             }
-            catch
-            {
-                return false;
-            }
+
+            wordApp = null;
+            return false;
         }
 
         private static bool WaitUntilDocumentsClosed(WordApp wordApp)
@@ -1225,6 +1213,11 @@ namespace Libraries
             if (projectId == 4 && taskId == 6)
                 // 4-6: ［デザイン］ページ罫線 — [Op] PageBorders（Ribbon / ポーリング。他タスクでは許可外）
                 allowed.Add("PageBorders");
+            if (projectId == 4 && taskId == 7)
+            {
+                // 4-7: ドキュメント検査で透かし削除 → VSTO 指紋変化が [Op] Watermark になる（正答副作用）
+                allowed.Add("Watermark");
+            }
 
             // P5
             if (projectId == 5)
@@ -1539,9 +1532,16 @@ namespace Libraries
                     return _reuseCurrent;
 
                 WordDoc doc = FindOpenDocumentForSnapshot(app, path);
+                bool openedForSnapshot = false;
                 if (doc == null)
                 {
-                    try { doc = app.Documents.Open(path, ReadOnly: true, Visible: false); }
+                    try
+                    {
+                        // 7-4/7-5 後など ProjectN が閉じていてもスナップショット用に一時 Open。
+                        // Visible:false でも .doc では窓が出ることがあるので、使い終わったら必ず Close する。
+                        doc = app.Documents.Open(path, ReadOnly: true, Visible: false);
+                        openedForSnapshot = true;
+                    }
                     catch { return RememberReuse(groupId, projectId, null); }
                 }
                 try { return RememberReuse(groupId, projectId, BuildSnapshotFromDocument(doc)); }
@@ -1549,6 +1549,10 @@ namespace Libraries
                 {
                     if (doc != null)
                     {
+                        if (openedForSnapshot)
+                        {
+                            try { doc.Close(SaveChanges: false); } catch { }
+                        }
                         try { Marshal.ReleaseComObject(doc); } catch { }
                     }
                 }

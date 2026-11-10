@@ -42,11 +42,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch
-                {
-                    wordApp = new Application();
-                    wordApp.Visible = true;
-                }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 document = GetDocument(wordApp, filePath);
                 if (document == null)
