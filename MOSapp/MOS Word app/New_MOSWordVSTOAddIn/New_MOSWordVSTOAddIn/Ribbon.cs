@@ -249,6 +249,135 @@ namespace New_MOSWordVSTOAddIn
             }
         }
 
+        /// <summary>
+        /// デバッグタブの「OpenXMLをtxt出力」ボタン。現在文書の WordOpenXML を %TEMP% に書き出す。
+        /// コメント本文＋アンカー調査用（全文と comments* 抽出の2ファイル）。
+        /// </summary>
+        public void DumpOpenXmlButtonOnAction(Microsoft.Office.Core.IRibbonControl control)
+        {
+            try
+            {
+                var app = Globals.ThisAddIn?.Application;
+                if (app == null || app.Documents.Count < 1 || app.ActiveDocument == null)
+                {
+                    System.Windows.Forms.MessageBox.Show(
+                        "開いている Word 文書がありません。",
+                        "OpenXML出力",
+                        System.Windows.Forms.MessageBoxButtons.OK,
+                        System.Windows.Forms.MessageBoxIcon.Information);
+                    return;
+                }
+
+                Microsoft.Office.Interop.Word.Document doc = app.ActiveDocument;
+                string xml = doc.WordOpenXML ?? string.Empty;
+                string tempDir = System.IO.Path.GetTempPath();
+                string fullPath = System.IO.Path.Combine(tempDir, "mos_word_openxml_dump.txt");
+                string commentsPath = System.IO.Path.Combine(tempDir, "mos_word_openxml_comments_dump.txt");
+
+                System.IO.File.WriteAllText(fullPath, xml, new System.Text.UTF8Encoding(false));
+                System.IO.File.WriteAllText(
+                    commentsPath,
+                    BuildCommentsFocusedDump(xml),
+                    new System.Text.UTF8Encoding(false));
+
+                System.Windows.Forms.MessageBox.Show(
+                    "出力しました。\r\n\r\n全文:\r\n" + fullPath
+                    + "\r\n\r\ncomments*/アンカー抽出:\r\n" + commentsPath,
+                    "OpenXML出力",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    ex.Message,
+                    "エラー",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// comments* パートと、本文側の commentRange / commentReference 周辺を抜き出して読みやすくする。
+        /// </summary>
+        private static string BuildCommentsFocusedDump(string wordOpenXml)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== /word/comments* package parts ===");
+            sb.AppendLine();
+
+            if (string.IsNullOrEmpty(wordOpenXml))
+            {
+                sb.AppendLine("(empty WordOpenXML)");
+                return sb.ToString();
+            }
+
+            var partMatches = System.Text.RegularExpressions.Regex.Matches(
+                wordOpenXml,
+                @"<pkg:part\b[^>]*\bpkg:name\s*=\s*""(/word/comments[^""]*)""[^>]*>.*?</pkg:part>",
+                System.Text.RegularExpressions.RegexOptions.Singleline
+                | System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+            if (partMatches.Count == 0)
+            {
+                sb.AppendLine("(no /word/comments* parts found)");
+            }
+            else
+            {
+                for (int i = 0; i < partMatches.Count; i++)
+                {
+                    sb.AppendLine("--- part " + (i + 1) + ": " + partMatches[i].Groups[1].Value + " ---");
+                    sb.AppendLine(partMatches[i].Value);
+                    sb.AppendLine();
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("=== document.xml comment anchors (commentRange*/commentReference) ===");
+            sb.AppendLine();
+
+            var docPart = System.Text.RegularExpressions.Regex.Match(
+                wordOpenXml,
+                @"<pkg:part\b[^>]*\bpkg:name\s*=\s*""(/word/document\.xml)""[^>]*>.*?</pkg:part>",
+                System.Text.RegularExpressions.RegexOptions.Singleline
+                | System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+            if (!docPart.Success)
+            {
+                sb.AppendLine("(document.xml part not found)");
+                return sb.ToString();
+            }
+
+            string docXml = docPart.Value;
+            var anchorMatches = System.Text.RegularExpressions.Regex.Matches(
+                docXml,
+                @"<w:commentRangeStart\b[^/]*/>|<w:commentRangeEnd\b[^/]*/>|<w:commentReference\b[^/]*/>",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+            if (anchorMatches.Count == 0)
+            {
+                sb.AppendLine("(no commentRangeStart/End or commentReference found in document.xml)");
+            }
+            else
+            {
+                sb.AppendLine("count=" + anchorMatches.Count);
+                for (int i = 0; i < anchorMatches.Count; i++)
+                {
+                    int idx = anchorMatches[i].Index;
+                    int start = Math.Max(0, idx - 240);
+                    int end = Math.Min(docXml.Length, idx + anchorMatches[i].Length + 240);
+                    sb.AppendLine("--- anchor hit " + (i + 1) + " ---");
+                    sb.AppendLine(docXml.Substring(start, end - start));
+                    sb.AppendLine();
+                }
+            }
+
+            return sb.ToString();
+        }
+
         #endregion
 
         #region ヘルパー
@@ -338,6 +467,7 @@ namespace New_MOSWordVSTOAddIn
         <group id=""grpLog"" label=""ログ"">
           <button id=""btnShowLogPath"" label=""ログパス表示"" onAction=""ShowLogPathButtonOnAction"" />
           <button id=""btnShowLogContent"" label=""ログ内容表示"" onAction=""ShowLogContentButtonOnAction"" />
+          <button id=""btnDumpOpenXml"" label=""OpenXMLをtxt出力"" onAction=""DumpOpenXmlButtonOnAction"" />
         </group>
       </tab>
     </tabs>

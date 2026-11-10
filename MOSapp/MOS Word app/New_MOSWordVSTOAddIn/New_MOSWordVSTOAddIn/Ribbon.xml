@@ -46,6 +46,7 @@
         <group id="grpLog" label="ログ">
           <button id="btnShowLogPath" label="ログパス表示" onAction="ShowLogPathButtonOnAction" />
           <button id="btnShowLogContent" label="ログ内容表示" onAction="ShowLogContentButtonOnAction" />
+          <button id="btnDumpOpenXml" label="OpenXMLをtxt出力" onAction="DumpOpenXmlButtonOnAction" />
         </group>
       </tab>
     </tabs>

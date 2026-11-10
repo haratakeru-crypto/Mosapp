@@ -9,19 +9,34 @@ namespace Libraries.Group1
 {
     public class WordChecker1_7
     {
-        public bool CheckTask_1_7_01() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_7_01(filePath); } catch { return false; } }
-        public bool CheckTask_1_7_02() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_7_02(filePath); } catch { return false; } }
-        public bool CheckTask_1_7_03() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_7_03(filePath); } catch { return false; } }
-        public bool CheckTask_1_7_04() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_7_04(filePath); } catch { return false; } }
-        public bool CheckTask_1_7_05() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_7_05(filePath); } catch { return false; } }
+        public bool CheckTask_1_7_01() => RunCheck(CheckTask_1_7_01_Impl);
+        public bool CheckTask_1_7_02() => RunCheck(CheckTask_1_7_02_Impl);
+        public bool CheckTask_1_7_03() => RunCheck(CheckTask_1_7_03_Impl);
+        public bool CheckTask_1_7_04() => RunCheck(CheckTask_1_7_04_Impl);
+        public bool CheckTask_1_7_05() => RunCheck(CheckTask_1_7_05_Impl);
 
-        private bool CheckTask_1_7_01(string filePath)
+        private bool RunCheck(Func<string, bool> task)
+        {
+            try
+            {
+                string filePath = GetCurrentWordFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(WordScoreExplanation.UnavailableText);
+                return task(filePath);
+            }
+            catch
+            {
+                return Miss(WordScoreExplanation.UnavailableText);
+            }
+        }
+
+        private bool CheckTask_1_7_01_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { return false; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
@@ -32,7 +47,7 @@ namespace Libraries.Group1
                         document = doc; break;
                     }
                 }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 // 1. 拡張子チェック: .doc のまま（「変換」直後・未保存のユニーク状態）
                 //    「変換」操作はメモリ内のドキュメント形式のみアップグレードし、
@@ -47,9 +62,11 @@ namespace Libraries.Group1
                 //    5-1 と同様「現在が合格」または「過去に互換解除したログがある」なら合格。
                 //    UpgradeDocument は Ribbon の idMso では発火しないが、ThisAddIn ポーリングで .doc 上の非15→15 遷移時に記録する。
                 bool logOk = LogReader.HasTaskEvidence(7, 1, "UpgradeDocument");
-                return stateOk || logOk;
+                if (stateOk || logOk)
+                    return true;
+                return Miss("文書の互換モードが解除されていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
@@ -58,11 +75,12 @@ namespace Libraries.Group1
         private const string P7RdDocmFileName = "朗読会.docm";
         private const string P7ReadPassword = "abc";
 
-        private bool CheckTask_1_7_02(string filePath)
+        private bool CheckTask_1_7_02_Impl(string filePath)
         {
             try
             {
-                if (string.IsNullOrEmpty(filePath)) return false;
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(WordScoreExplanation.UnavailableText);
 
                 bool logOk = LogReader.HasTaskEvidence(7, 2, "SetDocumentCompany");
                 Document project7 = null;
@@ -75,19 +93,31 @@ namespace Libraries.Group1
                         LogCompanyStateDiagnosticsIfNeeded(filePath, logOk, stateOk, company);
 
                         // 半角カナのみ veto（問題1）。読取不可・空は 7-4/7-5 後にログで救済する。
+                        // 詳細理由は他の誤りと同じく実値表示（半角専用文言は出さない）。
                         if (WordP7CompanyValidation.HasHalfWidthKatakanaCompany(project7))
-                            return false;
+                        {
+                            string raw = "";
+                            WordP7CompanyValidation.TryGetCompanyRaw(project7, out raw);
+                            if (!string.IsNullOrWhiteSpace(raw))
+                                return Miss($"会社名が「{QuoteForStudent(raw.Trim())}」になっています。");
+                            return Miss("会社名が「ラビット出版」に設定されていません。");
+                        }
 
                         bool saveAsFollowUp = LogReader.HasTaskEvidence(7, 4, "FileSaveAsTxt")
                             || LogReader.HasTaskEvidence(7, 5, "FileSaveAsDocm");
                         if (logOk && saveAsFollowUp)
                             return true;
 
-                        return logOk || stateOk;
+                        if (logOk || stateOk)
+                            return true;
+
+                        return Miss(BuildTask72CompanyFailReason(project7));
                     }
 
                     LogCompanyStateDiagnosticsIfNeeded(filePath, logOk, false, "");
-                    return logOk;
+                    if (logOk)
+                        return true;
+                    return Miss("会社名が「ラビット出版」に設定されていません。");
                 }
                 finally
                 {
@@ -95,7 +125,7 @@ namespace Libraries.Group1
                         Marshal.ReleaseComObject(project7);
                 }
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
         }
 
         /// <summary>7-2 採点: 開いている Project7.doc を取得。</summary>
@@ -412,14 +442,14 @@ namespace Libraries.Group1
             catch { return false; }
         }
 
-        private bool CheckTask_1_7_03(string filePath)
+        private bool CheckTask_1_7_03_Impl(string filePath)
         {
             Application wordApp = null;
             Document document = null;
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { return false; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 string fileName = Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
@@ -431,50 +461,69 @@ namespace Libraries.Group1
                         break;
                     }
                 }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 // SaveCopyAs + System.IO.Packaging でのパッケージ読取は、一部環境で参照が解決せずビルド不能となるため採用しない。
                 // 全セクション×各ヘッダー種別の WordOpenXML のみで判定する（論点1: いずれかのヘッダーで一致すれば○）。
                 // 拡張子 .doc のヘッダーは互換11/15で XML が異なる（Reference/XML: ED7D31 直書き vs themeFill accent2）。tbl+gridCol 補助指紋を OR する。
                 // 7-4 後などヘッダーが読めない／状態が変わったあとも、VSTO ポーリングで記録した IntegralHeader ログがあれば ○（7-1 と同型）。
-                return TryIntegralFromLiveHeaderWordOpenXml(document)
-                    || LogReader.HasTaskEvidence(7, 3, "IntegralHeader");
+                if (TryIntegralFromLiveHeaderWordOpenXml(document)
+                    || LogReader.HasTaskEvidence(7, 3, "IntegralHeader"))
+                    return true;
+                return Miss("「インテグラル」のヘッダーが挿入されていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally
             {
                 if (document != null) Marshal.ReleaseComObject(document);
             }
         }
 
-        private bool CheckTask_1_7_04(string filePath)
+        private bool CheckTask_1_7_04_Impl(string filePath)
         {
             try
             {
-                if (string.IsNullOrEmpty(filePath)) return false;
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(WordScoreExplanation.UnavailableText);
 
                 // 元 .docx と同一フォルダに「朗読会.txt」が存在するか（課題: 書式なしテキストで保存）
                 string dir = Path.GetDirectoryName(filePath);
-                if (string.IsNullOrEmpty(dir)) return false;
+                if (string.IsNullOrEmpty(dir))
+                    return Miss(WordScoreExplanation.UnavailableText);
                 string targetTxt = Path.Combine(dir, "朗読会.txt");
-                if (!File.Exists(targetTxt)) return false;
+                bool fileOk = File.Exists(targetTxt);
+                bool logOk = LogReader.HasTaskEvidence(7, 4, "FileSaveAsTxt");
 
-                // 保存時の操作ログが存在するか
-                if (!LogReader.HasTaskEvidence(7, 4, "FileSaveAsTxt")) return false;
+                if (fileOk && logOk)
+                    return true;
 
-                return true;
+                bool noted = false;
+                if (!fileOk)
+                {
+                    WordScoreExplanation.Note("「朗読会.txt」が保存されていません。");
+                    noted = true;
+                }
+                // 操作記録はファイルがあるときだけ（4-6型）
+                if (fileOk && !logOk)
+                {
+                    WordScoreExplanation.Note("テキストファイルとして保存した記録がありません。");
+                    noted = true;
+                }
+                if (noted)
+                    return false;
+                return Miss("テキストファイルへの保存が完了していません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
         }
 
-        private bool CheckTask_1_7_05(string filePath)
+        private bool CheckTask_1_7_05_Impl(string filePath)
         {
             Application wordApp = null;
             Document document = null;
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { return false; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 string fileName = Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents)
@@ -486,15 +535,19 @@ namespace Libraries.Group1
                         break;
                     }
                 }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 // 7-4 と同フォルダ・同ベース名（朗読会）の .docm（課題: マクロ有効＋読み取りパスワード）
                 string dir = Path.GetDirectoryName(filePath);
-                if (string.IsNullOrEmpty(dir)) return false;
+                if (string.IsNullOrEmpty(dir))
+                    return Miss(WordScoreExplanation.UnavailableText);
                 string targetDocm = Path.Combine(dir, "朗読会.docm");
-                if (!File.Exists(targetDocm)) return false;
-                if (!AppearsEncryptedByReadPassword(targetDocm)) return false;
-                if (!LogReader.HasTaskEvidence(7, 5, "FileSaveAsDocm")) return false;
+                bool fileOk = File.Exists(targetDocm);
+                if (!fileOk)
+                    return Miss("「朗読会.docm」が保存されていません。");
+
+                bool encrypted = AppearsEncryptedByReadPassword(targetDocm);
+                bool logOk = LogReader.HasTaskEvidence(7, 5, "FileSaveAsDocm");
 
                 // パスワードが「abc」に正しく設定されているかを一時コピーファイルで安全にサイレント検証
                 WdAlertLevel originalAlertLevel = wordApp.DisplayAlerts;
@@ -511,7 +564,7 @@ namespace Libraries.Group1
                     }
 
                     wordApp.DisplayAlerts = WdAlertLevel.wdAlertsNone;
-                    
+
                     // 非表示かつ読み取り専用で、複製した一時ファイルをパスワード "abc" でオープン試行
                     tempDoc = wordApp.Documents.Open(
                         FileName: tempPath,
@@ -521,7 +574,7 @@ namespace Libraries.Group1
                         PasswordDocument: "abc",
                         Visible: false
                     );
-                    
+
                     passwordOk = true;
                 }
                 catch (COMException)
@@ -549,10 +602,111 @@ namespace Libraries.Group1
                     catch { }
                 }
 
-                return passwordOk;
+                if (encrypted && logOk && passwordOk)
+                    return true;
+
+                bool noted = false;
+                if (!encrypted)
+                {
+                    WordScoreExplanation.Note("読み取りパスワードが設定されていません。");
+                    noted = true;
+                }
+                else if (!passwordOk)
+                {
+                    WordScoreExplanation.Note("読み取りパスワードが「abc」になっていません。");
+                    noted = true;
+                }
+                // 操作記録はファイル＋暗号化＋パスワード検証が揃っているときだけ（4-6型）
+                if (encrypted && passwordOk && !logOk)
+                {
+                    WordScoreExplanation.Note("マクロ有効文書として保存した記録がありません。");
+                    noted = true;
+                }
+                if (noted)
+                    return false;
+                return Miss("マクロ有効文書への保存が完了していません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
+        }
+
+        private static bool Miss(string reason)
+        {
+            WordScoreExplanation.Note(reason);
+            return false;
+        }
+
+        private static string QuoteForStudent(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "（空）";
+            string text = value.Replace("\r", "").Replace("\n", " ");
+            const int maxLen = 40;
+            if (text.Length <= maxLen)
+                return text;
+            return text.Substring(0, maxLen) + "…";
+        }
+
+        /// <summary>
+        /// 7-2 ×理由。Company に誤値があればそれだけ。
+        /// 空のときだけ他プロパティに「ラビット出版」完全一致があればその項目を伝える。
+        /// </summary>
+        private static string BuildTask72CompanyFailReason(Document document)
+        {
+            string actual = "";
+            if (WordP7CompanyValidation.TryGetCompanyRaw(document, out actual)
+                && !string.IsNullOrWhiteSpace(actual))
+            {
+                return $"会社名が「{QuoteForStudent(actual.Trim())}」になっています。";
+            }
+
+            if (TryFindExactRabbitInOtherDocumentProperty(document, out string propLabel))
+                return $"{propLabel}に「ラビット出版」が設定されています。";
+
+            return "会社名が「ラビット出版」に設定されていません。";
+        }
+
+        /// <summary>会社以外の代表プロパティに「ラビット出版」が完全一致であるか。</summary>
+        private static bool TryFindExactRabbitInOtherDocumentProperty(Document document, out string propertyLabelJa)
+        {
+            propertyLabelJa = null;
+            if (document == null)
+                return false;
+
+            // UI名 → BuiltInDocumentProperties 名
+            var candidates = new[]
+            {
+                ("タグ", "Keywords"),
+                ("タイトル", "Title"),
+                ("件名", "Subject"),
+                ("作成者", "Author"),
+                ("コメント", "Comments"),
+                ("管理者", "Manager"),
+            };
+
+            foreach (var (labelJa, propName) in candidates)
+            {
+                string value = TryGetBuiltInDocumentProperty(document, propName);
+                if (string.Equals((value ?? "").Trim(), WordP7CompanyValidation.TargetCompany, StringComparison.Ordinal))
+                {
+                    propertyLabelJa = labelJa;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string TryGetBuiltInDocumentProperty(Document document, string propertyName)
+        {
+            try
+            {
+                dynamic prop = ((dynamic)document.BuiltInDocumentProperties)[propertyName];
+                return prop?.Value?.ToString();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>

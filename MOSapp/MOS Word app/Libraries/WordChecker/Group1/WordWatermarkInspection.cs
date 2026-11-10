@@ -9,8 +9,8 @@ using Microsoft.Office.Interop.Word;
 namespace Libraries.Group1
 {
     /// <summary>
-    /// 4-5 透かし判定。ギャラリー「サンプル２」は表示文字「サンプル」（ヘッダー内）。
-    /// 「下書き1」は「下書き」＋斜め、「下書き2」は「下書き」＋横書き。
+    /// 4-5 透かし判定。ギャラリー「サンプル２」は表示文字「サンプル」＋横書き。
+    /// 「サンプル1」は同文字＋斜め。「下書き1」は「下書き」＋斜め、「下書き2」は「下書き」＋横書き。
     /// WordChecker と VSTO ポーリングで同条件を共有する。
     /// </summary>
     public static class WordWatermarkInspection
@@ -22,6 +22,18 @@ namespace Libraries.Group1
         {
             "社外秘", "至急", "案内", "転送厳禁", "CONFIDENTIAL", "URGENT", "DO NOT COPY"
         };
+
+        /// <summary>学生向け表示・抽出用。Forbidden に加えギャラリーでよく選ばれる文言。</summary>
+        private static readonly string[] KnownWatermarkDisplayTexts =
+        {
+            "社外秘", "至急", "案内", "転送厳禁", "複製を禁ず", "コピー禁止",
+            "CONFIDENTIAL", "URGENT", "DO NOT COPY",
+            "下書き", "サンプル", "SAMPLE"
+        };
+
+        private static readonly Regex TextPathStringRegex = new Regex(
+            @"string\s*=\s*""([^""]+)""",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         private static readonly string[] DiagonalRotationLiteralMarkers =
         {
@@ -35,6 +47,11 @@ namespace Libraries.Group1
 
         private static readonly Regex HeaderBlockRegex = new Regex(
             @"<w:hdr\b[^>]*>.*?</w:hdr>",
+            RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
+        /// <summary>透かし・ヘッダー／フッター残留の検査対象。媒体 part の base64 は含めない。</summary>
+        private static readonly Regex HeaderFooterBlockRegex = new Regex(
+            @"<w:(?:hdr|ftr)\b[^>]*>.*?</w:(?:hdr|ftr)>",
             RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
         public static string NormalizeXml(string xml)
@@ -51,7 +68,10 @@ namespace Libraries.Group1
             }
         }
 
-        /// <summary>透かし「サンプル２」: ヘッダー内に「サンプル」または SAMPLE（下書き・禁止キーワードは除外）。</summary>
+        /// <summary>
+        /// 透かし「サンプル２」: ヘッダー内に「サンプル」または SAMPLE かつ横書き。
+        /// 斜め（サンプル1相当）は false。下書き・禁止キーワードは除外。
+        /// </summary>
         public static bool IsSample2Watermark(string normalizedXml)
         {
             if (string.IsNullOrEmpty(normalizedXml))
@@ -60,7 +80,60 @@ namespace Libraries.Group1
                 return false;
             if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
                 return false;
-            return ContainsSample2TextInWatermarkHeader(normalizedXml);
+            return ContainsSampleTextWithOrientation(normalizedXml, requireHorizontal: true);
+        }
+
+        /// <summary>透かし「サンプル1」相当: 「サンプル」／SAMPLE かつ斜め。</summary>
+        public static bool IsSample1DiagonalWatermark(string normalizedXml)
+        {
+            if (string.IsNullOrEmpty(normalizedXml))
+                return false;
+            if (HasForbiddenWatermark(normalizedXml))
+                return false;
+            if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
+                return false;
+            return ContainsSampleTextWithOrientation(normalizedXml, requireHorizontal: false);
+        }
+
+        /// <summary>学生向け詳細理由用。表示文字と向き（取れた範囲）を返す。</summary>
+        public readonly struct WatermarkStudentView
+        {
+            public string DisplayText { get; }
+            /// <summary>true=横 / false=斜め / null=不明。</summary>
+            public bool? IsHorizontal { get; }
+            public bool IsExpectedSample2 { get; }
+
+            public WatermarkStudentView(string displayText, bool? isHorizontal, bool isExpectedSample2)
+            {
+                DisplayText = displayText;
+                IsHorizontal = isHorizontal;
+                IsExpectedSample2 = isExpectedSample2;
+            }
+        }
+
+        public static WatermarkStudentView AnalyzeForStudent(string normalizedXml)
+        {
+            if (string.IsNullOrEmpty(normalizedXml))
+                return new WatermarkStudentView(null, null, false);
+
+            if (IsSample2Watermark(normalizedXml))
+                return new WatermarkStudentView("サンプル", true, true);
+
+            if (IsSample1DiagonalWatermark(normalizedXml))
+                return new WatermarkStudentView("サンプル", false, false);
+
+            if (IsDraft1Watermark(normalizedXml))
+                return new WatermarkStudentView("下書き", false, false);
+
+            if (IsDraft2HorizontalWatermark(normalizedXml))
+                return new WatermarkStudentView("下書き", true, false);
+
+            string text = TryExtractWatermarkDisplayText(normalizedXml);
+            bool? horizontal = null;
+            if (!string.IsNullOrEmpty(text))
+                horizontal = TryGetOrientationNearText(normalizedXml, text);
+
+            return new WatermarkStudentView(text, horizontal, false);
         }
 
         /// <summary>［デザイン］透かし「下書き1」: 文字「下書き」かつ斜め。社外秘・至急・下書き2（横）は false。</summary>
@@ -122,8 +195,13 @@ namespace Libraries.Group1
                 return "Draft2Horizontal";
             if (IsSample2Watermark(normalizedXml))
                 return "Sample2";
+            if (IsSample1DiagonalWatermark(normalizedXml))
+                return "Sample1Diagonal";
             if (normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0)
                 return "DraftOther";
+            if (normalizedXml.IndexOf("サンプル", StringComparison.Ordinal) >= 0
+                || normalizedXml.IndexOf("SAMPLE", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "SampleOther";
             return "None";
         }
 
@@ -1240,35 +1318,143 @@ namespace Libraries.Group1
             }
         }
 
-        /// <summary>4-7 後: 禁止透かし・下書き1/2 相当の透かしが残っていない。</summary>
+        /// <summary>
+        /// 4-7 後: 禁止透かし・下書き1/2 相当の透かしがヘッダー／フッターに残っていない。
+        /// Flat OPC 全体（画像 base64 等）は見ない。SAMPLE 等が媒体バイト列に偶然含まれても誤検知しない。
+        /// </summary>
         public static bool IsWatermarkClearedForTask47FollowUp(string normalizedXml)
         {
             if (string.IsNullOrEmpty(normalizedXml))
                 return true;
-            if (HasForbiddenWatermark(normalizedXml))
+
+            string hfXml = ExtractHeaderFooterBlocksXml(normalizedXml);
+            if (string.IsNullOrEmpty(hfXml))
+                return true;
+
+            if (HasForbiddenWatermark(hfXml))
                 return false;
-            if (IsDraft1Watermark(normalizedXml))
+            if (IsDraft1Watermark(hfXml))
                 return false;
-            if (IsDraft2HorizontalWatermark(normalizedXml))
+            if (IsDraft2HorizontalWatermark(hfXml))
                 return false;
-            if (IsSample2Watermark(normalizedXml))
+            if (IsSample2Watermark(hfXml))
                 return false;
-            return normalizedXml.IndexOf("下書き", StringComparison.Ordinal) < 0
-                && normalizedXml.IndexOf("サンプル", StringComparison.Ordinal) < 0;
+            if (IsSample1DiagonalWatermark(hfXml))
+                return false;
+            return hfXml.IndexOf("下書き", StringComparison.Ordinal) < 0
+                && hfXml.IndexOf("サンプル", StringComparison.Ordinal) < 0
+                && hfXml.IndexOf("SAMPLE", StringComparison.OrdinalIgnoreCase) < 0;
         }
 
-        private static bool ContainsSample2TextInWatermarkHeader(string normalizedXml)
+        private static string ExtractHeaderFooterBlocksXml(string xml)
+        {
+            if (string.IsNullOrEmpty(xml))
+                return string.Empty;
+            var sb = new StringBuilder();
+            foreach (Match match in HeaderFooterBlockRegex.Matches(xml))
+                sb.Append(match.Value);
+            return sb.ToString();
+        }
+
+        /// <param name="requireHorizontal">true=横（サンプル2）、false=斜め（サンプル1）。</param>
+        private static bool ContainsSampleTextWithOrientation(string normalizedXml, bool requireHorizontal)
         {
             foreach (Match match in HeaderBlockRegex.Matches(normalizedXml))
             {
                 string hdr = match.Value;
-                if (hdr.IndexOf("サンプル", StringComparison.Ordinal) >= 0)
-                    return true;
-                if (hdr.IndexOf("SAMPLE", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (HasSampleTextWithOrientationInBlock(hdr, normalizedXml, match.Index, requireHorizontal))
                     return true;
             }
 
             return false;
+        }
+
+        private static bool HasSampleTextWithOrientationInBlock(
+            string hdr, string fullXml, int hdrOffsetInFull, bool requireHorizontal)
+        {
+            foreach (string needle in new[] { "サンプル", "SAMPLE" })
+            {
+                StringComparison cmp = needle == "SAMPLE"
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal;
+                int local = 0;
+                while (local < hdr.Length)
+                {
+                    int found = hdr.IndexOf(needle, local, cmp);
+                    if (found < 0)
+                        break;
+                    string context = GetContext(fullXml, hdrOffsetInFull + found, ContextCharsBefore, ContextCharsAfter);
+                    bool diagonal = ContextHasDiagonalRotation(context);
+                    bool horizontal = ContextSuggestsHorizontalWatermark(context);
+                    if (requireHorizontal)
+                    {
+                        if (!diagonal && horizontal)
+                            return true;
+                    }
+                    else
+                    {
+                        if (diagonal)
+                            return true;
+                    }
+                    local = found + needle.Length;
+                }
+            }
+            return false;
+        }
+
+        private static string TryExtractWatermarkDisplayText(string normalizedXml)
+        {
+            foreach (Match hdrMatch in HeaderBlockRegex.Matches(normalizedXml))
+            {
+                string hdr = hdrMatch.Value;
+                foreach (string known in KnownWatermarkDisplayTexts)
+                {
+                    StringComparison cmp = string.Equals(known, "SAMPLE", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(known, "CONFIDENTIAL", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(known, "URGENT", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(known, "DO NOT COPY", StringComparison.OrdinalIgnoreCase)
+                        ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal;
+                    if (hdr.IndexOf(known, cmp) >= 0)
+                        return known == "SAMPLE" ? "SAMPLE" : known;
+                }
+
+                foreach (Match tp in TextPathStringRegex.Matches(hdr))
+                {
+                    string raw = (tp.Groups[1].Value ?? "").Trim();
+                    if (string.IsNullOrEmpty(raw) || raw.Length > 40)
+                        continue;
+                    if (raw.IndexOf('<') >= 0)
+                        continue;
+                    return raw;
+                }
+            }
+            return null;
+        }
+
+        private static bool? TryGetOrientationNearText(string normalizedXml, string text)
+        {
+            if (string.IsNullOrEmpty(normalizedXml) || string.IsNullOrEmpty(text))
+                return null;
+
+            bool ascii = text.Length > 0 && text[0] < 128;
+            int idx = 0;
+            while (idx < normalizedXml.Length)
+            {
+                int found = ascii
+                    ? normalizedXml.IndexOf(text, idx, StringComparison.OrdinalIgnoreCase)
+                    : normalizedXml.IndexOf(text, idx, StringComparison.Ordinal);
+                if (found < 0)
+                    break;
+                string context = GetContext(normalizedXml, found, ContextCharsBefore, ContextCharsAfter);
+                if (ContextHasDiagonalRotation(context))
+                    return false;
+                if (ContextSuggestsHorizontalWatermark(context))
+                    return true;
+                idx = found + text.Length;
+            }
+
+            return null;
         }
 
         private static bool ContainsDraft1DiagonalNearDraftText(string normalizedXml)
@@ -1306,7 +1492,19 @@ namespace Libraries.Group1
 
         private static bool ContextLooksHorizontalWatermark(string context)
         {
+            return ContextSuggestsHorizontalWatermark(context);
+        }
+
+        /// <summary>
+        /// 横書き透かしとみなす。rotation≈0 / lrTb、または斜めでなく rotation 指定が無い場合
+        /// （Word の横プリセットは rotation を省略することが多い）。
+        /// </summary>
+        private static bool ContextSuggestsHorizontalWatermark(string context)
+        {
             if (string.IsNullOrEmpty(context))
+                return false;
+
+            if (ContextHasDiagonalRotation(context))
                 return false;
 
             if (context.IndexOf("rotation:0", StringComparison.OrdinalIgnoreCase) >= 0
@@ -1321,11 +1519,25 @@ namespace Libraries.Group1
             }
 
             // 横書きプリセットは textDirection が lrTb で rotation 指定が無いことが多い
-            if (context.IndexOf("lrTb", StringComparison.OrdinalIgnoreCase) >= 0
-                && context.IndexOf("下書き", StringComparison.Ordinal) >= 0)
+            if (context.IndexOf("lrTb", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            // rotation 系の指定が一切無い → 横とみなす（サンプル2・下書き2 の典型）
+            if (!ContextHasAnyRotationMarker(context))
                 return true;
 
             return false;
+        }
+
+        private static bool ContextHasAnyRotationMarker(string context)
+        {
+            if (string.IsNullOrEmpty(context))
+                return false;
+            if (context.IndexOf("rotation:", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            if (context.IndexOf("rot=\"", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            return RotationInStyleRegex.IsMatch(context);
         }
 
         private static bool TryParseRotationDegrees(string value, out double degrees)

@@ -37,7 +37,6 @@ namespace New_MOSWordVSTOAddIn
             (4, 5, "WatermarkCustomDialog"),
             (4, 6, "PageBorders"),
             (5, 1, "WrapTopBottom"),
-            (5, 2, "WrapTight"),
             (6, 1, "TableConvertTextToTable"),
             (6, 4, "TableColumnsDistribute"),
             (7, 1, "UpgradeDocument"),

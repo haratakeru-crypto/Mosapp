@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Linq;
@@ -42,7 +43,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] 文書取得中...");
                 string fileName = System.IO.Path.GetFileName(filePath);
@@ -72,72 +73,33 @@ namespace Libraries.Group1
 
                 if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
-                System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] ロジック実行開始");
-                Range searchRange = WordFindHelper.DuplicateContent(document);
-                Find find = searchRange.Find;
-                WordFindHelper.ConfigureSafeFind(find, "1.生活の中でできるエコ活動");
-                find.Execute();
-                if (!find.Found)
-                {
-                    WordFindHelper.ConfigureSafeFind(find, "１.生活の中でできるエコ活動");
-                    find.Execute();
-                }
-                if (!find.Found)
-                {
-                    WordFindHelper.ConfigureSafeFind(find, "生活の中でできるエコ活動");
-                    find.Execute();
-                }
-                if (!find.Found)
-                {
-                    Marshal.ReleaseComObject(find);
-                    Marshal.ReleaseComObject(searchRange);
-                    System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] 指定のテキストが見つかりません。");
-                    return Miss("見出し「1.生活の中でできるエコ活動」がありません。");
-                }
-                Marshal.ReleaseComObject(find);
-                Marshal.ReleaseComObject(searchRange);
-
-                System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] コメント取得開始...");
-                Comments comments = document.Comments;
-                bool result = false;
-                string otherBodyOnHeading = null;
+                // モダンコメントでも安定するよう、合否は OpenXML のみ（COM Comments は使わない）。
+                // 合否: comments* の本文完全一致 + document.xml の commentRange が指定見出し文言上。
+                const string expected = "最新の情報を確認";
+                const string anchorPhrase = "生活の中でできるエコ活動";
+                string xml = "";
                 try
                 {
-                    int count = comments.Count;
-                    for (int i = 1; i <= count; i++)
-                    {
-                        Comment comment = null;
-                        try
-                        {
-                            comment = comments[i];
-                            if (CommentBodyMatchesLatestInfoCheck(comment))
-                            {
-                                result = true;
-                                break;
-                            }
-                            if (otherBodyOnHeading == null && CommentScopeLooksLikeEcoHeading(SafeCommentScopeText(comment)))
-                            {
-                                string body = StripWordCommentControlChars(SafeCommentRangeText(comment));
-                                if (!string.IsNullOrEmpty(body) && !IsExactCommentPhrase(body, "最新の情報を確認"))
-                                    otherBodyOnHeading = body;
-                            }
-                        }
-                        finally
-                        {
-                            if (comment != null) Marshal.ReleaseComObject(comment);
-                        }
-                    }
+                    System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_01] WordOpenXML取得中...");
+                    xml = WordOpenXmlSession.Get(document);
                 }
-                finally
+                catch (Exception ex)
                 {
-                    Marshal.ReleaseComObject(comments);
+                    System.Diagnostics.Debug.WriteLine($"    [CheckTask_1_4_01] XML取得エラー: {ex.Message}");
                 }
+
+                string failReason;
+                bool result = TryPassCommentExactOnAnchor(
+                    xml,
+                    expected,
+                    anchorPhrase,
+                    requireReply: false,
+                    out failReason);
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_01] 終了。結果={result}");
                 if (result)
                     return true;
-                if (!string.IsNullOrEmpty(otherBodyOnHeading))
-                    return Miss($"見出し「1.生活の中でできるエコ活動」のコメントが「{Quote(otherBodyOnHeading)}」になっています。");
-                return Miss("見出し「1.生活の中でできるエコ活動」に「最新の情報を確認」のコメントがありません。");
+                return Miss(failReason
+                    ?? "見出し「1.生活の中でできるエコ活動」に「最新の情報を確認」のコメントがありません。");
             }
             catch (Exception ex)
             {
@@ -161,7 +123,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] 文書取得中...");
                 string fileName = System.IO.Path.GetFileName(filePath);
@@ -195,33 +157,32 @@ namespace Libraries.Group1
                     return Miss(WordScoreExplanation.UnavailableText);
                 }
 
-                System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] ロジック実行開始");
-                // 合否は指定文言との完全一致（余分な空白は×）。Word 由来の段落記号のみ除去。
-                // COM を優先し、取れない環境向けに OpenXML の <w:t> テキストも同じ厳密照合する。
+                // 合否: comments* の本文完全一致 + 返信(paraIdParent) + アンカーが「その他」。COM Comments は使わない。
                 const string expectedReply = "前田先生に最終確認";
-                bool fileStateCheck = DocumentHasExactReplyOnSonoTaComment(document, expectedReply);
-                if (!fileStateCheck)
+                const string anchorPhrase = "その他";
+                string xml = "";
+                try
                 {
-                    try
-                    {
-                        System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
-                        string xml = WordOpenXmlSession.Get(document);
-                        fileStateCheck = XmlHasExactWtText(xml, expectedReply);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"    [CheckTask_1_4_02] XML解析エラー: {ex.Message}");
-                    }
+                    System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_02] WordOpenXML取得中...");
+                    xml = WordOpenXmlSession.Get(document);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"    [CheckTask_1_4_02] XML解析エラー: {ex.Message}");
                 }
 
+                string failReason;
+                bool fileStateCheck = TryPassCommentExactOnAnchor(
+                    xml,
+                    expectedReply,
+                    anchorPhrase,
+                    requireReply: true,
+                    out failReason);
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_02] 終了。結果={fileStateCheck}");
                 if (fileStateCheck)
                     return true;
-
-                string otherReply = TryGetFirstReplyBodyOnSonoTaComment(document);
-                if (!string.IsNullOrEmpty(otherReply))
-                    return Miss($"見出し「その他」のコメントの返信が「{Quote(otherReply)}」になっています。");
-                return Miss("見出し「その他」のコメントに「前田先生に最終確認」の返信がありません。");
+                return Miss(failReason
+                    ?? "見出し「その他」のコメントに「前田先生に最終確認」の返信がありません。");
             }
             catch (Exception ex)
             {
@@ -245,7 +206,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_03] 文書取得中...");
                 string fileName = System.IO.Path.GetFileName(filePath);
@@ -333,7 +294,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_04] 文書取得中...");
                 string fileName = System.IO.Path.GetFileName(filePath);
@@ -376,8 +337,6 @@ namespace Libraries.Group1
                 System.Diagnostics.Debug.WriteLine($"<<< [CheckTask_1_4_04] 終了。結果={result} (lineSimple={lineSimple}, logSimple={logSimple})");
                 if (result)
                     return true;
-                if (styleSet.IsStylish)
-                    return Miss("スタイルセットが「線（スタイリッシュ）」になっています。");
                 if (!lineSimple)
                     return Miss("スタイルセットが「線（シンプル）」になっていません。");
                 return Miss("スタイルセット「線（シンプル）」について、必要な操作の記録がありません。");
@@ -404,7 +363,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
 
                 System.Diagnostics.Debug.WriteLine("    [CheckTask_1_4_05] 文書取得中...");
                 string fileName = System.IO.Path.GetFileName(filePath);
@@ -446,28 +405,18 @@ namespace Libraries.Group1
                 }
                 catch { }
 
-                // 1) 現在の文書: 透かし「サンプル２」（ヘッダー内「サンプル」）のみ ○
-                if (WordWatermarkInspection.HasForbiddenWatermark(normalizedXml))
-                {
-                    string forbidden = FindForbiddenWatermarkKeyword(normalizedXml);
-                    if (!string.IsNullOrEmpty(forbidden))
-                        return Miss($"透かしが「{forbidden}」になっています。");
-                    return Miss("指定以外の透かしが入っています。");
-                }
+                // 1) 現在の文書: 透かし「サンプル２」（「サンプル」＋横書き）のみ ○
                 if (WordWatermarkInspection.IsSample2Watermark(normalizedXml))
                     return true;
-                if (WordWatermarkInspection.IsDraft1Watermark(normalizedXml))
-                    return Miss("透かしが「下書き1」になっています。");
-                if (WordWatermarkInspection.IsDraft2HorizontalWatermark(normalizedXml))
-                    return Miss("透かしが「下書き2」になっています。");
 
-                // 2) 4-7 後: 透かしなし + 4-5 で透かし挿入証跡 + 4-7 相当（ヘッダー/フッター空）
+                // 2) 4-7 後: 透かしなし + 4-5 で透かし挿入証跡 + 4-7 相当（H/F・透かしクリア）
                 bool cleared = WordWatermarkInspection.IsWatermarkClearedForTask47FollowUp(normalizedXml);
                 bool evidenceWatermark = LogReader.HasTaskEvidence(4, 5, "Watermark");
-                bool task47State = IsPrimaryHeaderFooterEmpty(document);
+                bool task47State = IsTask47HeaderFooterWatermarkCleared(document, normalizedXml);
                 if (cleared && evidenceWatermark && task47State)
                     return true;
-                return Miss("透かし「サンプル２」がありません。");
+
+                return Miss(BuildTask45FailReason(normalizedXml));
             }
             catch (Exception ex)
             {
@@ -491,7 +440,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
                 string fileName = System.IO.Path.GetFileName(filePath);
                 docs = wordApp.Documents;
                 int docCount = 0; try { docCount = docs.Count; } catch { }
@@ -507,7 +456,7 @@ namespace Libraries.Group1
                 bool hasTop = false, hasBottom = false, hasLeft = false, hasRight = false;
                 int bordersShadow = -999;
                 string wrongWidthLabel = null;
-                bool anySidePresent = false;
+                bool topVisible = false, bottomVisible = false, leftVisible = false, rightVisible = false;
 
                 if (document.Sections.Count >= 1)
                 {
@@ -524,13 +473,15 @@ namespace Libraries.Group1
                     hasLeft = IsPageBorderSide150Single(left);
                     hasRight = IsPageBorderSide150Single(right);
 
+                    topVisible = IsPageBorderSideVisible(top);
+                    bottomVisible = IsPageBorderSideVisible(bottom);
+                    leftVisible = IsPageBorderSideVisible(left);
+                    rightVisible = IsPageBorderSideVisible(right);
+
                     if (!hasTop) wrongWidthLabel = DescribePageBorderSideMismatch(top) ?? wrongWidthLabel;
                     if (!hasBottom) wrongWidthLabel = DescribePageBorderSideMismatch(bottom) ?? wrongWidthLabel;
                     if (!hasLeft) wrongWidthLabel = DescribePageBorderSideMismatch(left) ?? wrongWidthLabel;
                     if (!hasRight) wrongWidthLabel = DescribePageBorderSideMismatch(right) ?? wrongWidthLabel;
-                    anySidePresent =
-                        IsPageBorderSideVisible(top) || IsPageBorderSideVisible(bottom)
-                        || IsPageBorderSideVisible(left) || IsPageBorderSideVisible(right);
 
                     Marshal.ReleaseComObject(right); Marshal.ReleaseComObject(left); Marshal.ReleaseComObject(bottom); Marshal.ReleaseComObject(top); Marshal.ReleaseComObject(borders1); Marshal.ReleaseComObject(section1);
                 }
@@ -542,38 +493,56 @@ namespace Libraries.Group1
                 if (result)
                     return true;
 
+                bool anySidePresent = topVisible || bottomVisible || leftVisible || rightVisible;
+                bool allSidesPresent = topVisible && bottomVisible && leftVisible && rightVisible;
                 bool sidesOk = hasTop && hasBottom && hasLeft && hasRight;
+                bool shadowOk = bordersShadow == 0;
+                bool visualOk = sidesOk && colorOk && shadowOk;
                 bool noted = false;
+
                 if (!anySidePresent)
                 {
+                    // 未設定時は色・太さ・影・辺・操作記録は出さない
                     WordScoreExplanation.Note("ページ罫線が設定されていません。");
                     noted = true;
                 }
-                else if (!sidesOk && !string.IsNullOrEmpty(wrongWidthLabel))
+                else
                 {
-                    WordScoreExplanation.Note($"ページ罫線の線の太さが「{wrongWidthLabel}」になっています。");
-                    noted = true;
+                    // 辺・太さ・色・影は、ずれているものだけ複数行で出す
+                    if (!allSidesPresent)
+                    {
+                        WordScoreExplanation.Note("上下左右のページ罫線が揃っていません。");
+                        noted = true;
+                    }
+                    if (!string.IsNullOrEmpty(wrongWidthLabel))
+                    {
+                        WordScoreExplanation.Note($"ページ罫線の線の太さが「{wrongWidthLabel}」になっています。");
+                        noted = true;
+                    }
+                    else if (allSidesPresent && !sidesOk)
+                    {
+                        WordScoreExplanation.Note("上下左右のページ罫線が「1.5pt」の実線になっていません。");
+                        noted = true;
+                    }
+                    if (!colorOk)
+                    {
+                        WordScoreExplanation.Note("ページ罫線の色が「オリーブ、アクセント3」になっていません。");
+                        noted = true;
+                    }
+                    if (bordersShadow != 0 && bordersShadow != -999)
+                    {
+                        WordScoreExplanation.Note("ページ罫線に影が付いています。");
+                        noted = true;
+                    }
                 }
-                else if (!sidesOk)
-                {
-                    WordScoreExplanation.Note("上下左右のページ罫線が「1.5pt」の実線になっていません。");
-                    noted = true;
-                }
-                if (anySidePresent && sidesOk && !colorOk)
-                {
-                    WordScoreExplanation.Note("ページ罫線の色が「オリーブ、アクセント3」になっていません。");
-                    noted = true;
-                }
-                if (anySidePresent && bordersShadow != 0 && bordersShadow != -999)
-                {
-                    WordScoreExplanation.Note("ページ罫線に影が付いています。");
-                    noted = true;
-                }
-                if (!logOk)
+
+                // 操作記録は「見た目はすべて正解なのに ×」のときだけ出す
+                if (visualOk && !logOk)
                 {
                     WordScoreExplanation.Note("ページ罫線について、必要な操作の記録がありません。");
                     noted = true;
                 }
+
                 if (noted)
                     return false;
                 return Miss("ページ罫線が指定どおりになっていません。");
@@ -591,7 +560,7 @@ namespace Libraries.Group1
             try
             {
                 try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); }
-                catch { wordApp = new Application(); wordApp.Visible = true; }
+                catch { return Miss(WordScoreExplanation.UnavailableText); }
                 string fileName = System.IO.Path.GetFileName(filePath);
                 docs = wordApp.Documents;
                 int docCount = 0; try { docCount = docs.Count; } catch { }
@@ -603,28 +572,12 @@ namespace Libraries.Group1
                 }
                 if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
-                // 文書検査はバージョンにより idMso が無効・非公開のため Ribbon フック不可。ヘッダー/フッターが空であることのみで判定する。
-                if (IsPrimaryHeaderFooterEmpty(document))
+                // 文書検査は Ribbon フック不可。合否は OpenXML（ヘッダー/フッター本文 + 透かし）を主とし、
+                // XML が取れないときだけ COM の primary H/F 空判定へフォールバックする。
+                if (IsTask47HeaderFooterWatermarkCleared(document))
                     return true;
 
-                string normalizedXml = "";
-                try
-                {
-                    normalizedXml = WordWatermarkInspection.NormalizeXml(WordOpenXmlSession.Get(document));
-                }
-                catch { }
-
-                bool hasWatermark =
-                    WordWatermarkInspection.IsSample2Watermark(normalizedXml)
-                    || WordWatermarkInspection.IsDraft1Watermark(normalizedXml)
-                    || WordWatermarkInspection.IsDraft2HorizontalWatermark(normalizedXml)
-                    || WordWatermarkInspection.HasForbiddenWatermark(normalizedXml)
-                    || (!string.IsNullOrEmpty(normalizedXml)
-                        && normalizedXml.IndexOf("下書き", StringComparison.Ordinal) >= 0);
-
-                if (hasWatermark)
-                    return Miss("透かし文字またはヘッダー・フッターが残っています。");
-                return Miss("ヘッダーまたはフッターが残っています。");
+                return Miss("ヘッダー・フッターまたは透かし文字が残っています。");
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"!!! [CheckTask_1_4_07] 例外: {ex.Message}"); return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); if (docs != null) Marshal.ReleaseComObject(docs); if (wordApp != null) Marshal.ReleaseComObject(wordApp); }
@@ -714,8 +667,57 @@ namespace Libraries.Group1
             return rotation;
         }
 
-        /// <summary>4-7 および 4-5 の 2 段目: 先頭セクションの primary ヘッダー/フッターが空か。</summary>
-        private static bool IsPrimaryHeaderFooterEmpty(Document document)
+        /// <summary>
+        /// 4-7 / 4-5 第2段: ヘッダー・フッター本文と透かしが文書検査相当で消えているか。
+        /// OpenXML を優先（COM Range.Text だけだと透かしシェイプ残留を見逃し得る）。
+        /// </summary>
+        private static bool IsTask47HeaderFooterWatermarkCleared(Document document, string normalizedXmlHint = null)
+        {
+            string xml = "";
+            try { xml = WordOpenXmlSession.Get(document); } catch { }
+
+            string normalized = !string.IsNullOrEmpty(normalizedXmlHint)
+                ? normalizedXmlHint
+                : WordWatermarkInspection.NormalizeXml(xml);
+
+            if (!string.IsNullOrEmpty(xml) || !string.IsNullOrEmpty(normalized))
+            {
+                string xmlForParts = !string.IsNullOrEmpty(xml) ? xml : normalized;
+                bool hfEmpty = AreHeaderFooterXmlPartsTextEmpty(xmlForParts);
+                bool watermarkCleared = WordWatermarkInspection.IsWatermarkClearedForTask47FollowUp(
+                    string.IsNullOrEmpty(normalized) ? WordWatermarkInspection.NormalizeXml(xmlForParts) : normalized);
+                return hfEmpty && watermarkCleared;
+            }
+
+            // WordOpenXML が取れない環境のみ COM にフォールバック
+            return IsPrimaryHeaderFooterEmptyCom(document);
+        }
+
+        /// <summary>Flat OPC / 正規化 XML 内の w:hdr・w:ftr から w:t を連結し、実質空か。</summary>
+        private static bool AreHeaderFooterXmlPartsTextEmpty(string wordOpenXml)
+        {
+            if (string.IsNullOrEmpty(wordOpenXml))
+                return false;
+
+            foreach (Match block in Regex.Matches(
+                wordOpenXml,
+                @"<w:(?:hdr|ftr)\b[^>]*>.*?</w:(?:hdr|ftr)>",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                string text = StripWordCommentControlChars(ExtractConcatenatedWtText(block.Value))
+                    .Replace("\r", "")
+                    .Replace("\f", "")
+                    .Replace("\a", "")
+                    .Trim();
+                if (!string.IsNullOrEmpty(text))
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>COM: 先頭セクション primary ヘッダー/フッターの Range.Text が空か（フォールバック専用）。</summary>
+        private static bool IsPrimaryHeaderFooterEmptyCom(Document document)
         {
             if (document == null)
                 return false;
@@ -735,210 +737,279 @@ namespace Libraries.Group1
             return string.IsNullOrEmpty(cleanH) && string.IsNullOrEmpty(cleanF);
         }
 
-        /// <summary>コメントまたはその返信に指定したテキストが含まれるか判定する</summary>
-        private static bool CommentBalloonContainsText(Comment comment, string searchText)
-        {
-            if (comment == null) return false;
-            string raw = "";
-            try { raw = comment.Range.Text ?? ""; } catch { }
-            if (raw.Contains(searchText)) return true;
-
-            Comments replies = null;
-            try
-            {
-                replies = comment.Replies;
-                if (replies != null)
-                {
-                    int n = replies.Count;
-                    for (int i = 1; i <= n; i++)
-                    {
-                        Comment reply = null;
-                        try
-                        {
-                            reply = replies[i];
-                            string rt = "";
-                            try { rt = reply.Range.Text ?? ""; } catch { }
-                            if (rt.Contains(searchText)) return true;
-                        }
-                        finally { if (reply != null) Marshal.ReleaseComObject(reply); }
-                    }
-                }
-            }
-            catch { }
-            finally { if (replies != null) Marshal.ReleaseComObject(replies); }
-            return false;
-        }
-
-        private static bool CommentScopeLooksLikeEcoHeading(string scopeText)
-        {
-            string n = NormalizeCommentBody(scopeText);
-            if (string.IsNullOrEmpty(n))
-                return false;
-            return n.Contains("1.生活の中でできるエコ活動")
-                || n.Contains("１.生活の中でできるエコ活動")
-                || n.Contains("生活の中でできるエコ活動");
-        }
-
-        private static bool CommentScopeLooksLikeSonoTaHeading(string scopeText)
-        {
-            string n = NormalizeCommentBody(scopeText);
-            return !string.IsNullOrEmpty(n) && n.Contains("その他");
-        }
-
-        private static bool DocumentHasExactReplyOnSonoTaComment(Document document, string expectedPhrase)
-        {
-            Comments comments = null;
-            try
-            {
-                comments = document?.Comments;
-                if (comments == null)
-                    return false;
-                int count = comments.Count;
-                for (int i = 1; i <= count; i++)
-                {
-                    Comment comment = null;
-                    try
-                    {
-                        comment = comments[i];
-                        Range scope = null;
-                        string scopeText = "";
-                        try
-                        {
-                            scope = comment.Scope;
-                            scopeText = scope?.Text ?? "";
-                        }
-                        finally { if (scope != null) Marshal.ReleaseComObject(scope); }
-                        if (!CommentScopeLooksLikeSonoTaHeading(scopeText))
-                            continue;
-                        Comments replies = null;
-                        try
-                        {
-                            replies = comment.Replies;
-                            if (replies == null)
-                                continue;
-                            int rc = replies.Count;
-                            for (int r = 1; r <= rc; r++)
-                            {
-                                Comment reply = null;
-                                try
-                                {
-                                    reply = replies[r];
-                                    string rt = "";
-                                    try { rt = reply.Range?.Text ?? ""; } catch { }
-                                    if (IsExactCommentPhrase(rt, expectedPhrase))
-                                        return true;
-                                }
-                                finally { if (reply != null) Marshal.ReleaseComObject(reply); }
-                            }
-                        }
-                        finally { if (replies != null) Marshal.ReleaseComObject(replies); }
-                    }
-                    finally { if (comment != null) Marshal.ReleaseComObject(comment); }
-                }
-            }
-            catch { }
-            finally { if (comments != null) Marshal.ReleaseComObject(comments); }
-            return false;
-        }
-
         /// <summary>
-        /// 見出し「その他」コメントへの返信のうち、正解文でない最初の本文を返す。
-        /// 返信が無い／COM で取れない／すべて正解文のときは null。
+        /// comments.xml の本文完全一致 + document.xml の commentRange アンカー。
+        /// requireReply 時は commentsExtended の paraIdParent（返信）も必須。
         /// </summary>
-        private static string TryGetFirstReplyBodyOnSonoTaComment(Document document)
+        private static bool TryPassCommentExactOnAnchor(
+            string wordOpenXml,
+            string expectedBody,
+            string anchorPhrase,
+            bool requireReply,
+            out string failReason)
         {
-            const string expectedReply = "前田先生に最終確認";
-            Comments comments = null;
-            try
+            failReason = null;
+            if (string.IsNullOrEmpty(wordOpenXml)
+                || string.IsNullOrEmpty(expectedBody)
+                || string.IsNullOrEmpty(anchorPhrase))
             {
-                comments = document?.Comments;
-                if (comments == null)
-                    return null;
-                int count = comments.Count;
-                for (int i = 1; i <= count; i++)
-                {
-                    Comment comment = null;
-                    try
-                    {
-                        comment = comments[i];
-                        Range scope = null;
-                        string scopeText = "";
-                        try
-                        {
-                            scope = comment.Scope;
-                            scopeText = scope?.Text ?? "";
-                        }
-                        finally { if (scope != null) Marshal.ReleaseComObject(scope); }
-                        if (!CommentScopeLooksLikeSonoTaHeading(scopeText))
-                            continue;
-
-                        Comments replies = null;
-                        try
-                        {
-                            replies = comment.Replies;
-                            if (replies == null)
-                                continue;
-                            int rc = replies.Count;
-                            for (int r = 1; r <= rc; r++)
-                            {
-                                Comment reply = null;
-                                try
-                                {
-                                    reply = replies[r];
-                                    string rt = "";
-                                    try { rt = reply.Range?.Text ?? ""; } catch { }
-                                    string body = StripWordCommentControlChars(rt);
-                                    if (string.IsNullOrEmpty(body))
-                                        continue;
-                                    if (IsExactCommentPhrase(body, expectedReply))
-                                        continue;
-                                    return body;
-                                }
-                                finally { if (reply != null) Marshal.ReleaseComObject(reply); }
-                            }
-                        }
-                        finally { if (replies != null) Marshal.ReleaseComObject(replies); }
-                    }
-                    finally { if (comment != null) Marshal.ReleaseComObject(comment); }
-                }
+                failReason = requireReply
+                    ? $"見出し「{anchorPhrase}」のコメントに「{expectedBody}」の返信がありません。"
+                    : $"見出し「1.{anchorPhrase}」に「{expectedBody}」のコメントがありません。";
+                return false;
             }
-            catch { }
-            finally { if (comments != null) Marshal.ReleaseComObject(comments); }
-            return null;
+
+            var comments = ParseCommentEntries(wordOpenXml);
+            var rangeById = BuildCommentRangeTexts(wordOpenXml);
+            var parentParaByChild = BuildCommentParaIdParentMap(wordOpenXml);
+            var commentByParaId = new Dictionary<string, CommentXmlEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in comments)
+            {
+                if (!string.IsNullOrEmpty(c.ParaId) && !commentByParaId.ContainsKey(c.ParaId))
+                    commentByParaId[c.ParaId] = c;
+            }
+
+            string wrongBodyOnAnchor = null;
+
+            foreach (var c in comments)
+            {
+                bool anchoredHere = CommentAnchorsOnPhrase(c, rangeById, commentByParaId, parentParaByChild, anchorPhrase);
+                if (!anchoredHere)
+                    continue;
+
+                bool isReply = !string.IsNullOrEmpty(c.ParaId)
+                    && parentParaByChild.ContainsKey(c.ParaId);
+                if (requireReply && !isReply)
+                    continue;
+                if (!requireReply && isReply)
+                    continue;
+
+                if (IsExactCommentPhrase(c.Body, expectedBody))
+                    return true;
+
+                string cleaned = StripWordCommentControlChars(c.Body ?? "");
+                if (!string.IsNullOrEmpty(cleaned))
+                    wrongBodyOnAnchor = cleaned;
+            }
+
+            // 正しい見出し上に別本文がある場合のみ具体理由。位置違い・欠損は「ありません」。
+            if (!string.IsNullOrEmpty(wrongBodyOnAnchor))
+            {
+                failReason = requireReply
+                    ? $"見出し「{anchorPhrase}」のコメントへの返信が「{wrongBodyOnAnchor}」になっています。"
+                    : $"見出し「1.{anchorPhrase}」のコメントが「{wrongBodyOnAnchor}」になっています。";
+            }
+            else
+            {
+                failReason = requireReply
+                    ? $"見出し「{anchorPhrase}」のコメントに「{expectedBody}」の返信がありません。"
+                    : $"見出し「1.{anchorPhrase}」に「{expectedBody}」のコメントがありません。";
+            }
+            return false;
         }
 
-        private static bool CommentBodyMatchesLatestInfoCheck(Comment comment)
+        private static bool CommentAnchorsOnPhrase(
+            CommentXmlEntry comment,
+            Dictionary<string, string> rangeById,
+            Dictionary<string, CommentXmlEntry> commentByParaId,
+            Dictionary<string, string> parentParaByChild,
+            string anchorPhrase)
         {
-            const string expected = "最新の情報を確認";
-            string raw = "";
-            try { raw = comment.Range.Text ?? ""; } catch { }
-            if (IsExactCommentPhrase(raw, expected))
-                return true;
-            Comments replies = null;
-            try
+            if (comment == null || string.IsNullOrEmpty(anchorPhrase))
+                return false;
+
+            if (rangeById != null
+                && !string.IsNullOrEmpty(comment.Id)
+                && rangeById.TryGetValue(comment.Id, out string ownRange)
+                && !string.IsNullOrEmpty(ownRange)
+                && ownRange.IndexOf(anchorPhrase, StringComparison.Ordinal) >= 0)
             {
-                replies = comment.Replies;
-                if (replies != null)
+                return true;
+            }
+
+            // 返信は親コメントの range で位置判定（返信側に range が無い場合もある）
+            if (!string.IsNullOrEmpty(comment.ParaId)
+                && parentParaByChild != null
+                && parentParaByChild.TryGetValue(comment.ParaId, out string parentPara)
+                && !string.IsNullOrEmpty(parentPara)
+                && commentByParaId != null
+                && commentByParaId.TryGetValue(parentPara, out CommentXmlEntry parent)
+                && parent != null
+                && rangeById != null
+                && !string.IsNullOrEmpty(parent.Id)
+                && rangeById.TryGetValue(parent.Id, out string parentRange)
+                && !string.IsNullOrEmpty(parentRange)
+                && parentRange.IndexOf(anchorPhrase, StringComparison.Ordinal) >= 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private sealed class CommentXmlEntry
+        {
+            public string Id;
+            public string Body;
+            public string ParaId;
+        }
+
+        private static List<CommentXmlEntry> ParseCommentEntries(string wordOpenXml)
+        {
+            var list = new List<CommentXmlEntry>();
+            if (string.IsNullOrEmpty(wordOpenXml))
+                return list;
+
+            foreach (string partXml in EnumerateCommentsPackageParts(wordOpenXml))
+            {
+                // 本文は comments.xml の w:comment のみ（Extended 等は除外）
+                if (partXml.IndexOf("pkg:name=\"/word/comments.xml\"", StringComparison.OrdinalIgnoreCase) < 0
+                    && partXml.IndexOf("pkg:name='/word/comments.xml'", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                foreach (Match comment in Regex.Matches(
+                    partXml,
+                    @"<w:comment\b([^>]*)>(.*?)</w:comment>",
+                    RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                 {
-                    int n = replies.Count;
-                    for (int i = 1; i <= n; i++)
+                    string attrs = comment.Groups[1].Value;
+                    string inner = comment.Groups[2].Value;
+                    string id = GetXmlAttr(attrs, "w:id");
+                    if (string.IsNullOrEmpty(id))
+                        continue;
+
+                    string paraId = "";
+                    Match para = Regex.Match(
+                        inner,
+                        @"<w:p\b[^>]*\bw14:paraId\s*=\s*""([^""]+)""",
+                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                    if (para.Success)
+                        paraId = para.Groups[1].Value;
+
+                    list.Add(new CommentXmlEntry
                     {
-                        Comment reply = null;
-                        try
-                        {
-                            reply = replies[i];
-                            string rt = "";
-                            try { rt = reply.Range.Text ?? ""; } catch { }
-                            if (IsExactCommentPhrase(rt, expected))
-                                return true;
-                        }
-                        finally { if (reply != null) Marshal.ReleaseComObject(reply); }
-                    }
+                        Id = id,
+                        Body = ExtractConcatenatedWtText(inner),
+                        ParaId = paraId
+                    });
                 }
             }
-            catch { }
-            finally { if (replies != null) Marshal.ReleaseComObject(replies); }
-            return false;
+
+            return list;
+        }
+
+        private static Dictionary<string, string> BuildCommentRangeTexts(string wordOpenXml)
+        {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            string docXml = GetPackagePartXml(wordOpenXml, "/word/document.xml");
+            if (string.IsNullOrEmpty(docXml))
+                return map;
+
+            // 返信コメントは親 range の内側に Start が重なることがあるため、
+            // Matches の非重複走査ではなく Start ごとに対応 End を探す。
+            foreach (Match start in Regex.Matches(
+                docXml,
+                @"<w:commentRangeStart\b[^>]*\bw:id\s*=\s*""(\d+)""[^/]*/>",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                string id = start.Groups[1].Value;
+                if (map.ContainsKey(id))
+                    continue;
+
+                string fromStart = docXml.Substring(start.Index);
+                Match end = Regex.Match(
+                    fromStart,
+                    @"<w:commentRangeEnd\b[^>]*\bw:id\s*=\s*""" + Regex.Escape(id) + @"""[^/]*/>",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                if (!end.Success)
+                    continue;
+
+                string fragment = fromStart.Substring(0, end.Index + end.Length);
+                map[id] = ExtractConcatenatedWtText(fragment);
+            }
+
+            return map;
+        }
+
+        private static Dictionary<string, string> BuildCommentParaIdParentMap(string wordOpenXml)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(wordOpenXml))
+                return map;
+
+            foreach (string partXml in EnumerateCommentsPackageParts(wordOpenXml))
+            {
+                if (partXml.IndexOf("/word/commentsExtended", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                foreach (Match m in Regex.Matches(
+                    partXml,
+                    @"<w15:commentEx\b([^>/]*)/?>",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                {
+                    string attrs = m.Groups[1].Value;
+                    string paraId = GetXmlAttr(attrs, "w15:paraId");
+                    string parent = GetXmlAttr(attrs, "w15:paraIdParent");
+                    if (!string.IsNullOrEmpty(paraId) && !string.IsNullOrEmpty(parent))
+                        map[paraId] = parent;
+                }
+            }
+
+            return map;
+        }
+
+        private static string GetPackagePartXml(string wordOpenXml, string partName)
+        {
+            if (string.IsNullOrEmpty(wordOpenXml) || string.IsNullOrEmpty(partName))
+                return "";
+            string escaped = Regex.Escape(partName);
+            Match part = Regex.Match(
+                wordOpenXml,
+                @"<pkg:part\b[^>]*\bpkg:name\s*=\s*""" + escaped + @"""[^>]*>.*?</pkg:part>",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return part.Success ? part.Value : "";
+        }
+
+        private static string GetXmlAttr(string attrs, string name)
+        {
+            if (string.IsNullOrEmpty(attrs) || string.IsNullOrEmpty(name))
+                return "";
+            Match m = Regex.Match(
+                attrs,
+                Regex.Escape(name) + @"\s*=\s*""([^""]*)""",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return m.Success ? m.Groups[1].Value : "";
+        }
+
+        private static IEnumerable<string> EnumerateCommentsPackageParts(string wordOpenXml)
+        {
+            if (string.IsNullOrEmpty(wordOpenXml))
+                yield break;
+
+            foreach (Match part in Regex.Matches(
+                wordOpenXml,
+                @"<pkg:part\b[^>]*\bpkg:name\s*=\s*""(/word/comments[^""]*)""[^>]*>.*?</pkg:part>",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                if (part.Success)
+                    yield return part.Value;
+            }
+        }
+
+        private static string ExtractConcatenatedWtText(string xmlFragment)
+        {
+            if (string.IsNullOrEmpty(xmlFragment))
+                return "";
+            var sb = new StringBuilder();
+            foreach (Match wt in Regex.Matches(
+                xmlFragment,
+                @"<w:t(?:\s[^>]*)?>([^<]*)</w:t>",
+                RegexOptions.CultureInvariant))
+            {
+                if (wt.Success && wt.Groups.Count >= 2)
+                    sb.Append(wt.Groups[1].Value);
+            }
+            return sb.ToString();
         }
 
         /// <summary>
@@ -959,25 +1030,6 @@ namespace Libraries.Group1
             {
                 return false;
             }
-        }
-
-        /// <summary>OpenXML の各 &lt;w:t&gt; テキストが指定文言と完全一致するか（空白付きは不一致）。</summary>
-        private static bool XmlHasExactWtText(string xml, string expectedPhrase)
-        {
-            if (string.IsNullOrEmpty(xml) || string.IsNullOrEmpty(expectedPhrase))
-                return false;
-            MatchCollection matches = Regex.Matches(
-                xml,
-                @"<w:t(?:\s[^>]*)?>([^<]*)</w:t>",
-                RegexOptions.CultureInvariant);
-            foreach (Match match in matches)
-            {
-                if (!match.Success || match.Groups.Count < 2)
-                    continue;
-                if (IsExactCommentPhrase(match.Groups[1].Value, expectedPhrase))
-                    return true;
-            }
-            return false;
         }
 
         /// <summary>Word がコメント本文に付けやすい制御文字・段落記号だけ除去。空白は残す。</summary>
@@ -1325,48 +1377,50 @@ namespace Libraries.Group1
             }
         }
 
-        private static string FindForbiddenWatermarkKeyword(string normalizedXml)
+        /// <summary>
+        /// 4-5 ×理由。文字・向きが取れたら分岐し、取れなければ汎用文。
+        /// 向きは「斜め／横」で伝え、ギャラリーの 1・2 表記は使わない。
+        /// </summary>
+        private static string BuildTask45FailReason(string normalizedXml)
         {
-            if (string.IsNullOrEmpty(normalizedXml))
-                return null;
-            string[] keywords = { "社外秘", "至急", "案内", "転送厳禁", "CONFIDENTIAL", "URGENT", "DO NOT COPY" };
-            foreach (string keyword in keywords)
+            WordWatermarkInspection.WatermarkStudentView view =
+                WordWatermarkInspection.AnalyzeForStudent(normalizedXml);
+
+            bool textIsSample = IsSampleDisplayText(view.DisplayText);
+            bool orientationWrong = view.IsHorizontal == false;
+            bool orientationOk = view.IsHorizontal == true;
+            bool hasText = !string.IsNullOrEmpty(view.DisplayText);
+
+            // 正解文字（サンプル）＋斜め
+            if (textIsSample && orientationWrong)
+                return "透かしの文字の向きが斜めになっています。";
+
+            // 下書きは従来どおりギャラリー名で出す
+            if (string.Equals(view.DisplayText, "下書き", StringComparison.Ordinal))
             {
-                if (normalizedXml.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
-                    return keyword;
+                if (orientationWrong)
+                    return "透かしが「下書き1」になっています。";
+                if (orientationOk)
+                    return "透かしが「下書き2」になっています。";
+                return "透かしが「下書き」になっています。";
             }
-            return null;
+
+            if (hasText && !textIsSample)
+            {
+                if (orientationWrong)
+                    return $"文字が「{view.DisplayText}」になっており、向きも斜めになっています。";
+                return $"文字が「{view.DisplayText}」になっています。";
+            }
+
+            return "透かし「サンプル２」がありません。";
         }
 
-        private static string SafeCommentScopeText(Comment comment)
+        private static bool IsSampleDisplayText(string text)
         {
-            try
-            {
-                Range scope = comment.Scope;
-                try { return scope?.Text ?? ""; }
-                finally { if (scope != null) Marshal.ReleaseComObject(scope); }
-            }
-            catch
-            {
-                return "";
-            }
-        }
-
-        private static string SafeCommentRangeText(Comment comment)
-        {
-            try { return comment.Range?.Text ?? ""; }
-            catch { return ""; }
-        }
-
-        private static string Quote(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-                return "（空）";
-            string text = value.Replace("\r", "").Replace("\n", " ");
-            const int maxLen = 40;
-            if (text.Length <= maxLen)
-                return text;
-            return text.Substring(0, maxLen) + "…";
+            if (string.IsNullOrEmpty(text))
+                return false;
+            return string.Equals(text, "サンプル", StringComparison.Ordinal)
+                || string.Equals(text, "SAMPLE", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool Miss(string reason)
