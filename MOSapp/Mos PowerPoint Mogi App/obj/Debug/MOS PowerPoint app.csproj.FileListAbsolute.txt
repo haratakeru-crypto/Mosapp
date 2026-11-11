@@ -610,3 +610,8 @@ C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Powe
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_4_PV1.pdb
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_5_PV1.pdb
 C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\PowerPointChecker1_6_PV1.pdb
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\runtimes\win-x86\native\WebView2Loader.dll
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\runtimes\win-x64\native\WebView2Loader.dll
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\runtimes\win-arm64\native\WebView2Loader.dll
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Web.WebView2.Wpf.dll
+C:\Users\kouza\source\repos\MOSapp\MOSapp\Mos PowerPoint Mogi App\bin\Debug\Microsoft.Web.WebView2.Core.dll

@@ -9,6 +9,78 @@
         Title="MOS PowerPoint App" Height="700" Width="1000"
         WindowStartupLocation="CenterScreen"
         Background="#F5F5F5">
+    <Window.Resources>
+        <Style x:Key="IdConfirmPendingTabStyle" TargetType="TabItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" Background="#DBEAFE" BorderBrush="#60A5FA" BorderThickness="2,2,2,0" CornerRadius="15,15,0,0" Margin="4,0" Padding="20,12">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#1E3A8A" Direction="135" ShadowDepth="4" Opacity="0.3" BlurRadius="8"/>
+                            </Border.Effect>
+                            <Border CornerRadius="15,15,0,0" Margin="1">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FFFFFF" Direction="315" ShadowDepth="2" Opacity="0.8" BlurRadius="6"/>
+                                </Border.Effect>
+                                <ContentPresenter x:Name="ContentSite" VerticalAlignment="Center" HorizontalAlignment="Center" ContentSource="Header" TextElement.FontWeight="SemiBold" TextElement.FontSize="14" TextElement.Foreground="#1E3A8A"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#1D4ED8" Offset="0"/>
+                                            <GradientStop Color="#3B82F6" Offset="0.5"/>
+                                            <GradientStop Color="#93C5FD" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#1E40AF"/>
+                                <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="#FFFFFF"/>
+                                <Setter TargetName="ContentSite" Property="TextElement.FontWeight" Value="Bold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="IdConfirmDoneTabStyle" TargetType="TabItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" Background="#FFE5D9" BorderBrush="#FF8C65" BorderThickness="2,2,2,0" CornerRadius="15,15,0,0" Margin="4,0" Padding="20,12">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#8B2E16" Direction="135" ShadowDepth="4" Opacity="0.3" BlurRadius="8"/>
+                            </Border.Effect>
+                            <Border CornerRadius="15,15,0,0" Margin="1">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FFFFFF" Direction="315" ShadowDepth="2" Opacity="0.8" BlurRadius="6"/>
+                                </Border.Effect>
+                                <ContentPresenter x:Name="ContentSite" VerticalAlignment="Center" HorizontalAlignment="Center" ContentSource="Header" TextElement.FontWeight="SemiBold" TextElement.FontSize="14" TextElement.Foreground="#1A1A1A"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#D04423" Offset="0"/>
+                                            <GradientStop Color="#FF6B35" Offset="0.5"/>
+                                            <GradientStop Color="#FF8C65" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#B83A1A"/>
+                                <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="#FFFFFF"/>
+                                <Setter TargetName="ContentSite" Property="TextElement.FontWeight" Value="Bold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid Background="#F5F5F5">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -225,7 +297,9 @@
                     </mos:GameTabControl.ButtonBackground>
                 </mos:GameTabControl>
             </TabItem>
-            <TabItem Header="ID確認">
+            <TabItem x:Name="IdConfirmationTab" Header="ID確認" Style="{StaticResource IdConfirmPendingTabStyle}">
+                <mos:CertiportIdConfirmationControl x:Name="IdConfirmation"
+                                                   Verified="IdConfirmation_Verified"/>
             </TabItem>
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">

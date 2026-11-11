@@ -154,19 +154,46 @@ namespace MOS_PowerPoint_app
 
         private void ApplyExamineeTabState()
         {
-            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.IsRegistered ? 1 : 0;
+            ApplyIdConfirmTabStyle();
+            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.IsRegistered
+                ? MosPracticeClient.ExamineeStore.PracticeTabIndex
+                : 0;
+        }
+
+        private void ApplyIdConfirmTabStyle()
+        {
+            if (IdConfirmationTab == null) return;
+            bool verified = MosPracticeClient.ExamineeStore.IsCertiportVerified;
+            IdConfirmationTab.Header = verified ? "ID確認 済" : "ID確認";
+            var pending = TryFindResource("IdConfirmPendingTabStyle") as Style;
+            var done = TryFindResource("IdConfirmDoneTabStyle") as Style;
+            if (verified)
+            {
+                if (done != null) IdConfirmationTab.Style = done;
+            }
+            else if (pending != null)
+            {
+                IdConfirmationTab.Style = pending;
+            }
         }
 
         private void UniversityRegistration_Registered(object sender, EventArgs e)
         {
-            _viewModel.SelectedTabIndex = 1;
+            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.PracticeTabIndex;
         }
 
         private void UniversityRegistration_Deleted(object sender, EventArgs e)
         {
             PowerPointTaskReviewStateStore.Discard();
             ScoringLogList?.Reload();
+            IdConfirmation?.Reload();
+            ApplyIdConfirmTabStyle();
             _viewModel.SelectedTabIndex = 0;
+        }
+
+        private void IdConfirmation_Verified(object sender, EventArgs e)
+        {
+            ApplyIdConfirmTabStyle();
         }
 
         private void VariantPlaceholderButton_Click(object sender, RoutedEventArgs e)

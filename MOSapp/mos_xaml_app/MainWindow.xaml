@@ -255,7 +255,9 @@
                     </mos:GameTabControl.ButtonBackground>
                 </mos:GameTabControl>
             </TabItem>
-            <TabItem Header="ID確認">
+            <TabItem x:Name="IdConfirmationTab" Header="ID確認">
+                <mos:CertiportIdConfirmationControl x:Name="IdConfirmation"
+                                                   Verified="IdConfirmation_Verified"/>
             </TabItem>
             <TabItem Header="類題">
                 <ScrollViewer Background="#F0F0F3">
