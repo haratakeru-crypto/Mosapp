@@ -218,7 +218,12 @@ namespace MosPracticeClient
                 UniversityName = university,
                 PersonName = person,
                 ClassroomName = classroom,
-                SubmittedSubjects = existing?.SubmittedSubjects ?? new List<string>()
+                SubmittedSubjects = existing?.SubmittedSubjects ?? new List<string>(),
+                CertiportLoginEmail = existing?.CertiportLoginEmail,
+                CertiportDisplayName = existing?.CertiportDisplayName,
+                CertiportCorrectName = existing?.CertiportCorrectName,
+                CertiportNameMatchesMos = existing?.CertiportNameMatchesMos ?? false,
+                CertiportVerifiedAt = existing?.CertiportVerifiedAt
             };
             ExamineeStore.Save(profile);
             PresenceClient.NotifyRegistered(profile);

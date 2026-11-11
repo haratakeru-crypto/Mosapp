@@ -97,18 +97,36 @@ namespace MOSExcelMogiApp
 
         private void ApplyExamineeTabState()
         {
-            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.IsRegistered ? 1 : 0;
+            ApplyIdConfirmTabHeader();
+            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.IsRegistered
+                ? MosPracticeClient.ExamineeStore.PracticeTabIndex
+                : 0;
+        }
+
+        private void ApplyIdConfirmTabHeader()
+        {
+            if (IdConfirmationTab == null) return;
+            IdConfirmationTab.Header = MosPracticeClient.ExamineeStore.IsCertiportVerified
+                ? "ID確認 済"
+                : "ID確認";
         }
 
         private void UniversityRegistration_Registered(object sender, EventArgs e)
         {
-            _viewModel.SelectedTabIndex = 1;
+            _viewModel.SelectedTabIndex = MosPracticeClient.ExamineeStore.PracticeTabIndex;
         }
 
         private void UniversityRegistration_Deleted(object sender, EventArgs e)
         {
             ScoringLogList?.Reload();
+            IdConfirmation?.Reload();
+            ApplyIdConfirmTabHeader();
             _viewModel.SelectedTabIndex = 0;
+        }
+
+        private void IdConfirmation_Verified(object sender, EventArgs e)
+        {
+            ApplyIdConfirmTabHeader();
         }
 
         private void VocabularyTab_StartRequested(object sender, MosPracticeClient.VocabularyStartEventArgs e)

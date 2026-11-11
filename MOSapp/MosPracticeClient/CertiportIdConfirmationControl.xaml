@@ -1,0 +1,70 @@
+<UserControl x:Class="MosPracticeClient.CertiportIdConfirmationControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             Background="#F0F0F3">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="32,24,32,8" MaxWidth="720" HorizontalAlignment="Left">
+                <TextBlock Text="Certiport ID確認"
+                           FontSize="22" FontWeight="Bold" Foreground="#1F2937" Margin="0,0,0,8"/>
+                <TextBlock TextWrapping="Wrap" FontSize="13" Foreground="#4B5563" Margin="0,0,0,16"
+                           Text="試験用の Certiport ID でログインできるか確認します。ログイン後、デジタル認定証に出ている氏名を大学名タブのお名前と照合します。"/>
+
+                <TextBlock x:Name="PrerequisiteText" TextWrapping="Wrap" FontSize="13" Foreground="#B45309" Margin="0,0,0,12"/>
+
+                <TextBlock Text="Certiport ID（メールアドレス）" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <TextBox x:Name="EmailBox" FontSize="16" Padding="8,6" Margin="0,0,0,12"/>
+
+                <TextBlock Text="パスワード" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <PasswordBox x:Name="PasswordBox" FontSize="16" Padding="8,6" Margin="0,0,0,4"/>
+                <TextBlock Text="パスワードはこのPCにも Rabbit にも保存しません。"
+                           FontSize="12" Foreground="#6B7280" Margin="0,0,0,16"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button x:Name="LoginButton" Content="ログインして確認" Width="180" Height="40" FontSize="15" FontWeight="SemiBold"
+                            Click="LoginButton_Click" Cursor="Hand"
+                            Background="#028760" Foreground="White" BorderThickness="0" Margin="0,0,12,0"/>
+                    <Button Content="まだ作成していない方" Width="200" Height="40" FontSize="14"
+                            Click="SignupButton_Click" Cursor="Hand"
+                            Background="#E5E7EB" Foreground="#111827" BorderThickness="0"/>
+                </StackPanel>
+
+                <TextBlock x:Name="StatusText" Margin="0,8,0,8" TextWrapping="Wrap" Foreground="#B91C1C"/>
+
+                <Border x:Name="ComparePanel" Visibility="Collapsed" Background="#FFFFFF" BorderBrush="#D1D5DB"
+                        BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,8,0,8">
+                    <StackPanel>
+                        <TextBlock Text="名前の確認" FontWeight="Bold" FontSize="16" Margin="0,0,0,8"/>
+                        <TextBlock x:Name="MosNameText" FontSize="14" Margin="0,0,0,4"/>
+                        <TextBlock x:Name="CertiportNameText" FontSize="14" Margin="0,0,0,12"/>
+                        <TextBlock x:Name="MatchResultText" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                        <StackPanel x:Name="ChoicePanel" Visibility="Collapsed">
+                            <TextBlock TextWrapping="Wrap" FontSize="13" Foreground="#4B5563" Margin="0,0,0,8"
+                                       Text="特殊漢字・あだ名・学籍番号が Certiport 側に入っていることがあります。試験結果に使う正しい名前を選んでください。"/>
+                            <RadioButton x:Name="ChooseMosRadio" GroupName="CorrectName" Margin="0,0,0,6"
+                                         Content="MOSアプリのお名前が正しい"/>
+                            <RadioButton x:Name="ChooseCertiportRadio" GroupName="CorrectName" Margin="0,0,0,12"
+                                         Content="デジタル認定証の名前が正しい"/>
+                        </StackPanel>
+                        <StackPanel x:Name="ManualNamePanel" Visibility="Collapsed" Margin="0,0,0,12">
+                            <TextBlock Text="認定証の氏名を読み取れませんでした。画面に出ている漢字氏名を入力してください。"
+                                       TextWrapping="Wrap" FontSize="13" Foreground="#4B5563" Margin="0,0,0,6"/>
+                            <TextBox x:Name="ManualNameBox" FontSize="16" Padding="8,6"/>
+                        </StackPanel>
+                        <Button x:Name="ConfirmButton" Content="この内容で一時保存する" Width="220" Height="36" FontSize="14"
+                                HorizontalAlignment="Left" Click="ConfirmButton_Click" Cursor="Hand"
+                                Background="#1D4ED8" Foreground="White" BorderThickness="0"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="1" Margin="24,0,24,24" BorderBrush="#D1D5DB" BorderThickness="1" Background="White">
+            <wv2:WebView2 x:Name="CertiportWebView"/>
+        </Border>
+    </Grid>
+</UserControl>

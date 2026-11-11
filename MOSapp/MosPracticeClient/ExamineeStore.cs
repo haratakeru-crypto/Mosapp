@@ -20,6 +20,9 @@ namespace MosPracticeClient
         public static string ExamineePath => Path.Combine(DataDirectory, "examinee.json");
         public static string LookupsPath => Path.Combine(DataDirectory, "lookups.json");
 
+        /// <summary>大学名登録後に進む演習タブ。</summary>
+        public const int PracticeTabIndex = 1;
+
         public static bool IsRegistered
         {
             get
@@ -28,6 +31,18 @@ namespace MosPracticeClient
                 return profile != null
                     && !string.IsNullOrWhiteSpace(profile.UniversityName)
                     && !string.IsNullOrWhiteSpace(profile.PersonName);
+            }
+        }
+
+        public static bool IsCertiportVerified
+        {
+            get
+            {
+                var profile = Load();
+                return profile != null
+                    && !string.IsNullOrWhiteSpace(profile.CertiportDisplayName)
+                    && !string.IsNullOrWhiteSpace(profile.CertiportCorrectName)
+                    && !string.IsNullOrWhiteSpace(profile.CertiportVerifiedAt);
             }
         }
 

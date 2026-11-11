@@ -473,6 +473,13 @@
   </Target>
   <Target Name="CopyMosPracticeSessionWatch" AfterTargets="Build">
     <Copy SourceFiles="$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="Exists('$(ProjectDir)..\MosPracticeSessionWatch\bin\$(Configuration)\MosPracticeSessionWatch.exe')" />
+    <ItemGroup>
+      <WebView2Out Include="$(ProjectDir)..\MosPracticeClient\bin\$(Configuration)\Microsoft.Web.WebView2.*.dll" />
+      <WebView2Out Include="$(ProjectDir)..\MosPracticeClient\bin\$(Configuration)\WebView2Loader.dll" />
+      <WebView2Runtime Include="$(ProjectDir)..\MosPracticeClient\bin\$(Configuration)\runtimes\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WebView2Out)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'@(WebView2Out)' != ''" />
+    <Copy SourceFiles="@(WebView2Runtime)" DestinationFiles="@(WebView2Runtime->'$(OutputPath)runtimes\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(WebView2Runtime)' != ''" />
   </Target>
   <!-- 発行時に VSTO アドインの出力を publish\WordAddIn にコピーする（Import の後に定義して確実に実行されるようにする） -->
   <Target Name="AfterPublish">
