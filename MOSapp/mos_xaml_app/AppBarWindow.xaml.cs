@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using Newtonsoft.Json;
@@ -67,6 +68,9 @@ namespace MOSExcelMogiApp
         private AnswerStepsWindow _answerStepsWindow;
         private bool _answerGuideUserDismissed;
         private bool _suppressAnswerGuideDismissTracking;
+        /// <summary>終了ボタン／Alt+F4 などで EndExam 相当を一度だけ走らせる。</summary>
+        private bool _examEndCleanupDone;
+        private bool _isClosing;
 
         // Win32 API
         [DllImport("user32.dll", SetLastError = true)]
@@ -1990,7 +1994,7 @@ namespace MOSExcelMogiApp
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
             {
-                _viewModel.EndExamCommand.Execute(null);
+                RequestExamEndCleanup();
                 return;
             }
 
@@ -2000,9 +2004,46 @@ namespace MOSExcelMogiApp
 
         private void OnExamEnded(object sender, EventArgs e)
         {
+            _examEndCleanupDone = true;
             CloseAnswerGuide();
-            // アプリバーを閉じる
-            this.Close();
+            // Alt+F4 の Closing 中に EndExam した場合は既に閉じ処理中なので再 Close しない
+            if (!_isClosing)
+                this.Close();
+        }
+
+        /// <summary>
+        /// Alt+F4 等で AppBar だけ閉じたときも、正規終了と同様にオーバーレイ解除＋Excel 終了を行う。
+        /// </summary>
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            _isClosing = true;
+            RequestExamEndCleanup();
+            base.OnClosing(e);
+        }
+
+        private void RequestExamEndCleanup()
+        {
+            if (_examEndCleanupDone)
+                return;
+
+            // すでに試験終了済み（オーバーレイも CurrentProject も無い）なら何もしない
+            bool examStillActive = _viewModel != null
+                && (_viewModel.IsExcelOverlayVisible || _viewModel.CurrentProject != null);
+            if (!examStillActive)
+            {
+                _examEndCleanupDone = true;
+                return;
+            }
+
+            _examEndCleanupDone = true;
+            try
+            {
+                _viewModel.EndExamCommand?.Execute(null);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[AppBarWindow] RequestExamEndCleanup: " + ex.Message);
+            }
         }
 
         private void OnCloseAnswerGuideRequested(object sender, EventArgs e)

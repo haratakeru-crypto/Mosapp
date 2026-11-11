@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using Newtonsoft.Json;
@@ -121,6 +122,7 @@ namespace MOS_Word_app.Views
         private AnswerStepsWindow _answerStepsWindow;
         private bool _answerGuideUserDismissed;
         private bool _suppressAnswerGuideDismissTracking;
+        private bool _officeExitCleanupDone;
         private readonly MainViewModel _viewModel;
 
         public int CurrentProjectId => _currentProjectId;
@@ -803,10 +805,33 @@ namespace MOS_Word_app.Views
                 : MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
-            MOS_Word_app.Views.WordStartupInputGate.End();
-            _timer?.Stop();
-            SaveAllWordDocumentsAndQuitWord();
+            // Word 終了は Closing → PerformOfficeExitCleanup
             this.Close();
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            PerformOfficeExitCleanup();
+            base.OnClosing(e);
+        }
+
+        /// <summary>Alt+F4 等でも Word を終了し、Hidden Main だけの残留を防ぐ。</summary>
+        private void PerformOfficeExitCleanup()
+        {
+            if (_officeExitCleanupDone)
+                return;
+            _officeExitCleanupDone = true;
+            try
+            {
+                try { MOS_Word_app.Views.WordStartupInputGate.End(); } catch { /* ignore */ }
+                _timer?.Stop();
+                _projectTimer?.Stop();
+                SaveAllWordDocumentsAndQuitWord();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] PerformOfficeExitCleanup: " + ex.Message);
+            }
         }
         
         private async void ReviewPageButton_Click(object sender, RoutedEventArgs e)

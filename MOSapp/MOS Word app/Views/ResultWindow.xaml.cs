@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
@@ -24,6 +25,7 @@ namespace MOS_Word_app.Views
         private Dictionary<int, bool[]> _projectTaskViewedStates;
         private int _groupId;
         private bool _isWindowClosed;
+        private bool _exitCleanupDone;
         private List<ResultProjectInfo> _allProjects;
         private bool _showingWrongOnly;
         private bool _seatChartSubmitStarted;
@@ -79,6 +81,8 @@ namespace MOS_Word_app.Views
             _fromScoringLog = fromScoringLog;
             _isVariantMode = isVariantMode;
             this.Loaded += ResultWindow_Loaded;
+            // Alt+F4 等ボタン以外の Close でも Word 終了＋Main 復帰を走らせる
+            this.Closing += ResultWindow_Closing;
             this.Closed += (s, args) =>
             {
                 foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
@@ -86,6 +90,11 @@ namespace MOS_Word_app.Views
                 foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
                     appBar.ClearReturnToResultMode();
             };
+        }
+
+        private void ResultWindow_Closing(object sender, CancelEventArgs e)
+        {
+            PerformExitCleanup();
         }
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
@@ -744,6 +753,19 @@ namespace MOS_Word_app.Views
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            // 実体の掃除は Closing → PerformExitCleanup
+            Close();
+        }
+
+        /// <summary>
+        /// 結果終了時の掃除（一度だけ）。Word 終了・Main 復帰・試験 UI の Hide。
+        /// </summary>
+        private void PerformExitCleanup()
+        {
+            if (_exitCleanupDone)
+                return;
+            _exitCleanupDone = true;
+
             try
             {
                 WordApplicationManager.CloseWordApplicationForAppExit();
@@ -753,12 +775,18 @@ namespace MOS_Word_app.Views
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseWord on exit: " + ex.Message);
             }
 
-            var mainWindow = Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
-            if (mainWindow == null)
-                mainWindow = new MOS_Word_app.MainWindow();
-            RestoreProjectSelectionAsMainWindow(mainWindow);
-            HideLeftoverExamWindows();
-            Close();
+            try
+            {
+                var mainWindow = Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
+                if (mainWindow == null)
+                    mainWindow = new MOS_Word_app.MainWindow();
+                RestoreProjectSelectionAsMainWindow(mainWindow);
+                HideLeftoverExamWindows();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] PerformExitCleanup UI: " + ex.Message);
+            }
         }
     }
 

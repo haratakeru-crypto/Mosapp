@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
@@ -56,6 +57,8 @@ namespace MOS_PowerPoint_app.Views
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}, fromLog: {_fromScoringLog}, variant: {_isVariantMode}");
             
             this.Loaded += ResultWindow_Loaded;
+            // Alt+F4 等ボタン以外の Close でも終了掃除を走らせ、Main 隠れ＋Mutex 残存を防ぐ
+            this.Closing += ResultWindow_Closing;
             this.Closed += (s, args) =>
             {
                 foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
@@ -64,6 +67,11 @@ namespace MOS_PowerPoint_app.Views
                     appBar.SetResultWindow(null);
                 }
             };
+        }
+
+        private void ResultWindow_Closing(object sender, CancelEventArgs e)
+        {
+            RequestExitCleanup();
         }
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
@@ -334,22 +342,21 @@ namespace MOS_PowerPoint_app.Views
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] EndButton_Click called");
-            RequestExitCleanup();
+            // 実体の掃除は Closing → RequestExitCleanup（二重実行はそこで抑止）
             this.Close();
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseButton_Click called");
-            // ✕ でも終了と同様に PP / AppBar を片付けてメインへ戻す
-            RequestExitCleanup();
+            // ✕ も Closing 経由で終了掃除（PP / AppBar 片付けてメインへ）
             this.Close();
         }
 
         private void RequestExitCleanup()
         {
             var handler = OnEndRequested;
-            OnEndRequested = null; // Close 時の二重実行を防ぐ
+            OnEndRequested = null; // Closing / ボタン経路の二重実行を防ぐ
             handler?.Invoke();
         }
 

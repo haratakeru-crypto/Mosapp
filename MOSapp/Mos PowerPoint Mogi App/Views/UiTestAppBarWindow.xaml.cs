@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using Newtonsoft.Json;
@@ -143,6 +144,7 @@ namespace MOS_PowerPoint_app.Views
         private AnswerStepsWindow _answerStepsWindow;
         private bool _answerGuideUserDismissed;
         private bool _suppressAnswerGuideDismissTracking;
+        private bool _officeExitCleanupDone;
         private readonly MainViewModel _viewModel;
 
         public int CurrentProjectId => _currentProjectId;
@@ -1527,30 +1529,46 @@ namespace MOS_PowerPoint_app.Views
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
-            PowerPointStartupInputGate.End();
-            _timer?.Stop();
-            _projectTimer?.Stop();
-            try { Libraries.PPLogReader.ClearVariantSetNo(); } catch { }
-            SaveAllPowerPointPresentations();
-            CloseAllPowerPointPresentations();
+            // PP 終了と Main 復帰は Closing / OnAppBarWindowClosed 側
+            this.Close();
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            PerformOfficeExitCleanup();
+            base.OnClosing(e);
+        }
+
+        /// <summary>Alt+F4 等でも PowerPoint を終了し、Hidden Main だけの残留を防ぐ。</summary>
+        private void PerformOfficeExitCleanup()
+        {
+            if (_officeExitCleanupDone)
+                return;
+            _officeExitCleanupDone = true;
             try
             {
-                var pptProcesses = Process.GetProcessesByName("POWERPNT");
-                foreach (var proc in pptProcesses)
+                try { PowerPointStartupInputGate.End(); } catch { /* ignore */ }
+                _timer?.Stop();
+                _projectTimer?.Stop();
+                try { Libraries.PPLogReader.ClearVariantSetNo(); } catch { /* ignore */ }
+                SaveAllPowerPointPresentations();
+                CloseAllPowerPointPresentations();
+                try
                 {
-                    proc.Kill();
+                    var pptProcesses = Process.GetProcessesByName("POWERPNT");
+                    foreach (var proc in pptProcesses)
+                    {
+                        try { proc.Kill(); } catch { /* ignore */ }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PerformOfficeExitCleanup] PowerPoint プロセス終了エラー: {ex.Message}");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CloseButton] PowerPoint プロセス終了エラー: {ex.Message}");
-            }
-            this.Close();
-            var main = System.Windows.Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
-            if (main != null)
-            {
-                main.Show();
-                main.Activate();
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] PerformOfficeExitCleanup: " + ex.Message);
             }
         }
         
