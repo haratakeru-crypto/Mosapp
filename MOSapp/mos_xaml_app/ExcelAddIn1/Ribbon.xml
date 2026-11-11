@@ -22,7 +22,7 @@
   </commands>
   <ribbon>
     <tabs>
-      <tab id="MosLogTab" label="ログ" insertAfterMso="TabHelp">
+      <tab id="MosLogTab" label="ログ" insertAfterMso="TabHelp" getVisible="GetDebugTabVisible">
         <group id="MosLogGroup" label="ログ">
           <button id="ShowLog" label="ログを表示" onAction="ShowLogOnAction" />
           <button id="ClearLog" label="ログをクリア" onAction="ClearLogOnAction" />

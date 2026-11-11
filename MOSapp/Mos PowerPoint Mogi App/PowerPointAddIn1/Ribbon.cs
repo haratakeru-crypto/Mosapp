@@ -40,6 +40,18 @@ namespace PowerPointAddIn1
             System.Diagnostics.Debug.WriteLine("[Ribbon] Ribbon_Load completed - ログタブ有効");
         }
 
+        /// <summary>
+        /// 開発用タブ「ログ」の表示制御。Debug ビルドのみ表示（受講者向け Release では非表示）。
+        /// </summary>
+        public bool GetDebugTabVisible(IRibbonControl control)
+        {
+#if DEBUG
+            return true;
+#else
+            return false;
+#endif
+        }
+
         public void ShowLogOnAction(IRibbonControl control)
         {
             try
@@ -140,7 +152,7 @@ namespace PowerPointAddIn1
 <customUI xmlns=""http://schemas.microsoft.com/office/2009/07/customui"" onLoad=""Ribbon_Load"">
   <ribbon>
     <tabs>
-      <tab id=""DebugTab"" label=""ログ"" insertAfterMso=""Help"">
+      <tab id=""DebugTab"" label=""ログ"" insertAfterMso=""Help"" getVisible=""GetDebugTabVisible"">
         <group id=""DebugGroup"" label=""ログ"">
           <button id=""ShowLog"" label=""ログを表示"" onAction=""ShowLogOnAction"" />
           <button id=""ClearLog"" label=""ログをクリア"" onAction=""ClearLogOnAction"" />

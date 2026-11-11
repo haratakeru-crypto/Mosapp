@@ -46,7 +46,7 @@
 
   <ribbon>
     <tabs>
-      <tab id="tabMOSDebug" label="MOSデバッグ" insertAfterMso="Help">
+      <tab id="tabMOSDebug" label="MOSデバッグ" insertAfterMso="Help" getVisible="GetDebugTabVisible">
         <group id="grpLog" label="ログ">
           <button id="btnShowLogPath" label="ログパス表示" onAction="ShowLogPathButtonOnAction" />
           <button id="btnShowLogContent" label="ログ内容表示" onAction="ShowLogContentButtonOnAction" />
