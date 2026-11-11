@@ -236,6 +236,36 @@ namespace New_MOSWordVSTOAddIn
                 System.Diagnostics.Debug.WriteLine($"[Logger] Error writing scoring log: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// 教材の採点証跡がログに既にあるか（VSTO 側の簡易照会。採点 DLL の LogReader とは別）。
+        /// </summary>
+        public static bool HasTaskEvidence(int projectId, int taskId, string commandId)
+        {
+            if (string.IsNullOrWhiteSpace(commandId) || projectId <= 0 || taskId <= 0)
+                return false;
+
+            try
+            {
+                lock (_lockObject)
+                {
+                    if (!File.Exists(LogFilePath))
+                        return false;
+
+                    string needle = "[Project" + projectId.ToString(CultureInfo.InvariantCulture)
+                        + "] [Task" + projectId.ToString(CultureInfo.InvariantCulture)
+                        + "-" + taskId.ToString(CultureInfo.InvariantCulture)
+                        + "] [" + commandId + "] Executed";
+                    string text = File.ReadAllText(LogFilePath, Encoding.UTF8);
+                    return text.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Logger] HasTaskEvidence: {ex.Message}");
+                return false;
+            }
+        }
     }
 }
 

@@ -45,6 +45,10 @@ namespace New_MOSWordVSTOAddIn
             (7, 4, "FileSaveAsTxt"),
             (7, 5, "FileSaveAsDocm"),
             (9, 5, "AcceptAllChangesInDocAndStopTracking"),
+            // 9-5: 「すべての変更を反映」のみ（偽○防止・詳細理由用）
+            (9, 5, "ReviewAcceptAllChangesInDocument"),
+            // 9-5: 二段操作で［変更の記録］をOFFにしたとき
+            (9, 5, "TrackRevisionsOff"),
         };
 
         static readonly string[] Task10_2BulletTexts =

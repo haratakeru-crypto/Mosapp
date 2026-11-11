@@ -402,7 +402,7 @@ namespace New_MOSWordVSTOAddIn
 
         /// <summary>
         /// 9-5 離脱時: 未処理履歴が0かつ追跡OFFなら AcceptAllChangesInDocAndStopTracking を補記する。
-        /// （「すべて承諾して追跡終了」直後の形。9-6 で追跡が戻る前にログを残し、一括の証跡欠落を防ぐ）
+        /// 「反映のみ」証跡があり停止操作が無いときは補記しない（偽○防止）。
         /// </summary>
         internal void EnsureTask95AcceptAllEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
         {
@@ -413,26 +413,83 @@ namespace New_MOSWordVSTOAddIn
 
             try
             {
-                Word.Document doc = TryGetProjectDocument(9);
-                if (doc == null)
-                    return;
-
-                int revCount = -1;
-                try { revCount = doc.Revisions.Count; } catch { revCount = -1; }
-                if (revCount != 0)
-                    return;
-
-                bool trackingOff = false;
-                try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
-                if (!trackingOff)
-                    return;
-
-                WordEvidenceHelper.LogCommandWithEvidence("AcceptAllChangesInDocAndStopTracking");
+                TryWriteTask95StopTrackingEvidenceIfAppropriate();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask95AcceptAllEvidenceBeforeLeave: " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// 9-5: ［変更の記録］トグル後、追跡が OFF なら TrackRevisionsOff を記録する。
+        /// </summary>
+        internal void ScheduleTask95TrackRevisionsOffCheck()
+        {
+            try
+            {
+                if (!TryGetActiveExamTask(out int projectId, out int taskId) || projectId != 9 || taskId != 5)
+                    return;
+
+                var timer = new Timer { Interval = 200 };
+                timer.Tick += (s, e) =>
+                {
+                    try
+                    {
+                        timer.Stop();
+                        timer.Dispose();
+                        Word.Document doc = TryGetProjectDocument(9) ?? this.Application?.ActiveDocument;
+                        if (doc == null)
+                            return;
+                        bool trackingOff = false;
+                        try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
+                        if (trackingOff)
+                            WordEvidenceHelper.LogCommandWithEvidence("TrackRevisionsOff");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ThisAddIn] ScheduleTask95TrackRevisionsOffCheck: " + ex.Message);
+                    }
+                };
+                timer.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] ScheduleTask95TrackRevisionsOffCheck schedule: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 9-5 正答証跡の補記。履歴0・追跡OFFで、かつ「反映のみ」単独ではないときだけ書く。
+        /// </summary>
+        private bool TryWriteTask95StopTrackingEvidenceIfAppropriate()
+        {
+            Word.Document doc = TryGetProjectDocument(9);
+            if (doc == null)
+                return false;
+
+            int revCount = -1;
+            try { revCount = doc.Revisions.Count; } catch { revCount = -1; }
+            if (revCount != 0)
+                return false;
+
+            bool trackingOff = false;
+            try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
+            if (!trackingOff)
+                return false;
+
+            if (Logger.HasTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking"))
+                return true;
+
+            bool acceptOnly = Logger.HasTaskEvidence(9, 5, "ReviewAcceptAllChangesInDocument");
+            bool trackOffLogged = Logger.HasTaskEvidence(9, 5, "TrackRevisionsOff");
+            // 反映のみで追跡が消えているだけの誤操作 → 補記しない
+            if (acceptOnly && !trackOffLogged)
+                return false;
+
+            // Active が既に別タスクでもよいよう、9-5 固定で直書きする
+            Logger.LogTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking");
+            return true;
         }
 
         /// <summary>
@@ -1422,25 +1479,13 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 明示された 9-5 の証跡確定。履歴 0 件かつ追跡終了のときだけ記録し、誤操作は証跡を作らない。
+        /// 明示された 9-5 の証跡確定。履歴0・追跡OFFで、反映のみ単独の誤操作は補記しない。
         /// </summary>
         private bool FlushExplicitTask95Evidence()
         {
             try
             {
-                Word.Document doc = TryGetProjectDocument(9);
-                if (doc == null)
-                    return false;
-
-                int revisionCount = -1;
-                try { revisionCount = doc.Revisions.Count; } catch { revisionCount = -1; }
-                bool trackingOff = false;
-                try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
-                if (revisionCount != 0 || !trackingOff)
-                    return false;
-
-                Logger.LogTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking");
-                return true;
+                return TryWriteTask95StopTrackingEvidenceIfAppropriate();
             }
             catch (Exception ex)
             {
@@ -1599,17 +1644,9 @@ namespace New_MOSWordVSTOAddIn
 
             try
             {
-                // 9-5: 未処理の変更履歴が 0 なら「すべて承諾して追跡終了」相当とみなす
+                // 9-5: 履歴0・追跡OFFの救済（反映のみ単独は補記しない）
                 if (projectId == 9 && taskId == 5)
-                {
-                    Word.Document doc = app.ActiveDocument;
-                    if (doc == null)
-                        return;
-                    int revCount = -1;
-                    try { revCount = doc.Revisions.Count; } catch { revCount = -1; }
-                    if (revCount == 0)
-                        WordEvidenceHelper.LogCommandWithEvidence("AcceptAllChangesInDocAndStopTracking");
-                }
+                    TryWriteTask95StopTrackingEvidenceIfAppropriate();
             }
             catch { /* ignore */ }
         }

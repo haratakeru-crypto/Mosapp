@@ -91,6 +91,14 @@ namespace New_MOSWordVSTOAddIn
                     loggedCommandId = "TableColumnsDistribute";
                     Globals.ThisAddIn?.RegisterRibbonLoggedTableColumnsDistribute();
                 }
+                else if (string.Equals(commandId, "ReviewTrackChanges", StringComparison.OrdinalIgnoreCase))
+                {
+                    // 既定トグルの後に追跡OFFなら TrackRevisionsOff を記録（9-5 二段操作）
+                    cancelDefault = false;
+                    Globals.ThisAddIn?.ScheduleTask95TrackRevisionsOffCheck();
+                    LogRibbonOperation(commandId, commandId);
+                    return;
+                }
 
                 bool cutSkipped = false;
                 if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))

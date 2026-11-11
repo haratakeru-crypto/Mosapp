@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Office.Interop.Word;
 using Libraries;
 
@@ -7,41 +8,90 @@ namespace Libraries.Group1
 {
     public class WordChecker1_9
     {
-        public bool CheckTask_1_9_01() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_9_01(filePath); } catch { return false; } }
-        public bool CheckTask_1_9_02() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_9_02(filePath); } catch { return false; } }
-        public bool CheckTask_1_9_03() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_9_03(filePath); } catch { return false; } }
-        public bool CheckTask_1_9_04() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_9_04(filePath); } catch { return false; } }
-        public bool CheckTask_1_9_05() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_9_05(filePath); } catch { return false; } }
-        public bool CheckTask_1_9_06() { try { string filePath = GetCurrentWordFilePath(); if (string.IsNullOrEmpty(filePath)) return false; return CheckTask_1_9_06(filePath); } catch { return false; } }
+        public bool CheckTask_1_9_01() => RunCheck(CheckTask_1_9_01_Impl);
+        public bool CheckTask_1_9_02() => RunCheck(CheckTask_1_9_02_Impl);
+        public bool CheckTask_1_9_03() => RunCheck(CheckTask_1_9_03_Impl);
+        public bool CheckTask_1_9_04() => RunCheck(CheckTask_1_9_04_Impl);
+        public bool CheckTask_1_9_05() => RunCheck(CheckTask_1_9_05_Impl);
+        public bool CheckTask_1_9_06() => RunCheck(CheckTask_1_9_06_Impl);
 
-        private bool CheckTask_1_9_01(string filePath)
+        private bool RunCheck(Func<string, bool> task)
         {
-            Application wordApp = null; Document document = null;
-            Range searchRange = null; Find find = null;
-            Paragraphs paragraphs = null; Paragraph firstPara = null;
-            Range paraRange = null; ListFormat lf = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
+                string filePath = GetCurrentWordFilePath();
+                if (string.IsNullOrEmpty(filePath))
+                    return Miss(WordScoreExplanation.UnavailableText);
+                return task(filePath);
+            }
+            catch
+            {
+                return Miss(WordScoreExplanation.UnavailableText);
+            }
+        }
+
+        private bool CheckTask_1_9_01_Impl(string filePath)
+        {
+            Application wordApp = null; Document document = null;
+            try
+            {
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return Miss(WordScoreExplanation.UnavailableText); }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
+                // 完成形: 1.ゴールデンウィーク / 2.こどもの日 / 3.母の日
+                if (!TryGetListValueAtPhrase(document, "ゴールデンウィーク", out int gwValue))
+                    return Miss("段落番号が「1」から開始されていません。");
+                if (gwValue != 1)
+                    return Miss($"段落番号が「{gwValue}」から始まっています。");
+
+                if (!TryGetListValueAtPhrase(document, "こどもの日", out int kodomoValue)
+                    || !TryGetListValueAtPhrase(document, "母の日", out int hahaValue))
+                    return Miss("続く段落番号が「2」「3」になっていません。");
+
+                if (kodomoValue == 2 && hahaValue == 3)
+                    return true;
+
+                return Miss($"続く段落番号が「{kodomoValue}」「{hahaValue}」になっています。");
+            }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
+            finally
+            {
+                if (document != null) Marshal.ReleaseComObject(document);
+            }
+        }
+
+        private static bool TryGetListValueAtPhrase(Document document, string phrase, out int listValue)
+        {
+            listValue = 0;
+            Range searchRange = null;
+            Find find = null;
+            Paragraphs paragraphs = null;
+            Paragraph firstPara = null;
+            Range paraRange = null;
+            ListFormat lf = null;
+            try
+            {
                 searchRange = WordFindHelper.DuplicateContent(document);
                 find = searchRange.Find;
-                WordFindHelper.ConfigureSafeFind(find, "ゴールデンウィーク");
+                WordFindHelper.ConfigureSafeFind(find, phrase);
                 find.Execute();
-                
-                if (!find.Found) return false;
+                if (!find.Found)
+                    return false;
 
                 paragraphs = searchRange.Paragraphs;
                 firstPara = paragraphs[1];
                 paraRange = firstPara.Range;
                 lf = paraRange.ListFormat;
-
-                return lf.ListValue == 1;
+                listValue = lf.ListValue;
+                return true;
             }
-            catch { return false; }
+            catch
+            {
+                listValue = 0;
+                return false;
+            }
             finally
             {
                 if (lf != null) Marshal.ReleaseComObject(lf);
@@ -50,29 +100,27 @@ namespace Libraries.Group1
                 if (paragraphs != null) Marshal.ReleaseComObject(paragraphs);
                 if (find != null) Marshal.ReleaseComObject(find);
                 if (searchRange != null) Marshal.ReleaseComObject(searchRange);
-                if (document != null) Marshal.ReleaseComObject(document);
             }
         }
 
-        private bool CheckTask_1_9_02(string filePath)
+        private bool CheckTask_1_9_02_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return Miss(WordScoreExplanation.UnavailableText); }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 string xml = document.WordOpenXML;
-                if (string.IsNullOrEmpty(xml)) return false;
+                if (string.IsNullOrEmpty(xml)) return Miss(WordScoreExplanation.UnavailableText);
 
-                // 1. 本文 (/word/document.xml) の抽出
-                var documentPartMatch = System.Text.RegularExpressions.Regex.Match(xml, @"<pkg:part pkg:name=""/word/document.xml""[^>]*>.*?</pkg:part>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                var documentPartMatch = Regex.Match(xml, @"<pkg:part pkg:name=""/word/document\.xml""[^>]*>.*?</pkg:part>", RegexOptions.Singleline);
                 string bodyXml = documentPartMatch.Success ? documentPartMatch.Value : xml;
 
-                var paragraphs = System.Text.RegularExpressions.Regex.Matches(bodyXml, @"<w:p\b[^>]*>.*?</w:p>", System.Text.RegularExpressions.RegexOptions.Singleline);
-                
+                var paragraphs = Regex.Matches(bodyXml, @"<w:p\b[^>]*>.*?</w:p>", RegexOptions.Singleline);
+
                 int headingIndex = -1;
                 int headingLength = 0;
                 int nextHeadingIndex = -1;
@@ -80,8 +128,8 @@ namespace Libraries.Group1
                 for (int i = 0; i < paragraphs.Count; i++)
                 {
                     var p = paragraphs[i];
-                    string pText = System.Text.RegularExpressions.Regex.Replace(p.Value, @"<[^>]+>", "");
-                    
+                    string pText = Regex.Replace(p.Value, @"<[^>]+>", "");
+
                     if (headingIndex == -1 && pText.Contains("月別催事内容"))
                     {
                         headingIndex = p.Index;
@@ -94,63 +142,70 @@ namespace Libraries.Group1
                     }
                 }
 
-                if (headingIndex == -1) return false;
+                if (headingIndex == -1)
+                    return Miss("見出し「2. 月別催事内容」が見つかりません。");
 
-                // 2. 「月別催事内容」見出しから「小豆島」見出しまでの間のXMLを切り出す
-                string rangeXml = "";
+                string rangeXml;
                 if (nextHeadingIndex != -1 && nextHeadingIndex > headingIndex + headingLength)
-                {
                     rangeXml = bodyXml.Substring(headingIndex + headingLength, nextHeadingIndex - (headingIndex + headingLength));
-                }
                 else
-                {
                     rangeXml = bodyXml.Substring(headingIndex + headingLength);
-                }
 
-                // 3. 該当範囲に表タグ <w:tbl> が含まれていないことを確認
-                if (rangeXml.Contains("<w:tbl")) return false;
+                if (rangeXml.Contains("<w:tbl"))
+                    return Miss("表がコンマ区切りの文字列に変更されていません。");
 
-                // 4. カンマが規定数（5個以上）含まれていることを確認
-                string rangeText = System.Text.RegularExpressions.Regex.Replace(rangeXml, @"<[^>]+>", "");
+                string rangeText = Regex.Replace(rangeXml, @"<[^>]+>", "");
                 int commaCount = 0;
                 foreach (char c in rangeText)
                 {
                     if (c == ',' || c == '，') commaCount++;
                 }
 
-                return commaCount >= 5;
+                if (commaCount >= 5)
+                    return true;
+
+                // 表の解除ダイアログで［タブ］［段落記号］を選んだ場合
+                int tabCount = Regex.Matches(rangeXml, @"<w:tab\b").Count;
+                if (tabCount >= 5)
+                    return Miss("タブ区切りになっています。");
+
+                int paragraphCount = Regex.Matches(rangeXml, @"<w:p\b").Count;
+                // 初期表は2列×7行程度。段落記号区切りだとセルごとに段落が増える
+                if (paragraphCount >= 10 && tabCount < 5)
+                    return Miss("段落記号区切りになっています。");
+
+                return Miss("コンマ区切りの文字列になっていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        private bool CheckTask_1_9_03(string filePath)
+        private bool CheckTask_1_9_03_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return Miss(WordScoreExplanation.UnavailableText); }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 string xml = document.WordOpenXML;
-                if (string.IsNullOrEmpty(xml)) return false;
+                if (string.IsNullOrEmpty(xml)) return Miss(WordScoreExplanation.UnavailableText);
 
-                // 1. 本文 (/word/document.xml) の抽出
-                var documentPartMatch = System.Text.RegularExpressions.Regex.Match(xml, @"<pkg:part pkg:name=""/word/document.xml""[^>]*>.*?</pkg:part>", System.Text.RegularExpressions.RegexOptions.Singleline);
+                var documentPartMatch = Regex.Match(xml, @"<pkg:part pkg:name=""/word/document\.xml""[^>]*>.*?</pkg:part>", RegexOptions.Singleline);
                 string bodyXml = documentPartMatch.Success ? documentPartMatch.Value : xml;
 
-                var paragraphs = System.Text.RegularExpressions.Regex.Matches(bodyXml, @"<w:p\b[^>]*>.*?</w:p>", System.Text.RegularExpressions.RegexOptions.Singleline);
-                
+                var paragraphs = Regex.Matches(bodyXml, @"<w:p\b[^>]*>.*?</w:p>", RegexOptions.Singleline);
+
                 int headingIndex = -1;
                 int headingLength = 0;
 
                 for (int i = 0; i < paragraphs.Count; i++)
                 {
                     var p = paragraphs[i];
-                    string pText = System.Text.RegularExpressions.Regex.Replace(p.Value, @"<[^>]+>", "");
-                    
+                    string pText = Regex.Replace(p.Value, @"<[^>]+>", "");
+
                     if (pText.Contains("小豆島のうまいもの市場売上"))
                     {
                         headingIndex = p.Index;
@@ -159,36 +214,38 @@ namespace Libraries.Group1
                     }
                 }
 
-                if (headingIndex == -1) return false;
+                if (headingIndex == -1)
+                    return Miss("見出し「3. 小豆島のうまいもの市場売上」が見つかりません。");
 
-                // 2. 見出しの直後に出現する表（<w:tbl>）のXMLブロックを抽出
                 string afterHeadingXml = bodyXml.Substring(headingIndex + headingLength);
-                var tblMatch = System.Text.RegularExpressions.Regex.Match(afterHeadingXml, @"<w:tbl\b[^>]*>.*?</w:tbl>", System.Text.RegularExpressions.RegexOptions.Singleline);
-                if (!tblMatch.Success) return false;
+                var tblMatch = Regex.Match(afterHeadingXml, @"<w:tbl\b[^>]*>.*?</w:tbl>", RegexOptions.Singleline);
+                if (!tblMatch.Success)
+                    return Miss("見出し「3. 小豆島のうまいもの市場売上」の下の表が見つかりません。");
                 string tableXml = tblMatch.Value;
 
-                // 3. 表全体のセル余白（tblCellMar）または個別セルの余白（tcMar）から「右余白」の設定値をチェック
                 // 4mm ≒ 227 dxa (誤差許容範囲 220 〜 235)
-                var marMatches = System.Text.RegularExpressions.Regex.Matches(tableXml, @"<(w:tblCellMar|w:tcMar)\b[^>]*>.*?</\1>", System.Text.RegularExpressions.RegexOptions.Singleline);
-                foreach (System.Text.RegularExpressions.Match mar in marMatches)
+                int? observedRight = null;
+                var marMatches = Regex.Matches(tableXml, @"<(w:tblCellMar|w:tcMar)\b[^>]*>.*?</\1>", RegexOptions.Singleline);
+                foreach (Match mar in marMatches)
                 {
-                    var rightMatch = System.Text.RegularExpressions.Regex.Match(mar.Value, @"<w:right\b[^>]*w:w=""(\d+)""");
+                    var rightMatch = Regex.Match(mar.Value, @"<w:right\b[^>]*w:w=""(\d+)""");
                     if (rightMatch.Success && int.TryParse(rightMatch.Groups[1].Value, out int width))
                     {
+                        observedRight = width;
                         if (width >= 220 && width <= 235)
-                        {
                             return true;
-                        }
                     }
                 }
 
-                return false;
+                if (observedRight.HasValue)
+                    return Miss($"セルの右の余白が「{FormatDxaAsMm(observedRight.Value)}」になっています。");
+                return Miss("セルの右の余白が「4mm」になっていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
         }
 
-        private bool CheckTask_1_9_04(string filePath)
+        private bool CheckTask_1_9_04_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             Range searchRange = null; Find find = null;
@@ -198,25 +255,29 @@ namespace Libraries.Group1
             Range hCellRange = null; Rows tblRows = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return Miss(WordScoreExplanation.UnavailableText); }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 searchRange = WordFindHelper.DuplicateContent(document);
                 find = searchRange.Find;
                 WordFindHelper.ConfigureSafeFind(find, "合計");
                 find.Execute();
-                
-                if (!find.Found) return false;
+
+                if (!find.Found)
+                    return Miss("表が「合計」の降順に並べ替えられていません。");
 
                 tables = searchRange.Tables;
+                if (tables == null || tables.Count < 1)
+                    return Miss("表が「合計」の降順に並べ替えられていません。");
+
                 table = tables[1];
                 rows = table.Rows;
                 headerRow = rows[1];
                 cells = headerRow.Cells;
                 int numCells = cells.Count;
-                int colIndex = 1;
+                int colIndex = -1;
 
                 for (int c = 1; c <= numCells; c++)
                 {
@@ -231,15 +292,19 @@ namespace Libraries.Group1
                     {
                         if (hCellRange != null) Marshal.ReleaseComObject(hCellRange);
                         if (hCell != null) Marshal.ReleaseComObject(hCell);
+                        hCellRange = null;
+                        hCell = null;
                     }
                 }
 
+                if (colIndex < 0)
+                    return Miss("表が「合計」の降順に並べ替えられていません。");
+
                 tblRows = table.Rows;
                 int rowCount = tblRows.Count;
-                float prev = float.MaxValue;
-                bool descending = rowCount >= 2;
+                var values = new System.Collections.Generic.List<float>();
 
-                for (int r = 2; r <= rowCount && descending; r++)
+                for (int r = 2; r <= rowCount; r++)
                 {
                     Cell cell = table.Cell(r, colIndex);
                     Range cellRange = cell.Range;
@@ -248,10 +313,7 @@ namespace Libraries.Group1
                         string cellText = cellRange?.Text?.Trim().TrimEnd('\r', '\a') ?? "";
                         if (string.IsNullOrEmpty(cellText)) continue;
                         if (float.TryParse(cellText.Replace(",", ""), out float val))
-                        {
-                            if (val > prev) descending = false;
-                            prev = val;
-                        }
+                            values.Add(val);
                     }
                     finally
                     {
@@ -260,9 +322,25 @@ namespace Libraries.Group1
                     }
                 }
 
-                return descending;
+                if (values.Count < 2)
+                    return Miss("表が「合計」の降順に並べ替えられていません。");
+
+                bool descending = true;
+                bool ascending = true;
+                for (int i = 1; i < values.Count; i++)
+                {
+                    if (values[i] > values[i - 1]) descending = false;
+                    if (values[i] < values[i - 1]) ascending = false;
+                }
+
+                if (descending)
+                    return true;
+                if (ascending)
+                    return Miss("「合計」の「昇順」になっています。");
+
+                return Miss("表が「合計」の降順に並べ替えられていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally
             {
                 if (tblRows != null) Marshal.ReleaseComObject(tblRows);
@@ -277,16 +355,16 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_9_05(string filePath)
+        private bool CheckTask_1_9_05_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             Revisions revisions = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return Miss(WordScoreExplanation.UnavailableText); }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
                 bool noRevisions = false;
                 try
@@ -299,13 +377,34 @@ namespace Libraries.Group1
                     noRevisions = true;
                 }
 
-                // 登録した正しいコマンドログが実行され、かつ未処理の変更履歴が残っていないことを厳格に判定
-                // (注: 後続タスクの「変更履歴のロック」を行うと、Wordの仕様により強制的にTrackRevisionsがtrueに戻ってしまい、
-                //  状態のみでの追跡が破綻するため、操作ログと履歴0件のANDで完全な厳格性と独立性を担保します)
-                // IRibbonExtensibility 無効時は VSTO が採点フラッシュで Revisions==0 なら証跡を補完する。
-                return LogReader.HasTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking") && noRevisions;
+                // 後続の変更履歴ロックで TrackRevisions が戻るため、操作ログと履歴0件で判定する。
+                bool stopTrackingOk = LogReader.HasTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking");
+                bool acceptOnly = LogReader.HasTaskEvidence(9, 5, "ReviewAcceptAllChangesInDocument");
+                bool trackOffLogged = LogReader.HasTaskEvidence(9, 5, "TrackRevisionsOff");
+                // 一発正答、または 反映＋変更の記録OFF の二段正答
+                bool logOk = stopTrackingOk || (acceptOnly && trackOffLogged);
+                if (logOk && noRevisions)
+                    return true;
+
+                bool noted = false;
+                if (!noRevisions)
+                {
+                    WordScoreExplanation.Note("変更履歴が残っています。");
+                    noted = true;
+                }
+                if (!logOk)
+                {
+                    if (noRevisions && acceptOnly && !trackOffLogged && !stopTrackingOk)
+                        WordScoreExplanation.Note("変更の記録が停止されていません。");
+                    else
+                        WordScoreExplanation.Note("すべての変更履歴を反映し、変更の記録を停止した記録がありません。");
+                    noted = true;
+                }
+                if (noted)
+                    return false;
+                return Miss("変更履歴の承認と記録の停止が完了していません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally
             {
                 if (revisions != null) Marshal.ReleaseComObject(revisions);
@@ -313,45 +412,68 @@ namespace Libraries.Group1
             }
         }
 
-        private bool CheckTask_1_9_06(string filePath)
+        private bool CheckTask_1_9_06_Impl(string filePath)
         {
             Application wordApp = null; Document document = null;
             try
             {
-                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return false; }
+                try { wordApp = (Application)Marshal.GetActiveObject("Word.Application"); } catch { return Miss(WordScoreExplanation.UnavailableText); }
                 document = null; string fileName = System.IO.Path.GetFileName(filePath);
                 foreach (Document doc in wordApp.Documents) { if (doc.FullName.Equals(filePath, StringComparison.OrdinalIgnoreCase) || doc.Name.Equals(fileName, StringComparison.OrdinalIgnoreCase)) { document = doc; break; } }
-                if (document == null) return false;
+                if (document == null) return Miss(WordScoreExplanation.UnavailableText);
 
-                // 1. まず編集制限タイプが「変更履歴のみ」になっているか
                 if (document.ProtectionType != WdProtectionType.wdAllowOnlyRevisions)
+                    return Miss("変更履歴を編集できないようにロックされていません。");
+
+                // 空パスワードは Unprotect("456") も成功するため、先に空解除を試す
+                try
                 {
-                    return false;
+                    document.Unprotect(string.Empty);
+                    try
+                    {
+                        document.Protect(WdProtectionType.wdAllowOnlyRevisions, NoReset: true, Password: string.Empty);
+                    }
+                    catch { /* ignore */ }
+                    return Miss("パスワードが「456」になっていません。");
+                }
+                catch (COMException)
+                {
+                    // 何らかのパスワードあり → 続けて 456 を検証
                 }
 
-                // 2. パスワードが「456」に設定されているかをサイレント検証
                 bool passwordOk = false;
                 try
                 {
-                    // パスワード「456」で解除を試みる (画面上のダイアログや警告は一切出ません)
                     document.Unprotect("456");
                     passwordOk = true;
-
-                    // 検証成功したため、即座に同じ「変更履歴のみ」「パスワード: 456」で保護を掛け直す
-                    // NoReset: true を指定することで、文書の状態を一切リセットせず完全に維持します
                     document.Protect(WdProtectionType.wdAllowOnlyRevisions, NoReset: true, Password: "456");
                 }
                 catch (COMException)
                 {
-                    // パスワードが間違っている、またはパスワードなしでロックされている場合は
-                    // 例外が発生するため自動的に不合格とします。文書の保護状態は維持されます。
                     passwordOk = false;
                 }
 
-                return passwordOk;
+                if (passwordOk)
+                    return true;
+
+                return Miss("パスワードが「456」になっていません。");
             }
-            catch { return false; }
+            catch { return Miss(WordScoreExplanation.UnavailableText); }
             finally { if (document != null) Marshal.ReleaseComObject(document); }
+        }
+
+        /// <summary>twip(dxa) を学生向けの mm 表示に変換（1mm ≒ 56.7 dxa）。</summary>
+        private static string FormatDxaAsMm(int dxa)
+        {
+            double mm = dxa / 56.7;
+            string text = mm.ToString("0.#");
+            return text + "mm";
+        }
+
+        private static bool Miss(string reason)
+        {
+            WordScoreExplanation.Note(reason);
+            return false;
         }
 
         private string GetCurrentWordFilePath()
@@ -363,4 +485,3 @@ namespace Libraries.Group1
         }
     }
 }
-
