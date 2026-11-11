@@ -25,6 +25,8 @@ namespace MOSExcelMogiApp.Views
         private List<ResultProjectInfo> _allProjects; // すべてのプロジェクトを保持
         private bool _showingWrongOnly = false; // フィルター状態
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
+        /// <summary>採点ログ起点など、終了／閉じる時のクリーンアップ（Excel・AppBar・メイン復帰）。</summary>
+        public Action OnEndRequested { get; set; }
         /// <summary>初回の <see cref="LoadResultsAsync"/>（問題文・一覧の読み込み含む）が完了したときに1回だけ発火する。</summary>
         public event EventHandler InitialPresentationCompleted;
         // 採点直後のスナップショット（復習前の正答率計算用）
@@ -545,6 +547,13 @@ namespace MOSExcelMogiApp.Views
         private async void EndButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] EndButton_Click called");
+
+            if (_fromScoringLog)
+            {
+                RequestExitCleanup();
+                Close();
+                return;
+            }
             
             // 待機メッセージウィンドウを作成
             Window waitWindow = null;
@@ -685,6 +694,13 @@ namespace MOSExcelMogiApp.Views
         private async void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseButton_Click called");
+
+            if (_fromScoringLog)
+            {
+                RequestExitCleanup();
+                Close();
+                return;
+            }
             
             // 待機メッセージウィンドウを作成
             Window waitWindow = null;
@@ -1023,6 +1039,15 @@ namespace MOSExcelMogiApp.Views
                 {
                     try
                     {
+                        // 採点ログ起点: MainWindow 側で AppBar / モード / ファイルオープンを一括処理
+                        if (OnNavigateToTask != null)
+                        {
+                            await Task.Delay(50);
+                            OnNavigateToTask(taskInfo.ProjectId, taskInfo.TaskId);
+                            this.Hide();
+                            return;
+                        }
+
                         // AppBarWindowを確実に表示してからNavigateToTaskを呼び出す
                         var appBarWindow = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault();
                         
@@ -1087,6 +1112,13 @@ namespace MOSExcelMogiApp.Views
                     }
                 }
             }
+        }
+
+        private void RequestExitCleanup()
+        {
+            var handler = OnEndRequested;
+            OnEndRequested = null;
+            handler?.Invoke();
         }
 
         /// <summary>結果一覧のコールバックから、×のタスクへ戻るときだけ再挑戦番号を予約する。</summary>

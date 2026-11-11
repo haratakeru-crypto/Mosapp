@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,62 +7,96 @@ using System.Windows.Threading;
 namespace Ui.ViewModels
 {
     /// <summary>
-    /// 次のプロジェクト切り替えが 300ms より長いときだけ案内を出す。
+    /// プロジェクト切替・タスク遷移時の準備中案内（Word / PP と同様に即時表示）。
     /// </summary>
     internal static class ExcelDelayedProjectOpenNotice
     {
-        const int DelayMs = 300;
-
         public static async Task RunAsync(Func<Task> transitionAsync)
         {
-            bool completed = false;
             Window overlay = null;
             DispatcherTimer keepOnTop = null;
-            Timer showTimer = null;
             var dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
 
-            void ShowIfNeeded()
+            try
             {
-                if (completed || overlay != null)
-                    return;
-                try
+                await dispatcher.InvokeAsync(() =>
                 {
                     overlay = CreateWindow();
                     overlay.Show();
                     overlay.Activate();
-                    keepOnTop = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-                    keepOnTop.Tick += (_, __) =>
-                    {
-                        if (overlay == null || !overlay.IsVisible || overlay.IsActive)
-                            return;
-                        overlay.Topmost = false;
-                        overlay.Topmost = true;
-                        overlay.Activate();
-                    };
-                    keepOnTop.Start();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("[ExcelDelayedProjectOpenNotice] " + ex.Message);
-                }
-            }
+                    overlay.UpdateLayout();
+                    keepOnTop = StartKeepOnTop(overlay);
+                });
 
-            showTimer = new Timer(_ => dispatcher.BeginInvoke(new Action(ShowIfNeeded)), null, DelayMs, Timeout.Infinite);
-            try
-            {
+                // COM で UI が固まる前に一度描画する
+                await dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
                 await dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 await transitionAsync();
             }
             finally
             {
-                completed = true;
-                showTimer.Dispose();
                 keepOnTop?.Stop();
                 if (overlay != null)
                 {
-                    try { overlay.Close(); } catch { }
+                    try { overlay.Close(); } catch { /* ignore */ }
                 }
             }
+        }
+
+        /// <summary>
+        /// 同期の NavigateToTask 用。表示して描画まで進めたあと、Dispose で閉じる。
+        /// </summary>
+        public static IDisposable BeginImmediate()
+        {
+            var dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+            Window overlay = null;
+            DispatcherTimer keepOnTop = null;
+
+            void Show()
+            {
+                overlay = CreateWindow();
+                overlay.Show();
+                overlay.Activate();
+                overlay.UpdateLayout();
+                keepOnTop = StartKeepOnTop(overlay);
+                FlushUntilRendered(overlay);
+            }
+
+            if (dispatcher.CheckAccess())
+                Show();
+            else
+                dispatcher.Invoke(Show);
+
+            return new NoticeScope(overlay, keepOnTop);
+        }
+
+        static DispatcherTimer StartKeepOnTop(Window overlay)
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+            timer.Tick += (_, __) =>
+            {
+                if (overlay == null || !overlay.IsVisible || overlay.IsActive)
+                    return;
+                overlay.Topmost = false;
+                overlay.Topmost = true;
+                overlay.Activate();
+            };
+            timer.Start();
+            return timer;
+        }
+
+        static void FlushUntilRendered(Window dialog)
+        {
+            if (dialog == null)
+                return;
+            dialog.UpdateLayout();
+            var frame = new DispatcherFrame();
+            dialog.Dispatcher.BeginInvoke(DispatcherPriority.Render, new DispatcherOperationCallback(_ =>
+            {
+                frame.Continue = false;
+                return null;
+            }), null);
+            Dispatcher.PushFrame(frame);
         }
 
         static Window CreateWindow()
@@ -97,6 +130,29 @@ namespace Ui.ViewModels
                     }
                 }
             };
+        }
+
+        sealed class NoticeScope : IDisposable
+        {
+            Window _overlay;
+            DispatcherTimer _keepOnTop;
+
+            public NoticeScope(Window overlay, DispatcherTimer keepOnTop)
+            {
+                _overlay = overlay;
+                _keepOnTop = keepOnTop;
+            }
+
+            public void Dispose()
+            {
+                try { _keepOnTop?.Stop(); } catch { /* ignore */ }
+                _keepOnTop = null;
+                if (_overlay != null)
+                {
+                    try { _overlay.Close(); } catch { /* ignore */ }
+                    _overlay = null;
+                }
+            }
         }
     }
 }

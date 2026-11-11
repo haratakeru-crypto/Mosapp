@@ -4,15 +4,13 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace MOS_Word_app.Views
 {
     /// <summary>
-    /// プロジェクト起動・切替中の準備ダイアログ。
-    /// ダイアログは専用 STA スレッドで動かし（バーが止まらない）、Word 処理は呼び出し元 UI スレッドで実行する。
+    /// プロジェクト起動・切替中の準備ダイアログ（Excel / PP と同様の簡易表示）。
+    /// ダイアログは専用 STA スレッドで動かし、Word 処理は呼び出し元 UI スレッドで実行する。
     /// </summary>
     public partial class PreparingWindow : Window
     {
@@ -33,26 +31,6 @@ namespace MOS_Word_app.Views
         public PreparingWindow()
         {
             InitializeComponent();
-        }
-
-        void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            StartMarqueeAnimation();
-        }
-
-        void StartMarqueeAnimation()
-        {
-            if (MarqueeTransform == null)
-                return;
-
-            var animation = new DoubleAnimation
-            {
-                From = -110,
-                To = 420,
-                Duration = TimeSpan.FromSeconds(1.15),
-                RepeatBehavior = RepeatBehavior.Forever
-            };
-            MarqueeTransform.BeginAnimation(TranslateTransform.XProperty, animation);
         }
 
         /// <summary>

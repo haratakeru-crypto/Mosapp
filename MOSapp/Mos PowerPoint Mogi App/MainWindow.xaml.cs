@@ -187,7 +187,114 @@ namespace MOS_PowerPoint_app
                 isVariantMode: entry.IsVariantMode);
             window.Owner = this;
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            window.OnNavigateToTask = (projectId, taskId) =>
+                NavigateFromScoringLogResult(window, entry, projectId, taskId);
+            window.OnEndRequested = ExitFromScoringLogResult;
             window.Show();
+        }
+
+        /// <summary>
+        /// 採点ログ起点の結果画面を終了するとき: PP を閉じ、AppBar を閉じ、メイン（採点ログ）へ戻る。
+        /// </summary>
+        private void ExitFromScoringLogResult()
+        {
+            try
+            {
+                PowerPointApplicationManager.ClosePowerPointApplicationForAppExit();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExitFromScoringLogResult] ClosePowerPoint: " + ex.Message);
+            }
+
+            var bar = _appBarWindow;
+            if (bar != null)
+            {
+                try { bar.SetFromResultWindow(false); } catch { /* ignore */ }
+                try { bar.SetResultWindow(null); } catch { /* ignore */ }
+                try { bar.Close(); } catch { /* ignore */ }
+                // OnAppBarWindowClosed で MainWindow 再表示
+            }
+            else
+            {
+                Show();
+                Activate();
+            }
+        }
+
+        /// <summary>
+        /// 採点ログの結果画面からタスク選択時: AppBar を用意し、該当 Project の PowerPoint を開いて操作可能にする。
+        /// </summary>
+        private void NavigateFromScoringLogResult(
+            Views.ResultWindow resultWindow,
+            MosPracticeClient.ScoringLogEntry entry,
+            int projectId,
+            int taskId)
+        {
+            if (entry == null || projectId <= 0 || taskId <= 0)
+                return;
+
+            var appBar = EnsureAppBarForScoringLog(entry.GroupId, entry.IsVariantMode, projectId);
+            if (appBar == null)
+                return;
+
+            appBar.Show();
+            appBar.Activate();
+            appBar.SetFromResultWindow(true);
+            if (resultWindow != null)
+                appBar.SetResultWindow(resultWindow);
+
+            var wrongKeys = BuildWrongTaskKeysFromResults(entry.ProjectResults);
+            appBar.SetInitialWrongTaskKeys(wrongKeys);
+            appBar.TryPrepareRetryAttemptFromResult(projectId, taskId);
+            appBar.NavigateToTask(projectId, taskId);
+
+            Hide();
+        }
+
+        private Views.UiTestAppBarWindow EnsureAppBarForScoringLog(int groupId, bool isVariantMode, int projectId)
+        {
+            bool needRecreate =
+                _appBarWindow == null ||
+                !_appBarWindow.IsLoaded ||
+                _appBarWindow.CurrentGroupId != groupId ||
+                _appBarWindow.IsVariantMode != isVariantMode;
+
+            if (!needRecreate)
+                return _appBarWindow;
+
+            var oldAppBar = _appBarWindow;
+            _appBarWindow = new Views.UiTestAppBarWindow(
+                projectId,
+                groupId,
+                showScoreButton: true,
+                showPauseButton: false,
+                onScoreClick: () => _viewModel?.ScoreCommand?.Execute(null),
+                isVariantMode: isVariantMode,
+                viewModel: _viewModel);
+            _appBarWindow.Closed += OnAppBarWindowClosed;
+            try { oldAppBar?.Close(); } catch { /* ignore */ }
+            return _appBarWindow;
+        }
+
+        private static List<string> BuildWrongTaskKeysFromResults(Dictionary<int, List<bool>> projectResults)
+        {
+            var keys = new List<string>();
+            if (projectResults == null)
+                return keys;
+
+            foreach (var kv in projectResults)
+            {
+                var list = kv.Value;
+                if (list == null)
+                    continue;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (!list[i])
+                        keys.Add($"{kv.Key}-{i + 1}");
+                }
+            }
+            return keys;
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)

@@ -140,7 +140,93 @@ namespace MOSExcelMogiApp
                 flaggedStates: entry.GetFlaggedStates());
             window.Owner = this;
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            window.OnNavigateToTask = (projectId, taskId) =>
+                NavigateFromScoringLogResult(window, entry, projectId, taskId);
+            window.OnEndRequested = ExitFromScoringLogResult;
             window.Show();
+        }
+
+        /// <summary>
+        /// 採点ログ起点の結果画面を終了するとき: Excel を閉じ、AppBar を閉じ、メイン（採点ログ）へ戻る。
+        /// </summary>
+        private void ExitFromScoringLogResult()
+        {
+            try
+            {
+                _viewModel?.CloseExcelApplication();
+                _viewModel?.ClearSharedExcelApplication();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ExitFromScoringLogResult] CloseExcel: " + ex.Message);
+            }
+
+            var bar = _appBarWindow;
+            if (bar != null)
+            {
+                try { bar.SetFromResultWindow(false); } catch { /* ignore */ }
+                try { bar.SetResultWindow(null); } catch { /* ignore */ }
+                try { bar.Close(); } catch { /* ignore */ }
+                // OnAppBarWindowClosed で MainWindow 再表示
+            }
+            else
+            {
+                _viewModel?.EnableProjectSelection();
+                Show();
+                Activate();
+            }
+        }
+
+        /// <summary>
+        /// 採点ログの結果画面からタスク選択時: AppBar を用意し、該当 Project の Excel を開いて操作可能にする。
+        /// </summary>
+        private void NavigateFromScoringLogResult(
+            Views.ResultWindow resultWindow,
+            MosPracticeClient.ScoringLogEntry entry,
+            int projectId,
+            int taskId)
+        {
+            if (entry == null || projectId <= 0 || taskId <= 0)
+                return;
+
+            _viewModel?.ApplyScoringLogSessionContext(entry.IsVariantMode, entry.VariantSetNo);
+
+            var appBar = EnsureAppBarForScoringLog();
+            if (appBar == null)
+                return;
+
+            appBar.Show();
+            appBar.Activate();
+            appBar.SetFromResultWindow(true);
+            if (resultWindow != null)
+                appBar.SetResultWindow(resultWindow);
+
+            bool isWrong = false;
+            if (entry.ProjectResults != null
+                && entry.ProjectResults.TryGetValue(projectId, out var list)
+                && list != null)
+            {
+                int index = taskId - 1;
+                if (index >= 0 && index < list.Count)
+                    isWrong = !list[index];
+            }
+            appBar.PrepareResultRetry(projectId, taskId, isWrong);
+            appBar.NavigateToTask(projectId, taskId, entry.GroupId);
+
+            Hide();
+        }
+
+        private AppBarWindow EnsureAppBarForScoringLog()
+        {
+            if (_appBarWindow != null && _appBarWindow.IsLoaded)
+                return _appBarWindow;
+
+            var oldAppBar = _appBarWindow;
+            _appBarWindow = new AppBarWindow(_viewModel);
+            _appBarWindow.Closed += OnAppBarWindowClosed;
+            _appBarWindow.ShowActivated = false;
+            try { oldAppBar?.Close(); } catch { /* ignore */ }
+            return _appBarWindow;
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)

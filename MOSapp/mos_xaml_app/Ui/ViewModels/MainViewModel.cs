@@ -1069,6 +1069,17 @@ namespace Ui.ViewModels
             }
         }
 
+        /// <summary>
+        /// 採点ログから復習するとき用。NavigateToTask が正しい作業ファイルを選ぶようモードを合わせる。
+        /// </summary>
+        public void ApplyScoringLogSessionContext(bool isVariantMode, int variantSetNo)
+        {
+            if (isVariantMode)
+                VariantSetNo = variantSetNo > 0 ? variantSetNo : 1;
+            IsVariantMode = isVariantMode;
+            ShowScoreButton = true;
+        }
+
         /// <summary>教材モード中のみ類題セット ComboBox を変更可能。</summary>
         public bool CanSelectVariantSet => !IsVariantMode && HasVariantSupportForCurrentProject;
 

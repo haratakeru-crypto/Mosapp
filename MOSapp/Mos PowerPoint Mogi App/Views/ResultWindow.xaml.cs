@@ -56,6 +56,14 @@ namespace MOS_PowerPoint_app.Views
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}, fromLog: {_fromScoringLog}, variant: {_isVariantMode}");
             
             this.Loaded += ResultWindow_Loaded;
+            this.Closed += (s, args) =>
+            {
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
+                {
+                    appBar.SetFromResultWindow(false);
+                    appBar.SetResultWindow(null);
+                }
+            };
         }
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
@@ -326,14 +334,23 @@ namespace MOS_PowerPoint_app.Views
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] EndButton_Click called");
-            OnEndRequested?.Invoke();
+            RequestExitCleanup();
             this.Close();
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseButton_Click called");
+            // ✕ でも終了と同様に PP / AppBar を片付けてメインへ戻す
+            RequestExitCleanup();
             this.Close();
+        }
+
+        private void RequestExitCleanup()
+        {
+            var handler = OnEndRequested;
+            OnEndRequested = null; // Close 時の二重実行を防ぐ
+            handler?.Invoke();
         }
 
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
@@ -663,7 +680,12 @@ namespace MOS_PowerPoint_app.Views
                     bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                     bool isWrong;
                     if (scoreList != null && arrayIndex >= 0 && arrayIndex < scoreList.Count)
-                        isWrong = isFlagged || !scoreList[arrayIndex];
+                    {
+                        // 採点ログ表示は ○/✖ のみ（フラグは見ない）。通常結果はフラグも✖扱い。
+                        isWrong = _fromScoringLog
+                            ? !scoreList[arrayIndex]
+                            : (isFlagged || !scoreList[arrayIndex]);
+                    }
                     else
                         isWrong = isFlagged || isUnread || !isCompleted;
 

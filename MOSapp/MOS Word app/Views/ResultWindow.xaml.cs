@@ -79,16 +79,13 @@ namespace MOS_Word_app.Views
             _fromScoringLog = fromScoringLog;
             _isVariantMode = isVariantMode;
             this.Loaded += ResultWindow_Loaded;
-            if (!_fromScoringLog)
+            this.Closed += (s, args) =>
             {
-                this.Closed += (s, args) =>
-                {
-                    foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
-                        appBar.ClearReturnToResultMode();
-                    foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
-                        appBar.ClearReturnToResultMode();
-                };
-            }
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
+                    appBar.ClearReturnToResultMode();
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
+                    appBar.ClearReturnToResultMode();
+            };
         }
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
@@ -572,6 +569,27 @@ namespace MOS_Word_app.Views
             return list[index];
         }
 
+        /// <summary>採点ログのスナップショットから ✖ タスクキー（"projectId-taskId"）を構築する。</summary>
+        private List<string> BuildSnapshotWrongTaskKeys()
+        {
+            var keys = new List<string>();
+            if (_snapshotResults == null)
+                return keys;
+
+            foreach (var kv in _snapshotResults)
+            {
+                var list = kv.Value;
+                if (list == null)
+                    continue;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (!list[i])
+                        keys.Add($"{kv.Key}-{i + 1}");
+                }
+            }
+            return keys;
+        }
+
         private static string RemoveQuotes(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
@@ -655,7 +673,9 @@ namespace MOS_Word_app.Views
             try
             {
                 bool canRetry = taskInfo.ResultMark != "－";
-                var initialWrongKeys = ScoreResultStore.GetInitialWrongKeys(_groupId, ResultVariantSetNo).ToList();
+                var initialWrongKeys = _fromScoringLog
+                    ? BuildSnapshotWrongTaskKeys()
+                    : ScoreResultStore.GetInitialWrongKeys(_groupId, ResultVariantSetNo).ToList();
                 var uiTestAppBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
                 if (uiTestAppBar != null)
                 {
@@ -724,6 +744,15 @@ namespace MOS_Word_app.Views
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
+                WordApplicationManager.CloseWordApplicationForAppExit();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseWord on exit: " + ex.Message);
+            }
+
             var mainWindow = Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
             if (mainWindow == null)
                 mainWindow = new MOS_Word_app.MainWindow();

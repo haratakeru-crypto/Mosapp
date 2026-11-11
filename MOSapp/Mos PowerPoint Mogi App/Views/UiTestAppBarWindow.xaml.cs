@@ -766,8 +766,6 @@ namespace MOS_PowerPoint_app.Views
             return new ScoringProgressOverlay(window, message, progress);
         }
 
-        /// <summary>プレゼンを開き直す処理が 300ms 以上かかる場合のみ「準備中」オーバーレイを表示する（速い遷移ではチラつきを抑える）。</summary>
-        private const int PrepareProjectOverlayDelayMs = 300;
         private const int VstoHeartbeatWaitMs = 8000;
         private const int ActiveVstoHeartbeatMaxAgeSeconds = 15;
 
@@ -836,49 +834,36 @@ namespace MOS_PowerPoint_app.Views
         }
 
         /// <summary>
-        /// 遅延後に準備中オーバーレイを表示しつつ遷移処理を実行する。
-        /// 処理の合間で Dispatcher を yield し、オーバーレイの表示キューが処理されるようにする。
+        /// 準備中オーバーレイを即時表示してから遷移処理を実行する（Word の PreparingWindow と同様のタイミング）。
+        /// COM で UI が固まる前に一度描画まで進める。
         /// </summary>
         private async Task RunWithDelayedPrepareOverlayAsync(Func<Task> transitionAsync)
         {
-            bool transitionCompleted = false;
             Window overlay = null;
             DispatcherTimer overlayKeepOnTopTimer = null;
-            System.Threading.Timer showOverlayTimer = null;
 
-            void ShowOverlayIfNeeded()
+            try
             {
-                if (transitionCompleted) return;
-                if (overlay != null) return;
                 try
                 {
                     overlay = CreatePrepareProjectOverlayWindow();
                     overlay.Show();
                     overlay.Activate();
+                    overlay.UpdateLayout();
                     overlayKeepOnTopTimer = StartPrepareOverlayKeepOnTopTimer(overlay);
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[RunWithDelayedPrepareOverlay] Show overlay: {ex.Message}");
                 }
-            }
 
-            showOverlayTimer = new System.Threading.Timer(
-                _ => Dispatcher.BeginInvoke(new Action(ShowOverlayIfNeeded)),
-                null,
-                PrepareProjectOverlayDelayMs,
-                Timeout.Infinite);
-
-            try
-            {
+                // オーバーレイを描画してから OpenProjectDocument 等の COM を始める
+                await Dispatcher.Yield(DispatcherPriority.Render);
                 await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                 await transitionAsync();
             }
             finally
             {
-                transitionCompleted = true;
-                showOverlayTimer?.Dispose();
-                showOverlayTimer = null;
                 overlayKeepOnTopTimer?.Stop();
                 overlayKeepOnTopTimer = null;
                 if (overlay != null)
@@ -1641,6 +1626,9 @@ namespace MOS_PowerPoint_app.Views
                 {
                     TryRescorePendingRetryTasks();
                 }
+
+                // Word と同様: Project を閉じて空の PP も終了（長いプロセス待ちはしない）
+                PowerPointApplicationManager.ClosePowerPointForReturnToResult();
 
                 // 結果画面を表示
                 if (_resultWindow != null && !_resultWindow.IsVisible)

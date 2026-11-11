@@ -1038,7 +1038,8 @@ namespace MOS_Word_app.Views
                 btn.Content = label;
         }
         
-        private void NavigateToTask(int projectId, int taskId)
+        /// <summary>レビュー／結果／採点ログから指定タスクへ遷移し、該当 Project の Word ファイルを開く。</summary>
+        public void NavigateToTask(int projectId, int taskId)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called in main window: ProjectId={projectId}, TaskId={taskId}");
             ScoreResultWindow.TryBringOpenToFront();
@@ -2975,11 +2976,12 @@ namespace MOS_Word_app.Views
         }
 
         /// <summary>
-        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じる。
+        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じ、空の Word も終了する。
         /// </summary>
         private void CloseWordDocumentsBeforeReturnToResult()
         {
             SaveAndCloseAllWordDocuments();
+            TryQuitWord();
         }
 
         /// <summary>

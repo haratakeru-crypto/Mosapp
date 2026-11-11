@@ -1696,9 +1696,17 @@ namespace MOSExcelMogiApp
             
             ExcelApp excelApp = null;
             ExcelWorkbook targetWorkbook = null;
+            IDisposable prepareNotice = null;
             
             try
             {
+                // Word / PP と同様: ファイルオープン前に準備中を即時表示
+                try { prepareNotice = ExcelDelayedProjectOpenNotice.BeginImmediate(); }
+                catch (Exception noticeEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Prepare notice: " + noticeEx.Message);
+                }
+
                 // プロジェクトIDとタスクIDを設定
                 _currentProjectId = projectId;
                 _currentTaskId = taskId;
@@ -1913,6 +1921,7 @@ namespace MOSExcelMogiApp
             }
             finally
             {
+                try { prepareNotice?.Dispose(); } catch { /* ignore */ }
                 // リソースのクリーンアップ
                 _isNavigatingToTask = false;
                 if (targetWorkbook != null)
@@ -2492,13 +2501,30 @@ namespace MOSExcelMogiApp
 
         private async void ReturnToResultButton_Click(object sender, RoutedEventArgs e)
         {
+            Window waitWindow = null;
+            var returnButton = sender as Button;
             try
             {
+                if (returnButton != null)
+                    returnButton.IsEnabled = false;
+
+                // Excel 終了待ちは数秒かかることがあるため、フリーズ誤認を防ぐ案内を出す（プログレスバーなし）
+                waitWindow = CreateReturnToResultWaitWindow();
+                waitWindow.Owner = this;
+                waitWindow.Show();
+                await Dispatcher.Yield(DispatcherPriority.Render);
+
                 // Quit 後もプロセスが残ると VSTO が再ロードされずログタブが消えるため、
                 // PID を記録して EnsureExcelProcessExited まで完了してから結果画面へ遷移する。
                 await Task.Run(() => CloseExcelForReturnToResult());
 
                 _viewModel?.ClearSharedExcelApplication();
+
+                if (waitWindow != null)
+                {
+                    try { waitWindow.Close(); } catch { /* ignore */ }
+                    waitWindow = null;
+                }
 
                 if (_resultWindow != null && !_resultWindow.IsVisible)
                 {
@@ -2524,6 +2550,59 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"結果画面表示エラー: {ex.Message}");
                 MessageBox.Show("結果画面の表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally
+            {
+                if (waitWindow != null)
+                {
+                    try { waitWindow.Close(); } catch { /* ignore */ }
+                }
+                if (returnButton != null)
+                    returnButton.IsEnabled = true;
+            }
+        }
+
+        private static Window CreateReturnToResultWaitWindow()
+        {
+            var stack = new StackPanel
+            {
+                Margin = new Thickness(28, 24, 28, 24),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "結果画面に戻っています",
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "少々お待ちください。",
+                FontSize = 14,
+                Margin = new Thickness(0, 12, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(51, 51, 51))
+            });
+
+            return new Window
+            {
+                Title = "結果画面に戻る",
+                SizeToContent = SizeToContent.WidthAndHeight,
+                MinWidth = 320,
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
+                BorderThickness = new Thickness(2),
+                Content = stack
+            };
         }
 
         /// <summary>
