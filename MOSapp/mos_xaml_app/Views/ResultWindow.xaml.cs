@@ -347,12 +347,35 @@ namespace MOSExcelMogiApp.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Excel", _isVariantMode);
+                    SeatChartSubmitStatusText,
+                    SeatChartQrImage,
+                    wrongTasks,
+                    "Excel",
+                    _isVariantMode,
+                    TryResolvePracticeTotalScore());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
             }
+        }
+
+        /// <summary>全プロジェクト採点時のみ総合点を返す（画面表示と同じ条件）。</summary>
+        private int? TryResolvePracticeTotalScore()
+        {
+            if (!_isVariantMode)
+                return null;
+
+            var results = _fromScoringLog
+                ? _allProjectResults
+                : MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
+            if (results == null || results.Count == 0)
+                results = _allProjectResults;
+            if (!HasAllVariantProjects(results))
+                return null;
+            if (!PracticeScoreClient.TryCompute(VariantExam.FlattenResults(results), out int total, out _))
+                return null;
+            return total;
         }
 
         /// <summary>

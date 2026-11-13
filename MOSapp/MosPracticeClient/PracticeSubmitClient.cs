@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -31,23 +32,26 @@ namespace MosPracticeClient
             return client;
         }
 
-        public static async Task<PracticeSubmitResult> SubmitInitialAsync(int wrongCount, string subject, bool isVariant = false)
+        /// <summary>
+        /// 座席表へ初回送信。類題は range に点数と採点範囲（例: 類題:700 P1～3）を載せ、×は wrongCount に任せる。
+        /// </summary>
+        public static async Task<PracticeSubmitResult> SubmitInitialAsync(
+            int wrongCount,
+            string subject,
+            bool isVariant = false,
+            int? practiceTotalScore = null)
         {
             var settings = PracticeSubmitConfig.Load();
             var profile = ExamineeStore.Load();
             var scoredAt = DateTime.Now;
             string attempt = "";
             string range = "";
-            if (isVariant)
-            {
-                range = "類題";
-            }
             if (!string.IsNullOrEmpty(subject))
             {
                 var logs = ScoringLogStore.Load(subject);
                 if (logs.Count > 0)
                 {
-                    var latest = logs[0];
+                    var latest = logs.FirstOrDefault(e => e.IsVariantMode == isVariant) ?? logs[0];
                     if (latest.ScoredAt != default(DateTime))
                         scoredAt = latest.ScoredAt;
                     if (!isVariant)
@@ -55,8 +59,14 @@ namespace MosPracticeClient
                         attempt = logs.Count.ToString(CultureInfo.InvariantCulture);
                         range = ScoringRangeSelection.ShortenRangeLabel(latest.RangeLabel);
                     }
+                    else
+                    {
+                        range = BuildVariantRangeLabel(practiceTotalScore, latest.RangeLabel);
+                    }
                 }
             }
+            if (isVariant && string.IsNullOrEmpty(range))
+                range = BuildVariantRangeLabel(practiceTotalScore, null);
             string at = scoredAt.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
 
             var result = new PracticeSubmitResult();
@@ -136,6 +146,19 @@ namespace MosPracticeClient
                 result.Error = ex.Message;
                 return result;
             }
+        }
+
+        /// <summary>類題用 range。点数があれば「類題:700」、範囲があれば続けて「 P1～3」。</summary>
+        internal static string BuildVariantRangeLabel(int? practiceTotalScore, string rangeLabel)
+        {
+            string shortRange = ScoringRangeSelection.ShortenRangeLabel(rangeLabel);
+            if (practiceTotalScore.HasValue)
+            {
+                string withScore = "類題:" + practiceTotalScore.Value.ToString(CultureInfo.InvariantCulture);
+                return shortRange.Length > 0 ? withScore + " " + shortRange : withScore;
+            }
+
+            return shortRange.Length > 0 ? "類題 " + shortRange : "類題";
         }
     }
 }

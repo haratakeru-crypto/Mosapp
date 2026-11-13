@@ -277,12 +277,31 @@ namespace MOS_Word_app.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Word", _isVariantMode);
+                    SeatChartSubmitStatusText,
+                    SeatChartQrImage,
+                    wrongTasks,
+                    "Word",
+                    _isVariantMode,
+                    TryResolvePracticeTotalScore());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
             }
+        }
+
+        /// <summary>全プロジェクト採点時のみ総合点を返す（画面表示と同じ条件）。</summary>
+        private int? TryResolvePracticeTotalScore()
+        {
+            if (!_isVariantMode)
+                return null;
+
+            Dictionary<int, List<bool>> results = _fromScoringLog
+                ? _snapshotResults
+                : ScoreResultStore.GetProjectResults(_groupId, ResultVariantSetNo);
+            if (!HasAllVariantProjects(results))
+                return null;
+            return WordPracticeScore.Compute(WordPracticeScore.FlattenResults(results));
         }
 
         private int CountWrongTasks(ProjectData projectData, bool useInitialSnapshot)

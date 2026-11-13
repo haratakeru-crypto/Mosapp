@@ -659,12 +659,32 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "PowerPoint", _isVariantMode);
+                    SeatChartSubmitStatusText,
+                    SeatChartQrImage,
+                    wrongTasks,
+                    "PowerPoint",
+                    _isVariantMode,
+                    TryResolvePracticeTotalScore());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
             }
+        }
+
+        /// <summary>全プロジェクト採点時のみ総合点を返す（画面表示と同じ条件）。</summary>
+        private int? TryResolvePracticeTotalScore()
+        {
+            if (!_isVariantMode)
+                return null;
+            if (!PowerPointVariantExam.HasAllProjects(_allProjectScoringResults))
+                return null;
+            if (!PracticeScoreClient.TryCompute(
+                    PowerPointVariantExam.FlattenResults(_allProjectScoringResults),
+                    out int total,
+                    out _))
+                return null;
+            return total;
         }
 
         private int CalculateWrongCount(ProjectData projectData, Dictionary<int, List<bool>> scoringResults, bool collectInitialWrong)
