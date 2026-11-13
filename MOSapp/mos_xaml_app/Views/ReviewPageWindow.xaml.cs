@@ -826,8 +826,8 @@ namespace MOSExcelMogiApp.Views
                 
                 try
                 {
-                    // AppBarWindow（下の問題領域）を閉じる（UIスレッドで実行）
-                    await Dispatcher.InvokeAsync(() => CloseAppBarWindows(), DispatcherPriority.Background);
+                    // AppBar は Close せず Hide（Close すると Main が再表示されプロジェクト選択が押せてしまう）
+                    await Dispatcher.InvokeAsync(() => HideExamChromeForScoring(), DispatcherPriority.Background);
                     
                     // 以降、重い採点処理へ
                     
@@ -953,6 +953,11 @@ namespace MOSExcelMogiApp.Views
                             // ReviewPageWindowのOnNavigateToTaskを再利用
                             resultWindow.OnNavigateToTask = (projectId, taskId) =>
                             {
+                                // 結果からの復習中は Main（プロジェクト選択）を出さない
+                                var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+                                if (mainWindow != null && mainWindow.IsVisible)
+                                    mainWindow.Hide();
+
                                 // AppBarWindowを確実に表示
                                 var appBarWindow = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault();
                                 if (appBarWindow != null)
@@ -962,9 +967,7 @@ namespace MOSExcelMogiApp.Views
                                     appBarWindow.SetResultWindow(resultWindow);
                                     resultWindow.PrepareAppBarForResultRetry(appBarWindow, projectId, taskId);
                                     if (!appBarWindow.IsVisible)
-                                    {
                                         appBarWindow.Show();
-                                    }
                                     appBarWindow.Activate();
 
                                     // 重要: 表示中のAppBarWindowに直接ナビゲートする（デリゲートの参照先が古い可能性があるため）
@@ -984,35 +987,27 @@ namespace MOSExcelMogiApp.Views
                             {
                                 resultWindow.OnNavigateToTask = (projectId, taskId) =>
                                 {
-                                    // MainWindowを表示
+                                    // 結果からの復習中は Main（プロジェクト選択）を出さない
                                     var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
-                                    if (mainWindow == null)
-                                    {
-                                        mainWindow = new MainWindow();
-                                        Application.Current.MainWindow = mainWindow;
-                                    }
-                                    mainWindow.Show();
-                                    mainWindow.WindowState = WindowState.Normal;
-                                    mainWindow.Activate();
-                                    mainWindow.Focus();
-                                    
-                                    // AppBarWindowを表示
+                                    if (mainWindow != null && mainWindow.IsVisible)
+                                        mainWindow.Hide();
+
                                     // 結果画面から来たことを記録
                                     appBarWindow.SetFromResultWindow(true);
                                     appBarWindow.SetResultWindow(resultWindow);
                                     resultWindow.PrepareAppBarForResultRetry(appBarWindow, projectId, taskId);
                                     if (!appBarWindow.IsVisible)
-                                    {
                                         appBarWindow.Show();
-                                    }
                                     appBarWindow.Activate();
-                                    
-                                    // NavigateToTaskを呼び出す
+
                                     appBarWindow.NavigateToTask(projectId, taskId, _groupId);
                                 };
                             }
                         }
-                        
+
+                        // 結果表示直前に再度隠す（配置タイマー等で AppBar が戻っていても落とす）
+                        HideExamChromeForScoring();
+
                         // 結果ウィンドウを表示
                         resultWindow.Show();
                         resultWindow.Activate();
@@ -1860,25 +1855,43 @@ namespace MOSExcelMogiApp.Views
                 variantSetNo: _isVariantMode ? _variantSetNo : 0);
         }
         
-        private void CloseAppBarWindows()
+        /// <summary>
+        /// 一括採点〜結果表示中は AppBar / Main を隠す（Word/PP と同様）。
+        /// AppBar を Close すると MainWindow.OnAppBarWindowClosed でプロジェクト選択が再表示されるため Hide にする。
+        /// AppBar は配置リトライの SWP_SHOWWINDOW で再出現しうるため、タイマー停止込みの Suspend を使う。
+        /// </summary>
+        private void HideExamChromeForScoring()
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Closing AppBarWindows");
-                
-                // すべてのウィンドウを走査してAppBarWindowとUiTestAppBarWindowを閉じる
-                foreach (Window window in Application.Current.Windows)
+                System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Hiding AppBar/Main for scoring");
+
+                foreach (var appBar in Application.Current.Windows.OfType<AppBarWindow>().ToList())
                 {
-                    if (window is AppBarWindow || window is UiTestAppBarWindow)
+                    System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Suspend AppBarWindow chrome");
+                    appBar.SuspendChromeWhileHidden();
+                }
+
+                foreach (var appBar in Application.Current.Windows.OfType<UiTestAppBarWindow>().ToList())
+                {
+                    try
                     {
-                        System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Closing window: {window.GetType().Name}");
-                        window.Close();
+                        if (appBar.IsVisible)
+                            appBar.Hide();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // already closing/closed
                     }
                 }
+
+                var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+                if (mainWindow != null && mainWindow.IsVisible)
+                    mainWindow.Hide();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error closing AppBarWindows: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error hiding exam chrome: {ex.Message}");
             }
         }
 

@@ -219,6 +219,11 @@ namespace MOSExcelMogiApp
         /// </param>
         private void SetWindowPosition(bool bringExcelToForeground = false)
         {
+            // レビュー／採点／結果中は AppBar を Hide している。
+            // その間に MoveWindow / SWP_SHOWWINDOW すると非表示が取り消され、結果画面の下に AppBar が残る。
+            if (!IsLoaded || !IsVisible)
+                return;
+
             // Excel の共有参照が確立した後のみ配置を行う（初期化中の新規起動・競合を避ける）
             try
             {
@@ -269,9 +274,12 @@ namespace MOSExcelMogiApp
 
         /// <summary>
         /// アプリバーをタスクバーより上の Z 順に保つ。フォーカスは奪わない。
+        /// 表示中のみ。非表示中の SWP_SHOWWINDOW は Hide を取り消すため禁止。
         /// </summary>
         private void EnsureAppBarTopmost(IntPtr hWnd)
         {
+            if (!IsLoaded || !IsVisible)
+                return;
             this.Topmost = true;
             if (hWnd == IntPtr.Zero)
                 return;
@@ -289,6 +297,23 @@ namespace MOSExcelMogiApp
             catch
             {
                 // ignore
+            }
+        }
+
+        /// <summary>
+        /// レビュー／一括採点／結果表示中に AppBar を隠し、配置リトライによる再表示を止める。
+        /// </summary>
+        public void SuspendChromeWhileHidden()
+        {
+            StopExcelPositionRetryTimer();
+            try
+            {
+                if (IsLoaded && IsVisible)
+                    Hide();
+            }
+            catch (InvalidOperationException)
+            {
+                // already closing/closed
             }
         }
 
@@ -436,6 +461,12 @@ namespace MOSExcelMogiApp
 
         private void OnExcelPositionRetryTick(object sender, EventArgs e)
         {
+            if (!IsLoaded || !IsVisible)
+            {
+                StopExcelPositionRetryTimer();
+                return;
+            }
+
             if (DateTime.UtcNow >= _excelPositionRetryDeadline)
             {
                 StopExcelPositionRetryTimer();
@@ -1596,8 +1627,8 @@ namespace MOSExcelMogiApp
                     ReviewPageWindow.SetPendingExcelCloseTask(_viewModel.BeginExcelShutdownForReview());
                 }
 
-                // メインのバーウィンドウを非表示にする
-                this.Hide();
+                // メインのバーウィンドウを非表示にし、配置リトライによる再表示も止める
+                SuspendChromeWhileHidden();
                 
                 // Group番号を取得
                 int groupId = 1; // デフォルト
@@ -1624,10 +1655,22 @@ namespace MOSExcelMogiApp
                 reviewWindow.Closed += (s, args) =>
                 {
                     _isOpeningReviewPage = false;
-                    // 採点中に AppBar を Close 済みなら Show しない（閉じた Window への Show 例外を防ぐ）
-                    if (!IsLoaded)
-                        return;
-                    Show();
+                    // レビューを通常閉じたときだけ AppBar を戻す。
+                    // 結果終了の掃除で AppBar も Close される途中だと IsLoaded でも Show が落ちる。
+                    try
+                    {
+                        if (!IsLoaded)
+                            return;
+                        var app = Application.Current;
+                        if (app != null && app.Windows.OfType<ResultWindow>().Any())
+                            return;
+                        Show();
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[AppBarWindow] Skip Show after Review closed: " + ex.Message);
+                    }
                 };
                 
                 // ShowDialog()ではなくShow()を使用
@@ -1638,8 +1681,15 @@ namespace MOSExcelMogiApp
                 _isOpeningReviewPage = false;
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                if (IsLoaded)
-                    Show();
+                try
+                {
+                    if (IsLoaded)
+                        Show();
+                }
+                catch (InvalidOperationException)
+                {
+                    // already closed
+                }
             }
         }
 
@@ -2376,6 +2426,9 @@ namespace MOSExcelMogiApp
             {
                 try
                 {
+                    // レビュー／採点／結果中は Hide している。再配置で SWP_SHOWWINDOW しない。
+                    if (!IsLoaded || !IsVisible)
+                        return;
                     StartExcelPositionRetryTimer();
                 }
                 catch (Exception ex)

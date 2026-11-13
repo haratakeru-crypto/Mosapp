@@ -2,14 +2,14 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="MOS Excel - App Bar" 
-        SizeToContent="Height"
+        SizeToContent="Manual"
         Width="{Binding Source={x:Static SystemParameters.PrimaryScreenWidth}}"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
-        ResizeMode="CanResize"
+        ResizeMode="NoResize"
         WindowStartupLocation="Manual">
     
     <Window.Resources>
@@ -496,14 +496,17 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <!-- 上段: 指示テキスト -->
-                            <TextBlock Grid.Row="0"
-                                       Name="TaskDescriptionTextBlock" 
-                                       Text="シート[売上一覧]の印刷の向きを横向きに設定します。"
-                                       FontSize="16"
-                                       Foreground="#374151"
-                                       LineHeight="24"
-                                       TextWrapping="Wrap"/>
+                            <!-- 上段: 指示テキスト（ウィンドウ高さは固定。長い文は枠内スクロールで全文表示） -->
+                            <ScrollViewer Grid.Row="0"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock Name="TaskDescriptionTextBlock" 
+                                           Text="シート[売上一覧]の印刷の向きを横向きに設定します。"
+                                           FontSize="16"
+                                           Foreground="#374151"
+                                           LineHeight="24"
+                                           TextWrapping="Wrap"/>
+                            </ScrollViewer>
 
                             <!-- 下段: アクションボタン（中央寄せ） -->
                             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
