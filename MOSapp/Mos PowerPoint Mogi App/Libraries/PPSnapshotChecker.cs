@@ -17,13 +17,29 @@ namespace Libraries
 
         public static List<string> CompareAndGetErrors(int projectId, int taskId, PPValidationExemptFlags exemptFlags)
         {
-            return CompareAndGetErrors(projectId, taskId, 1, exemptFlags);
+            return CompareAndGetErrors(projectId, taskId, 1, exemptFlags, -1);
         }
 
         public static List<string> CompareAndGetErrors(int projectId, int taskId, int attemptNo, PPValidationExemptFlags exemptFlags)
         {
+            return CompareAndGetErrors(projectId, taskId, attemptNo, exemptFlags, -1);
+        }
+
+        /// <param name="variantSetNo">
+        /// 類題採点時はセット番号を明示する。負数のときだけ temp の ActiveVariantSetNo にフォールバック。
+        /// </param>
+        public static List<string> CompareAndGetErrors(
+            int projectId,
+            int taskId,
+            int attemptNo,
+            PPValidationExemptFlags exemptFlags,
+            int variantSetNo)
+        {
             List<string> errors = new List<string>();
             var swTotal = Stopwatch.StartNew();
+            int effectiveVariantSetNo = variantSetNo >= 0
+                ? variantSetNo
+                : PPVariantValidationConfig.ActiveVariantSetNo();
 
             if (!File.Exists(SnapshotFilePath))
             {
@@ -76,10 +92,13 @@ namespace Libraries
                     try { perfSlideCount = pres.Slides.Count; } catch { }
                     int currentSlideCount = pres.Slides.Count;
 
-                    // 1. スライド数の比較
-                    if (PPTaskValidationConfig.UsesSlideIndexMapping(projectId, taskId))
+                    // 1. スライド数の比較（類題は教材 P1 挿入マッピングを使わない）
+                    bool usesSlideIndexMapping = PPTaskValidationConfig.UsesSlideIndexMapping(
+                        effectiveVariantSetNo, projectId, taskId);
+                    if (usesSlideIndexMapping)
                     {
-                        if (!PPTaskValidationConfig.IsSlidesCountValidForTask(projectId, taskId, snapshot.SlidesCount, currentSlideCount))
+                        if (!PPTaskValidationConfig.IsSlidesCountValidForTask(
+                            effectiveVariantSetNo, projectId, taskId, snapshot.SlidesCount, currentSlideCount))
                         {
                             errors.Add($"SlidesCount changed: expected {snapshot.SlidesCount} or {snapshot.SlidesCount + 1}, but is {currentSlideCount}");
                         }
@@ -88,7 +107,7 @@ namespace Libraries
                             for (int i = 1; i <= currentSlideCount; i++)
                             {
                                 if (!PPTaskValidationConfig.TryMapCurrentSlideToSnapshot(
-                                    projectId, taskId, snapshot.SlidesCount, currentSlideCount, i,
+                                    effectiveVariantSetNo, projectId, taskId, snapshot.SlidesCount, currentSlideCount, i,
                                     out int snapshotSlideIndex, out bool isInsertedSlide))
                                     continue;
                                 if (isInsertedSlide) continue;
@@ -146,12 +165,13 @@ namespace Libraries
                             slide = pres.Slides[i];
 
                             if (!PPTaskValidationConfig.TryMapCurrentSlideToSnapshot(
-                                projectId, taskId, snapshot.SlidesCount, currentSlideCount, i,
+                                effectiveVariantSetNo, projectId, taskId, snapshot.SlidesCount, currentSlideCount, i,
                                 out int snapshotSlideIndex, out bool isInsertedSlide))
                                 continue;
 
-                            // 図形数
-                            int allowedDelta = PPTaskValidationConfig.GetAllowedShapesCountDelta(projectId, taskId, i);
+                            // 図形数（類題/教材のデルタは effectiveVariantSetNo で分散）
+                            int allowedDelta = PPTaskValidationConfig.GetAllowedShapesCountDelta(
+                                effectiveVariantSetNo, projectId, taskId, i);
                             bool hasShapesExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.ShapesCount);
 
                             if (!isInsertedSlide && (!hasShapesExemptFlag || allowedDelta != int.MaxValue))
@@ -162,7 +182,8 @@ namespace Libraries
                                     int actualDelta = actualCount - expectedShapesCount;
                                     bool deltaOk = !hasShapesExemptFlag
                                         ? (actualDelta == 0)
-                                        : PPTaskValidationConfig.IsAllowedShapesCountDelta(projectId, taskId, i, allowedDelta, actualDelta);
+                                        : PPTaskValidationConfig.IsAllowedShapesCountDelta(
+                                            effectiveVariantSetNo, projectId, taskId, i, allowedDelta, actualDelta);
 
                                     if (!deltaOk)
                                     {
@@ -184,12 +205,16 @@ namespace Libraries
 
                             // 図形座標・サイズの比較設定（図形走査はテキスト算出と同一ループで実施）
                             bool exemptFullShapePosition = exemptFlags.HasFlag(PPValidationExemptFlags.ShapePosition);
-                            bool perSlideShapePositionExempt = PPTaskValidationConfig.UsesPerSlideShapePositionExempt(projectId, taskId);
+                            bool perSlideShapePositionExempt = PPTaskValidationConfig.UsesPerSlideShapePositionExempt(
+                                effectiveVariantSetNo, projectId, taskId);
                             bool slideShapePositionExempt = exemptFullShapePosition
                                 && (!perSlideShapePositionExempt
-                                    || PPTaskValidationConfig.IsShapePositionExemptForSlide(projectId, taskId, i));
-                            bool onlyNewShapesExempt = PPTaskValidationConfig.IsShapePositionExemptForNewShapesOnly(projectId, taskId);
-                            int allowedExistingChangesCount = PPTaskValidationConfig.GetAllowedExistingShapePositionChangeCount(projectId, taskId);
+                                    || PPTaskValidationConfig.IsShapePositionExemptForSlide(
+                                        effectiveVariantSetNo, projectId, taskId, i));
+                            bool onlyNewShapesExempt = PPTaskValidationConfig.IsShapePositionExemptForNewShapesOnly(
+                                effectiveVariantSetNo, projectId, taskId);
+                            int allowedExistingChangesCount = PPTaskValidationConfig.GetAllowedExistingShapePositionChangeCount(
+                                effectiveVariantSetNo, projectId, taskId);
                             bool needsShapePositionCheck = !exemptFullShapePosition
                                 || onlyNewShapesExempt
                                 || allowedExistingChangesCount >= 0
@@ -262,8 +287,9 @@ namespace Libraries
                             // 算出されたスライドのテキスト文字数を全体の合計に加算
                             currentTotalTextLength += slideTextLength;
 
-                            // スライドごとの文字増減の厳格チェック
-                            int allowedTextDelta = PPTaskValidationConfig.GetAllowedTextLengthDelta(projectId, taskId, i);
+                            // スライドごとの文字増減（類題/教材のデルタは effectiveVariantSetNo で分散）
+                            int allowedTextDelta = PPTaskValidationConfig.GetAllowedTextLengthDelta(
+                                effectiveVariantSetNo, projectId, taskId, i);
                             bool hasTextExemptFlag = exemptFlags.HasFlag(PPValidationExemptFlags.TextLength);
 
                             if (!isInsertedSlide && (!hasTextExemptFlag || allowedTextDelta != int.MaxValue))
@@ -292,7 +318,8 @@ namespace Libraries
 
                             // アニメーション数（減少のみ不合格）
                             bool skipAnimationRemovedCheck = exemptFlags.HasFlag(PPValidationExemptFlags.AnimationRemoved)
-                                || PPTaskValidationConfig.IsAnimationRemovedCheckExemptForSlide(projectId, taskId, i);
+                                || PPTaskValidationConfig.IsAnimationRemovedCheckExemptForSlide(
+                                    effectiveVariantSetNo, projectId, taskId, i);
                             if (!skipAnimationRemovedCheck && !isInsertedSlide)
                             {
                                 if (snapshot.AnimationCounts.TryGetValue(snapshotSlideIndex, out int expectedAnimCount))

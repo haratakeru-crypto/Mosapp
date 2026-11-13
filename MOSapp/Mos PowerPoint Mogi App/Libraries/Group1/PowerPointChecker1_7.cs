@@ -205,11 +205,17 @@ namespace Libraries.Group1
             return string.Equals((address ?? "").Trim(), (expected ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>P7-3: スライド6の後ろに文書「まとめ」のアウトライン挿入。7枚目に「まとめ」を含む（旧7-3、文言・位置差分）。</summary>
+        /// <summary>
+        /// P7-3: スライド6の後ろに文書「まとめ」のアウトライン挿入。
+        /// 最終状態（7枚目に「まとめ」）に加え、VSTO 証跡で挿入時点がスライド6直後であることを必須とする。
+        /// </summary>
         public bool CheckTask_1_7_03()
         {
             const string expectedOutlineText = "まとめ";
             const int expectedSlideNumber = 7;
+            if (!PPLogReader.HasTask7_3InsertFromOutlineAfterSlide6())
+                return false;
+
             Presentation pres = null;
             try
             {

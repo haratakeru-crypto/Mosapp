@@ -221,10 +221,56 @@ namespace Libraries
 
         public static int GetAllowedShapesCountDelta(int variantSetNo, int projectId, int taskId, int slideIndex)
         {
-            // Project1 は ShapesCount 免除なし。将来の挿入系タスク用プレースホルダ。
-            if (variantSetNo != 1)
+            // 類題は ShapesCount 免除フラグ側で制御。厳密デルタは教材専用。
+            if (variantSetNo < 1)
                 return int.MaxValue;
             return int.MaxValue;
+        }
+
+        /// <summary>
+        /// 類題は ShapePosition 免除時に既存図形の移動も許可する（教材の NewShapesOnly を流用しない）。
+        /// </summary>
+        public static bool IsShapePositionExemptForNewShapesOnly(int variantSetNo, int projectId, int taskId)
+        {
+            return false;
+        }
+
+        /// <summary>
+        /// 類題は既存図形の変更上限を設けない（-1）。必要なタスクだけ将来ここで上書きする。
+        /// </summary>
+        public static int GetAllowedExistingShapePositionChangeCount(int variantSetNo, int projectId, int taskId)
+        {
+            return -1;
+        }
+
+        /// <summary>類題は教材 P1 のスライド単位 ShapePosition 免除を使わない。</summary>
+        public static bool UsesPerSlideShapePositionExempt(int variantSetNo, int projectId, int taskId)
+        {
+            return false;
+        }
+
+        public static bool IsShapePositionExemptForSlide(int variantSetNo, int projectId, int taskId, int slideIndex)
+        {
+            return false;
+        }
+
+        public static bool IsAnimationRemovedCheckExemptForSlide(int variantSetNo, int projectId, int taskId, int slideIndex)
+        {
+            return false;
+        }
+
+        /// <summary>類題は教材 P1 の挿入スライド番号マッピングを使わない。</summary>
+        public static bool UsesSlideIndexMapping(int variantSetNo, int projectId, int taskId)
+        {
+            return false;
+        }
+
+        /// <summary>類題の ShapesCount 厳密デルタ特例は無し（allowedDelta との一致／MaxValue のみ）。</summary>
+        public static bool IsAllowedShapesCountDelta(
+            int variantSetNo, int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
+        {
+            if (allowedDelta == int.MaxValue) return true;
+            return actualDelta == allowedDelta;
         }
     }
 }
