@@ -390,6 +390,38 @@ namespace MOS_Word_app
             ExecuteOpenProject(parameter, openAsVariant: false);
         }
 
+        /// <summary>
+        /// 採点ログ等の結果画面が modeless で残っている場合に閉じる。
+        /// プロジェクト選択から新規に開くときに前面に重ならないようにする。
+        /// </summary>
+        private static void CloseOpenResultWindows()
+        {
+            try
+            {
+                var app = System.Windows.Application.Current;
+                if (app == null)
+                    return;
+
+                void CloseAll()
+                {
+                    foreach (var window in app.Windows.OfType<Views.ResultWindow>().ToList())
+                    {
+                        try { window.Close(); } catch { /* ignore */ }
+                    }
+                }
+
+                var dispatcher = app.Dispatcher;
+                if (dispatcher != null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(CloseAll);
+                else
+                    CloseAll();
+            }
+            catch
+            {
+                /* ignore */
+            }
+        }
+
         private void ExecuteOpenProject(object parameter, bool openAsVariant)
         {
             if (_isBulkResetInProgress)
@@ -397,6 +429,9 @@ namespace MOS_Word_app
 
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
+
+            // 採点ログ等の結果画面が残っていると前面に重なるため、プロジェクト開始時に閉じる
+            CloseOpenResultWindows();
 
             if (!(parameter is ProjectViewModel))
             {
