@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using Newtonsoft.Json;
@@ -67,6 +68,9 @@ namespace MOSExcelMogiApp
         private AnswerStepsWindow _answerStepsWindow;
         private bool _answerGuideUserDismissed;
         private bool _suppressAnswerGuideDismissTracking;
+        /// <summary>終了ボタン／Alt+F4 などで EndExam 相当を一度だけ走らせる。</summary>
+        private bool _examEndCleanupDone;
+        private bool _isClosing;
 
         // Win32 API
         [DllImport("user32.dll", SetLastError = true)]
@@ -215,6 +219,11 @@ namespace MOSExcelMogiApp
         /// </param>
         private void SetWindowPosition(bool bringExcelToForeground = false)
         {
+            // レビュー／採点／結果中は AppBar を Hide している。
+            // その間に MoveWindow / SWP_SHOWWINDOW すると非表示が取り消され、結果画面の下に AppBar が残る。
+            if (!IsLoaded || !IsVisible)
+                return;
+
             // Excel の共有参照が確立した後のみ配置を行う（初期化中の新規起動・競合を避ける）
             try
             {
@@ -265,9 +274,12 @@ namespace MOSExcelMogiApp
 
         /// <summary>
         /// アプリバーをタスクバーより上の Z 順に保つ。フォーカスは奪わない。
+        /// 表示中のみ。非表示中の SWP_SHOWWINDOW は Hide を取り消すため禁止。
         /// </summary>
         private void EnsureAppBarTopmost(IntPtr hWnd)
         {
+            if (!IsLoaded || !IsVisible)
+                return;
             this.Topmost = true;
             if (hWnd == IntPtr.Zero)
                 return;
@@ -285,6 +297,23 @@ namespace MOSExcelMogiApp
             catch
             {
                 // ignore
+            }
+        }
+
+        /// <summary>
+        /// レビュー／一括採点／結果表示中に AppBar を隠し、配置リトライによる再表示を止める。
+        /// </summary>
+        public void SuspendChromeWhileHidden()
+        {
+            StopExcelPositionRetryTimer();
+            try
+            {
+                if (IsLoaded && IsVisible)
+                    Hide();
+            }
+            catch (InvalidOperationException)
+            {
+                // already closing/closed
             }
         }
 
@@ -432,6 +461,12 @@ namespace MOSExcelMogiApp
 
         private void OnExcelPositionRetryTick(object sender, EventArgs e)
         {
+            if (!IsLoaded || !IsVisible)
+            {
+                StopExcelPositionRetryTimer();
+                return;
+            }
+
             if (DateTime.UtcNow >= _excelPositionRetryDeadline)
             {
                 StopExcelPositionRetryTimer();
@@ -1464,8 +1499,8 @@ namespace MOSExcelMogiApp
                     bool isVariantMode = _viewModel.IsVariantMode;
                     int variantSetNo = _viewModel.VariantSetNo;
                     string confirmMessage = isVariantMode
-                        ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしますか？\n（編集内容は失われます）"
-                        : $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）";
+                        ? $"類題{variantSetNo}（プロジェクト{projectId}）をリセットしますか？\n（編集内容は失われます）"
+                        : $"プロジェクト{projectId}をリセットしますか？\n（編集内容は失われます）";
 
                     var result = MessageBox.Show(
                         this,
@@ -1505,8 +1540,8 @@ namespace MOSExcelMogiApp
                     var label = new System.Windows.Controls.TextBlock
                     {
                         Text = isVariantMode
-                            ? $"リセット中です...\n類題{variantSetNo} プロジェクト {groupId}-{projectId}"
-                            : $"リセット中です...\nプロジェクト {groupId}-{projectId}",
+                            ? $"リセット中です...\n類題{variantSetNo} プロジェクト{projectId}"
+                            : $"リセット中です...\nプロジェクト{projectId}",
                         FontSize = 14,
                         TextAlignment = System.Windows.TextAlignment.Center,
                         Foreground = System.Windows.Media.Brushes.SteelBlue
@@ -1545,8 +1580,8 @@ namespace MOSExcelMogiApp
                             SetCurrentTask(1, notifyGuide: false);
 
                             string doneMessage = isVariantMode
-                                ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。"
-                                : $"プロジェクト {groupId}-{projectId} をリセットしました。";
+                                ? $"類題{variantSetNo}（プロジェクト{projectId}）をリセットしました。"
+                                : $"プロジェクト{projectId}をリセットしました。";
                             MessageBox.Show(this, doneMessage,
                                 "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
@@ -1592,8 +1627,8 @@ namespace MOSExcelMogiApp
                     ReviewPageWindow.SetPendingExcelCloseTask(_viewModel.BeginExcelShutdownForReview());
                 }
 
-                // メインのバーウィンドウを非表示にする
-                this.Hide();
+                // メインのバーウィンドウを非表示にし、配置リトライによる再表示も止める
+                SuspendChromeWhileHidden();
                 
                 // Group番号を取得
                 int groupId = 1; // デフォルト
@@ -1620,10 +1655,22 @@ namespace MOSExcelMogiApp
                 reviewWindow.Closed += (s, args) =>
                 {
                     _isOpeningReviewPage = false;
-                    // 採点中に AppBar を Close 済みなら Show しない（閉じた Window への Show 例外を防ぐ）
-                    if (!IsLoaded)
-                        return;
-                    Show();
+                    // レビューを通常閉じたときだけ AppBar を戻す。
+                    // 結果終了の掃除で AppBar も Close される途中だと IsLoaded でも Show が落ちる。
+                    try
+                    {
+                        if (!IsLoaded)
+                            return;
+                        var app = Application.Current;
+                        if (app != null && app.Windows.OfType<ResultWindow>().Any())
+                            return;
+                        Show();
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[AppBarWindow] Skip Show after Review closed: " + ex.Message);
+                    }
                 };
                 
                 // ShowDialog()ではなくShow()を使用
@@ -1634,8 +1681,15 @@ namespace MOSExcelMogiApp
                 _isOpeningReviewPage = false;
                 System.Diagnostics.Debug.WriteLine($"レビューページ表示エラー: {ex.Message}");
                 MessageBox.Show("レビューページの表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                if (IsLoaded)
-                    Show();
+                try
+                {
+                    if (IsLoaded)
+                        Show();
+                }
+                catch (InvalidOperationException)
+                {
+                    // already closed
+                }
             }
         }
 
@@ -1696,9 +1750,17 @@ namespace MOSExcelMogiApp
             
             ExcelApp excelApp = null;
             ExcelWorkbook targetWorkbook = null;
+            IDisposable prepareNotice = null;
             
             try
             {
+                // Word / PP と同様: ファイルオープン前に準備中を即時表示
+                try { prepareNotice = ExcelDelayedProjectOpenNotice.BeginImmediate(); }
+                catch (Exception noticeEx)
+                {
+                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Prepare notice: " + noticeEx.Message);
+                }
+
                 // プロジェクトIDとタスクIDを設定
                 _currentProjectId = projectId;
                 _currentTaskId = taskId;
@@ -1913,6 +1975,7 @@ namespace MOSExcelMogiApp
             }
             finally
             {
+                try { prepareNotice?.Dispose(); } catch { /* ignore */ }
                 // リソースのクリーンアップ
                 _isNavigatingToTask = false;
                 if (targetWorkbook != null)
@@ -1981,7 +2044,7 @@ namespace MOSExcelMogiApp
             var result = MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
             {
-                _viewModel.EndExamCommand.Execute(null);
+                RequestExamEndCleanup();
                 return;
             }
 
@@ -1991,9 +2054,46 @@ namespace MOSExcelMogiApp
 
         private void OnExamEnded(object sender, EventArgs e)
         {
+            _examEndCleanupDone = true;
             CloseAnswerGuide();
-            // アプリバーを閉じる
-            this.Close();
+            // Alt+F4 の Closing 中に EndExam した場合は既に閉じ処理中なので再 Close しない
+            if (!_isClosing)
+                this.Close();
+        }
+
+        /// <summary>
+        /// Alt+F4 等で AppBar だけ閉じたときも、正規終了と同様にオーバーレイ解除＋Excel 終了を行う。
+        /// </summary>
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            _isClosing = true;
+            RequestExamEndCleanup();
+            base.OnClosing(e);
+        }
+
+        private void RequestExamEndCleanup()
+        {
+            if (_examEndCleanupDone)
+                return;
+
+            // すでに試験終了済み（オーバーレイも CurrentProject も無い）なら何もしない
+            bool examStillActive = _viewModel != null
+                && (_viewModel.IsExcelOverlayVisible || _viewModel.CurrentProject != null);
+            if (!examStillActive)
+            {
+                _examEndCleanupDone = true;
+                return;
+            }
+
+            _examEndCleanupDone = true;
+            try
+            {
+                _viewModel.EndExamCommand?.Execute(null);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[AppBarWindow] RequestExamEndCleanup: " + ex.Message);
+            }
         }
 
         private void OnCloseAnswerGuideRequested(object sender, EventArgs e)
@@ -2326,6 +2426,9 @@ namespace MOSExcelMogiApp
             {
                 try
                 {
+                    // レビュー／採点／結果中は Hide している。再配置で SWP_SHOWWINDOW しない。
+                    if (!IsLoaded || !IsVisible)
+                        return;
                     StartExcelPositionRetryTimer();
                 }
                 catch (Exception ex)
@@ -2492,13 +2595,30 @@ namespace MOSExcelMogiApp
 
         private async void ReturnToResultButton_Click(object sender, RoutedEventArgs e)
         {
+            Window waitWindow = null;
+            var returnButton = sender as Button;
             try
             {
+                if (returnButton != null)
+                    returnButton.IsEnabled = false;
+
+                // Excel 終了待ちは数秒かかることがあるため、フリーズ誤認を防ぐ案内を出す（プログレスバーなし）
+                waitWindow = CreateReturnToResultWaitWindow();
+                waitWindow.Owner = this;
+                waitWindow.Show();
+                await Dispatcher.Yield(DispatcherPriority.Render);
+
                 // Quit 後もプロセスが残ると VSTO が再ロードされずログタブが消えるため、
                 // PID を記録して EnsureExcelProcessExited まで完了してから結果画面へ遷移する。
                 await Task.Run(() => CloseExcelForReturnToResult());
 
                 _viewModel?.ClearSharedExcelApplication();
+
+                if (waitWindow != null)
+                {
+                    try { waitWindow.Close(); } catch { /* ignore */ }
+                    waitWindow = null;
+                }
 
                 if (_resultWindow != null && !_resultWindow.IsVisible)
                 {
@@ -2524,6 +2644,59 @@ namespace MOSExcelMogiApp
                 System.Diagnostics.Debug.WriteLine($"結果画面表示エラー: {ex.Message}");
                 MessageBox.Show("結果画面の表示に失敗しました。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally
+            {
+                if (waitWindow != null)
+                {
+                    try { waitWindow.Close(); } catch { /* ignore */ }
+                }
+                if (returnButton != null)
+                    returnButton.IsEnabled = true;
+            }
+        }
+
+        private static Window CreateReturnToResultWaitWindow()
+        {
+            var stack = new StackPanel
+            {
+                Margin = new Thickness(28, 24, 28, 24),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "結果画面に戻っています",
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = "少々お待ちください。",
+                FontSize = 14,
+                Margin = new Thickness(0, 12, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(51, 51, 51))
+            });
+
+            return new Window
+            {
+                Title = "結果画面に戻る",
+                SizeToContent = SizeToContent.WidthAndHeight,
+                MinWidth = 320,
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ShowInTaskbar = false,
+                ResizeMode = ResizeMode.NoResize,
+                Topmost = true,
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
+                BorderThickness = new Thickness(2),
+                Content = stack
+            };
         }
 
         /// <summary>

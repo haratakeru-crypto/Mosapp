@@ -91,6 +91,14 @@ namespace New_MOSWordVSTOAddIn
                     loggedCommandId = "TableColumnsDistribute";
                     Globals.ThisAddIn?.RegisterRibbonLoggedTableColumnsDistribute();
                 }
+                else if (string.Equals(commandId, "ReviewTrackChanges", StringComparison.OrdinalIgnoreCase))
+                {
+                    // 既定トグルの後に追跡OFFなら TrackRevisionsOff を記録（9-5 二段操作）
+                    cancelDefault = false;
+                    Globals.ThisAddIn?.ScheduleTask95TrackRevisionsOffCheck();
+                    LogRibbonOperation(commandId, commandId);
+                    return;
+                }
 
                 bool cutSkipped = false;
                 if (string.Equals(commandId, "Cut", StringComparison.OrdinalIgnoreCase))
@@ -188,11 +196,15 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 開発用タブ「MOSデバッグ」の表示制御。常に表示（Release でもログ確認可能にする）。
+        /// 開発用タブ「MOSデバッグ」の表示制御。Debug ビルドのみ表示（受講者向け Release では非表示）。
         /// </summary>
         public bool GetDebugTabVisible(Microsoft.Office.Core.IRibbonControl control)
         {
+#if DEBUG
             return true;
+#else
+            return false;
+#endif
         }
 
         /// <summary>
@@ -334,7 +346,7 @@ namespace New_MOSWordVSTOAddIn
   </commands>
   <ribbon>
     <tabs>
-      <tab id=""tabMOSDebug"" label=""MOSデバッグ"" insertAfterMso=""Help"">
+      <tab id=""tabMOSDebug"" label=""MOSデバッグ"" insertAfterMso=""Help"" getVisible=""GetDebugTabVisible"">
         <group id=""grpLog"" label=""ログ"">
           <button id=""btnShowLogPath"" label=""ログパス表示"" onAction=""ShowLogPathButtonOnAction"" />
           <button id=""btnShowLogContent"" label=""ログ内容表示"" onAction=""ShowLogContentButtonOnAction"" />

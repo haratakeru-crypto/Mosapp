@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Windows;
+using System.Windows.Interop;
 using WordApp = Microsoft.Office.Interop.Word.Application;
 
 namespace Libraries
@@ -122,6 +124,7 @@ namespace Libraries
 
                 MoveWindow(wordHwnd, x, y, width, height, true);
                 SetForegroundWindow(wordHwnd);
+                TryBringExamAppBarToFront();
                 TryBringScoreResultToFront();
 
                 System.Diagnostics.Debug.WriteLine(
@@ -180,6 +183,8 @@ namespace Libraries
 
                 MoveWindow(wordHwnd, wordX, wordY, wordWidth, wordHeightWithBorder, true);
                 SetForegroundWindow(wordHwnd);
+                // Word 前面化のあとアプリバーを戻し、Windows タスクバーがアプリバーの裏に隠れた状態を安定させる
+                TryBringExamAppBarToFront();
                 TryBringScoreResultToFront();
 
                 System.Diagnostics.Debug.WriteLine(
@@ -189,6 +194,51 @@ namespace Libraries
             {
                 System.Diagnostics.Debug.WriteLine($"[WordWindowLayoutHelper] Exam layout error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Word 前面化のあと、試験用アプリバーを再前面化する（Topmost 再設定 + SetForegroundWindow）。
+        /// 採点結果ダイアログが開いていれば、その後 TryBringScoreResultToFront でさらに上に載せる。
+        /// </summary>
+        public static void TryBringExamAppBarToFront()
+        {
+            try
+            {
+                var wpfApp = Application.Current;
+                if (wpfApp == null)
+                    return;
+
+                void Bring()
+                {
+                    Window bar = null;
+                    foreach (Window window in wpfApp.Windows)
+                    {
+                        if (window is MOS_Word_app.Views.UiTestAppBarWindow
+                            || window is MOS_Word_app.Views.AppBarWindow)
+                        {
+                            if (window.IsVisible)
+                            {
+                                bar = window;
+                                break;
+                            }
+                        }
+                    }
+                    if (bar == null)
+                        return;
+
+                    bar.Topmost = false;
+                    bar.Topmost = true;
+                    IntPtr hwnd = new WindowInteropHelper(bar).Handle;
+                    if (hwnd != IntPtr.Zero)
+                        SetForegroundWindow(hwnd);
+                }
+
+                if (wpfApp.Dispatcher.CheckAccess())
+                    Bring();
+                else
+                    wpfApp.Dispatcher.Invoke(Bring);
+            }
+            catch { }
         }
 
         /// <summary>Word を前面にした直後に、開いている採点結果があれば最前面へ戻す。</summary>

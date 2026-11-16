@@ -1069,6 +1069,17 @@ namespace Ui.ViewModels
             }
         }
 
+        /// <summary>
+        /// 採点ログから復習するとき用。NavigateToTask が正しい作業ファイルを選ぶようモードを合わせる。
+        /// </summary>
+        public void ApplyScoringLogSessionContext(bool isVariantMode, int variantSetNo)
+        {
+            if (isVariantMode)
+                VariantSetNo = variantSetNo > 0 ? variantSetNo : 1;
+            IsVariantMode = isVariantMode;
+            ShowScoreButton = true;
+        }
+
         /// <summary>教材モード中のみ類題セット ComboBox を変更可能。</summary>
         public bool CanSelectVariantSet => !IsVariantMode && HasVariantSupportForCurrentProject;
 
@@ -1286,7 +1297,7 @@ namespace Ui.ViewModels
                     {
                         GroupId = groupId,
                         ProjectId = projectId,
-                        Name = $"プロジェクト{groupId}-{projectId}"
+                        Name = $"プロジェクト{projectId}"
                     });
                 }
                 
@@ -1402,6 +1413,38 @@ namespace Ui.ViewModels
             }
         }
 
+        /// <summary>
+        /// 採点ログや試験終了後の結果画面が modeless で残っている場合に閉じる。
+        /// プロジェクト選択から新規に開くときに前面に重ならないようにする。
+        /// </summary>
+        private static void CloseOpenResultWindows()
+        {
+            try
+            {
+                var app = Application.Current;
+                if (app == null)
+                    return;
+
+                void CloseAll()
+                {
+                    foreach (var window in app.Windows.OfType<ResultWindow>().ToList())
+                    {
+                        try { window.Close(); } catch { /* ignore */ }
+                    }
+                }
+
+                var dispatcher = app.Dispatcher;
+                if (dispatcher != null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(CloseAll);
+                else
+                    CloseAll();
+            }
+            catch
+            {
+                /* ignore */
+            }
+        }
+
         public void EnableProjectSelection()
         {
             var dispatcher = Application.Current?.Dispatcher;
@@ -1439,6 +1482,9 @@ namespace Ui.ViewModels
                 return;
             if (!MosPracticeClient.ExamStartGuard.EnsureRegistered())
                 return;
+
+            // 採点ログ等の結果画面が残っていると前面に重なるため、プロジェクト開始時に閉じる
+            CloseOpenResultWindows();
 
             // Excel重複起動チェックを無効化（修正）
             // if (IsExcelRunning())
@@ -3793,7 +3839,7 @@ namespace Ui.ViewModels
                     ScoringResultDialog.TryBringOpenToFront();
                     CurrentProject = new ProjectInfo
                     {
-                        Name = $"プロジェクト{groupId}-{nextProjectNumber}",
+                        Name = $"プロジェクト{nextProjectNumber}",
                         FilePath = nextFilePath,
                         Group = $"Group {groupId}",
                         ProjectNumber = nextProjectNumber

@@ -52,8 +52,8 @@ namespace Libraries.Group1
                 return VariantCheckSupport.Miss(ExcelScoreExplanation.UnavailableText);
 
             string formula = VariantCheckSupport.CellFormula(sheet.Range["B3"]);
-            bool ok = VariantCheckSupport.FormulaContainsAll(formula, "COUNTIF")
-                && VariantCheckSupport.NormalizeFormula(formula).Contains("欠席");
+            // 出欠列の空白個数。正答例: =COUNTBLANK(出席一覧[出欠])
+            bool ok = VariantCheckSupport.FormulaContainsAll(formula, "COUNTBLANK", "出欠");
             return ok ? true : VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
         }
 

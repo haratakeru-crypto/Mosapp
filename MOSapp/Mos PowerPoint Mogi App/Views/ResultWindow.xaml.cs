@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
@@ -56,6 +57,21 @@ namespace MOS_PowerPoint_app.Views
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_projectTaskFlaggedStates?.Count ?? 0} projects, scoring results: {_allProjectScoringResults?.Count ?? 0}, groupId: {_groupId}, fromLog: {_fromScoringLog}, variant: {_isVariantMode}");
             
             this.Loaded += ResultWindow_Loaded;
+            // Alt+F4 等ボタン以外の Close でも終了掃除を走らせ、Main 隠れ＋Mutex 残存を防ぐ
+            this.Closing += ResultWindow_Closing;
+            this.Closed += (s, args) =>
+            {
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
+                {
+                    appBar.SetFromResultWindow(false);
+                    appBar.SetResultWindow(null);
+                }
+            };
+        }
+
+        private void ResultWindow_Closing(object sender, CancelEventArgs e)
+        {
+            RequestExitCleanup();
         }
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
@@ -326,14 +342,22 @@ namespace MOS_PowerPoint_app.Views
         private void EndButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] EndButton_Click called");
-            OnEndRequested?.Invoke();
+            // 実体の掃除は Closing → RequestExitCleanup（二重実行はそこで抑止）
             this.Close();
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseButton_Click called");
+            // ✕ も Closing 経由で終了掃除（PP / AppBar 片付けてメインへ）
             this.Close();
+        }
+
+        private void RequestExitCleanup()
+        {
+            var handler = OnEndRequested;
+            OnEndRequested = null; // Closing / ボタン経路の二重実行を防ぐ
+            handler?.Invoke();
         }
 
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
@@ -635,12 +659,32 @@ namespace MOS_PowerPoint_app.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "PowerPoint", _isVariantMode);
+                    SeatChartSubmitStatusText,
+                    SeatChartQrImage,
+                    wrongTasks,
+                    "PowerPoint",
+                    _isVariantMode,
+                    TryResolvePracticeTotalScore());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
             }
+        }
+
+        /// <summary>全プロジェクト採点時のみ総合点を返す（画面表示と同じ条件）。</summary>
+        private int? TryResolvePracticeTotalScore()
+        {
+            if (!_isVariantMode)
+                return null;
+            if (!PowerPointVariantExam.HasAllProjects(_allProjectScoringResults))
+                return null;
+            if (!PracticeScoreClient.TryCompute(
+                    PowerPointVariantExam.FlattenResults(_allProjectScoringResults),
+                    out int total,
+                    out _))
+                return null;
+            return total;
         }
 
         private int CalculateWrongCount(ProjectData projectData, Dictionary<int, List<bool>> scoringResults, bool collectInitialWrong)
@@ -663,7 +707,12 @@ namespace MOS_PowerPoint_app.Views
                     bool isUnread = arrayIndex >= viewedStates.Length || (arrayIndex >= 0 && !viewedStates[arrayIndex]);
                     bool isWrong;
                     if (scoreList != null && arrayIndex >= 0 && arrayIndex < scoreList.Count)
-                        isWrong = isFlagged || !scoreList[arrayIndex];
+                    {
+                        // 採点ログ表示は ○/✖ のみ（フラグは見ない）。通常結果はフラグも✖扱い。
+                        isWrong = _fromScoringLog
+                            ? !scoreList[arrayIndex]
+                            : (isFlagged || !scoreList[arrayIndex]);
+                    }
                     else
                         isWrong = isFlagged || isUnread || !isCompleted;
 

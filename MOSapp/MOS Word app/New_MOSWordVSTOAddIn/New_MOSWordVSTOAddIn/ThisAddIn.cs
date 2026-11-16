@@ -54,9 +54,6 @@ namespace New_MOSWordVSTOAddIn
         private int _suppressWatermarkPollLogs;
         private int _lastLaptopWrapType = -1;
 
-        /// <summary>5-2 滞在中に折り返し「狭く」への遷移を検知したか（離脱補記のガード）。</summary>
-        private bool _wrapTightSeenThisVisit;
-
         /// <summary>6-1 滞在中に「文字列を表にする」を実行したか（離脱補記のガード）。</summary>
         private bool _tableConvertSeenThisVisit;
 
@@ -271,7 +268,7 @@ namespace New_MOSWordVSTOAddIn
         /// <summary>
         /// 5-1 離脱時の保険: 対象画像がまだ「上下」なら WrapTopBottom を補記する。
         /// 通常は 5-1 完了→次へ→5-2 の順なので、離脱時点では「上下」のまま残っている想定。
-        /// （5-1 画面のまま「狭く」まで進めた場合は補記せず、既存ポーリング頼み／未記録なら ×）
+        /// （5-1 画面のまま「狭く」まで進めた場合は補記しない＝タスク先読みは 5-1 × になり得る）
         /// </summary>
         internal void EnsureTask51WrapEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
         {
@@ -282,23 +279,12 @@ namespace New_MOSWordVSTOAddIn
 
             try
             {
-                Word.Document doc = TryGetProjectDocument(5);
-                if (doc == null)
-                    return;
-                if (IsLaptopParagraphWrapTopBottom(doc))
-                    WordEvidenceHelper.LogCommandWithEvidence("WrapTopBottom");
+                TryLogWrapTopBottomEvidenceIfPresent();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask51WrapEvidenceBeforeLeave: " + ex.Message);
             }
-        }
-
-        /// <summary>5-2 再入場時に WrapTight 滞在フラグをリセットする。</summary>
-        internal void SyncTask52WrapVisitOnTaskSwitch(int projectId, int taskId)
-        {
-            if (projectId == 5 && taskId == 2)
-                _wrapTightSeenThisVisit = false;
         }
 
         /// <summary>6-1 再入場時に TableConvert 滞在フラグをリセットする。</summary>
@@ -313,38 +299,6 @@ namespace New_MOSWordVSTOAddIn
         {
             if (projectId == 3 && taskId == 3)
                 _orientationChangedThisVisit = false;
-        }
-
-        /// <summary>
-        /// 5-2 離脱時: 滞在中に「狭く」へ遷移し、かついま狭くなら WrapTight を補記する。
-        /// （5-1 直後は上下のため、無操作通過ではフラグも狭くも付かない）
-        /// </summary>
-        internal void EnsureTask52WrapEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
-        {
-            if (previousProjectId != 5 || previousTaskId != 2)
-                return;
-            if (nextProjectId == 5 && nextTaskId == 2)
-                return;
-
-            try
-            {
-                if (!_wrapTightSeenThisVisit)
-                    return;
-
-                Word.Document doc = TryGetProjectDocument(5);
-                if (doc == null)
-                    return;
-                if (IsLaptopParagraphWrapTight(doc))
-                    WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask52WrapEvidenceBeforeLeave: " + ex.Message);
-            }
-            finally
-            {
-                _wrapTightSeenThisVisit = false;
-            }
         }
 
         /// <summary>
@@ -448,7 +402,7 @@ namespace New_MOSWordVSTOAddIn
 
         /// <summary>
         /// 9-5 離脱時: 未処理履歴が0かつ追跡OFFなら AcceptAllChangesInDocAndStopTracking を補記する。
-        /// （「すべて承諾して追跡終了」直後の形。9-6 で追跡が戻る前にログを残し、一括の証跡欠落を防ぐ）
+        /// 「反映のみ」証跡があり停止操作が無いときは補記しない（偽○防止）。
         /// </summary>
         internal void EnsureTask95AcceptAllEvidenceBeforeLeave(int previousProjectId, int previousTaskId, int nextProjectId, int nextTaskId)
         {
@@ -459,26 +413,83 @@ namespace New_MOSWordVSTOAddIn
 
             try
             {
-                Word.Document doc = TryGetProjectDocument(9);
-                if (doc == null)
-                    return;
-
-                int revCount = -1;
-                try { revCount = doc.Revisions.Count; } catch { revCount = -1; }
-                if (revCount != 0)
-                    return;
-
-                bool trackingOff = false;
-                try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
-                if (!trackingOff)
-                    return;
-
-                WordEvidenceHelper.LogCommandWithEvidence("AcceptAllChangesInDocAndStopTracking");
+                TryWriteTask95StopTrackingEvidenceIfAppropriate();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ThisAddIn] EnsureTask95AcceptAllEvidenceBeforeLeave: " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// 9-5: ［変更の記録］トグル後、追跡が OFF なら TrackRevisionsOff を記録する。
+        /// </summary>
+        internal void ScheduleTask95TrackRevisionsOffCheck()
+        {
+            try
+            {
+                if (!TryGetActiveExamTask(out int projectId, out int taskId) || projectId != 9 || taskId != 5)
+                    return;
+
+                var timer = new Timer { Interval = 200 };
+                timer.Tick += (s, e) =>
+                {
+                    try
+                    {
+                        timer.Stop();
+                        timer.Dispose();
+                        Word.Document doc = TryGetProjectDocument(9) ?? this.Application?.ActiveDocument;
+                        if (doc == null)
+                            return;
+                        bool trackingOff = false;
+                        try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
+                        if (trackingOff)
+                            WordEvidenceHelper.LogCommandWithEvidence("TrackRevisionsOff");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ThisAddIn] ScheduleTask95TrackRevisionsOffCheck: " + ex.Message);
+                    }
+                };
+                timer.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] ScheduleTask95TrackRevisionsOffCheck schedule: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 9-5 正答証跡の補記。履歴0・追跡OFFで、かつ「反映のみ」単独ではないときだけ書く。
+        /// </summary>
+        private bool TryWriteTask95StopTrackingEvidenceIfAppropriate()
+        {
+            Word.Document doc = TryGetProjectDocument(9);
+            if (doc == null)
+                return false;
+
+            int revCount = -1;
+            try { revCount = doc.Revisions.Count; } catch { revCount = -1; }
+            if (revCount != 0)
+                return false;
+
+            bool trackingOff = false;
+            try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
+            if (!trackingOff)
+                return false;
+
+            if (Logger.HasTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking"))
+                return true;
+
+            bool acceptOnly = Logger.HasTaskEvidence(9, 5, "ReviewAcceptAllChangesInDocument");
+            bool trackOffLogged = Logger.HasTaskEvidence(9, 5, "TrackRevisionsOff");
+            // 反映のみで追跡が消えているだけの誤操作 → 補記しない
+            if (acceptOnly && !trackOffLogged)
+                return false;
+
+            // Active が既に別タスクでもよいよう、9-5 固定で直書きする
+            Logger.LogTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking");
+            return true;
         }
 
         /// <summary>
@@ -590,10 +601,31 @@ namespace New_MOSWordVSTOAddIn
             return IsLaptopParagraphWrapType(doc, Word.WdWrapType.wdWrapTopBottom);
         }
 
-        /// <summary>「5月21日より5日間の」段落付近の浮動画像が折り返し「狭く」か。</summary>
-        private static bool IsLaptopParagraphWrapTight(Word.Document doc)
+        /// <summary>
+        /// 5-1 用: 対象画像がいま「上下」なら WrapTopBottom 証跡を書く。
+        /// プロジェクト文書が取れないときは ActiveDocument を試す。
+        /// </summary>
+        private void TryLogWrapTopBottomEvidenceIfPresent()
         {
-            return IsLaptopParagraphWrapType(doc, Word.WdWrapType.wdWrapTight);
+            Word.Document doc = TryGetProjectDocument(5);
+            if (doc == null)
+            {
+                try
+                {
+                    Word.Document active = Application?.ActiveDocument;
+                    if (active != null && IsProjectDocumentName(active.FullName, 5, 0))
+                        doc = active;
+                }
+                catch
+                {
+                    doc = null;
+                }
+            }
+
+            if (doc == null)
+                return;
+            if (IsLaptopParagraphWrapTopBottom(doc))
+                WordEvidenceHelper.LogCommandWithEvidence("WrapTopBottom");
         }
 
         private static bool IsLaptopParagraphWrapType(Word.Document doc, Word.WdWrapType wrapType)
@@ -1400,7 +1432,7 @@ namespace New_MOSWordVSTOAddIn
                 TryLogTask11ShowAllFinalOnForScore(app);
                 FlushEcoCommentEvidenceForScore();
                 FlushP7FileSaveAsEvidenceForScore(app);
-                FlushTask52WrapEvidenceForScore();
+                FlushTask51WrapEvidenceForScore();
                 FlushTask61TableConvertEvidenceForScore();
                 FlushTask33OrientationEvidenceForScore();
                 FlushP7CompanyEvidenceForScore(app);
@@ -1447,25 +1479,13 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 明示された 9-5 の証跡確定。履歴 0 件かつ追跡終了のときだけ記録し、誤操作は証跡を作らない。
+        /// 明示された 9-5 の証跡確定。履歴0・追跡OFFで、反映のみ単独の誤操作は補記しない。
         /// </summary>
         private bool FlushExplicitTask95Evidence()
         {
             try
             {
-                Word.Document doc = TryGetProjectDocument(9);
-                if (doc == null)
-                    return false;
-
-                int revisionCount = -1;
-                try { revisionCount = doc.Revisions.Count; } catch { revisionCount = -1; }
-                bool trackingOff = false;
-                try { trackingOff = !doc.TrackRevisions; } catch { trackingOff = false; }
-                if (revisionCount != 0 || !trackingOff)
-                    return false;
-
-                Logger.LogTaskEvidence(9, 5, "AcceptAllChangesInDocAndStopTracking");
-                return true;
+                return TryWriteTask95StopTrackingEvidenceIfAppropriate();
             }
             catch (Exception ex)
             {
@@ -1519,28 +1539,23 @@ namespace New_MOSWordVSTOAddIn
         }
 
         /// <summary>
-        /// 5-2 採点直前: 滞在中に「狭く」遷移を検知し、いま狭くなら WrapTight を再記する。
+        /// 5-1 採点直前: いま「上下」なら WrapTopBottom を再記する（離脱補記の取りこぼし保険）。
+        /// すでに「狭く」等へ進んだあとは書かない（案A: 正規は 5-1 離脱時点で上下のまま）。
         /// </summary>
-        private void FlushTask52WrapEvidenceForScore()
+        private void FlushTask51WrapEvidenceForScore()
         {
-            if (!TryGetActiveExamTask(out int projectId, out int taskId))
+            if (!TryGetActiveExamTask(out int projectId, out _))
                 return;
-            if (projectId != 5 || taskId != 2)
-                return;
-            if (!_wrapTightSeenThisVisit)
+            if (projectId != 5)
                 return;
 
             try
             {
-                Word.Document doc = TryGetProjectDocument(5);
-                if (doc == null)
-                    return;
-                if (IsLaptopParagraphWrapTight(doc))
-                    WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
+                TryLogWrapTopBottomEvidenceIfPresent();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[ThisAddIn] FlushTask52WrapEvidenceForScore: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("[ThisAddIn] FlushTask51WrapEvidenceForScore: " + ex.Message);
             }
         }
 
@@ -1629,17 +1644,9 @@ namespace New_MOSWordVSTOAddIn
 
             try
             {
-                // 9-5: 未処理の変更履歴が 0 なら「すべて承諾して追跡終了」相当とみなす
+                // 9-5: 履歴0・追跡OFFの救済（反映のみ単独は補記しない）
                 if (projectId == 9 && taskId == 5)
-                {
-                    Word.Document doc = app.ActiveDocument;
-                    if (doc == null)
-                        return;
-                    int revCount = -1;
-                    try { revCount = doc.Revisions.Count; } catch { revCount = -1; }
-                    if (revCount == 0)
-                        WordEvidenceHelper.LogCommandWithEvidence("AcceptAllChangesInDocAndStopTracking");
-                }
+                    TryWriteTask95StopTrackingEvidenceIfAppropriate();
             }
             catch { /* ignore */ }
         }
@@ -1997,7 +2004,7 @@ namespace New_MOSWordVSTOAddIn
                         _lastColumnBreakCount = columnBreakCount;
                     }
 
-                    // 5-1, 5-2: 画像レイアウトの検知（5月21日...段落付近）
+                    // 5-1: 折り返し「上下」への変化をバックアップ証跡（主は離脱／採点時補記）。5-2 は最終状態採点のため証跡不要。
                     if (projectId == 5)
                     {
                         try
@@ -2041,17 +2048,8 @@ namespace New_MOSWordVSTOAddIn
                                     }
                                 }
 
-                                if (_lastLaptopWrapType != currentWrapType)
-                                {
-                                    if (currentWrapType == 3) WordEvidenceHelper.LogCommandWithEvidence("WrapTopBottom");
-                                    else if (currentWrapType == 2)
-                                    {
-                                        WordEvidenceHelper.LogCommandWithEvidence("WrapTight");
-                                        if (projectId == 5 && taskId == 2)
-                                            _wrapTightSeenThisVisit = true;
-                                    }
-                                    else if (currentWrapType == 1) WordEvidenceHelper.LogCommandWithEvidence("WrapSquare");
-                                }
+                                if (_lastLaptopWrapType != currentWrapType && currentWrapType == 3)
+                                    WordEvidenceHelper.LogCommandWithEvidence("WrapTopBottom");
                                 _lastLaptopWrapType = currentWrapType;
 
                                 Marshal.ReleaseComObject(paraRange);
@@ -3250,7 +3248,6 @@ namespace New_MOSWordVSTOAddIn
 
                     _addIn.EnsureTask45WatermarkEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId, normalizedXml);
                     _addIn.EnsureTask51WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
-                    _addIn.EnsureTask52WrapEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
                     _addIn.EnsureTask61TableConvertEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
                     _addIn.EnsureTask33OrientationEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
                     _addIn.EnsureTask95AcceptAllEvidenceBeforeLeave(_projectId, _taskId, projectId, taskId);
@@ -3315,7 +3312,6 @@ namespace New_MOSWordVSTOAddIn
                 _addIn.SyncWatermarkPollingBaselineOnTaskSwitch(projectId, normalizedXml);
                 _addIn.SyncEcoCommentBaselineOnTaskSwitch(projectId, taskId);
                 _addIn.SyncP7FileSaveAsVisitOnTaskSwitch(projectId, taskId);
-                _addIn.SyncTask52WrapVisitOnTaskSwitch(projectId, taskId);
                 _addIn.SyncTask61TableConvertVisitOnTaskSwitch(projectId, taskId);
                 _addIn.SyncTask33OrientationVisitOnTaskSwitch(projectId, taskId);
                 _pendingBaselineSync = false;

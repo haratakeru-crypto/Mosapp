@@ -145,15 +145,16 @@ namespace MOS_PowerPoint_app
                 if (snapProjectId != curProjectId || snapTaskId != curTaskId || snapAttemptNo != attemptNo || snapGen != 0)
                     return false;
 
-                var exempt = Libraries.PPVariantValidationConfig.ResolveExemptFlags(curProjectId, curTaskId);
+                int variantSetNo = Libraries.PPVariantValidationConfig.ActiveVariantSetNo();
+                var exempt = Libraries.PPVariantValidationConfig.ResolveExemptFlags(variantSetNo, curProjectId, curTaskId);
                 List<string> errors;
                 lock (PowerPointCheckerCommon.PowerPointComInteropSync)
                 {
-                    errors = Libraries.PPSnapshotChecker.CompareAndGetErrors(curProjectId, curTaskId, attemptNo, exempt);
+                    errors = Libraries.PPSnapshotChecker.CompareAndGetErrors(
+                        curProjectId, curTaskId, attemptNo, exempt, variantSetNo);
                 }
                 if (errors != null && errors.Count > 0)
                 {
-                    int variantSetNo = Libraries.PPVariantValidationConfig.ActiveVariantSetNo();
                     Libraries.PPLogReader.AppendDestructiveErrors(
                         curProjectId, curTaskId, attemptNo, errors, variantSetNo);
                 }
@@ -210,7 +211,7 @@ namespace MOS_PowerPoint_app
 
             // 2. スナップショット比較と COM 採点を同一ロックで実行（閉じる処理とスナップショット COM の間に割り込まれないようにする）
             sw.Restart();
-            var exemptFlags = Libraries.PPVariantValidationConfig.ResolveExemptFlags(projectId, taskId);
+            var exemptFlags = Libraries.PPVariantValidationConfig.ResolveExemptFlags(variantSetNo, projectId, taskId);
             bool comResult = false;
             lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
@@ -232,7 +233,8 @@ namespace MOS_PowerPoint_app
                 else
                 {
                     string fallback = skipFreshSnapshotCompare ? " fallback" : string.Empty;
-                    var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, attemptNo, exemptFlags);
+                    var destructiveErrors = Libraries.PPSnapshotChecker.CompareAndGetErrors(
+                        projectId, taskId, attemptNo, exemptFlags, variantSetNo);
                     PPGradingPerf.Log("GradeTask.PPSnapshotCompare", sw.ElapsedMilliseconds, $"P{projectId}-T{taskId}{fallback}");
                     if (projectId == 1 && taskId == 1)
                     {

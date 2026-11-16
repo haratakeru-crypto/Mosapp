@@ -14,11 +14,29 @@ namespace Libraries
     public static class PowerPointApplicationManager
     {
         private const int PowerPointQuitWaitMs = 5000;
+        /// <summary>結果に戻るなど UI 切り替え時の短い待機（Word の TryQuitWord と同程度）。</summary>
+        private const int ReturnToResultQuitWaitMs = 1000;
 
         /// <summary>
         /// 模試アプリ終了時: プレゼンを保存して閉じ、PowerPoint を終了し、残プロセスがあれば待機／強制終了する。
         /// </summary>
         public static void ClosePowerPointApplicationForAppExit()
+        {
+            QuitPowerPointAfterClosingPresentations();
+            WaitForPowerPointExitOrKill();
+        }
+
+        /// <summary>
+        /// 結果画面に戻るとき用: プレゼンを保存して閉じ、PowerPoint を終了する。
+        /// 長いプロセス待ちはせず、Word と同様に短い待機のみ。
+        /// </summary>
+        public static void ClosePowerPointForReturnToResult()
+        {
+            QuitPowerPointAfterClosingPresentations();
+            Thread.Sleep(ReturnToResultQuitWaitMs);
+        }
+
+        private static void QuitPowerPointAfterClosingPresentations()
         {
             lock (PowerPointCheckerCommon.PowerPointComInteropSync)
             {
@@ -81,7 +99,7 @@ namespace Libraries
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine(
-                        "[ClosePowerPointApplicationForAppExit] " + ex.Message);
+                        "[QuitPowerPointAfterClosingPresentations] " + ex.Message);
                 }
                 finally
                 {
@@ -91,8 +109,6 @@ namespace Libraries
                     }
                 }
             }
-
-            WaitForPowerPointExitOrKill();
         }
 
         private static int GetPresentationCountSafe(PowerPointApp pptApp)

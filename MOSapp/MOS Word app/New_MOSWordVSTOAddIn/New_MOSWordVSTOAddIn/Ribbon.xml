@@ -25,6 +25,10 @@
     <command idMso="FileSaveAs" onAction="CommandOnAction" />
     <command idMso="TableColumnsDistribute" onAction="CommandOnAction" />
     <command idMso="AcceptAllChangesInDocAndStopTracking" onAction="CommandOnAction" />
+    <!-- 9-5: 「すべての変更を反映」のみ（停止なし）。idMso は ReviewAcceptAllChangesInDocument。 -->
+    <command idMso="ReviewAcceptAllChangesInDocument" onAction="CommandOnAction" />
+    <!-- 9-5: 二段操作（反映→変更の記録OFF）用。トグル後に TrackRevisionsOff を記録。 -->
+    <command idMso="ReviewTrackChanges" onAction="CommandOnAction" />
     <!-- 注: UpgradeDocument は Office 仕様により idMso 経由で onAction フックが発火しない（実機検証で確認済み）。
          7-1 の採点ロジックは State-only（ext=.doc + CompatMode=15 のユニークシグネチャ）で実装されており、
          この登録には依存していない。将来 Office 側で対応された場合に備えて登録は残している。 -->
@@ -42,7 +46,7 @@
 
   <ribbon>
     <tabs>
-      <tab id="tabMOSDebug" label="MOSデバッグ" insertAfterMso="Help">
+      <tab id="tabMOSDebug" label="MOSデバッグ" insertAfterMso="Help" getVisible="GetDebugTabVisible">
         <group id="grpLog" label="ログ">
           <button id="btnShowLogPath" label="ログパス表示" onAction="ShowLogPathButtonOnAction" />
           <button id="btnShowLogContent" label="ログ内容表示" onAction="ShowLogContentButtonOnAction" />

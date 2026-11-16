@@ -35,6 +35,18 @@ namespace ExcelAddIn1
             System.Diagnostics.Debug.WriteLine("[ExcelAddIn1.Ribbon] Ribbon_Load completed");
         }
 
+        /// <summary>
+        /// 開発用タブ「ログ」の表示制御。Debug ビルドのみ表示（受講者向け Release では非表示）。
+        /// </summary>
+        public bool GetDebugTabVisible(IRibbonControl control)
+        {
+#if DEBUG
+            return true;
+#else
+            return false;
+#endif
+        }
+
         /// <summary>単語帳モード用: 通常ボタンの idMso クリックを記録し、既定動作は継続する。</summary>
         public void VocabCommandOnAction(IRibbonControl control, ref bool cancelDefault)
         {
@@ -384,7 +396,7 @@ namespace ExcelAddIn1
   </commands>
   <ribbon>
     <tabs>
-      <tab id=""MosLogTab"" label=""ログ"" insertAfterMso=""TabHelp"">
+      <tab id=""MosLogTab"" label=""ログ"" insertAfterMso=""TabHelp"" getVisible=""GetDebugTabVisible"">
         <group id=""MosLogGroup"" label=""ログ"">
           <button id=""ShowLog"" label=""ログを表示"" onAction=""ShowLogOnAction"" />
           <button id=""ClearLog"" label=""ログをクリア"" onAction=""ClearLogOnAction"" />

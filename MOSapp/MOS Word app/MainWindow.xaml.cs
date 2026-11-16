@@ -101,7 +101,83 @@ namespace MOS_Word_app
                 flaggedStates: entry.GetFlaggedStates());
             window.Owner = this;
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            window.OnNavigateToTask = (projectId, taskId) =>
+                NavigateFromScoringLogResult(window, entry, projectId, taskId);
             window.Show();
+        }
+
+        /// <summary>
+        /// 採点ログの結果画面からタスク選択時: AppBar を用意し、該当 Project の Word を開いて操作可能にする。
+        /// </summary>
+        private void NavigateFromScoringLogResult(
+            Views.ResultWindow resultWindow,
+            MosPracticeClient.ScoringLogEntry entry,
+            int projectId,
+            int taskId)
+        {
+            if (entry == null || projectId <= 0 || taskId <= 0)
+                return;
+
+            var appBar = EnsureAppBarForScoringLog(entry.GroupId, entry.IsVariantMode, projectId);
+            if (appBar == null)
+                return;
+
+            appBar.Show();
+            appBar.Activate();
+            if (resultWindow != null)
+                appBar.SetReturnToResultMode(resultWindow);
+
+            var wrongKeys = BuildWrongTaskKeysFromResults(entry.ProjectResults);
+            appBar.SetInitialWrongTaskKeys(wrongKeys);
+            appBar.TryEnqueueRetryTask(projectId, taskId);
+            appBar.NavigateToTask(projectId, taskId);
+            appBar.ApplyExamWindowLayout();
+
+            Hide();
+        }
+
+        private Views.UiTestAppBarWindow EnsureAppBarForScoringLog(int groupId, bool isVariantMode, int projectId)
+        {
+            bool needRecreate =
+                _appBarWindow == null ||
+                !_appBarWindow.IsLoaded ||
+                _appBarWindow.CurrentGroupId != groupId ||
+                _appBarWindow.IsVariantMode != isVariantMode;
+
+            if (!needRecreate)
+                return _appBarWindow;
+
+            var oldAppBar = _appBarWindow;
+            _appBarWindow = new Views.UiTestAppBarWindow(
+                projectId,
+                groupId,
+                showScoreButton: true,
+                showPauseButton: false,
+                isVariantMode: isVariantMode,
+                viewModel: _viewModel);
+            _appBarWindow.Closed += OnAppBarWindowClosed;
+            try { oldAppBar?.Close(); } catch { /* ignore */ }
+            return _appBarWindow;
+        }
+
+        private static List<string> BuildWrongTaskKeysFromResults(Dictionary<int, List<bool>> projectResults)
+        {
+            var keys = new List<string>();
+            if (projectResults == null)
+                return keys;
+
+            foreach (var kv in projectResults)
+            {
+                var list = kv.Value;
+                if (list == null)
+                    continue;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (!list[i])
+                        keys.Add($"{kv.Key}-{i + 1}");
+                }
+            }
+            return keys;
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)

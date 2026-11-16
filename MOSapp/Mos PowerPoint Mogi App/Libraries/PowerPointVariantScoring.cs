@@ -90,7 +90,9 @@ namespace MOS_PowerPoint_app
                 return false;
 
             var exemptFlags = PPVariantValidationConfig.ResolveExemptFlags(variantSetNo, projectId, taskId);
-            List<string> errors = PPSnapshotChecker.CompareAndGetErrors(projectId, taskId, attemptNo, exemptFlags);
+            // デルタ判定も variantSetNo を明示渡し（temp 未設定時に教材1-3ルールへ落ちるのを防ぐ）
+            List<string> errors = PPSnapshotChecker.CompareAndGetErrors(
+                projectId, taskId, attemptNo, exemptFlags, variantSetNo);
             if (errors != null && errors.Count > 0)
             {
                 foreach (string err in errors)

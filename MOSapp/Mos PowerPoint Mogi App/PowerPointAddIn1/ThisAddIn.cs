@@ -110,6 +110,11 @@ namespace PowerPointAddIn1
 
         private Timer _kiosk7_4PollTimer;
         private bool _task7_4KioskLogged;
+        /// <summary>P7-3: アウトライン挿入（「まとめ」新規スライド）の AfterSlide=6 証跡。</summary>
+        private Timer _task7_3PollTimer;
+        private bool _task7_3AfterSlide6Logged;
+        private List<int> _task7_3PrevSlideIds = new List<int>();
+        private string _task7_3PrevPresentationKey;
         private Timer _task1_2To1_4PollTimer;
         private bool _task1_2Logged;
         private bool _task1_3Logged;
@@ -224,6 +229,14 @@ namespace PowerPointAddIn1
             _kiosk7_4PollTimer.Interval = 1000;
             _kiosk7_4PollTimer.Tick += Kiosk7_4PollTimer_Tick;
             _kiosk7_4PollTimer.Start();
+
+            _task7_3AfterSlide6Logged = false;
+            _task7_3PrevSlideIds.Clear();
+            _task7_3PrevPresentationKey = null;
+            _task7_3PollTimer = new Timer();
+            _task7_3PollTimer.Interval = 700;
+            _task7_3PollTimer.Tick += Task7_3PollTimer_Tick;
+            _task7_3PollTimer.Start();
 
             _task1_8Logged = false;
             _task1_2Logged = false;
@@ -354,6 +367,12 @@ namespace PowerPointAddIn1
                     _task4_3GlowWasOn = false;
                 }
                 if (!(projectId == 7 && taskId == 4) && !(projectId == 6 && taskId == 3)) _task7_4KioskLogged = false;
+                if (!(projectId == 7 && taskId == 3))
+                {
+                    _task7_3AfterSlide6Logged = false;
+                    _task7_3PrevSlideIds.Clear();
+                    _task7_3PrevPresentationKey = null;
+                }
                 if (!(projectId == 6 && taskId == 5)) _task6_5PrintLogged = false;
                 if (!(projectId == 6 && taskId == 6)) _task6_6PrintLogged = false;
                 if (!(projectId == 6 && taskId == 7)) _task6_7PrintLogged = false;
@@ -639,6 +658,12 @@ namespace PowerPointAddIn1
 
         private static bool IsAllowedShapesCountDelta(int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
         {
+            if (ReadActiveVariantSetNo() > 0)
+            {
+                if (allowedDelta == int.MaxValue) return true;
+                return actualDelta == allowedDelta;
+            }
+
             if (allowedDelta == int.MaxValue) return true;
 
             // P3-4: Slide 1 only: allow 0 or +1.
@@ -777,11 +802,16 @@ namespace PowerPointAddIn1
 
         private static bool UsesSlideIndexMapping(int projectId, int taskId)
         {
+            if (ReadActiveVariantSetNo() > 0)
+                return false;
             return projectId == 1 && (taskId == 1 || taskId == 8);
         }
 
         private static bool IsSlidesCountValidForTask(int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
         {
+            if (ReadActiveVariantSetNo() > 0)
+                return currentSlidesCount == snapshotSlidesCount;
+
             if (projectId == 1 && (taskId == 1 || taskId == 8))
             {
                 if (taskId == 1)
@@ -814,6 +844,9 @@ namespace PowerPointAddIn1
             int snapshotSlidesCount,
             int currentSlidesCount)
         {
+            if (ReadActiveVariantSetNo() > 0)
+                return snapshotSlideIndex;
+
             if (projectId == 1 && taskId == 1)
             {
                 if (IsProject1Task1_1InsertApplied(snapshotSlidesCount, currentSlidesCount))
@@ -840,11 +873,15 @@ namespace PowerPointAddIn1
 
         private static bool UsesPerSlideShapePositionExempt(int projectId, int taskId)
         {
+            if (ReadActiveVariantSetNo() > 0)
+                return false;
             return projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8);
         }
 
         private static bool IsShapePositionExemptForSlide(int projectId, int taskId, int slideIndex)
         {
+            if (ReadActiveVariantSetNo() > 0)
+                return false;
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex);
             if (projectId == 1 && taskId == 3)
@@ -856,6 +893,9 @@ namespace PowerPointAddIn1
 
         private bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
+            // 類題: ShapePosition 免除時は既存図形の移動も許可（教材 NewShapesOnly を流用しない）
+            if (ReadActiveVariantSetNo() > 0)
+                return false;
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3, P5-4, P5-5
             if (projectId == 9 && taskId == 4) return true; // P9-4
@@ -865,6 +905,9 @@ namespace PowerPointAddIn1
 
         private int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
         {
+            // 類題: 既存図形変更の上限なし（免除フラグに委ねる）
+            if (ReadActiveVariantSetNo() > 0)
+                return -1;
             if (projectId == 4 && taskId == 5) return 1; // P4-5
             if (projectId == 4 && taskId == 6) return 1; // P4-6
             if (projectId == 4 && taskId == 8) return 1; // P4-8
@@ -878,6 +921,9 @@ namespace PowerPointAddIn1
 
         private int GetAllowedShapesCountDelta(int projectId, int taskId, int slideIndex)
         {
+            if (ReadActiveVariantSetNo() > 0)
+                return int.MaxValue;
+
             if (projectId == 3 && taskId == 1) return slideIndex == 7 ? 0 : 0; // P3-1
             if (projectId == 3 && taskId == 3) return slideIndex == 6 ? 0 : 0; // P3-3
             if (projectId == 3 && taskId == 4) return slideIndex == 1 ? 1 : 0; // P3-4
@@ -903,6 +949,15 @@ namespace PowerPointAddIn1
 
         private int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
+            int variantSetNo = ReadActiveVariantSetNo();
+            if (variantSetNo > 0)
+            {
+                // 類題1-3: スライド1の吹き出しのみ無制限、他スライドは厳格
+                if (variantSetNo == 1 && projectId == 1 && taskId == 3)
+                    return slideIndex == 1 ? int.MaxValue : 0;
+                return int.MaxValue;
+            }
+
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex) ? int.MaxValue : 0;
             if (projectId == 1 && taskId == 3)
@@ -1451,6 +1506,8 @@ namespace PowerPointAddIn1
                 TryLogTaskV1_3_1TableSlideLayout(requireCurrentTask: false);
             else if (projectId == 5 && taskId == 6)
                 TryLogTaskV1_5_6AudioSettings(requireCurrentTask: false);
+            else if (projectId == 7 && taskId == 3)
+                TryLogTask7_3InsertFromOutline(requireCurrentTask: false);
         }
 
         /// <summary>
@@ -2590,6 +2647,135 @@ namespace PowerPointAddIn1
             }
         }
 
+        private void Task7_3PollTimer_Tick(object sender, EventArgs e)
+        {
+            TryLogTask7_3InsertFromOutline(requireCurrentTask: true);
+        }
+
+        /// <summary>
+        /// P7-3: 新規スライドに「まとめ」が現れた瞬間の挿入位置（先頭新規の直前）を証跡化する。
+        /// AfterSlide=6 のときだけ合格用フラグを立てる。誤位置挿入→後から並べ替えでは出ない。
+        /// </summary>
+        private void TryLogTask7_3InsertFromOutline(bool requireCurrentTask = true)
+        {
+            if (_task7_3AfterSlide6Logged) return;
+            if (requireCurrentTask && !IsCurrentTask(7, 3)) return;
+            try
+            {
+                if (Application == null || Application.Presentations == null) return;
+                PowerPoint.Presentation pres = null;
+                try
+                {
+                    pres = Application.ActivePresentation;
+                    if (pres == null) return;
+
+                    string key = null;
+                    try { key = (pres.FullName ?? pres.Name ?? "").Trim(); } catch { }
+                    PowerPoint.Slides slides = null;
+                    try
+                    {
+                        slides = pres.Slides;
+                        if (slides == null) return;
+
+                        var currentIds = new List<int>();
+                        for (int i = 1; i <= slides.Count; i++)
+                        {
+                            PowerPoint.Slide s = null;
+                            try
+                            {
+                                s = slides[i];
+                                if (s != null) currentIds.Add(s.SlideID);
+                            }
+                            finally { if (s != null) try { Marshal.ReleaseComObject(s); } catch { } }
+                        }
+
+                        if (string.IsNullOrEmpty(_task7_3PrevPresentationKey)
+                            || !string.Equals(_task7_3PrevPresentationKey, key, StringComparison.OrdinalIgnoreCase)
+                            || _task7_3PrevSlideIds == null
+                            || _task7_3PrevSlideIds.Count == 0)
+                        {
+                            _task7_3PrevPresentationKey = key;
+                            _task7_3PrevSlideIds = new List<int>(currentIds);
+                            return;
+                        }
+
+                        if (currentIds.Count <= _task7_3PrevSlideIds.Count)
+                        {
+                            _task7_3PrevSlideIds = new List<int>(currentIds);
+                            return;
+                        }
+
+                        var prevSet = new HashSet<int>(_task7_3PrevSlideIds);
+                        int firstNewPos = -1;
+                        bool matomeInNew = false;
+                        for (int i = 0; i < currentIds.Count; i++)
+                        {
+                            if (prevSet.Contains(currentIds[i])) continue;
+                            if (firstNewPos < 0) firstNewPos = i + 1;
+                            PowerPoint.Slide newSlide = null;
+                            try
+                            {
+                                newSlide = slides[i + 1];
+                                if (newSlide != null && SlideContainsText(newSlide, "まとめ"))
+                                    matomeInNew = true;
+                            }
+                            finally { if (newSlide != null) try { Marshal.ReleaseComObject(newSlide); } catch { } }
+                        }
+
+                        _task7_3PrevSlideIds = new List<int>(currentIds);
+
+                        if (!matomeInNew || firstNewPos < 1) return;
+
+                        int afterSlide = firstNewPos - 1;
+                        Logger.LogTask7_3InsertFromOutline(afterSlide);
+                        if (afterSlide == 6)
+                            _task7_3AfterSlide6Logged = true;
+                    }
+                    finally { if (slides != null) try { Marshal.ReleaseComObject(slides); } catch { } }
+                }
+                finally { if (pres != null) try { Marshal.ReleaseComObject(pres); } catch { } }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[Task7-3Poll] " + ex.Message);
+            }
+        }
+
+        private static bool SlideContainsText(PowerPoint.Slide slide, string searchText)
+        {
+            if (slide == null || string.IsNullOrEmpty(searchText)) return false;
+            PowerPoint.Shapes shapes = null;
+            try
+            {
+                shapes = slide.Shapes;
+                if (shapes == null) return false;
+                for (int i = 1; i <= shapes.Count; i++)
+                {
+                    PowerPoint.Shape sh = null;
+                    try
+                    {
+                        sh = shapes[i];
+                        if (sh == null) continue;
+                        try
+                        {
+                            if (sh.HasTextFrame == Office.MsoTriState.msoTrue
+                                && sh.TextFrame.HasText == Office.MsoTriState.msoTrue)
+                            {
+                                string t = sh.TextFrame.TextRange.Text ?? "";
+                                if (t.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                                    return true;
+                            }
+                        }
+                        catch { }
+                    }
+                    finally { if (sh != null) try { Marshal.ReleaseComObject(sh); } catch { } }
+                }
+            }
+            catch { }
+            finally { if (shapes != null) try { Marshal.ReleaseComObject(shapes); } catch { } }
+            return false;
+        }
+
         private void Kiosk7_4PollTimer_Tick(object sender, EventArgs e)
         {
             if (_task7_4KioskLogged) return;
@@ -2766,6 +2952,12 @@ namespace PowerPointAddIn1
                 _kiosk7_4PollTimer.Stop();
                 _kiosk7_4PollTimer.Dispose();
                 _kiosk7_4PollTimer = null;
+            }
+            if (_task7_3PollTimer != null)
+            {
+                _task7_3PollTimer.Stop();
+                _task7_3PollTimer.Dispose();
+                _task7_3PollTimer = null;
             }
             if (_task1_2To1_4PollTimer != null)
             {

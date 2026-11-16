@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MOSExcelMogiApp.Infrastructure;
@@ -17,8 +19,13 @@ namespace MOSExcelMogiApp
     public partial class App : Application
     {
         const string SingleInstanceMutexName = "Local\\MOS_Excel_app_SingleInstance";
+        const string ActivateEventName = "Local\\MOS_Excel_app_Activate";
+        const int ActivateSignalWaitMs = 500;
 
         static Mutex _singleInstanceMutex;
+        static EventWaitHandle _activateEvent;
+        static CancellationTokenSource _activateListenCts;
+        static Thread _activateListenThread;
         Window _startupSplash;
 
         protected override void OnStartup(StartupEventArgs e)
@@ -39,8 +46,9 @@ namespace MOSExcelMogiApp
                 try { _singleInstanceMutex?.Dispose(); } catch { }
                 _singleInstanceMutex = null;
 
+                bool signaled = SignalExistingInstanceToActivate();
                 bool activated = TryActivateExistingInstance();
-                if (!activated)
+                if (!signaled && !activated)
                 {
                     MessageBox.Show(
                         "MOS Excel アプリは既に起動しています。\n起動中の場合は、しばらくお待ちください。",
@@ -52,6 +60,8 @@ namespace MOSExcelMogiApp
                 Shutdown();
                 return;
             }
+
+            StartActivateListener();
 
             _startupSplash = CreateStartupSplash();
             _startupSplash.Show();
@@ -78,6 +88,7 @@ namespace MOSExcelMogiApp
         protected override void OnExit(ExitEventArgs e)
         {
             CloseStartupSplash();
+            StopActivateListener();
             ReleaseSingleInstanceMutex();
             base.OnExit(e);
         }
@@ -165,6 +176,159 @@ namespace MOSExcelMogiApp
             }
             catch { /* ignore */ }
             _singleInstanceMutex = null;
+        }
+
+        /// <summary>既存インスタンスへ「UI を前面へ」を通知する。通知できれば true。</summary>
+        private static bool SignalExistingInstanceToActivate()
+        {
+            EventWaitHandle ev = null;
+            try
+            {
+                bool createdNew;
+                ev = new EventWaitHandle(false, EventResetMode.AutoReset, ActivateEventName, out createdNew);
+                if (createdNew)
+                    return false;
+
+                ev.Set();
+                Thread.Sleep(ActivateSignalWaitMs);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[App] SignalExistingInstanceToActivate: " + ex.Message);
+                return false;
+            }
+            finally
+            {
+                try { ev?.Dispose(); } catch { /* ignore */ }
+            }
+        }
+
+        void StartActivateListener()
+        {
+            try
+            {
+                bool createdNew;
+                _activateEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ActivateEventName, out createdNew);
+                _activateListenCts = new CancellationTokenSource();
+                CancellationToken token = _activateListenCts.Token;
+                _activateListenThread = new Thread(() =>
+                {
+                    WaitHandle[] handles = { _activateEvent, token.WaitHandle };
+                    while (!token.IsCancellationRequested)
+                    {
+                        int index;
+                        try
+                        {
+                            index = WaitHandle.WaitAny(handles);
+                        }
+                        catch
+                        {
+                            break;
+                        }
+
+                        if (token.IsCancellationRequested || index != 0)
+                            break;
+
+                        try
+                        {
+                            Dispatcher.BeginInvoke(new Action(BringUiToForeground), DispatcherPriority.Send);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine("[App] Activate listener invoke: " + ex.Message);
+                        }
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Name = "MosExcelActivateListener"
+                };
+                _activateListenThread.Start();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[App] StartActivateListener: " + ex.Message);
+            }
+        }
+
+        static void StopActivateListener()
+        {
+            try { _activateListenCts?.Cancel(); } catch { /* ignore */ }
+            try { _activateEvent?.Set(); } catch { /* ignore */ }
+            try
+            {
+                if (_activateListenThread != null && _activateListenThread.IsAlive)
+                    _activateListenThread.Join(1000);
+            }
+            catch { /* ignore */ }
+            _activateListenThread = null;
+            try { _activateListenCts?.Dispose(); } catch { /* ignore */ }
+            _activateListenCts = null;
+            try { _activateEvent?.Dispose(); } catch { /* ignore */ }
+            _activateEvent = null;
+        }
+
+        /// <summary>
+        /// 可視ウィンドウがあれば前面化。無ければ Hidden の Main を Show して復帰する。
+        /// </summary>
+        void BringUiToForeground()
+        {
+            try
+            {
+                Window target = FindPreferredVisibleWindow();
+                if (target == null)
+                {
+                    target = MainWindow
+                        ?? Windows.OfType<MainWindow>().FirstOrDefault();
+                    if (target == null)
+                        return;
+                    target.Show();
+                }
+
+                if (target.WindowState == WindowState.Minimized)
+                    target.WindowState = WindowState.Normal;
+
+                target.Show();
+                target.Activate();
+
+                IntPtr hwnd = IntPtr.Zero;
+                try { hwnd = new WindowInteropHelper(target).Handle; } catch { /* ignore */ }
+                if (hwnd != IntPtr.Zero)
+                {
+                    ShowWindow(hwnd, SwRestore);
+                    SetForegroundWindow(hwnd);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[App] BringUiToForeground: " + ex.Message);
+            }
+        }
+
+        Window FindPreferredVisibleWindow()
+        {
+            Window appBarOrOther = null;
+            foreach (Window w in Windows)
+            {
+                if (w == null || !w.IsLoaded || !w.IsVisible)
+                    continue;
+
+                string typeName = w.GetType().Name ?? string.Empty;
+                if (typeName.IndexOf("Result", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return w;
+                if (typeName.IndexOf("AppBar", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    if (appBarOrOther == null)
+                        appBarOrOther = w;
+                    continue;
+                }
+
+                if (appBarOrOther == null)
+                    appBarOrOther = w;
+            }
+
+            return appBarOrOther;
         }
 
         /// <summary>既に動いている同名プロセスのメインウィンドウを前面に出す。成功時 true。</summary>

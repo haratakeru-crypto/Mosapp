@@ -554,6 +554,8 @@ namespace Libraries
                     return new[] { "[Task10-4] Grayscale" };
                 case 6:
                     return new[] { "[Task6-5] Print", "[Task6-6] Print", "[Task6-7] Print" };
+                case 7:
+                    return new[] { "[Task7-3] InsertFromOutline" };
                 case 11:
                     return new[] { "[Task11-7] Print" };
                 default:
@@ -966,7 +968,16 @@ namespace Libraries
         /// <summary>ログに 7-3 アウトラインから挿入記録（[Task7-3] InsertFromOutline）が含まれるか。</summary>
         public static bool HasTask7_3InsertFromOutlineExecuted()
         {
-            return HasLogLineContaining("[Task7-3] InsertFromOutline");
+            return HasGradingEvidenceMarker("[Task7-3] InsertFromOutline");
+        }
+
+        /// <summary>
+        /// P7-3: スライド6の直後へ「まとめ」スライドが挿入された証跡
+        /// （[Task7-3] InsertFromOutline AfterSlide=6）。後から並べ替えただけでは出ない。
+        /// </summary>
+        public static bool HasTask7_3InsertFromOutlineAfterSlide6()
+        {
+            return HasGradingEvidenceMarker("[Task7-3] InsertFromOutline AfterSlide=6");
         }
 
         /// <summary>ログに 7-4 Kiosk 設定記録（[Task7-4] Kiosk）が含まれるか。</summary>

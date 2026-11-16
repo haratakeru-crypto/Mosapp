@@ -309,9 +309,13 @@ namespace Libraries
         /// <summary>スライド挿入によりスナップショット番号と現在番号の対応付けが必要か。</summary>
         public static bool UsesSlideIndexMapping(int projectId, int taskId)
         {
-            // 類題は教材 P1 の挿入マッピングを使わない
-            if (PPVariantValidationConfig.IsVariantActive())
-                return false;
+            return UsesSlideIndexMapping(PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId);
+        }
+
+        public static bool UsesSlideIndexMapping(int variantSetNo, int projectId, int taskId)
+        {
+            if (variantSetNo > 0)
+                return PPVariantValidationConfig.UsesSlideIndexMapping(variantSetNo, projectId, taskId);
             return projectId == 1 && (taskId == 1 || taskId == 8);
         }
 
@@ -330,7 +334,14 @@ namespace Libraries
         /// <summary>スライド枚数がタスク操作として許容されるか。</summary>
         public static bool IsSlidesCountValidForTask(int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
         {
-            if (PPVariantValidationConfig.IsVariantActive())
+            return IsSlidesCountValidForTask(
+                PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId, snapshotSlidesCount, currentSlidesCount);
+        }
+
+        public static bool IsSlidesCountValidForTask(
+            int variantSetNo, int projectId, int taskId, int snapshotSlidesCount, int currentSlidesCount)
+        {
+            if (variantSetNo > 0)
                 return currentSlidesCount == snapshotSlidesCount;
 
             if (projectId == 1 && (taskId == 1 || taskId == 8))
@@ -395,9 +406,25 @@ namespace Libraries
             out int snapshotSlideIndex,
             out bool isInsertedSlide)
         {
+            return TryMapCurrentSlideToSnapshot(
+                PPVariantValidationConfig.ActiveVariantSetNo(),
+                projectId, taskId, snapshotSlidesCount, currentSlidesCount, currentSlideIndex,
+                out snapshotSlideIndex, out isInsertedSlide);
+        }
+
+        public static bool TryMapCurrentSlideToSnapshot(
+            int variantSetNo,
+            int projectId,
+            int taskId,
+            int snapshotSlidesCount,
+            int currentSlidesCount,
+            int currentSlideIndex,
+            out int snapshotSlideIndex,
+            out bool isInsertedSlide)
+        {
             snapshotSlideIndex = currentSlideIndex;
             isInsertedSlide = false;
-            if (PPVariantValidationConfig.IsVariantActive())
+            if (variantSetNo > 0)
                 return true;
 
             if (projectId == 1 && taskId == 1)
@@ -452,7 +479,20 @@ namespace Libraries
             int snapshotSlidesCount,
             int currentSlidesCount)
         {
-            if (PPVariantValidationConfig.IsVariantActive())
+            return MapSnapshotSlideToCurrent(
+                PPVariantValidationConfig.ActiveVariantSetNo(),
+                projectId, taskId, snapshotSlideIndex, snapshotSlidesCount, currentSlidesCount);
+        }
+
+        public static int MapSnapshotSlideToCurrent(
+            int variantSetNo,
+            int projectId,
+            int taskId,
+            int snapshotSlideIndex,
+            int snapshotSlidesCount,
+            int currentSlidesCount)
+        {
+            if (variantSetNo > 0)
                 return snapshotSlideIndex;
 
             if (projectId == 1 && taskId == 1)
@@ -477,16 +517,26 @@ namespace Libraries
         /// <summary>ShapePosition 免除をスライド単位で適用するタスクか。</summary>
         public static bool UsesPerSlideShapePositionExempt(int projectId, int taskId)
         {
-            if (PPVariantValidationConfig.IsVariantActive())
-                return false;
+            return UsesPerSlideShapePositionExempt(PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId);
+        }
+
+        public static bool UsesPerSlideShapePositionExempt(int variantSetNo, int projectId, int taskId)
+        {
+            if (variantSetNo > 0)
+                return PPVariantValidationConfig.UsesPerSlideShapePositionExempt(variantSetNo, projectId, taskId);
             return projectId == 1 && (taskId == 1 || taskId == 3 || taskId == 8);
         }
 
         /// <summary>指定スライドで ShapePosition チェックを免除するか。</summary>
         public static bool IsShapePositionExemptForSlide(int projectId, int taskId, int slideIndex)
         {
-            if (PPVariantValidationConfig.IsVariantActive())
-                return false;
+            return IsShapePositionExemptForSlide(PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId, slideIndex);
+        }
+
+        public static bool IsShapePositionExemptForSlide(int variantSetNo, int projectId, int taskId, int slideIndex)
+        {
+            if (variantSetNo > 0)
+                return PPVariantValidationConfig.IsShapePositionExemptForSlide(variantSetNo, projectId, taskId, slideIndex);
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex);
             if (projectId == 1 && taskId == 3)
@@ -499,8 +549,15 @@ namespace Libraries
         /// <summary>対象スライドはレイアウト/挿入でアニメーションが変わるため AnimationRemoved を緩和する。</summary>
         public static bool IsAnimationRemovedCheckExemptForSlide(int projectId, int taskId, int slideIndex)
         {
-            if (PPVariantValidationConfig.IsVariantActive())
-                return false;
+            return IsAnimationRemovedCheckExemptForSlide(
+                PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId, slideIndex);
+        }
+
+        public static bool IsAnimationRemovedCheckExemptForSlide(int variantSetNo, int projectId, int taskId, int slideIndex)
+        {
+            if (variantSetNo > 0)
+                return PPVariantValidationConfig.IsAnimationRemovedCheckExemptForSlide(
+                    variantSetNo, projectId, taskId, slideIndex);
             if (projectId == 1 && taskId == 1)
                 return IsProject1Task1_1TargetSlide(slideIndex);
             if (projectId == 1 && taskId == 3)
@@ -517,7 +574,15 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedShapesCountDelta(int projectId, int taskId, int slideIndex)
         {
-            int variantSetNo = PPVariantValidationConfig.ActiveVariantSetNo();
+            return GetAllowedShapesCountDelta(PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId, slideIndex);
+        }
+
+        /// <summary>
+        /// 採点コンテキストの variantSetNo を明示してデルタを取る（temp ファイルに依存しない）。
+        /// variantSetNo &gt; 0 は類題、0 以下は教材。
+        /// </summary>
+        public static int GetAllowedShapesCountDelta(int variantSetNo, int projectId, int taskId, int slideIndex)
+        {
             if (variantSetNo > 0)
                 return PPVariantValidationConfig.GetAllowedShapesCountDelta(variantSetNo, projectId, taskId, slideIndex);
 
@@ -559,6 +624,19 @@ namespace Libraries
         /// </summary>
         public static bool IsAllowedShapesCountDelta(int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
         {
+            return IsAllowedShapesCountDelta(
+                PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId, slideIndex, allowedDelta, actualDelta);
+        }
+
+        public static bool IsAllowedShapesCountDelta(
+            int variantSetNo, int projectId, int taskId, int slideIndex, int allowedDelta, int actualDelta)
+        {
+            if (variantSetNo > 0)
+            {
+                return PPVariantValidationConfig.IsAllowedShapesCountDelta(
+                    variantSetNo, projectId, taskId, slideIndex, allowedDelta, actualDelta);
+            }
+
             if (allowedDelta == int.MaxValue) return true;
 
             // P3-4: Slide 1 only: allow 0 or +1 (3Dモデル挿入)。
@@ -598,7 +676,15 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedTextLengthDelta(int projectId, int taskId, int slideIndex)
         {
-            int variantSetNo = PPVariantValidationConfig.ActiveVariantSetNo();
+            return GetAllowedTextLengthDelta(PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId, slideIndex);
+        }
+
+        /// <summary>
+        /// 採点コンテキストの variantSetNo を明示してデルタを取る（temp ファイルに依存しない）。
+        /// variantSetNo &gt; 0 は類題、0 以下は教材。
+        /// </summary>
+        public static int GetAllowedTextLengthDelta(int variantSetNo, int projectId, int taskId, int slideIndex)
+        {
             if (variantSetNo > 0)
                 return PPVariantValidationConfig.GetAllowedTextLengthDelta(variantSetNo, projectId, taskId, slideIndex);
 
@@ -664,6 +750,15 @@ namespace Libraries
         /// </summary>
         public static bool IsShapePositionExemptForNewShapesOnly(int projectId, int taskId)
         {
+            return IsShapePositionExemptForNewShapesOnly(
+                PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId);
+        }
+
+        public static bool IsShapePositionExemptForNewShapesOnly(int variantSetNo, int projectId, int taskId)
+        {
+            if (variantSetNo > 0)
+                return PPVariantValidationConfig.IsShapePositionExemptForNewShapesOnly(variantSetNo, projectId, taskId);
+
             if (projectId == 3 && (taskId == 1 || taskId == 3 || taskId == 4 || taskId == 6)) return true;
             if (projectId == 5 && (taskId == 3 || taskId == 4 || taskId == 5)) return true; // P5-3 図形変更, P5-4 z-order, P5-5 グループ化
             if (projectId == 9 && taskId == 4) return true; // P9-4 グラフ作成
@@ -677,6 +772,18 @@ namespace Libraries
         /// </summary>
         public static int GetAllowedExistingShapePositionChangeCount(int projectId, int taskId)
         {
+            return GetAllowedExistingShapePositionChangeCount(
+                PPVariantValidationConfig.ActiveVariantSetNo(), projectId, taskId);
+        }
+
+        public static int GetAllowedExistingShapePositionChangeCount(int variantSetNo, int projectId, int taskId)
+        {
+            if (variantSetNo > 0)
+            {
+                return PPVariantValidationConfig.GetAllowedExistingShapePositionChangeCount(
+                    variantSetNo, projectId, taskId);
+            }
+
             if (projectId == 4 && taskId == 5) return 1; // P4-5 画像の配置
             if (projectId == 4 && taskId == 6) return 1; // P4-6 画像のトリミング
             if (projectId == 4 && taskId == 8) return 1; // P4-8 垂直中央配置

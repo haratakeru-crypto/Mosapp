@@ -358,8 +358,9 @@ namespace Libraries
                         case 2: // RIGHT EditCellFormula
                         case 3: // データバー AddConditionalFormat
                             return ExcelValidationExemptFlags.RangeEdit;
-                        case 4: // 折り返しが SetPageBreak として記録
-                            return ExcelValidationExemptFlags.PrintAndPage;
+                        case 4: // 折り返し → EditCellFormat。行高変化で SetPageBreak も付く
+                            return ExcelValidationExemptFlags.CellFormatOnly
+                                | ExcelValidationExemptFlags.PrintAndPage;
                         case 5: // 3-D縦棒 AddChart / InsertShapeOrImage。グラフ挿入で自動改ページが付く
                             return ExcelValidationExemptFlags.ShapeOrImage | ExcelValidationExemptFlags.PrintAndPage;
                         case 6: // 印刷向き・印刷範囲 + SortOrFilter + NamedRange

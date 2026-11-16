@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 using Newtonsoft.Json;
@@ -121,6 +122,7 @@ namespace MOS_Word_app.Views
         private AnswerStepsWindow _answerStepsWindow;
         private bool _answerGuideUserDismissed;
         private bool _suppressAnswerGuideDismissTracking;
+        private bool _officeExitCleanupDone;
         private readonly MainViewModel _viewModel;
 
         public int CurrentProjectId => _currentProjectId;
@@ -217,7 +219,9 @@ namespace MOS_Word_app.Views
                 this.Height = barH;
                 this.Left = 0;
                 this.Top = barTop;
+                this.Topmost = false;
                 this.Topmost = true;
+                ScoreResultWindow.TryBringOpenToFront();
                 return;
             }
 
@@ -233,12 +237,17 @@ namespace MOS_Word_app.Views
             int height = barH + borderHeight;
 
             MoveWindow(hWnd, x, y, width, height, true);
+            this.Topmost = false;
             this.Topmost = true;
+            // PositionWordForExamMode 内の Word 前面化より後で、アプリバーを再前面化する
+            TryForceForeground(hWnd);
+            ScoreResultWindow.TryBringOpenToFront();
         }
 
         private void PositionWordWindow()
         {
             WordWindowLayoutHelper.PositionWordForExamMode();
+            WordWindowLayoutHelper.TryBringExamAppBarToFront();
         }
 
         protected override void OnContentRendered(EventArgs e)
@@ -629,12 +638,23 @@ namespace MOS_Word_app.Views
 
         private void ShowVariantScoreResult()
         {
-            var scoreList = WordVariantScoring.ScoreProject(_groupId, _currentProjectId);
-            if (scoreList.Count == 0)
+            var scored = WordVariantScoring.ScoreProject(_groupId, _currentProjectId);
+            if (scored.Count == 0)
             {
                 MessageBox.Show("タスクが見つかりません。", "採点エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            // 詳細理由は教材のみ。類題の即時採点では「詳細」リンクを出さない。
+            var scoreList = scored
+                .Select(t => new MOS_Word_app.TaskResult
+                {
+                    TaskNumber = t.TaskNumber,
+                    IsPassed = t.IsPassed,
+                    TaskName = t.TaskName,
+                    FailReason = ""
+                })
+                .ToList();
 
             ShowScoreResult(scoreList);
         }
@@ -696,9 +716,10 @@ namespace MOS_Word_app.Views
             {
                 WordStartupInputGate.EnsureWordInputEnabled();
                 IntPtr hwnd = TryGetWordMainWindowHandle();
-                if (hwnd == IntPtr.Zero)
-                    return;
-                TryForceForeground(hwnd);
+                if (hwnd != IntPtr.Zero)
+                    TryForceForeground(hwnd);
+                // Word 前面化のあとアプリバーを戻し、タスクバーがアプリバーの裏に隠れた状態を維持する
+                WordWindowLayoutHelper.TryBringExamAppBarToFront();
             }
             catch
             {
@@ -784,10 +805,33 @@ namespace MOS_Word_app.Views
                 : MessageBox.Show("アプリ自体を終了します。本当にいいですか？", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes)
                 return;
-            MOS_Word_app.Views.WordStartupInputGate.End();
-            _timer?.Stop();
-            SaveAllWordDocumentsAndQuitWord();
+            // Word 終了は Closing → PerformOfficeExitCleanup
             this.Close();
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            PerformOfficeExitCleanup();
+            base.OnClosing(e);
+        }
+
+        /// <summary>Alt+F4 等でも Word を終了し、Hidden Main だけの残留を防ぐ。</summary>
+        private void PerformOfficeExitCleanup()
+        {
+            if (_officeExitCleanupDone)
+                return;
+            _officeExitCleanupDone = true;
+            try
+            {
+                try { MOS_Word_app.Views.WordStartupInputGate.End(); } catch { /* ignore */ }
+                _timer?.Stop();
+                _projectTimer?.Stop();
+                SaveAllWordDocumentsAndQuitWord();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[UiTestAppBarWindow] PerformOfficeExitCleanup: " + ex.Message);
+            }
         }
         
         private async void ReviewPageButton_Click(object sender, RoutedEventArgs e)
@@ -1019,7 +1063,8 @@ namespace MOS_Word_app.Views
                 btn.Content = label;
         }
         
-        private void NavigateToTask(int projectId, int taskId)
+        /// <summary>レビュー／結果／採点ログから指定タスクへ遷移し、該当 Project の Word ファイルを開く。</summary>
+        public void NavigateToTask(int projectId, int taskId)
         {
             System.Diagnostics.Debug.WriteLine($"NavigateToTask called in main window: ProjectId={projectId}, TaskId={taskId}");
             ScoreResultWindow.TryBringOpenToFront();
@@ -2578,7 +2623,7 @@ namespace MOS_Word_app.Views
             {
                 int variantSetNo = CurrentVariantSetNo;
                 string confirmMessage = _isVariantMode
-                    ? $"類題{variantSetNo}（プロジェクト {_groupId}-{_currentProjectId}）をリセットしますか？\n現在の変更内容は失われます。"
+                    ? $"類題{variantSetNo}（プロジェクト{_currentProjectId}）をリセットしますか？\n現在の変更内容は失われます。"
                     : $"プロジェクト{_currentProjectId}をリセットしますか？\n現在の変更内容は失われます。";
 
                 var result = MessageBox.Show(
@@ -2598,7 +2643,7 @@ namespace MOS_Word_app.Views
                 }
 
                 string doneMessage = _isVariantMode
-                    ? $"類題{variantSetNo}（プロジェクト {_groupId}-{_currentProjectId}）をリセットしました。"
+                    ? $"類題{variantSetNo}（プロジェクト{_currentProjectId}）をリセットしました。"
                     : "プロジェクトをリセットしました。";
                 MessageBox.Show(doneMessage, "リセット完了",
                     MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2956,11 +3001,12 @@ namespace MOS_Word_app.Views
         }
 
         /// <summary>
-        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じる。
+        /// 結果画面に戻る前に、開いている Word 文書を保存して閉じ、空の Word も終了する。
         /// </summary>
         private void CloseWordDocumentsBeforeReturnToResult()
         {
             SaveAndCloseAllWordDocuments();
+            TryQuitWord();
         }
 
         /// <summary>

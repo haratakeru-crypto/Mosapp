@@ -10,7 +10,13 @@ namespace MosPracticeClient
 {
     public static class ResultSubmitBinder
     {
-        public static async Task BindAsync(TextBlock statusText, Image qrImage, int wrongCount, string subject, bool isVariant = false)
+        public static async Task BindAsync(
+            TextBlock statusText,
+            Image qrImage,
+            int wrongCount,
+            string subject,
+            bool isVariant = false,
+            int? practiceTotalScore = null)
         {
             SetUi(statusText, qrImage, "座席表へ送信中…", false, null);
 
@@ -23,7 +29,8 @@ namespace MosPracticeClient
                 return;
             }
 
-            var result = await PracticeSubmitClient.SubmitInitialAsync(wrongCount, subject, isVariant).ConfigureAwait(false);
+            var result = await PracticeSubmitClient.SubmitInitialAsync(
+                wrongCount, subject, isVariant, practiceTotalScore).ConfigureAwait(false);
             if (result.Success)
             {
                 SetUi(statusText, qrImage, "座席表に送信しました（×の数: " + wrongCount + "）", false, null);

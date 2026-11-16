@@ -185,10 +185,13 @@ namespace PowerPointAddIn1
             LogTaskTag("Task7-2", "ReuseSlides");
         }
 
-        /// <summary>7-3: アウトラインから挿入を記録。</summary>
-        public static void LogTask7_3InsertFromOutline()
+        /// <summary>
+        /// P7-3: アウトライン由来（「まとめ」を含む新規スライド）の挿入を記録。
+        /// afterSlideIndex は挿入直前に選択されていた位置＝新規先頭の直前スライド番号（正しい操作は 6）。
+        /// </summary>
+        public static void LogTask7_3InsertFromOutline(int afterSlideIndex)
         {
-            LogTaskTag("Task7-3", "InsertFromOutline");
+            LogTaskTag("Task7-3", "InsertFromOutline AfterSlide=" + afterSlideIndex);
         }
 
         /// <summary>7-4: スライドショーを自動プレゼンテーション（Kiosk）に設定したことを記録。</summary>
@@ -316,7 +319,8 @@ namespace PowerPointAddIn1
                         || string.Equals(taskTag, "Task2-2", StringComparison.Ordinal)
                         || string.Equals(taskTag, "Task2-3", StringComparison.Ordinal)
                         || string.Equals(taskTag, "TaskV1-3-1", StringComparison.Ordinal)
-                        || string.Equals(taskTag, "TaskV1-5-6", StringComparison.Ordinal))
+                        || string.Equals(taskTag, "TaskV1-5-6", StringComparison.Ordinal)
+                        || string.Equals(taskTag, "Task7-3", StringComparison.Ordinal))
                     {
                         AppendToFile(TaskEvidenceFilePath, logEntry);
                     }

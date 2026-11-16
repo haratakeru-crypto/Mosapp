@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows;
@@ -24,6 +25,7 @@ namespace MOS_Word_app.Views
         private Dictionary<int, bool[]> _projectTaskViewedStates;
         private int _groupId;
         private bool _isWindowClosed;
+        private bool _exitCleanupDone;
         private List<ResultProjectInfo> _allProjects;
         private bool _showingWrongOnly;
         private bool _seatChartSubmitStarted;
@@ -79,16 +81,20 @@ namespace MOS_Word_app.Views
             _fromScoringLog = fromScoringLog;
             _isVariantMode = isVariantMode;
             this.Loaded += ResultWindow_Loaded;
-            if (!_fromScoringLog)
+            // Alt+F4 等ボタン以外の Close でも Word 終了＋Main 復帰を走らせる
+            this.Closing += ResultWindow_Closing;
+            this.Closed += (s, args) =>
             {
-                this.Closed += (s, args) =>
-                {
-                    foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
-                        appBar.ClearReturnToResultMode();
-                    foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
-                        appBar.ClearReturnToResultMode();
-                };
-            }
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>())
+                    appBar.ClearReturnToResultMode();
+                foreach (var appBar in System.Windows.Application.Current.Windows.OfType<AppBarWindow>())
+                    appBar.ClearReturnToResultMode();
+            };
+        }
+
+        private void ResultWindow_Closing(object sender, CancelEventArgs e)
+        {
+            PerformExitCleanup();
         }
 
         private async void ResultWindow_Loaded(object sender, RoutedEventArgs e)
@@ -271,12 +277,31 @@ namespace MOS_Word_app.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Word", _isVariantMode);
+                    SeatChartSubmitStatusText,
+                    SeatChartQrImage,
+                    wrongTasks,
+                    "Word",
+                    _isVariantMode,
+                    TryResolvePracticeTotalScore());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
             }
+        }
+
+        /// <summary>全プロジェクト採点時のみ総合点を返す（画面表示と同じ条件）。</summary>
+        private int? TryResolvePracticeTotalScore()
+        {
+            if (!_isVariantMode)
+                return null;
+
+            Dictionary<int, List<bool>> results = _fromScoringLog
+                ? _snapshotResults
+                : ScoreResultStore.GetProjectResults(_groupId, ResultVariantSetNo);
+            if (!HasAllVariantProjects(results))
+                return null;
+            return WordPracticeScore.Compute(WordPracticeScore.FlattenResults(results));
         }
 
         private int CountWrongTasks(ProjectData projectData, bool useInitialSnapshot)
@@ -572,6 +597,27 @@ namespace MOS_Word_app.Views
             return list[index];
         }
 
+        /// <summary>採点ログのスナップショットから ✖ タスクキー（"projectId-taskId"）を構築する。</summary>
+        private List<string> BuildSnapshotWrongTaskKeys()
+        {
+            var keys = new List<string>();
+            if (_snapshotResults == null)
+                return keys;
+
+            foreach (var kv in _snapshotResults)
+            {
+                var list = kv.Value;
+                if (list == null)
+                    continue;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (!list[i])
+                        keys.Add($"{kv.Key}-{i + 1}");
+                }
+            }
+            return keys;
+        }
+
         private static string RemoveQuotes(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
@@ -613,6 +659,9 @@ namespace MOS_Word_app.Views
                 return "";
             if (_fromScoringLog)
                 return "";
+            // 詳細理由は教材のみ表示（類題は未整備のため出さない）
+            if (_isVariantMode)
+                return "";
             string reason = ScoreResultStore.GetFailReason(_groupId, projectId, taskId, ResultVariantSetNo);
             if (!string.IsNullOrEmpty(reason))
                 return reason;
@@ -652,7 +701,9 @@ namespace MOS_Word_app.Views
             try
             {
                 bool canRetry = taskInfo.ResultMark != "－";
-                var initialWrongKeys = ScoreResultStore.GetInitialWrongKeys(_groupId, ResultVariantSetNo).ToList();
+                var initialWrongKeys = _fromScoringLog
+                    ? BuildSnapshotWrongTaskKeys()
+                    : ScoreResultStore.GetInitialWrongKeys(_groupId, ResultVariantSetNo).ToList();
                 var uiTestAppBar = System.Windows.Application.Current.Windows.OfType<UiTestAppBarWindow>().FirstOrDefault();
                 if (uiTestAppBar != null)
                 {
@@ -721,12 +772,40 @@ namespace MOS_Word_app.Views
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            var mainWindow = Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
-            if (mainWindow == null)
-                mainWindow = new MOS_Word_app.MainWindow();
-            RestoreProjectSelectionAsMainWindow(mainWindow);
-            HideLeftoverExamWindows();
+            // 実体の掃除は Closing → PerformExitCleanup
             Close();
+        }
+
+        /// <summary>
+        /// 結果終了時の掃除（一度だけ）。Word 終了・Main 復帰・試験 UI の Hide。
+        /// </summary>
+        private void PerformExitCleanup()
+        {
+            if (_exitCleanupDone)
+                return;
+            _exitCleanupDone = true;
+
+            try
+            {
+                WordApplicationManager.CloseWordApplicationForAppExit();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseWord on exit: " + ex.Message);
+            }
+
+            try
+            {
+                var mainWindow = Application.Current.Windows.OfType<MOS_Word_app.MainWindow>().FirstOrDefault();
+                if (mainWindow == null)
+                    mainWindow = new MOS_Word_app.MainWindow();
+                RestoreProjectSelectionAsMainWindow(mainWindow);
+                HideLeftoverExamWindows();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] PerformExitCleanup UI: " + ex.Message);
+            }
         }
     }
 
@@ -746,8 +825,8 @@ namespace MOS_Word_app.Views
         public Brush ResultColor { get; set; }
         /// <summary>×のときの学生向け理由。〇・時間切れは空。</summary>
         public string FailReason { get; set; }
-        /// <summary>Word の詳細誤答理由は未完成のため、学生向け「詳細」は出さない。</summary>
-        public bool HasFailReason => false;
+        /// <summary>×かつ理由があるとき「詳細」リンクを出す（教材のみ ResolveDisplayedFailReason で埋める）。</summary>
+        public bool HasFailReason => !string.IsNullOrEmpty(FailReason);
         public bool ShowDispositionColumns { get; set; }
         public bool IsCompleted { get; set; }
         public bool IsFlagged { get; set; }

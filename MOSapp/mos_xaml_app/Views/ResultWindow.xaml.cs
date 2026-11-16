@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -25,11 +26,14 @@ namespace MOSExcelMogiApp.Views
         private List<ResultProjectInfo> _allProjects; // すべてのプロジェクトを保持
         private bool _showingWrongOnly = false; // フィルター状態
         public Action<int, int> OnNavigateToTask { get; set; } // ProjectId, TaskId
+        /// <summary>採点ログ起点など、終了／閉じる時のクリーンアップ（Excel・AppBar・メイン復帰）。</summary>
+        public Action OnEndRequested { get; set; }
         /// <summary>初回の <see cref="LoadResultsAsync"/>（問題文・一覧の読み込み含む）が完了したときに1回だけ発火する。</summary>
         public event EventHandler InitialPresentationCompleted;
         // 採点直後のスナップショット（復習前の正答率計算用）
         private Dictionary<int, List<bool>> _initialProjectResults;
         private bool _seatChartSubmitStarted;
+        private bool _exitCleanupDone;
         private readonly bool _fromScoringLog;
         private readonly bool _isVariantMode;
         private readonly int _variantSetNo;
@@ -67,9 +71,16 @@ namespace MOSExcelMogiApp.Views
             System.Diagnostics.Debug.WriteLine($"[ResultWindow] Constructor called with {_allProjectResults?.Count ?? 0} projects, groupId: {_groupId}, fromLog: {_fromScoringLog}");
             
             this.Loaded += ResultWindow_Loaded;
+            // Alt+F4 等ボタン以外の Close でも Main 復帰／採点ログ掃除を走らせる
+            this.Closing += ResultWindow_Closing;
 
             if (!_fromScoringLog)
                 MOSExcelMogiApp.Models.ExamResultStorage.ResultsChanged += OnResultsChanged;
+        }
+
+        private void ResultWindow_Closing(object sender, CancelEventArgs e)
+        {
+            EnsureExitCleanup();
         }
 
         private static Dictionary<int, List<bool>> CloneResults(Dictionary<int, List<bool>> source)
@@ -336,12 +347,35 @@ namespace MOSExcelMogiApp.Views
             try
             {
                 await MosPracticeClient.ResultSubmitBinder.BindAsync(
-                    SeatChartSubmitStatusText, SeatChartQrImage, wrongTasks, "Excel", _isVariantMode);
+                    SeatChartSubmitStatusText,
+                    SeatChartQrImage,
+                    wrongTasks,
+                    "Excel",
+                    _isVariantMode,
+                    TryResolvePracticeTotalScore());
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] seat chart submit: " + ex.Message);
             }
+        }
+
+        /// <summary>全プロジェクト採点時のみ総合点を返す（画面表示と同じ条件）。</summary>
+        private int? TryResolvePracticeTotalScore()
+        {
+            if (!_isVariantMode)
+                return null;
+
+            var results = _fromScoringLog
+                ? _allProjectResults
+                : MOSExcelMogiApp.Models.ExamResultStorage.GetAllResults(_resultScope);
+            if (results == null || results.Count == 0)
+                results = _allProjectResults;
+            if (!HasAllVariantProjects(results))
+                return null;
+            if (!PracticeScoreClient.TryCompute(VariantExam.FlattenResults(results), out int total, out _))
+                return null;
+            return total;
         }
 
         /// <summary>
@@ -542,9 +576,78 @@ namespace MOSExcelMogiApp.Views
             }
         }
 
+        /// <summary>
+        /// 結果終了時の掃除（一度だけ）。採点ログは OnEndRequested、通常は Main 復帰＋試験 UI クローズ。
+        /// </summary>
+        private void EnsureExitCleanup()
+        {
+            if (_exitCleanupDone)
+                return;
+            _exitCleanupDone = true;
+
+            if (_fromScoringLog)
+            {
+                RequestExitCleanup();
+                return;
+            }
+
+            try
+            {
+                MOSExcelMogiApp.MainWindow mainWindow = null;
+                try
+                {
+                    mainWindow = Application.Current.Windows.OfType<MOSExcelMogiApp.MainWindow>().FirstOrDefault();
+                    if (mainWindow == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Creating new MainWindow");
+                        mainWindow = new MOSExcelMogiApp.MainWindow();
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Resetting MainViewModel state");
+                        var viewModel = mainWindow.DataContext as Ui.ViewModels.MainViewModel;
+                        if (viewModel != null)
+                        {
+                            viewModel.IsExcelOverlayVisible = false;
+                            viewModel.CurrentProject = null;
+                            viewModel.ResultMessage = "";
+                            viewModel.EnableProjectSelection();
+                        }
+                    }
+
+                    RestoreProjectSelectionAsMainWindow(mainWindow);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error showing MainWindow: {ex.Message}");
+                    try
+                    {
+                        mainWindow = new MOSExcelMogiApp.MainWindow();
+                        RestoreProjectSelectionAsMainWindow(mainWindow);
+                    }
+                    catch (Exception ex2)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error creating new MainWindow: {ex2.Message}");
+                    }
+                }
+
+                CloseLeftoverExamWindows();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("[ResultWindow] EnsureExitCleanup: " + ex.Message);
+            }
+        }
+
         private async void EndButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] EndButton_Click called");
+
+            if (_fromScoringLog)
+            {
+                Close();
+                return;
+            }
             
             // 待機メッセージウィンドウを作成
             Window waitWindow = null;
@@ -597,57 +700,8 @@ namespace MOSExcelMogiApp.Views
                 
                 // UI更新の機会を与える
                 await Task.Delay(100);
-                
-                // MainWindowを先に表示
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    MOSExcelMogiApp.MainWindow mainWindow = null;
-                    try
-                    {
-                        // まず、既存のMainWindowを探す
-                        mainWindow = Application.Current.Windows.OfType<MOSExcelMogiApp.MainWindow>().FirstOrDefault();
-                        
-                        // 見つからない場合は、新しく作成
-                        if (mainWindow == null)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[ResultWindow] Creating new MainWindow");
-                            mainWindow = new MOSExcelMogiApp.MainWindow();
-                        }
-                        else
-                        {
-                            // 既存のMainWindowが見つかった場合、ViewModelの状態をリセット
-                            System.Diagnostics.Debug.WriteLine("[ResultWindow] Resetting MainViewModel state");
-                            var viewModel = mainWindow.DataContext as Ui.ViewModels.MainViewModel;
-                            if (viewModel != null)
-                            {
-                                viewModel.IsExcelOverlayVisible = false;
-                                viewModel.CurrentProject = null;
-                                viewModel.ResultMessage = "";
-                                viewModel.EnableProjectSelection();
-                            }
-                        }
-                        
-                        // MainWindowを確実に表示
-                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Showing MainWindow");
-                        RestoreProjectSelectionAsMainWindow(mainWindow);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error showing MainWindow: {ex.Message}");
-                        // エラーが発生した場合でも、新しいMainWindowを作成
-                        try
-                        {
-                            mainWindow = new MOSExcelMogiApp.MainWindow();
-                            RestoreProjectSelectionAsMainWindow(mainWindow);
-                        }
-                        catch (Exception ex2)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error creating new MainWindow: {ex2.Message}");
-                        }
-                    }
-                }, DispatcherPriority.Normal);
-                
-                // MainWindowが表示されるまで待つ
+
+                await Dispatcher.InvokeAsync(() => EnsureExitCleanup(), DispatcherPriority.Normal);
                 await Task.Delay(300);
                 
                 // 待機メッセージウィンドウを閉じる
@@ -657,9 +711,7 @@ namespace MOSExcelMogiApp.Views
                     waitWindow = null;
                 }
                 
-                await Dispatcher.InvokeAsync(() => CloseLeftoverExamWindows(), DispatcherPriority.Normal);
-                
-                // 結果画面を閉じる
+                // 結果画面を閉じる（Closing でも EnsureExitCleanup するが二重実行は抑止済み）
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing ResultWindow");
                 this.Close();
             }
@@ -685,6 +737,12 @@ namespace MOSExcelMogiApp.Views
         private async void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine("[ResultWindow] CloseButton_Click called");
+
+            if (_fromScoringLog)
+            {
+                Close();
+                return;
+            }
             
             // 待機メッセージウィンドウを作成
             Window waitWindow = null;
@@ -737,57 +795,8 @@ namespace MOSExcelMogiApp.Views
                 
                 // UI更新の機会を与える
                 await Task.Delay(100);
-                
-                // MainWindowを先に表示
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    MOSExcelMogiApp.MainWindow mainWindow = null;
-                    try
-                    {
-                        // まず、既存のMainWindowを探す
-                        mainWindow = Application.Current.Windows.OfType<MOSExcelMogiApp.MainWindow>().FirstOrDefault();
-                        
-                        // 見つからない場合は、新しく作成
-                        if (mainWindow == null)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[ResultWindow] Creating new MainWindow");
-                            mainWindow = new MOSExcelMogiApp.MainWindow();
-                        }
-                        else
-                        {
-                            // 既存のMainWindowが見つかった場合、ViewModelの状態をリセット
-                            System.Diagnostics.Debug.WriteLine("[ResultWindow] Resetting MainViewModel state");
-                            var viewModel = mainWindow.DataContext as Ui.ViewModels.MainViewModel;
-                            if (viewModel != null)
-                            {
-                                viewModel.IsExcelOverlayVisible = false;
-                                viewModel.CurrentProject = null;
-                                viewModel.ResultMessage = "";
-                                viewModel.EnableProjectSelection();
-                            }
-                        }
-                        
-                        // MainWindowを確実に表示し、本体窓をプロジェクト選択へ戻す
-                        System.Diagnostics.Debug.WriteLine("[ResultWindow] Showing MainWindow");
-                        RestoreProjectSelectionAsMainWindow(mainWindow);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error showing MainWindow: {ex.Message}");
-                        // エラーが発生した場合でも、新しいMainWindowを作成
-                        try
-                        {
-                            mainWindow = new MOSExcelMogiApp.MainWindow();
-                            RestoreProjectSelectionAsMainWindow(mainWindow);
-                        }
-                        catch (Exception ex2)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ResultWindow] Error creating new MainWindow: {ex2.Message}");
-                        }
-                    }
-                }, DispatcherPriority.Normal);
-                
-                // MainWindowが表示されるまで待つ
+
+                await Dispatcher.InvokeAsync(() => EnsureExitCleanup(), DispatcherPriority.Normal);
                 await Task.Delay(300);
                 
                 // 待機メッセージウィンドウを閉じる
@@ -797,9 +806,6 @@ namespace MOSExcelMogiApp.Views
                     waitWindow = null;
                 }
                 
-                await Dispatcher.InvokeAsync(() => CloseLeftoverExamWindows(), DispatcherPriority.Normal);
-                
-                // 結果画面を閉じる
                 System.Diagnostics.Debug.WriteLine("[ResultWindow] Closing ResultWindow");
                 this.Close();
             }
@@ -1023,6 +1029,15 @@ namespace MOSExcelMogiApp.Views
                 {
                     try
                     {
+                        // 採点ログ起点: MainWindow 側で AppBar / モード / ファイルオープンを一括処理
+                        if (OnNavigateToTask != null)
+                        {
+                            await Task.Delay(50);
+                            OnNavigateToTask(taskInfo.ProjectId, taskInfo.TaskId);
+                            this.Hide();
+                            return;
+                        }
+
                         // AppBarWindowを確実に表示してからNavigateToTaskを呼び出す
                         var appBarWindow = Application.Current.Windows.OfType<AppBarWindow>().FirstOrDefault();
                         
@@ -1087,6 +1102,13 @@ namespace MOSExcelMogiApp.Views
                     }
                 }
             }
+        }
+
+        private void RequestExitCleanup()
+        {
+            var handler = OnEndRequested;
+            OnEndRequested = null;
+            handler?.Invoke();
         }
 
         /// <summary>結果一覧のコールバックから、×のタスクへ戻るときだけ再挑戦番号を予約する。</summary>
