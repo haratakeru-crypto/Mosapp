@@ -228,7 +228,7 @@ namespace MOS_Word_app
                     {
                         GroupId = groupId,
                         ProjectId = projectId,
-                        Name = $"プロジェクト{groupId}-{projectId}",
+                        Name = $"プロジェクト{projectId}",
                         FilePath = filePath
                     });
                 }
@@ -254,7 +254,7 @@ namespace MOS_Word_app
                 {
                     GroupId = 1,
                     ProjectId = projectId,
-                    Name = $"プロジェクト1-{projectId}",
+                    Name = $"プロジェクト{projectId}",
                     FilePath = filePath
                 });
             }

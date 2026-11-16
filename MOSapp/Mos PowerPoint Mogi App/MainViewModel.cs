@@ -223,7 +223,7 @@ namespace MOS_PowerPoint_app
                             {
                                 GroupId = groupId,
                                 ProjectId = projectId,
-                                Name = $"プロジェクト{groupId}-{projectId}",
+                                Name = $"プロジェクト{projectId}",
                                 FilePath = filePath
                             });
                         }
@@ -237,7 +237,7 @@ namespace MOS_PowerPoint_app
                             {
                                 GroupId = groupId,
                                 ProjectId = projectId,
-                                Name = $"プロジェクト{groupId}-{projectId}",
+                                Name = $"プロジェクト{projectId}",
                                 FilePath = null
                             });
                         }
@@ -260,7 +260,7 @@ namespace MOS_PowerPoint_app
                         {
                             GroupId = groupId,
                             ProjectId = projectId,
-                            Name = $"プロジェクト{groupId}-{projectId}",
+                            Name = $"プロジェクト{projectId}",
                             FilePath = null
                         });
                     }
@@ -286,7 +286,7 @@ namespace MOS_PowerPoint_app
                 {
                     GroupId = 1,
                     ProjectId = projectId,
-                    Name = $"プロジェクト1-{projectId}",
+                    Name = $"プロジェクト{projectId}",
                     FilePath = filePath
                 });
             }

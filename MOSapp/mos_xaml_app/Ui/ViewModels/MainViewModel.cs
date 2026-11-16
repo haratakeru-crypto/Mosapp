@@ -1297,7 +1297,7 @@ namespace Ui.ViewModels
                     {
                         GroupId = groupId,
                         ProjectId = projectId,
-                        Name = $"プロジェクト{groupId}-{projectId}"
+                        Name = $"プロジェクト{projectId}"
                     });
                 }
                 
@@ -3839,7 +3839,7 @@ namespace Ui.ViewModels
                     ScoringResultDialog.TryBringOpenToFront();
                     CurrentProject = new ProjectInfo
                     {
-                        Name = $"プロジェクト{groupId}-{nextProjectNumber}",
+                        Name = $"プロジェクト{nextProjectNumber}",
                         FilePath = nextFilePath,
                         Group = $"Group {groupId}",
                         ProjectNumber = nextProjectNumber

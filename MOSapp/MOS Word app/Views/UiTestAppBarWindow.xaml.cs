@@ -2623,7 +2623,7 @@ namespace MOS_Word_app.Views
             {
                 int variantSetNo = CurrentVariantSetNo;
                 string confirmMessage = _isVariantMode
-                    ? $"類題{variantSetNo}（プロジェクト {_groupId}-{_currentProjectId}）をリセットしますか？\n現在の変更内容は失われます。"
+                    ? $"類題{variantSetNo}（プロジェクト{_currentProjectId}）をリセットしますか？\n現在の変更内容は失われます。"
                     : $"プロジェクト{_currentProjectId}をリセットしますか？\n現在の変更内容は失われます。";
 
                 var result = MessageBox.Show(
@@ -2643,7 +2643,7 @@ namespace MOS_Word_app.Views
                 }
 
                 string doneMessage = _isVariantMode
-                    ? $"類題{variantSetNo}（プロジェクト {_groupId}-{_currentProjectId}）をリセットしました。"
+                    ? $"類題{variantSetNo}（プロジェクト{_currentProjectId}）をリセットしました。"
                     : "プロジェクトをリセットしました。";
                 MessageBox.Show(doneMessage, "リセット完了",
                     MessageBoxButton.OK, MessageBoxImage.Information);

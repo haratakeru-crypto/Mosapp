@@ -563,7 +563,7 @@ namespace MOSExcelMogiApp
                 
                 if (string.IsNullOrEmpty(projectFilePath))
                 {
-                    string errorMsg = $"プロジェクトファイルのパスを取得できませんでした。\nプロジェクト: Group{groupId}, Project{projectId}";
+                    string errorMsg = $"プロジェクトファイルのパスを取得できませんでした。\nプロジェクト{projectId}";
                     if (showMessage)
                     {
                         MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -579,7 +579,7 @@ namespace MOSExcelMogiApp
                 
                 if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
                 {
-                    string errorMsg = $"テンプレートファイルが見つかりません。\n\nプロジェクト: Group{groupId}, Project{projectId}\n検索フォルダ: {templatesFolder}";
+                    string errorMsg = $"テンプレートファイルが見つかりません。\n\nプロジェクト{projectId}\n検索フォルダ: {templatesFolder}";
                     
                     if (Directory.Exists(templatesFolder))
                     {
@@ -644,13 +644,13 @@ namespace MOSExcelMogiApp
                     
                     if (showMessage)
                     {
-                        MessageBox.Show($"プロジェクト (Group{groupId}, Project{projectId}) をリセットしました。", 
+                        MessageBox.Show($"プロジェクト{projectId}をリセットしました。",
                             "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    string errorMsg = $"ファイルへのアクセスが拒否されました。\nファイルが他のプログラムで開かれている可能性があります。\n\nプロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                    string errorMsg = $"ファイルへのアクセスが拒否されました。\nファイルが他のプログラムで開かれている可能性があります。\n\nプロジェクト{projectId}\n{ex.Message}";
                     if (showMessage)
                     {
                         MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -660,7 +660,7 @@ namespace MOSExcelMogiApp
                 }
                 catch (IOException ex)
                 {
-                    string errorMsg = $"ファイルのコピー中にエラーが発生しました。\nファイルがロックされている可能性があります。\n\nプロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                    string errorMsg = $"ファイルのコピー中にエラーが発生しました。\nファイルがロックされている可能性があります。\n\nプロジェクト{projectId}\n{ex.Message}";
                     if (showMessage)
                     {
                         MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -671,7 +671,7 @@ namespace MOSExcelMogiApp
             }
             catch (Exception ex)
             {
-                string errorMsg = $"プロジェクトリセット中にエラーが発生しました。\nプロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                string errorMsg = $"プロジェクトリセット中にエラーが発生しました。\nプロジェクト{projectId}\n{ex.Message}";
                 if (showMessage)
                 {
                     MessageBox.Show($"{errorMsg}\n\n{ex.StackTrace}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -806,7 +806,7 @@ namespace MOSExcelMogiApp
 
                 if (string.IsNullOrEmpty(projectFilePath))
                 {
-                    string errorMsg = $"類題ファイルのパスを取得できませんでした。\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}";
+                    string errorMsg = $"類題ファイルのパスを取得できませんでした。\n類題{variantSetNo} プロジェクト{projectId}";
                     if (showMessage)
                         MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     throw new Exception(errorMsg);
@@ -815,7 +815,7 @@ namespace MOSExcelMogiApp
                 string templatePath = _viewModel.GetVariantTemplateFilePath(groupId, projectId, variantSetNo);
                 if (!File.Exists(templatePath))
                 {
-                    string errorMsg = $"類題テンプレートファイルが見つかりません。\n\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{templatePath}";
+                    string errorMsg = $"類題テンプレートファイルが見つかりません。\n\n類題{variantSetNo} プロジェクト{projectId}\n{templatePath}";
                     if (showMessage)
                         MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     throw new Exception(errorMsg);
@@ -878,13 +878,13 @@ namespace MOSExcelMogiApp
 
                     if (showMessage)
                     {
-                        MessageBox.Show($"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。",
+                        MessageBox.Show($"類題{variantSetNo}（プロジェクト{projectId}）をリセットしました。",
                             "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    string errorMsg = $"ファイルへのアクセスが拒否されました。\nファイルが他のプログラムで開かれている可能性があります。\n\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                    string errorMsg = $"ファイルへのアクセスが拒否されました。\nファイルが他のプログラムで開かれている可能性があります。\n\n類題{variantSetNo} プロジェクト{projectId}\n{ex.Message}";
                     if (showMessage)
                         MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     System.Diagnostics.Debug.WriteLine($"UnauthorizedAccessException in ResetVariantProject: {ex.Message}");
@@ -892,7 +892,7 @@ namespace MOSExcelMogiApp
                 }
                 catch (IOException ex)
                 {
-                    string errorMsg = $"ファイルのコピー中にエラーが発生しました。\nファイルがロックされている可能性があります。\n\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                    string errorMsg = $"ファイルのコピー中にエラーが発生しました。\nファイルがロックされている可能性があります。\n\n類題{variantSetNo} プロジェクト{projectId}\n{ex.Message}";
                     if (showMessage)
                         MessageBox.Show(errorMsg, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     System.Diagnostics.Debug.WriteLine($"IOException in ResetVariantProject: {ex.Message}");
@@ -901,7 +901,7 @@ namespace MOSExcelMogiApp
             }
             catch (Exception ex)
             {
-                string errorMsg = $"類題リセット中にエラーが発生しました。\n類題{variantSetNo} プロジェクト: Group{groupId}, Project{projectId}\n{ex.Message}";
+                string errorMsg = $"類題リセット中にエラーが発生しました。\n類題{variantSetNo} プロジェクト{projectId}\n{ex.Message}";
                 if (showMessage)
                     MessageBox.Show($"{errorMsg}\n\n{ex.StackTrace}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 System.Diagnostics.Debug.WriteLine($"Error in ResetVariantProject: {ex.Message}\n{ex.StackTrace}");

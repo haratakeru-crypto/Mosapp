@@ -1499,8 +1499,8 @@ namespace MOSExcelMogiApp
                     bool isVariantMode = _viewModel.IsVariantMode;
                     int variantSetNo = _viewModel.VariantSetNo;
                     string confirmMessage = isVariantMode
-                        ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしますか？\n（編集内容は失われます）"
-                        : $"プロジェクト {groupId}-{projectId} をリセットしますか？\n（編集内容は失われます）";
+                        ? $"類題{variantSetNo}（プロジェクト{projectId}）をリセットしますか？\n（編集内容は失われます）"
+                        : $"プロジェクト{projectId}をリセットしますか？\n（編集内容は失われます）";
 
                     var result = MessageBox.Show(
                         this,
@@ -1540,8 +1540,8 @@ namespace MOSExcelMogiApp
                     var label = new System.Windows.Controls.TextBlock
                     {
                         Text = isVariantMode
-                            ? $"リセット中です...\n類題{variantSetNo} プロジェクト {groupId}-{projectId}"
-                            : $"リセット中です...\nプロジェクト {groupId}-{projectId}",
+                            ? $"リセット中です...\n類題{variantSetNo} プロジェクト{projectId}"
+                            : $"リセット中です...\nプロジェクト{projectId}",
                         FontSize = 14,
                         TextAlignment = System.Windows.TextAlignment.Center,
                         Foreground = System.Windows.Media.Brushes.SteelBlue
@@ -1580,8 +1580,8 @@ namespace MOSExcelMogiApp
                             SetCurrentTask(1, notifyGuide: false);
 
                             string doneMessage = isVariantMode
-                                ? $"類題{variantSetNo}（プロジェクト {groupId}-{projectId}）をリセットしました。"
-                                : $"プロジェクト {groupId}-{projectId} をリセットしました。";
+                                ? $"類題{variantSetNo}（プロジェクト{projectId}）をリセットしました。"
+                                : $"プロジェクト{projectId}をリセットしました。";
                             MessageBox.Show(this, doneMessage,
                                 "完了", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
