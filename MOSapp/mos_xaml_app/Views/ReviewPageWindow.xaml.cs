@@ -750,8 +750,9 @@ namespace MOSExcelMogiApp.Views
                     scoringOverlay = new Window
                     {
                         Title = "採点中",
-                        Width = 320,
-                        Height = 140,
+                        Width = 360,
+                        MinHeight = 140,
+                        SizeToContent = SizeToContent.Height,
                         WindowStyle = WindowStyle.None,
                         WindowStartupLocation = WindowStartupLocation.CenterScreen,
                         ShowInTaskbar = false,
@@ -773,6 +774,9 @@ namespace MOSExcelMogiApp.Views
                         Text = "採点の準備をしています...",
                         FontSize = 18,
                         HorizontalAlignment = HorizontalAlignment.Center,
+                        TextAlignment = TextAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxWidth = 300,
                         Margin = new Thickness(0, 0, 0, 12),
                         Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
                     };
@@ -783,7 +787,7 @@ namespace MOSExcelMogiApp.Views
                         Maximum = 1,
                         Value = 0,
                         Height = 20,
-                        Width = 260
+                        Width = 300
                     };
                     stack.Children.Add(text);
                     stack.Children.Add(progress);
@@ -1392,7 +1396,7 @@ namespace MOSExcelMogiApp.Views
                     {
                         SaveAllFalse(project.projectId, project.taskCount, resultScope);
                         progress?.Invoke(
-                            $"プロジェクト{project.projectId}を採点しました（{idx + 1}/{projectList.Count}）",
+                            FormatProjectScoredProgress(project.projectId, idx + 1, projectList.Count),
                             idx + 1,
                             projectList.Count);
                         continue;
@@ -1432,7 +1436,7 @@ namespace MOSExcelMogiApp.Views
                         if (opened)
                             CloseProjectWorkbook(project.filePath);
                         progress?.Invoke(
-                            $"プロジェクト{project.projectId}を採点しました（{idx + 1}/{projectList.Count}）",
+                            FormatProjectScoredProgress(project.projectId, idx + 1, projectList.Count),
                             idx + 1,
                             projectList.Count);
                     }
@@ -1450,6 +1454,13 @@ namespace MOSExcelMogiApp.Views
                 ReleaseScoringWorkbookIndex();
                 ExcelLogReader.ClearLogLinesCache();
             }
+        }
+
+        private static string FormatProjectScoredProgress(int projectId, int completed, int total)
+        {
+            if (completed >= total && total > 0)
+                return $"採点が完了しました（{completed}/{total}）";
+            return $"プロジェクト{projectId}を採点しました（{completed}/{total}）";
         }
 
         private ExamResultScope CurrentResultScope()

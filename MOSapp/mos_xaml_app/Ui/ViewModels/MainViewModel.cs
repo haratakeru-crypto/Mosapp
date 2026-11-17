@@ -3782,6 +3782,14 @@ namespace Ui.ViewModels
         {
             System.Diagnostics.Debug.WriteLine(
                 $"[ExecuteNextProject] Opening review page for {(IsVariantMode ? "類題" : "教材")} project {CurrentProject?.ProjectNumber}");
+
+            // PowerPoint と同様、最終プロジェクトから次へ進むときに完了を明示する。
+            MessageBox.Show(
+                "すべてのプロジェクトが完了しました。",
+                "完了",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
             _isSwitchingProject = true;
             Task shutdown = null;
             try
