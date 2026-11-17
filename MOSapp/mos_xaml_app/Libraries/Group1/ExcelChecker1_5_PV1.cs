@@ -67,10 +67,16 @@ namespace Libraries.Group1
 
             string formula = VariantCheckSupport.CellFormula(sheet.Range["F6"]);
             string normalized = VariantCheckSupport.NormalizeFormula(formula);
+            // NormalizeFormula は引用符を落とすため、空欄判定 "" / ISBLANK は元数式側で見る。
+            // 正答例: =IF([@出欠]="","送付しない","当日配布")
+            string rawCompact = (formula ?? string.Empty).Replace(" ", "");
+            bool hasBlankCond = rawCompact.IndexOf("\"\"", StringComparison.Ordinal) >= 0
+                || normalized.Contains("ISBLANK");
             bool ok = normalized.Contains("IF")
-                && normalized.Contains("欠席")
+                && normalized.Contains("出欠")
                 && normalized.Contains("送付しない")
-                && normalized.Contains("当日配布");
+                && normalized.Contains("当日配布")
+                && hasBlankCond;
             return ok ? true : VariantCheckSupport.Miss(ExcelScoreExplanation.RequirementMissText);
         }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -78,6 +79,7 @@ namespace Libraries.Group1
 
         // ---------------------------------------------------------
         // 10-4: 担当者リスト!A5 = SEQUENCE(22,1,1,1)
+        // 列・開始・目盛の既定値(1)は省略・空引数でも同値のため許容する。
         // ---------------------------------------------------------
         private bool CheckTask_1_10_04_Impl(string filePath)
         {
@@ -96,7 +98,7 @@ namespace Libraries.Group1
 
                 string n = NormalizeFormula(formula);
                 bool hasSeq = n.Contains("SEQUENCE(");
-                bool hasArgs = n.Contains("22,1,1,1") || (n.Contains("22") && n.Contains("1,1,1"));
+                bool hasArgs = IsSequenceWithDefaultOnes(formula, expectedRows: 22);
                 if (hasSeq && hasArgs)
                     return true;
 
@@ -547,6 +549,43 @@ namespace Libraries.Group1
             if (string.IsNullOrEmpty(formula))
                 return "";
             return formula.Replace(" ", "").ToUpperInvariant();
+        }
+
+        /// <summary>
+        /// SEQUENCE(行[,列][,開始][,目盛]) で、行が expectedRows、列・開始・目盛が省略/空/1 のとき true。
+        /// SEQUENCE 自体の有無は呼び出し側で確認する。
+        /// </summary>
+        private static bool IsSequenceWithDefaultOnes(string formula, int expectedRows)
+        {
+            string args = DescribeFormulaArgs(formula, "SEQUENCE");
+            if (string.IsNullOrWhiteSpace(args) || args == "（不明）")
+                return false;
+
+            string[] parts = args.Split(',');
+            if (parts.Length < 1 || parts.Length > 4)
+                return false;
+
+            if (!TryParseSequenceArgAsInt(parts[0], out int rows) || rows != expectedRows)
+                return false;
+
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string part = parts[i].Trim();
+                if (part.Length == 0)
+                    continue; // 空引数は既定値1
+                if (!TryParseSequenceArgAsInt(part, out int value) || value != 1)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryParseSequenceArgAsInt(string text, out int value)
+        {
+            value = 0;
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            return int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
         }
 
         private static string DescribeFormulaArgs(string formula, string functionName)

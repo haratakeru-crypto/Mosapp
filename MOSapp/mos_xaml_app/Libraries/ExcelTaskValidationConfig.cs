@@ -356,11 +356,14 @@ namespace Libraries
                     {
                         case 1: // オートフィル EditCellValue
                         case 2: // RIGHT EditCellFormula
-                        case 3: // データバー AddConditionalFormat
                             return ExcelValidationExemptFlags.RangeEdit;
-                        case 4: // 折り返し → EditCellFormat。行高変化で SetPageBreak も付く
+                        case 3: // データバー AddConditionalFormat。条件付き書式で AutoFilter/Sort 署名が動く
+                            return ExcelValidationExemptFlags.RangeEdit
+                                | ExcelValidationExemptFlags.SheetStructure;
+                        case 4: // 折り返し → EditCellFormat。行高変化で SetPageBreak / SortOrFilter も付く
                             return ExcelValidationExemptFlags.CellFormatOnly
-                                | ExcelValidationExemptFlags.PrintAndPage;
+                                | ExcelValidationExemptFlags.PrintAndPage
+                                | ExcelValidationExemptFlags.SheetStructure;
                         case 5: // 3-D縦棒 AddChart / InsertShapeOrImage。グラフ挿入で自動改ページが付く
                             return ExcelValidationExemptFlags.ShapeOrImage | ExcelValidationExemptFlags.PrintAndPage;
                         case 6: // 印刷向き・印刷範囲 + SortOrFilter + NamedRange
