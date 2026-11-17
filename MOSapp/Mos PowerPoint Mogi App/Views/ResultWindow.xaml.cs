@@ -476,10 +476,8 @@ namespace MOS_PowerPoint_app.Views
                     ProjectData projectData = await LoadProjectDataModelAsync();
                     if (projectData != null)
                     {
-                        // 2回目以降の採点も座席表へ送る
-                        _seatChartSubmitStarted = false;
-                        int latestWrong = UpdateSummary(projectData);
-                        await StartSeatChartSubmitAsync(latestWrong);
+                        // 座席表は採点ログ追加時の初回送信のみ。復習後の再採点では送らない
+                        UpdateSummary(projectData);
                         await LoadProjectDataAsync();
                     }
                 }

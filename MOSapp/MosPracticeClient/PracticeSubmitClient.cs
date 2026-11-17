@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
@@ -56,8 +57,14 @@ namespace MosPracticeClient
                         scoredAt = latest.ScoredAt;
                     if (!isVariant)
                     {
-                        attempt = logs.Count.ToString(CultureInfo.InvariantCulture);
+                        // 教材の「〇回目」= その科目の教材採点ログ件数（類題ログは含めない）
+                        int textbookLogCount = logs.Count(e => !e.IsVariantMode);
+                        attempt = textbookLogCount.ToString(CultureInfo.InvariantCulture);
                         range = ScoringRangeSelection.ShortenRangeLabel(latest.RangeLabel);
+                        // ×は今回の採点ログに残ったプロジェクト結果だけ（範囲外のストア合計にしない）
+                        int? fromLog = CountWrongInProjectResults(latest.ProjectResults);
+                        if (fromLog.HasValue)
+                            wrongCount = fromLog.Value;
                     }
                     else
                     {
@@ -159,6 +166,46 @@ namespace MosPracticeClient
             }
 
             return shortRange.Length > 0 ? "類題 " + shortRange : "類題";
+        }
+
+        /// <summary>採点ログの projectResults 内の false 件数。空なら null。</summary>
+        internal static int? CountWrongInProjectResults(Dictionary<int, List<bool>> projectResults)
+        {
+            if (projectResults == null || projectResults.Count == 0)
+                return null;
+
+            int wrong = 0;
+            foreach (var kv in projectResults)
+            {
+                if (kv.Value == null) continue;
+                foreach (bool passed in kv.Value)
+                {
+                    if (!passed)
+                        wrong++;
+                }
+            }
+            return wrong;
+        }
+
+        /// <summary>採点範囲に含まれるプロジェクトの結果だけ残す。</summary>
+        public static Dictionary<int, List<bool>> FilterProjectResults(
+            Dictionary<int, List<bool>> source,
+            ISet<int> projectIds)
+        {
+            var filtered = new Dictionary<int, List<bool>>();
+            if (source == null)
+                return filtered;
+
+            bool filter = projectIds != null && projectIds.Count > 0;
+            foreach (var kv in source)
+            {
+                if (filter && !projectIds.Contains(kv.Key))
+                    continue;
+                filtered[kv.Key] = kv.Value != null
+                    ? new List<bool>(kv.Value)
+                    : new List<bool>();
+            }
+            return filtered;
         }
     }
 }

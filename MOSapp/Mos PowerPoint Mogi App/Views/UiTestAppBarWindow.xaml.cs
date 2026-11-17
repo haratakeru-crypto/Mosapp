@@ -613,16 +613,22 @@ namespace MOS_PowerPoint_app.Views
                 {
                     try
                     {
-                        MosPracticeClient.ScoringLogStore.Append(
-                            MosPracticeClient.ScoringLogStore.SubjectPowerPoint,
-                            MosPracticeClient.ScoringLogEntry.Create(
-                                rangeLabel,
-                                _groupId,
-                                allResults,
-                                isVariantMode: _isVariantMode,
-                                variantSetNo: _isVariantMode ? PowerPointVariantScoring.DefaultVariantSetNo : 0,
-                                completedStates: completedSnapshot,
-                                flaggedStates: flaggedSnapshot));
+                        // 座席表の × が範囲外を含まないよう、今回採点したプロジェクトだけ残す
+                        var logResults = MosPracticeClient.PracticeSubmitClient.FilterProjectResults(
+                            allResults, scoringIds);
+                        if (logResults.Count > 0)
+                        {
+                            MosPracticeClient.ScoringLogStore.Append(
+                                MosPracticeClient.ScoringLogStore.SubjectPowerPoint,
+                                MosPracticeClient.ScoringLogEntry.Create(
+                                    rangeLabel,
+                                    _groupId,
+                                    logResults,
+                                    isVariantMode: _isVariantMode,
+                                    variantSetNo: _isVariantMode ? PowerPointVariantScoring.DefaultVariantSetNo : 0,
+                                    completedStates: completedSnapshot,
+                                    flaggedStates: flaggedSnapshot));
+                        }
                     }
                     catch (Exception logEx)
                     {

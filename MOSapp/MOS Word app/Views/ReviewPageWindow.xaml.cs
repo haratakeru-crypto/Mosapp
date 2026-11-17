@@ -673,7 +673,10 @@ namespace MOS_Word_app.Views
                 ScoreResultStore.SnapshotGroup(_groupId, resultVariantSetNo);
                 try
                 {
-                    var logResults = ScoreResultStore.GetProjectResults(_groupId, resultVariantSetNo);
+                    // 座席表の × が範囲外を含まないよう、今回採点したプロジェクトだけ残す
+                    var logResults = MosPracticeClient.PracticeSubmitClient.FilterProjectResults(
+                        ScoreResultStore.GetProjectResults(_groupId, resultVariantSetNo),
+                        scoringProjectIds);
                     if (logResults.Count > 0)
                     {
                         MosPracticeClient.ScoringLogStore.Append(

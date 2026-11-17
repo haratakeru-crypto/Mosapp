@@ -108,8 +108,7 @@ namespace MOS_Word_app.Views
         /// </summary>
         public async Task RefreshResultsAsync()
         {
-            // 2回目以降の採点も座席表へ送る
-            _seatChartSubmitStarted = false;
+            // 座席表は採点ログ追加時の初回送信のみ。復習後の再採点では送らない（同じ〇回目の重複防止）
             await LoadResultsAsync();
         }
 
