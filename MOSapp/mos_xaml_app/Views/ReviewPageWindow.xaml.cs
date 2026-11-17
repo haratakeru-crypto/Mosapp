@@ -900,14 +900,17 @@ namespace MOSExcelMogiApp.Views
 
                     try
                     {
-                        if (allResults != null && allResults.Count > 0)
+                        // 座席表の × が範囲外プロジェクトを含まないよう、今回採点したプロジェクトだけ残す
+                        var logResults = MosPracticeClient.PracticeSubmitClient.FilterProjectResults(
+                            allResults, scoringProjectIds);
+                        if (logResults.Count > 0)
                         {
                             MosPracticeClient.ScoringLogStore.Append(
                                 MosPracticeClient.ScoringLogStore.SubjectExcel,
                                 MosPracticeClient.ScoringLogEntry.Create(
                                     scoringRangeLabel,
                                     _groupId,
-                                    allResults,
+                                    logResults,
                                     _isVariantMode,
                                     _variantSetNo,
                                     completedSnapshot,

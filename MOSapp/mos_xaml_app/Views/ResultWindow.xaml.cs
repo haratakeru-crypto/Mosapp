@@ -96,8 +96,7 @@ namespace MOSExcelMogiApp.Views
         {
             try
             {
-                // 2回目以降の採点も座席表へ送る
-                _seatChartSubmitStarted = false;
+                // 座席表は採点ログ追加時の初回送信のみ。復習後の再採点では送らない（同じ〇回目の重複防止）
                 // UIスレッドで再計算・再描画（連続発火に備えて少しだけ遅延）
                 await Dispatcher.InvokeAsync(async () =>
                 {
