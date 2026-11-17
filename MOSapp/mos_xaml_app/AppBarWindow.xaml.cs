@@ -2593,31 +2593,20 @@ namespace MOSExcelMogiApp
             }
         }
 
-        private async void ReturnToResultButton_Click(object sender, RoutedEventArgs e)
+        private void ReturnToResultButton_Click(object sender, RoutedEventArgs e)
         {
-            Window waitWindow = null;
             var returnButton = sender as Button;
             try
             {
                 if (returnButton != null)
                     returnButton.IsEnabled = false;
 
-                // Excel 終了待ちは数秒かかることがあるため、フリーズ誤認を防ぐ案内を出す（プログレスバーなし）
-                waitWindow = CreateReturnToResultWaitWindow();
-                waitWindow.Owner = this;
-                waitWindow.Show();
-                await Dispatcher.Yield(DispatcherPriority.Render);
-
-                // Quit 後もプロセスが残ると VSTO が再ロードされずログタブが消えるため、
-                // PID を記録して EnsureExcelProcessExited まで完了してから結果画面へ遷移する。
-                await Task.Run(() => CloseExcelForReturnToResult());
-
-                _viewModel?.ClearSharedExcelApplication();
-
-                if (waitWindow != null)
+                // 試験終了・レビュー遷移と同じく、Excel 終了は裏で進め結果画面を先に出す。
+                // 再オープン時は WaitForExcelShutdownToCompleteBeforeOpeningProject がガードする。
+                if (_viewModel != null)
                 {
-                    try { waitWindow.Close(); } catch { /* ignore */ }
-                    waitWindow = null;
+                    _viewModel.FlushCurrentTaskBoundaryBeforeReview();
+                    _viewModel.BeginExcelShutdownForReview();
                 }
 
                 if (_resultWindow != null && !_resultWindow.IsVisible)
@@ -2646,191 +2635,8 @@ namespace MOSExcelMogiApp
             }
             finally
             {
-                if (waitWindow != null)
-                {
-                    try { waitWindow.Close(); } catch { /* ignore */ }
-                }
                 if (returnButton != null)
                     returnButton.IsEnabled = true;
-            }
-        }
-
-        private static Window CreateReturnToResultWaitWindow()
-        {
-            var stack = new StackPanel
-            {
-                Margin = new Thickness(28, 24, 28, 24),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            stack.Children.Add(new TextBlock
-            {
-                Text = "結果画面に戻っています",
-                FontSize = 18,
-                FontWeight = FontWeights.SemiBold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                TextAlignment = TextAlignment.Center,
-                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
-            });
-            stack.Children.Add(new TextBlock
-            {
-                Text = "少々お待ちください。",
-                FontSize = 14,
-                Margin = new Thickness(0, 12, 0, 0),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                TextAlignment = TextAlignment.Center,
-                Foreground = new SolidColorBrush(Color.FromRgb(51, 51, 51))
-            });
-
-            return new Window
-            {
-                Title = "結果画面に戻る",
-                SizeToContent = SizeToContent.WidthAndHeight,
-                MinWidth = 320,
-                WindowStyle = WindowStyle.None,
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                ShowInTaskbar = false,
-                ResizeMode = ResizeMode.NoResize,
-                Topmost = true,
-                Background = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(30, 64, 175)),
-                BorderThickness = new Thickness(2),
-                Content = stack
-            };
-        }
-
-        /// <summary>
-        /// 結果画面に戻る前に Excel を保存して終了し、プロセスが残る場合は PID 単位で確実に終了させる。
-        /// </summary>
-        private static void CloseExcelForReturnToResult()
-        {
-            ExcelApp excelApp = null;
-            int excelPid = -1;
-
-            ExcelVstoReadiness.RecordHostEvent(
-                "return-to-result close begin excelCount="
-                + ExcelApplicationManager.CountExcelProcesses());
-
-            try
-            {
-                try
-                {
-                    excelApp = (ExcelApp)Marshal.GetActiveObject("Excel.Application");
-                }
-                catch (COMException)
-                {
-                    System.Diagnostics.Debug.WriteLine("[ReturnToResult] No Excel application");
-                    ExcelVstoReadiness.RecordHostEvent("return-to-result no-rot");
-                    return;
-                }
-
-                excelPid = ExcelApplicationManager.TryGetExcelProcessId(excelApp);
-                ExcelVstoReadiness.RecordHostEvent("return-to-result rot pid=" + excelPid);
-
-                bool originalDisplayAlerts = true;
-                try
-                {
-                    originalDisplayAlerts = excelApp.DisplayAlerts;
-                }
-                catch
-                {
-                    /* ignore */
-                }
-
-                try
-                {
-                    excelApp.DisplayAlerts = false;
-
-                    var workbooks = excelApp.Workbooks;
-                    foreach (ExcelWorkbook workbook in workbooks)
-                    {
-                        try
-                        {
-                            if (workbook.Path != "")
-                            {
-                                workbook.Save();
-                            }
-                            else
-                            {
-                                workbook.Saved = true;
-                            }
-
-                            Marshal.ReleaseComObject(workbook);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[ReturnToResult] workbook: {ex.Message}");
-                        }
-                    }
-
-                    Marshal.ReleaseComObject(workbooks);
-                }
-                finally
-                {
-                    try
-                    {
-                        excelApp.DisplayAlerts = originalDisplayAlerts;
-                    }
-                    catch
-                    {
-                        /* ignore */
-                    }
-                }
-
-                try
-                {
-                    excelApp.Quit();
-                    ExcelVstoReadiness.RecordHostEvent("return-to-result Quit requested pid=" + excelPid);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ReturnToResult] Quit: {ex.Message}");
-                    ExcelVstoReadiness.RecordHostEvent(
-                        "return-to-result Quit failed pid=" + excelPid
-                        + " error=" + ex.GetType().Name + ":" + ex.Message);
-                }
-
-                // Quit 後の同期 ReleaseComObject はブロックし得るため破棄のみ。
-                ExcelApplicationManager.AbandonComObjectAfterQuit(excelApp, "[ReturnToResult]");
-                excelApp = null;
-
-                const int quitWaitMs = 10000;
-                if (excelPid > 0)
-                {
-                    ExcelApplicationManager.EnsureExcelProcessExited(
-                        excelPid,
-                        quitWaitMs,
-                        5000,
-                        "[ReturnToResult]");
-                }
-                else
-                {
-                    ExcelApplicationManager.WaitForAllExcelProcessesGone(quitWaitMs);
-                }
-
-                ExcelVstoReadiness.RecordHostEvent(
-                    "return-to-result close end pid=" + excelPid
-                    + " alive=" + (ExcelApplicationManager.IsProcessAlive(excelPid) ? "1" : "0")
-                    + " excelCount=" + ExcelApplicationManager.CountExcelProcesses());
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[ReturnToResult] {ex.Message}");
-                ExcelVstoReadiness.RecordHostEvent(
-                    "return-to-result exception error=" + ex.GetType().Name + ":" + ex.Message);
-                if (excelApp != null)
-                {
-                    ExcelApplicationManager.AbandonComObjectAfterQuit(excelApp, "[ReturnToResult]");
-                    excelApp = null;
-                }
-                if (excelPid > 0)
-                {
-                    ExcelApplicationManager.EnsureExcelProcessExited(
-                        excelPid,
-                        10000,
-                        5000,
-                        "[ReturnToResult]");
-                }
             }
         }
     }
