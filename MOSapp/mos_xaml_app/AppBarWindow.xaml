@@ -315,7 +315,7 @@
                     </Grid.RowDefinitions>
                     
                     <!-- ナビゲーション -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,30">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
                         <Button Name="PreviousTaskButton" Width="96" Height="32" 
                                 Background="#D1D5DB" 
                                 BorderThickness="0"
@@ -488,15 +488,16 @@
                             BorderBrush="#E5E7EB" 
                             BorderThickness="1"
                             CornerRadius="8"
-                            Padding="30"
-                            Margin="0,0,0,30">
+                            Padding="28,20,28,18"
+                            Margin="0,0,0,20">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="*"/>
+                                <!-- 2行分を常に確保し、解答済み／終了ボタンの上下位置を固定する -->
+                                <RowDefinition Height="48"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <!-- 上段: 指示テキスト（ウィンドウ高さは固定。長い文は枠内スクロールで全文表示） -->
+                            <!-- 上段: 指示テキスト（省略せず、2行超のみ枠内スクロール） -->
                             <ScrollViewer Grid.Row="0"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled">
@@ -509,7 +510,7 @@
                             </ScrollViewer>
 
                             <!-- 下段: アクションボタン（中央寄せ） -->
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
                                 <Button Name="CompleteButton" Content="解答済みにする" 
                                         Background="Transparent"
                                         Foreground="#1E40AF" 
