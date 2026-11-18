@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using Newtonsoft.Json;
@@ -912,7 +914,10 @@ namespace MOSExcelMogiApp.Views
         private void UpdateTotalScoreDisplay(Dictionary<int, List<bool>> results)
         {
             if (TotalScorePanel == null || TotalScoreTextBlock == null)
+            {
+                UpdateDispositionSummaryDisplay(results);
                 return;
+            }
 
             if (PassingRangeBadge != null)
                 PassingRangeBadge.Visibility = Visibility.Collapsed;
@@ -922,6 +927,7 @@ namespace MOSExcelMogiApp.Views
                 TotalScorePanel.Visibility = Visibility.Collapsed;
                 if (LostPointsTextBlock != null)
                     LostPointsTextBlock.Visibility = Visibility.Collapsed;
+                UpdateDispositionSummaryDisplay(results);
                 return;
             }
 
@@ -950,6 +956,7 @@ namespace MOSExcelMogiApp.Views
             }
 
             UpdateLostPointsDisplay(results);
+            UpdateDispositionSummaryDisplay(results);
         }
 
         /// <summary>全プロジェクト採点時だけ 1000 点満点の総合点を出す（一部採点は未採点を不正解扱いするため）。</summary>
@@ -989,6 +996,76 @@ namespace MOSExcelMogiApp.Views
 
             LostPointsTextBlock.Text = message;
             LostPointsTextBlock.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateDispositionSummaryDisplay(Dictionary<int, List<bool>> results)
+        {
+            TaskReviewState.CountDispositions(
+                results,
+                _completedStates,
+                _flaggedStates,
+                out int completedCount,
+                out int completedWrongCount,
+                out int reviewLaterCount,
+                out int reviewLaterWrongCount);
+
+            if (DispositionSummaryVariantTextBlock != null)
+            {
+                ApplyDispositionSummaryInlines(
+                    DispositionSummaryVariantTextBlock,
+                    completedCount,
+                    completedWrongCount,
+                    reviewLaterCount,
+                    reviewLaterWrongCount,
+                    fontSize: 16,
+                    stackLines: false);
+                DispositionSummaryVariantTextBlock.Visibility =
+                    _isVariantMode ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (DispositionSummaryTextbookTextBlock != null)
+            {
+                ApplyDispositionSummaryInlines(
+                    DispositionSummaryTextbookTextBlock,
+                    completedCount,
+                    completedWrongCount,
+                    reviewLaterCount,
+                    reviewLaterWrongCount,
+                    fontSize: 18,
+                    stackLines: true);
+                DispositionSummaryTextbookTextBlock.Visibility =
+                    _isVariantMode ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        /// <summary>
+        /// 解答済み括弧＝損と同系赤、あとで見直す括弧＝橙。本体はグレー。
+        /// </summary>
+        private static void ApplyDispositionSummaryInlines(
+            TextBlock target,
+            int completedCount,
+            int completedWrongCount,
+            int reviewLaterCount,
+            int reviewLaterWrongCount,
+            double fontSize,
+            bool stackLines)
+        {
+            if (target == null)
+                return;
+
+            var gray = new SolidColorBrush(Color.FromRgb(0x37, 0x41, 0x55));
+            var red = new SolidColorBrush(Color.FromRgb(0xB9, 0x1C, 0x1C));
+            var amber = new SolidColorBrush(Color.FromRgb(0xD9, 0x77, 0x06));
+
+            target.FontSize = fontSize;
+            target.Inlines.Clear();
+            target.Inlines.Add(new Run($"解答済み：{completedCount}問") { Foreground = gray });
+            target.Inlines.Add(new Run($"（うち間違えた問題：{completedWrongCount}問）") { Foreground = red });
+            if (stackLines)
+                target.Inlines.Add(new LineBreak());
+            else
+                target.Inlines.Add(new Run("　") { Foreground = gray });
+            target.Inlines.Add(new Run($"あとで見直す：{reviewLaterCount}問") { Foreground = gray });
+            target.Inlines.Add(new Run($"（うち間違えた問題：{reviewLaterWrongCount}問）") { Foreground = amber });
         }
 
         private string FailReasonFor(int projectId, int taskId)

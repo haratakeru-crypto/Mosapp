@@ -22,9 +22,10 @@ namespace MOSExcelMogiApp.Models
             return isVariantMode && variantSetNo == 1;
         }
 
+        /// <summary>教材・類題とも結果画面に解答済み／あとで見直す列を出す。点数・優先バッジは別ゲート。</summary>
         public static bool ShowDispositionColumns(bool isVariantMode)
         {
-            return isVariantMode;
+            return true;
         }
 
         public static bool ShowLostPoints(bool isVariantMode)
@@ -173,10 +174,29 @@ namespace MOSExcelMogiApp.Models
             Dictionary<int, List<bool>> results,
             Dictionary<int, bool[]> completed)
         {
-            if (results == null || completed == null)
-                return 0;
+            CountDispositions(results, completed, null, out _, out int completedWrongCount, out _, out _);
+            return completedWrongCount;
+        }
 
-            int count = 0;
+        /// <summary>
+        /// 結果に含まれるタスクについて、解答済み／あとで見直すと、それぞれの間違えた問題数を数える。
+        /// </summary>
+        public static void CountDispositions(
+            Dictionary<int, List<bool>> results,
+            Dictionary<int, bool[]> completed,
+            Dictionary<int, bool[]> flagged,
+            out int completedCount,
+            out int completedWrongCount,
+            out int reviewLaterCount,
+            out int reviewLaterWrongCount)
+        {
+            completedCount = 0;
+            completedWrongCount = 0;
+            reviewLaterCount = 0;
+            reviewLaterWrongCount = 0;
+            if (results == null)
+                return;
+
             foreach (var kv in results)
             {
                 if (kv.Value == null)
@@ -184,14 +204,33 @@ namespace MOSExcelMogiApp.Models
 
                 for (int i = 0; i < kv.Value.Count; i++)
                 {
-                    if (kv.Value[i])
-                        continue;
-                    if (GetFlag(completed, kv.Key, i + 1))
-                        count++;
+                    int taskId = i + 1;
+                    bool isWrong = !kv.Value[i];
+                    bool isCompleted = GetFlag(completed, kv.Key, taskId);
+                    bool isFlagged = GetFlag(flagged, kv.Key, taskId);
+                    if (isCompleted)
+                    {
+                        completedCount++;
+                        if (isWrong)
+                            completedWrongCount++;
+                    }
+                    if (isFlagged)
+                    {
+                        reviewLaterCount++;
+                        if (isWrong)
+                            reviewLaterWrongCount++;
+                    }
                 }
             }
+        }
 
-            return count;
+        public static string FormatDispositionSummary(
+            int completedCount,
+            int completedWrongCount,
+            int reviewLaterCount,
+            int reviewLaterWrongCount)
+        {
+            return $"解答済み：{completedCount}問（うち間違えた問題：{completedWrongCount}問）　あとで見直す：{reviewLaterCount}問（うち間違えた問題：{reviewLaterWrongCount}問）";
         }
 
         public static string FormatLostPointsMessage(int completedWrongCount)
