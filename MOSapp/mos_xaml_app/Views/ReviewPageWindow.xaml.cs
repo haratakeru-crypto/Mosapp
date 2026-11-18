@@ -20,6 +20,7 @@ using System.Text;
 using Libraries;
 using MOSExcelMogiApp.Infrastructure;
 using MOSExcelMogiApp.Models;
+using Ui.ViewModels;
 
 namespace MOSExcelMogiApp.Views
 {
@@ -51,6 +52,10 @@ namespace MOSExcelMogiApp.Views
         {
             Interlocked.Exchange(ref _pendingExcelCloseTask, task);
         }
+
+        /// <summary>最終プロジェクト経路などで既に終了処理が積まれているか。</summary>
+        public static bool HasPendingExcelCloseTask =>
+            Volatile.Read(ref _pendingExcelCloseTask) != null;
 
         private static async Task WaitForPendingExcelCloseAsync(string logPrefix)
         {
@@ -750,7 +755,7 @@ namespace MOSExcelMogiApp.Views
                     scoringOverlay = new Window
                     {
                         Title = "採点中",
-                        Width = 360,
+                        Width = 380,
                         MinHeight = 140,
                         SizeToContent = SizeToContent.Height,
                         WindowStyle = WindowStyle.None,
@@ -776,7 +781,7 @@ namespace MOSExcelMogiApp.Views
                         HorizontalAlignment = HorizontalAlignment.Center,
                         TextAlignment = TextAlignment.Center,
                         TextWrapping = TextWrapping.Wrap,
-                        MaxWidth = 300,
+                        MaxWidth = 320,
                         Margin = new Thickness(0, 0, 0, 12),
                         Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
                     };
@@ -787,10 +792,23 @@ namespace MOSExcelMogiApp.Views
                         Maximum = 1,
                         Value = 0,
                         Height = 20,
-                        Width = 300
+                        Width = 320
+                    };
+                    var waitNotice = new TextBlock
+                    {
+                        Text = BatchScoringWaitNotice,
+                        FontSize = 13,
+                        FontWeight = FontWeights.SemiBold,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        TextAlignment = TextAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxWidth = 320,
+                        Margin = new Thickness(0, 12, 0, 0),
+                        Foreground = new SolidColorBrush(Color.FromRgb(31, 41, 55))
                     };
                     stack.Children.Add(text);
                     stack.Children.Add(progress);
+                    stack.Children.Add(waitNotice);
                     scoringOverlay.Content = stack;
                     scoringOverlay.Tag = new ScoringProgressUi { StatusText = text, ProgressBar = progress };
                     scoringOverlay.Show();
@@ -1018,6 +1036,18 @@ namespace MOSExcelMogiApp.Views
                         // 結果ウィンドウを表示
                         resultWindow.Show();
                         resultWindow.Activate();
+
+                        // 元のレビューを閉じ、AppBar の _isOpeningReviewPage を解除する。
+                        // Hide のままだと結果→復習→最終プロジェクト「次へ」でレビュー再表示が早期 return する。
+                        try
+                        {
+                            Close();
+                        }
+                        catch (Exception closeEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                "[ReviewPageWindow] Close after ResultWindow: " + closeEx.Message);
+                        }
                     }, DispatcherPriority.Normal);
 
                     // ResultWindow の初回データ表示完了まで待つ（固定 500ms+1000ms より短く終わることが多い）
@@ -1068,6 +1098,9 @@ namespace MOSExcelMogiApp.Views
 
         private void RestoreAfterScoringFailure(object sender)
         {
+            try { ExcelStartupInputGate.EndBatch(); } catch { }
+            try { ExcelStartupInputGate.EnsureExcelInputEnabled(); } catch { }
+
             _isScoring = false;
             if (sender is Button button)
             {
@@ -1289,6 +1322,9 @@ namespace MOSExcelMogiApp.Views
             }
         }
         
+        private const string BatchScoringWaitNotice =
+            "表示されているファイルは操作せず、そのままお待ちください。";
+
         private sealed class ScoringProgressUi
         {
             public TextBlock StatusText;
@@ -1385,64 +1421,79 @@ namespace MOSExcelMogiApp.Views
                     "ScoreAllProjects.Connect",
                     connectSw.ElapsedMilliseconds,
                     _scoringExcelApp == null ? "missing" : "ok");
+
+                int scoringPid = ExcelApplicationManager.TryGetExcelProcessId(_scoringExcelApp);
+                if (scoringPid <= 0 && _scoringExcelCreatedPid > 0)
+                    scoringPid = _scoringExcelCreatedPid;
+                // 受講者の Excel 操作・閉じを防ぐ（採点オーバーレイと併用、ダイアログは出さない）
+                ExcelStartupInputGate.BeginBatch(scoringPid);
                 
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] Scoring one workbook at a time");
-                for (int idx = 0; idx < projectList.Count; idx++)
+                try
                 {
-                    var project = projectList[idx];
-                    progress?.Invoke(
-                        $"プロジェクト{project.projectId}を採点中（{idx + 1}/{projectList.Count}）",
-                        idx,
-                        projectList.Count);
-
-                    if (string.IsNullOrEmpty(project.filePath) || !File.Exists(project.filePath) || _scoringExcelApp == null)
+                    for (int idx = 0; idx < projectList.Count; idx++)
                     {
-                        SaveAllFalse(project.projectId, project.taskCount, resultScope);
+                        var project = projectList[idx];
                         progress?.Invoke(
-                            FormatProjectScoredProgress(project.projectId, idx + 1, projectList.Count),
-                            idx + 1,
+                            $"プロジェクト{project.projectId}を採点中（{idx + 1}/{projectList.Count}）",
+                            idx,
                             projectList.Count);
-                        continue;
-                    }
 
-                    bool opened = false;
-                    try
-                    {
-                        var projectSw = Stopwatch.StartNew();
-                        opened = OpenProjectWorkbook(project.filePath);
-                        if (!opened)
+                        if (string.IsNullOrEmpty(project.filePath) || !File.Exists(project.filePath) || _scoringExcelApp == null)
                         {
                             SaveAllFalse(project.projectId, project.taskCount, resultScope);
+                            progress?.Invoke(
+                                FormatProjectScoredProgress(project.projectId, idx + 1, projectList.Count),
+                                idx + 1,
+                                projectList.Count);
                             continue;
                         }
 
-                        var results = ExecuteScoringForProject(
-                            project.libraryName,
-                            project.taskCount,
-                            project.filePath,
-                            project.projectId,
-                            out List<string> failReasons);
-                        Models.ExamResultStorage.SaveProjectResult(resultScope, project.projectId, results, failReasons);
-                        ExcelGradingPerf.Log(
-                            "ScoreAllProjects.Project",
-                            projectSw.ElapsedMilliseconds,
-                            $"P{project.projectId}");
-                        Application.Current.Dispatcher.BeginInvoke(new Action(() => { }), DispatcherPriority.Background);
+                        bool opened = false;
+                        try
+                        {
+                            var projectSw = Stopwatch.StartNew();
+                            opened = OpenProjectWorkbook(project.filePath);
+                            if (!opened)
+                            {
+                                SaveAllFalse(project.projectId, project.taskCount, resultScope);
+                                continue;
+                            }
+
+                            var results = ExecuteScoringForProject(
+                                project.libraryName,
+                                project.taskCount,
+                                project.filePath,
+                                project.projectId,
+                                out List<string> failReasons);
+                            Models.ExamResultStorage.SaveProjectResult(resultScope, project.projectId, results, failReasons);
+                            ExcelGradingPerf.Log(
+                                "ScoreAllProjects.Project",
+                                projectSw.ElapsedMilliseconds,
+                                $"P{project.projectId}");
+                            Application.Current.Dispatcher.BeginInvoke(new Action(() => { }), DispatcherPriority.Background);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error scoring project {project.projectId}: {ex.Message}");
+                            SaveAllFalse(project.projectId, project.taskCount, resultScope);
+                        }
+                        finally
+                        {
+                            if (opened)
+                                CloseProjectWorkbook(project.filePath);
+                            progress?.Invoke(
+                                FormatProjectScoredProgress(project.projectId, idx + 1, projectList.Count),
+                                idx + 1,
+                                projectList.Count);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ReviewPageWindow] Error scoring project {project.projectId}: {ex.Message}");
-                        SaveAllFalse(project.projectId, project.taskCount, resultScope);
-                    }
-                    finally
-                    {
-                        if (opened)
-                            CloseProjectWorkbook(project.filePath);
-                        progress?.Invoke(
-                            FormatProjectScoredProgress(project.projectId, idx + 1, projectList.Count),
-                            idx + 1,
-                            projectList.Count);
-                    }
+                }
+                finally
+                {
+                    // CloseExcel 前に必ず入力を復旧する
+                    try { ExcelStartupInputGate.EndBatch(); } catch { }
+                    try { ExcelStartupInputGate.EnsureExcelInputEnabled(scoringPid); } catch { }
                 }
                 
                 System.Diagnostics.Debug.WriteLine("[ReviewPageWindow] All projects scored successfully");
@@ -1454,6 +1505,8 @@ namespace MOSExcelMogiApp.Views
             }
             finally
             {
+                try { ExcelStartupInputGate.EndBatch(); } catch { }
+                try { ExcelStartupInputGate.EnsureExcelInputEnabled(); } catch { }
                 ReleaseScoringWorkbookIndex();
                 ExcelLogReader.ClearLogLinesCache();
             }
@@ -1911,6 +1964,14 @@ namespace MOSExcelMogiApp.Views
 
         private void CloseExcelApplication()
         {
+            try
+            {
+                // Quit 前の保険。一括採点ゲートが残っていても Excel を操作不能のままにしない。
+                ExcelStartupInputGate.EndBatch();
+                ExcelStartupInputGate.EnsureExcelInputEnabled();
+            }
+            catch { }
+
             ReleaseScoringWorkbookIndex();
             ExcelApp excelApp = _scoringExcelApp;
             bool createdBySession = _scoringExcelCreatedBySession;

@@ -3790,24 +3790,20 @@ namespace Ui.ViewModels
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
 
+            // Flush / Excel 終了は AppBar 側で1回だけ行う（二重待ちと AppBar 閉じ遅れを防ぐ）。
             _isSwitchingProject = true;
-            Task shutdown = null;
             try
             {
-                FlushCurrentTaskBoundaryBeforeReview();
-                shutdown = BeginExcelShutdownForReview(() => _isSwitchingProject = false);
-                ReviewPageWindow.SetPendingExcelCloseTask(shutdown);
                 OpenReviewPageRequested?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[ExecuteNextProject] Review transition error: {ex.Message}");
-                _isSwitchingProject = false;
-                return;
             }
-
-            if (shutdown == null)
+            finally
+            {
                 _isSwitchingProject = false;
+            }
         }
 
         private bool TryGetNextVariantProjectPath(out int nextProjectNumber, out string nextFilePath)
