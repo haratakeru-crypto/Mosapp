@@ -12,6 +12,7 @@ namespace Ui.ViewModels
 {
     /// <summary>
     /// Excel はすぐ見せる。対象ブックのアドインが初期基準を終えるまで、その Excel だけを無効にし前面に案内を出す。
+    /// 一括採点中はダイアログなしで入力だけ遮断し、明示的な EndBatch まで解除しない。
     /// </summary>
     internal static class ExcelStartupInputGate
     {
@@ -23,6 +24,7 @@ namespace Ui.ViewModels
         static Window _dialog;
         static Stopwatch _waiting;
         static bool _active;
+        static bool _batchMode;
         static int _targetPid;
         static string _expectedFile;
         static string _openToken;
@@ -59,6 +61,7 @@ namespace Ui.ViewModels
             }
 
             Finish(_active ? "restart" : null);
+            _batchMode = false;
             _expectedFile = expectedFilePath ?? "";
             _openToken = openToken ?? "";
             _targetPid = 0;
@@ -67,6 +70,37 @@ namespace Ui.ViewModels
             ExcelVstoReadiness.RecordHostEvent("gate start file=" + _expectedFile);
             _dialog = CreateDialog();
             _dialog.Show();
+            DisableExcelWindows();
+
+            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMs) };
+            _timer.Tick += OnTick;
+            _timer.Start();
+        }
+
+        /// <summary>
+        /// 一括採点用。ダイアログなし・ready/タイムアウトでは解除せず、EndBatch まで入力を遮断する。
+        /// processId が有効ならその Excel だけを対象にする。
+        /// </summary>
+        public static void BeginBatch(int processId = 0)
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return;
+            if (!dispatcher.CheckAccess())
+            {
+                dispatcher.Invoke(new Action(() => BeginBatch(processId)));
+                return;
+            }
+
+            Finish(_active ? "batch-restart" : null);
+            _batchMode = true;
+            _expectedFile = "";
+            _openToken = "";
+            _targetPid = processId > 0 ? processId : 0;
+            _active = true;
+            _waiting = null;
+            ExcelVstoReadiness.RecordHostEvent(
+                "gate batch start pid=" + _targetPid);
             DisableExcelWindows();
 
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMs) };
@@ -85,9 +119,12 @@ namespace Ui.ViewModels
                 return;
             }
 
-            if (!_active || processId <= 0 || _targetPid == processId)
+            if (!_active || processId <= 0)
+                return;
+
+            if (_targetPid == processId)
             {
-                if (_active && processId > 0 && _targetPid == processId && IsTargetReady(processId))
+                if (!_batchMode && IsTargetReady(processId))
                     Finish("ready");
                 return;
             }
@@ -96,11 +133,12 @@ namespace Ui.ViewModels
             ExcelVstoReadiness.RecordHostEvent(
                 "gate target-pid pid=" + processId
                 + " elapsed=" + ElapsedMs()
-                + "ms file=" + _expectedFile);
+                + "ms file=" + _expectedFile
+                + (_batchMode ? " batch=1" : ""));
             // PID 確定前に無効化した他 Excel も含め、いったん全部戻してから対象だけ落とす。
             RestoreExcelInput(releaseTrackedOnly: false, onlyPid: 0);
             DisableExcelWindows();
-            if (IsTargetReady(processId))
+            if (!_batchMode && IsTargetReady(processId))
                 Finish("ready");
         }
 
@@ -113,7 +151,13 @@ namespace Ui.ViewModels
                 return;
             }
 
-            Finish(_active ? "closed" : null);
+            Finish(_active ? (_batchMode ? "batch-closed" : "closed") : null);
+        }
+
+        /// <summary>一括採点用の明示解除。End と同じく入力を復旧する。</summary>
+        public static void EndBatch()
+        {
+            End();
         }
 
         /// <summary>
@@ -124,11 +168,14 @@ namespace Ui.ViewModels
             var dispatcher = Application.Current?.Dispatcher;
             if (dispatcher != null && !dispatcher.CheckAccess())
             {
-                dispatcher.BeginInvoke(new Action(() => EnsureExcelInputEnabled(processId)));
+                try { dispatcher.Invoke(new Action(() => EnsureExcelInputEnabled(processId))); } catch { }
                 return;
             }
 
-            RestoreExcelInput(releaseTrackedOnly: false, onlyPid: processId);
+            if (_active)
+                Finish("ensure");
+            else
+                RestoreExcelInput(releaseTrackedOnly: false, onlyPid: processId);
         }
 
         static void OnTick(object sender, EventArgs e)
@@ -137,6 +184,9 @@ namespace Ui.ViewModels
                 return;
 
             DisableExcelWindows();
+            if (_batchMode)
+                return;
+
             bool ready = _targetPid > 0 && IsTargetReady(_targetPid);
             bool timedOut = _waiting != null && _waiting.ElapsedMilliseconds >= TimeoutMs;
             if (ready)
@@ -148,11 +198,13 @@ namespace Ui.ViewModels
         static void Finish(string reason)
         {
             bool wasActive = _active;
+            bool wasBatch = _batchMode;
             long elapsed = ElapsedMs();
             int pid = _targetPid;
             string file = _expectedFile;
 
             _active = false;
+            _batchMode = false;
             _targetPid = 0;
             if (_timer != null)
             {
@@ -179,7 +231,8 @@ namespace Ui.ViewModels
                     "gate end reason=" + reason
                     + " elapsed=" + elapsed
                     + "ms pid=" + pid
-                    + " file=" + file);
+                    + " file=" + file
+                    + (wasBatch ? " batch=1" : ""));
                 if (string.Equals(reason, "timeout", StringComparison.OrdinalIgnoreCase)
                     && pid > 0
                     && !ExcelVstoReadiness.HasAnyStartupForProcess(pid))
@@ -238,6 +291,9 @@ namespace Ui.ViewModels
 
         static void DisableExcelWindows()
         {
+            if (!_active)
+                return;
+
             int onlyPid = _targetPid;
             EnumWindows((hWnd, lParam) =>
             {

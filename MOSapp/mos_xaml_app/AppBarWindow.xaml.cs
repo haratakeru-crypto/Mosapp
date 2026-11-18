@@ -1609,26 +1609,73 @@ namespace MOSExcelMogiApp
             }
         }
         
-        private void ReviewPageButton_Click(object sender, RoutedEventArgs e)
+        private async void ReviewPageButton_Click(object sender, RoutedEventArgs e)
         {
             if (_viewModel != null && (_viewModel.IsScoring || _viewModel.IsScoreResultOpen || _viewModel.IsBulkResetInProgress))
                 return;
+
+            // 結果画面後などにフラグだけ残っている場合は、生存レビューが無ければ自己回復する。
             if (_isOpeningReviewPage)
-                return;
+            {
+                var existingReviews = Application.Current.Windows
+                    .OfType<ReviewPageWindow>()
+                    .Where(w => w != null && w.IsLoaded)
+                    .ToList();
+                if (existingReviews.Count > 0)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        "[AppBarWindow] Review open ignored: ReviewPageWindow already exists");
+                    try
+                    {
+                        SuspendChromeWhileHidden();
+                        var review = existingReviews[0];
+                        if (!review.IsVisible)
+                            review.Show();
+                        review.Activate();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[AppBarWindow] Reactivate existing Review failed: " + ex.Message);
+                    }
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine(
+                    "[AppBarWindow] Clearing stale _isOpeningReviewPage (no ReviewPageWindow)");
+                _isOpeningReviewPage = false;
+            }
 
             CloseAnswerGuide();
             _isOpeningReviewPage = true;
+
+            // Excel 終了待ちより先に AppBar を隠し、閉じ遅れに見えないようにする。
+            SuspendChromeWhileHidden();
+
             try
             {
+                bool shutdownAlreadyQueued = ReviewPageWindow.HasPendingExcelCloseTask;
                 if (_viewModel != null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[AppBarWindow] Requesting STA Excel shutdown before review page");
-                    _viewModel.FlushCurrentTaskBoundaryBeforeReview();
-                    ReviewPageWindow.SetPendingExcelCloseTask(_viewModel.BeginExcelShutdownForReview());
+                    if (!shutdownAlreadyQueued)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[AppBarWindow] Requesting STA Excel shutdown before review page");
+                        // UI を塞がないよう境界フラッシュは裏で実行する。
+                        await Task.Run(() => _viewModel.FlushCurrentTaskBoundaryBeforeReview())
+                            .ConfigureAwait(true);
+                        ReviewPageWindow.SetPendingExcelCloseTask(
+                            _viewModel.BeginExcelShutdownForReview());
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            "[AppBarWindow] Excel shutdown already queued; skip duplicate flush");
+                        // 既に MainViewModel 側で積まれた Task を維持（Begin は同一 Task を返す）
+                        ReviewPageWindow.SetPendingExcelCloseTask(
+                            _viewModel.BeginExcelShutdownForReview());
+                    }
                 }
-
-                // メインのバーウィンドウを非表示にし、配置リトライによる再表示も止める
-                SuspendChromeWhileHidden();
                 
                 // Group番号を取得
                 int groupId = 1; // デフォルト
